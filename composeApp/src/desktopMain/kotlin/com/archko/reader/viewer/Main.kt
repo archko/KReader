@@ -1,0 +1,69 @@
+package com.archko.reader.viewer
+
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.singleWindowApplication
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.util.DebugLogger
+import coil3.util.Logger
+import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.pdf.cache.AppDatabase
+import com.archko.reader.pdf.cache.DatabaseDriverFactory
+import com.archko.reader.pdf.cache.DriverFactory
+import com.archko.reader.pdf.util.CustomImageFetcher
+import org.jetbrains.skiko.setSystemLookAndFeel
+
+@OptIn(ExperimentalComposeUiApi::class)
+fun main() {
+    setSystemLookAndFeel()
+
+    singleWindowApplication(
+        title = "Dragon Viewer",
+        state = WindowState(width = 1024.dp, height = 768.dp)
+    ) {
+        setSingletonImageLoaderFactory { context ->
+            ImageLoader.Builder(context)
+                .components { add(CustomImageFetcher.Factory()) }
+                .logger(DebugLogger(minLevel = Logger.Level.Warn))
+                .build()
+        }
+
+        val windowInfo = LocalWindowInfo.current
+        val density = LocalDensity.current
+        var screenWidthInPixels by remember { mutableStateOf(0) }
+        var screenHeightInPixels by remember { mutableStateOf(0) }
+        density.run {
+            screenWidthInPixels = windowInfo.containerSize.width.toDp().toPx().toInt()
+            screenHeightInPixels = windowInfo.containerSize.height.toDp().toPx().toInt()
+        }
+        println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
+
+        val driverFactory: DatabaseDriverFactory = DriverFactory()
+        val database = AppDatabase(driverFactory.createDriver())
+
+        val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
+        CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
+            val viewModel: PdfViewModel = viewModel()
+            viewModel.database = database
+            Application(screenWidthInPixels, screenHeightInPixels, viewModel)
+        }
+
+    }
+}
+
+class ComposeViewModelStoreOwner : ViewModelStoreOwner {
+    override val viewModelStore: ViewModelStore = ViewModelStore()
+}

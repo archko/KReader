@@ -13,10 +13,10 @@ kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
-    
+
     /*listOf(
         iosX64(),
         iosArm64(),
@@ -27,27 +27,38 @@ kotlin {
             isStatic = true
         }
     }*/
-    
+
     jvm("desktop")
-    
+
     sourceSets {
         val desktopMain by getting
-        
+
         androidMain.dependencies {
-            implementation(compose.preview)
+            //implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
+            implementation(project(":lib"))
+
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material)
+            implementation(compose.material3)
             implementation(compose.ui)
+            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodel)
-            implementation(libs.androidx.lifecycle.runtime.compose)
+            //implementation(compose.components.uiToolingPreview)
+            implementation(libs.jetbrains.lifecycle.viewmodel)
+            implementation(libs.jetbrains.lifecycle.runtime.compose)
+
+            implementation(libs.filePicker)
+            implementation(libs.mmkv)
+
+            api(libs.coil.kt)
+            api(libs.coil.kt.compose)
+            api(libs.coil.kt.okhttp)
         }
         desktopMain.dependencies {
+            implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }
@@ -76,8 +87,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -90,9 +101,22 @@ compose.desktop {
         mainClass = "com.archko.reader.viewer.MainKt"
 
         nativeDistributions {
+            modules("java.instrument", "java.sql", "jdk.unsupported")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.archko.reader.kreader"
+            packageName = "Dragon Viewer"
             packageVersion = "1.0.0"
         }
+    }
+}
+tasks.withType<JavaExec> {
+    doFirst {
+        val libDir = "${projectDir}/src/commonMain/resources/macos-aarch64"
+        val existingPath = System.getProperty("java.library.path")
+        val newPath = if (existingPath.isNullOrEmpty()) {
+            libDir
+        } else {
+            "$existingPath:$libDir"
+        }
+        systemProperty("java.library.path", newPath)
     }
 }

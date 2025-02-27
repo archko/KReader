@@ -3,6 +3,11 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
     repositories {
+
+        mavenLocal()
+        maven {
+            url = uri("https://jitpack.io")
+        }
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")
@@ -12,11 +17,17 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        google()
     }
 }
 
 dependencyResolutionManagement {
     repositories {
+
+        mavenLocal()
+        maven {
+            url = uri("https://jitpack.io")
+        }
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")
@@ -25,7 +36,9 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        google()
     }
 }
 
+include(":lib")
 include(":composeApp")
