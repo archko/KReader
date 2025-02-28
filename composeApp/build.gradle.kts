@@ -17,24 +17,12 @@ kotlin {
         }
     }
 
-    /*listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
-        }
-    }*/
-
     jvm("desktop")
 
     sourceSets {
         val desktopMain by getting
 
         androidMain.dependencies {
-            //implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
@@ -46,7 +34,6 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
-            //implementation(compose.components.uiToolingPreview)
             implementation(libs.jetbrains.lifecycle.viewmodel)
             implementation(libs.jetbrains.lifecycle.runtime.compose)
 
@@ -108,15 +95,30 @@ compose.desktop {
         }
     }
 }
+
+// 根据操作系统和架构设置 java.library.path
 tasks.withType<JavaExec> {
     doFirst {
-        val libDir = "${projectDir}/src/commonMain/resources/macos-aarch64"
-        val existingPath = System.getProperty("java.library.path")
-        val newPath = if (existingPath.isNullOrEmpty()) {
-            libDir
-        } else {
-            "$existingPath:$libDir"
+        val osName = System.getProperty("os.name").toLowerCase()
+        val arch = System.getProperty("os.arch").toLowerCase()
+
+        var libDir: String? = null
+        if (osName.contains("mac")) {
+            if (arch.contains("aarch64") || arch.contains("arm64")) {
+                libDir = "${projectDir}/src/commonMain/resources/macos-aarch64"
+            } else if (arch.contains("x86_64")) {
+                libDir = "${projectDir}/src/commonMain/resources/macos-x64"
+            }
         }
-        systemProperty("java.library.path", newPath)
+
+        if (libDir != null) {
+            val existingPath = System.getProperty("java.library.path")
+            val newPath = if (existingPath.isNullOrEmpty()) {
+                libDir
+            } else {
+                "$existingPath:$libDir"
+            }
+            systemProperty("java.library.path", newPath)
+        }
     }
 }
