@@ -29,6 +29,7 @@ mmkv = "1.3.4"
 gson = "2.10.1"
 sqlDelight = "2.0.2"
 core = "1.15.0"
+lifecycleViewmodelComposeAndroid = "2.8.7"
 
 [libraries]
 android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "androidDriver" }
@@ -45,6 +46,7 @@ mupdf-fitz = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitz
 jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "jetbrains-lifecycle" }
 jetbrains-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
 jetbrains-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "jetbrains-lifecycle" }
+androidx-lifecycle-viewmodel-compose-android = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose-android", version.ref = "lifecycleViewmodelComposeAndroid" }
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 
 mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
