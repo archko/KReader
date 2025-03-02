@@ -16,6 +16,11 @@ import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.util.BitmapUtils
+import com.artifex.mupdf.fitz.Cookie
+import com.artifex.mupdf.fitz.Document
+import com.artifex.mupdf.fitz.Matrix
+import com.artifex.mupdf.fitz.Page
+import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -62,7 +67,8 @@ public class CustomImageFetcher(
     override suspend fun fetch(): FetchResult {
         var bitmap = loadBitmapFromCache()
         if (bitmap == null) {
-            bitmap = decodePdfSys()
+            //bitmap = decodePdfSys()
+            bitmap = decodeMuPdf()
         }
 
         if (bitmap == null) {
@@ -78,6 +84,36 @@ public class CustomImageFetcher(
             dataSource = DataSource.MEMORY,
             isSampled = false
         )
+    }
+
+    private fun decodeMuPdf(): Bitmap? {
+        var document: Document = Document.openDocument(data.path)
+
+        val bitmap = if (document.countPages() > 0)
+            renderPdfPage(
+                document.loadPage(0),
+                data.width,
+                data.height
+            ) else null
+        return bitmap
+    }
+
+    private fun renderPdfPage(page: Page, width: Int, height: Int): Bitmap {
+        val pWidth = page.bounds.x1 - page.bounds.x0
+        val pHeight = page.bounds.y1 - page.bounds.y0
+        val ctm = Matrix()
+        val xscale = 1f * width / pWidth
+        val yscale = 1f * height / pHeight
+        val size = caculateSize(pWidth.toInt(), pHeight.toInt(), width, height)
+
+        ctm.scale(xscale, yscale)
+        val bitmap = BitmapPool.acquire(size.width, size.height)
+        val dev =
+            AndroidDrawDevice(bitmap, 0, 0, 0, 0, bitmap.getWidth(), bitmap.getHeight())
+        page.run(dev, ctm, null as Cookie?)
+        dev.close()
+        dev.destroy()
+        return bitmap
     }
 
     private fun decodePdfSys(): Bitmap? {

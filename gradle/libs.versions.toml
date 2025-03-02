@@ -25,6 +25,7 @@ kotlinx-coroutines = "1.10.1"
 
 calf = "0.7.0"
 mupdfFitz = "1.25.1"
+mupdfFitzAar = "1.25.0"
 mmkv = "1.3.4"
 gson = "2.10.1"
 sqlDelight = "2.0.2"
@@ -42,6 +43,7 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 filePicker = { module = "com.mohamedrejeb.calf:calf-file-picker", version.ref = "calf" }
 mupdf-fitz = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitz" }
+mupdf-fitz-aar = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitzAar" }
 
 jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "jetbrains-lifecycle" }
 jetbrains-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
