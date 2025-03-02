@@ -23,6 +23,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.android.driver)
+            implementation(libs.androidx.core)
         }
         commonMain {
             dependencies {

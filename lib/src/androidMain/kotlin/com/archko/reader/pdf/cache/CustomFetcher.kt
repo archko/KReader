@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
-import androidx.core.graphics.createBitmap
 import coil3.BitmapImage
 import coil3.ImageLoader
 import coil3.asImage
@@ -44,7 +43,7 @@ public class CustomImageFetcher(
         val buffer = ByteBuffer.allocate(bitmap.getByteCount())
         bitmap.copyPixelsToBuffer(buffer)
         buffer.position(0)
-        bmp.copyPixelsFromBuffer(buffer);
+        bmp.copyPixelsFromBuffer(buffer)
         BitmapUtils.saveBitmapToFile(bmp, File(path))
     }
 
@@ -60,14 +59,14 @@ public class CustomImageFetcher(
         return bmp
     }
 
-    override suspend fun fetch(): FetchResult? {
+    override suspend fun fetch(): FetchResult {
         var bitmap = loadBitmapFromCache()
         if (bitmap == null) {
             bitmap = decodePdfSys()
         }
 
         if (bitmap == null) {
-            bitmap = createBitmap(data.width, data.height, Bitmap.Config.RGB_565)
+            bitmap = Bitmap.createBitmap(data.width, data.height, Bitmap.Config.RGB_565)
         } else {
             cacheBitmap(bitmap)
         }
