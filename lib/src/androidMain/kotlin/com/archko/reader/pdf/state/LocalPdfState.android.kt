@@ -6,8 +6,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.painter.Painter
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
@@ -81,9 +79,13 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         pageSizes = prepareSizes()
     }*/
 
-    public actual override fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): Painter {
+    public actual override fun renderPage(
+        index: Int,
+        viewWidth: Int,
+        viewHeight: Int
+    ): ImageBitmap {
         if (viewWidth <= 0) {
-            return BitmapPainter(ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
+            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
         }
         val page = document.loadPage(index)
         val bounds = page.bounds
@@ -101,7 +103,7 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         dev.close()
         dev.destroy()
 
-        return BitmapPainter(bitmap.asImageBitmap())
+        return (bitmap.asImageBitmap())
     }
 
     override fun close() {

@@ -1,6 +1,6 @@
 package com.archko.reader.pdf.component
 
-import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.ImageBitmap
 
 private const val MAX_IMAGE_COUNT = 3
 
@@ -9,14 +9,13 @@ private const val MAX_IMAGE_COUNT = 3
  */
 // 定义 ImageCache 类
 public object ImageCache {
-    private val cache = mutableMapOf<String, Painter>()
+    private val cache = mutableMapOf<String, ImageBitmap>()
 
-    public fun get(key: String): Painter? {
+    public fun get(key: String): ImageBitmap? {
         return cache[key]
     }
 
-    public fun put(key: String, painter: Painter) {
-        println("put:${cache.size}, key->$key")
+    public fun put(key: String, painter: ImageBitmap) {
         if (cache.size > MAX_IMAGE_COUNT) {
             cache.clear()
         }

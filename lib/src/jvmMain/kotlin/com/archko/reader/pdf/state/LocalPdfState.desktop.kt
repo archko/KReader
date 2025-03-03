@@ -5,8 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
@@ -86,14 +84,18 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         pageSizes = prepareSizes()
     }*/
 
-    public actual override fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): Painter {
+    public actual override fun renderPage(
+        index: Int,
+        viewWidth: Int,
+        viewHeight: Int
+    ): ImageBitmap {
         val page = document.loadPage(index)
         val bounds = page.bounds
         val scale: Float
         if (viewWidth > 0) {
             scale = (1f * viewWidth / (bounds.x1 - bounds.x0))
         } else {
-            return BitmapPainter(ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
+            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
         }
         println("renderPage:index:$index, scale:$scale, $viewWidth-$viewHeight, bounds:${page.bounds}")
         val ctm: Matrix = Matrix.Scale(scale)
@@ -114,12 +116,12 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
             val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
             image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
             bmp = image.toComposeImageBitmap()
-            return BitmapPainter(bmp)
+            return (bmp)
         } catch (e: Exception) {
             System.err.println(("Error loading page " + (index + 1)) + ": " + e)
         }
 
-        return BitmapPainter(ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
+        return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
     }
 
     override fun close() {

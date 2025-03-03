@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.state
 
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.Painter
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
@@ -20,5 +21,5 @@ public interface PdfState : AutoCloseable {
      * @param index the page number to render
      * @return [Painter]
      */
-    public fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): Painter
+    public fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): ImageBitmap
 }

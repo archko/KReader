@@ -22,7 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -75,7 +76,7 @@ public fun PdfPage(
     },
     errorIndicator: @Composable () -> Unit = {
         Image(
-            painter = state.renderPage(index, width, height),
+            painter = BitmapPainter(state.renderPage(index, width, height)),
             contentDescription = null,
             colorFilter = if (errorIconTint ==
                 Color.Unspecified
@@ -91,7 +92,9 @@ public fun PdfPage(
 ) {
     //val loadState = if (state is RemotePdfState) state.loadState else LoadState.Success
     val cacheKey = "$index-$width-$height"
-    val imageState: MutableState<Painter?> = remember { mutableStateOf(ImageCache.get(cacheKey)) }
+    val imageState: MutableState<ImageBitmap?> =
+        remember { mutableStateOf(ImageCache.get(cacheKey)) }
+    println("PdfPage: cacheKey:$cacheKey, ${imageState.value}")
     if (imageState.value == null) {
         loadingIndicator()
 
@@ -108,8 +111,8 @@ public fun PdfPage(
                     .collectLatest {
                         if (it != null) {
                             ImageCache.put(cacheKey, it)
+                            imageState.value = it
                         }
-                        imageState.value = it
                     }
             }
             onDispose {
@@ -119,7 +122,7 @@ public fun PdfPage(
         }
     } else {
         Image(
-            painter = imageState.value!!,
+            painter = BitmapPainter(imageState.value!!),
             contentDescription = null,
             contentScale = ContentScale.FillWidth
         )

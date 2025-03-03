@@ -2,6 +2,7 @@ package com.archko.reader.pdf.state
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.Painter
 import java.io.File
 import java.net.URL
@@ -10,7 +11,7 @@ import java.net.URL
 public expect class LocalPdfState public constructor(file: File) : PdfState {
     public override var pageCount: Int
 
-    public override fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): Painter
+    public override fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): ImageBitmap
 }
 
 /**

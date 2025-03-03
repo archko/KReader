@@ -362,7 +362,7 @@ private fun PdfScreen(
                 actions = {
                     IconButton(onClick = {
                         scope.launch {
-                            ImageCache.clear()
+                            //ImageCache.clear()
                             tocVisibile.value = !tocVisibile.value
                             if (!tocVisibile.value) {
                                 focusRequester1.requestFocus()
@@ -585,17 +585,17 @@ private fun PdfScreen(
         }
 
         if (tocVisibile.value) {
-            Row(
+            Box(
                 modifier = Modifier.fillMaxSize()
                     .background(Color.Transparent)
             ) {
+                screen()
                 toc()
-                HorizontalDivider(
+                /*HorizontalDivider(
                     modifier = Modifier.width(1.dp),
                     thickness = 1.dp,
                     color = Color.Gray,
-                )
-                screen()
+                )*/
             }
         } else {
             screen()
