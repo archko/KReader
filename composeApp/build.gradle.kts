@@ -24,6 +24,7 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.lifecycle.viewmodel.compose.android)
         }
         commonMain.dependencies {
             implementation(project(":lib"))

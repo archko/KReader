@@ -1,54 +1,49 @@
 package com.archko.reader.pdf.cache
 
 import android.graphics.Bitmap
-import androidx.core.graphics.createBitmap
 import androidx.core.util.Pools
 
 /**
  * Created by archko on 16/12/24.
  */
 public object BitmapPool {
-    private val simplePool: FixedSimplePool<Bitmap>?
-
-    init {
-        simplePool = FixedSimplePool<Bitmap>(18)
-    }
+    private val simplePool: FixedSimplePool<Bitmap> = FixedSimplePool(18)
 
     public fun acquire(width: Int, height: Int): Bitmap {
-        var bitmap = simplePool!!.acquire()
+        var bitmap = simplePool.acquire()
         if (null != bitmap && bitmap.isRecycled()) {
             bitmap = simplePool.acquire()
         }
         if (null == bitmap) {
-            bitmap = createBitmap(width, height)
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         } else {
             if (bitmap.getHeight() == height && bitmap.getWidth() == width) {
                 //Log.d("TAG", String.format("use cache:%s-%s-%s%n", width, height, simplePool.mPoolSize));
                 bitmap.eraseColor(0)
             } else {
-                bitmap = createBitmap(width, height)
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             }
         }
         return bitmap
     }
 
     public fun acquire(width: Int, height: Int, config: Bitmap.Config): Bitmap {
-        var bitmap = simplePool!!.acquire()
+        var bitmap = simplePool.acquire()
         if (null != bitmap && bitmap.isRecycled()) {
             bitmap = simplePool.acquire()
         }
         if (null == bitmap) {
-            bitmap = createBitmap(width, height, config)
+            bitmap = Bitmap.createBitmap(width, height, config)
         } else {
             if (bitmap.getConfig() == config) {
                 if (bitmap.getHeight() == height && bitmap.getWidth() == width) {
                     //Log.d("TAG", String.format("use cache:%s-%s-%s%n", width, height, simplePool.mPoolSize));
                     bitmap.eraseColor(0)
                 } else {
-                    bitmap = createBitmap(width, height, config)
+                    bitmap = Bitmap.createBitmap(width, height, config)
                 }
             } else {
-                bitmap = createBitmap(width, height, config)
+                bitmap = Bitmap.createBitmap(width, height, config)
             }
         }
         return bitmap
@@ -58,7 +53,7 @@ public object BitmapPool {
         if (null == bitmap || bitmap.isRecycled()) {
             return
         }
-        val isRelease = simplePool!!.release(bitmap)
+        val isRelease = simplePool.release(bitmap)
         if (!isRelease) {
             println("recycle bitmap:" + bitmap)
             bitmap.recycle()
@@ -67,11 +62,9 @@ public object BitmapPool {
 
     @Synchronized
     public fun clear() {
-        if (null != simplePool) {
-            var bitmap: Bitmap?
-            while ((simplePool.acquire().also { bitmap = it }) != null) {
-                bitmap!!.recycle()
-            }
+        var bitmap: Bitmap?
+        while ((simplePool.acquire().also { bitmap = it }) != null) {
+            bitmap!!.recycle()
         }
         //simplePool = null;
     }
@@ -81,12 +74,6 @@ public object BitmapPool {
 
         private var mPoolSize = 0
 
-        /**
-         * Creates a new instance.
-         *
-         * @param maxPoolSize The max pool size.
-         * @throws IllegalArgumentException If the max pool size is less than zero.
-         */
         init {
             require(maxPoolSize > 0) { "The max pool size must be > 0" }
             mPool = arrayOfNulls<Any>(maxPoolSize)
