@@ -1,6 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Locale
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -100,8 +101,8 @@ compose.desktop {
 // 根据操作系统和架构设置 java.library.path
 tasks.withType<JavaExec> {
     doFirst {
-        val osName = System.getProperty("os.name").toLowerCase()
-        val arch = System.getProperty("os.arch").toLowerCase()
+        val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
+        val arch = System.getProperty("os.arch").lowercase(Locale.getDefault())
 
         var libDir: String? = null
         if (osName.contains("mac")) {
@@ -123,3 +124,34 @@ tasks.withType<JavaExec> {
         }
     }
 }
+
+// 排除 dylib 文件被打进 JAR
+tasks.withType<Jar> {
+    exclude("macos-aarch64/**")
+    exclude("macos-x64/**")
+}
+
+// 复制 dylib 文件到 JAR 输出目录
+tasks.register<Copy>("copyDylibFiles") {
+    val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
+    val arch = System.getProperty("os.arch").lowercase(Locale.getDefault())
+
+    if (osName.contains("mac")) {
+        if (arch.contains("aarch64") || arch.contains("arm64")) {
+            from("src/commonMain/resources/macos-aarch64")
+        } else if (arch.contains("x86_64")) {
+            from("src/commonMain/resources/macos-x64")
+        }
+    }
+    // 目标路径为.app包内的目录
+    val targetDir = layout.buildDirectory.dir("app").get().asFile
+    into(targetDir)
+
+    // 确保目标目录存在
+    doFirst {
+        targetDir.mkdirs()
+    }
+}
+
+// 确保此任务在打包应用之前运行
+tasks.named("assemble") { dependsOn("copyDylibFiles") }
