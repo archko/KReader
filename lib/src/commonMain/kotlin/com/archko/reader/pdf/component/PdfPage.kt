@@ -161,7 +161,7 @@ public fun PdfPage(
         Row(
             modifier = Modifier
                 .width(with(LocalDensity.current) { width.toDp() })
-                //.height(with(LocalDensity.current) { subHeight.toDp() })
+                .height(with(LocalDensity.current) { subHeight.toDp() })
         ) {
             // 左上角子页面
             PdfSubPage(

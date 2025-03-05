@@ -2,12 +2,14 @@ package com.archko.reader.viewer
 
 import android.net.Uri
 import android.text.TextUtils
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +70,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -295,12 +298,22 @@ private fun PdfScreen(
     var width by remember { mutableIntStateOf(screenWidth) }
     var height by remember { mutableIntStateOf(screenHeight) }
     val tocVisibile = remember { mutableStateOf(false) }
+    val showTopBar = remember { mutableStateOf(false) }
     val currentPage by remember {
         derivedStateOf { lazyListState.firstVisibleItemIndex + 1 }
     }
     val scrollbarState = lazyListState.scrollbarState(
         itemsAvailable = pdf.pageCount,
     )
+
+    // 处理系统后退手势
+    BackHandler(enabled = true) {
+        if (showTopBar.value) {
+            showTopBar.value = false
+        } else {
+            onClickBack()
+        }
+    }
 
     // 在组合完成后请求焦点
     LaunchedEffect(Unit) {
@@ -336,51 +349,52 @@ private fun PdfScreen(
     }
 
     Scaffold(
-        //modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                modifier = Modifier.background(Color.White),
-                title = {
-                    Column {
-                        Text(
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = Color.White,
-                            text = "${viewModel.progress?.path}"
-                        )
-                        Text(
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            text = "$currentPage/${pdf.pageCount}"
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onClickBack) {
-                        Icon(Icons.Default.Close, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        scope.launch {
-                            ImageCache.clear()
-                            tocVisibile.value = !tocVisibile.value
+            if (showTopBar.value) {
+                TopAppBar(
+                    modifier = Modifier.background(Color.White),
+                    title = {
+                        Column {
+                            Text(
+                                fontSize = 16.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = Color.White,
+                                text = "${viewModel.progress?.path}"
+                            )
+                            Text(
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                text = "$currentPage/${pdf.pageCount}"
+                            )
                         }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
-                    }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onClickBack) {
+                            Icon(Icons.Default.Close, contentDescription = null)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            scope.launch {
+                                ImageCache.clear()
+                                tocVisibile.value = !tocVisibile.value
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
+                        }
 
-                    IconButton(onClick = { scale -= 0.1f }) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = null)
-                    }
+                        IconButton(onClick = { scale -= 0.1f }) {
+                            Icon(Icons.Default.ZoomOut, contentDescription = null)
+                        }
 
-                    IconButton(onClick = { scale += 0.1f }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = null)
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
+                        IconButton(onClick = { scale += 0.1f }) {
+                            Icon(Icons.Default.ZoomIn, contentDescription = null)
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
         //snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
@@ -391,11 +405,17 @@ private fun PdfScreen(
                     .fillMaxSize()
                     .background(Color.Transparent)
                     .padding(paddingValues)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                showTopBar.value = !showTopBar.value
+                            }
+                        )
+                    }
             ) {
                 PdfColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        //.padding(end = 8.dp) // 为滚动条留出空间
                         .onSizeChanged {
                             width = it.width
                             height = it.height
@@ -449,7 +469,6 @@ private fun PdfScreen(
                                 return@onKeyEvent false // 返回 false 表示事件未处理
                             }
                         },
-                    //.scale(scale),
                     viewWidth = width,
                     viewHeight = height,
                     state = pdf,
