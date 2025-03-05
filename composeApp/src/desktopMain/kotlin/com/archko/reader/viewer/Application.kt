@@ -25,21 +25,23 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Toc
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -76,6 +78,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -85,16 +90,16 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
-import com.archko.reader.pdf.entity.CustomImageData
-import com.archko.reader.pdf.state.PdfState
-import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.component.ImageCache
 import com.archko.reader.pdf.component.PdfColumn
+import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.scrollbar.DraggableScrollbar
 import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
+import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.util.inferName
+import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
@@ -102,6 +107,7 @@ import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 
 @Composable
 fun Application(
@@ -271,6 +277,45 @@ private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchTextField(scope: CoroutineScope) {
+    var text by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+
+    TextField(
+        value = text,
+        maxLines = 1,
+        onValueChange = { newText ->
+            text = newText
+        },
+        modifier = Modifier
+            .width(160.dp)
+            .focusRequester(focusRequester),
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search"
+            )
+        },
+        placeholder = {
+            Text(text = "")
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Text,
+            imeAction = ImeAction.Search
+        ),
+        keyboardActions = KeyboardActions(
+            onSearch = {
+                // 在这里添加搜索逻辑，比如打印搜索内容
+                println("Searching for: ${text.lowercase(Locale.getDefault())}")
+                focusManager.clearFocus()
+            }
+        )
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 private fun PdfScreen(
@@ -282,12 +327,9 @@ private fun PdfScreen(
     viewModel: PdfViewModel,
     lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val snackbarHostState = remember { SnackbarHostState() }
     var scale by rememberSaveable { mutableFloatStateOf(1f) }
     val lazyListState = rememberLazyListState()
     val tocLazyListState = rememberLazyListState()
-    // 创建一个 FocusRequester 用于请求焦点
     val focusRequester1 = FocusRequester()
     var width by remember { mutableIntStateOf(screenWidth) }
     var height by remember { mutableIntStateOf(screenHeight) }
@@ -333,58 +375,7 @@ private fun PdfScreen(
         }
     }
 
-    Scaffold(
-        //modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                modifier = Modifier.background(Color.White),
-                title = {
-                    Column {
-                        Text(
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = Color.White,
-                            text = "${viewModel.progress?.path}"
-                        )
-                        Text(
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            text = "$currentPage/${pdf.pageCount}"
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onClickBack) {
-                        Icon(Icons.Default.Close, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        scope.launch {
-                            //ImageCache.clear()
-                            tocVisibile.value = !tocVisibile.value
-                            if (!tocVisibile.value) {
-                                focusRequester1.requestFocus()
-                            }
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
-                    }
-
-                    IconButton(onClick = { scale -= 0.1f }) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = null)
-                    }
-
-                    IconButton(onClick = { scale += 0.1f }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = null)
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        },
-        //snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
+    Scaffold(modifier = Modifier.background(Color.White)) { paddingValues ->
         @Composable
         fun screen() {
             Box(
@@ -465,23 +456,6 @@ private fun PdfScreen(
                     state = pdf,
                     lazyListState = lazyListState
                 )
-                /*VerticalScrollbar(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(8.dp)
-                        .fillMaxHeight(),
-                    adapter = rememberScrollbarAdapter(
-                        scrollState = lazyListState
-                    ),
-                    style = androidx.compose.foundation.ScrollbarStyle(
-                        minimalHeight = 16.dp,
-                        thickness = 8.dp,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                        hoverDurationMillis = 300,
-                        hoverColor = Color.LightGray.copy(alpha = 0.8f),
-                        unhoverColor = Color.LightGray.copy(alpha = 0.4f)
-                    )
-                )*/
                 lazyListState.DraggableScrollbar(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -523,10 +497,9 @@ private fun PdfScreen(
                     }
                 }
                 LazyColumn(
-                    modifier = Modifier.width(240.dp)
+                    modifier = Modifier.width(300.dp)
                         .background(Color.White)
                         .fillMaxHeight()
-                        //.hoverable(enabled = true, interactionSource = MutableInteractionSource())
                         .focusable(),
                     state = tocLazyListState,
                 ) {
@@ -584,21 +557,78 @@ private fun PdfScreen(
             }
         }
 
-        if (tocVisibile.value) {
-            Box(
-                modifier = Modifier.fillMaxSize()
-                    .background(Color.Transparent)
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                screen()
-                toc()
-                /*HorizontalDivider(
-                    modifier = Modifier.width(1.dp),
-                    thickness = 1.dp,
-                    color = Color.Gray,
-                )*/
+                // 左边部分，使用 Modifier.weight 让其可伸缩
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onClickBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                    Column(
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            fontSize = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = Color.White,
+                            text = "${viewModel.progress?.path}"
+                        )
+                        Text(
+                            fontSize = 16.sp,
+                            color = Color.White,
+                            text = "$currentPage/${pdf.pageCount}"
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            //ImageCache.clear()
+                            tocVisibile.value = !tocVisibile.value
+                            if (!tocVisibile.value) {
+                                focusRequester1.requestFocus()
+                            }
+                        }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
+                    }
+                    SearchTextField(scope)
+                    IconButton(onClick = { scale -= 0.1f }) {
+                        Icon(Icons.Default.ZoomOut, contentDescription = null)
+                    }
+
+                    IconButton(onClick = { scale += 0.1f }) {
+                        Icon(Icons.Default.ZoomIn, contentDescription = null)
+                    }
+                }
             }
-        } else {
-            screen()
+            if (tocVisibile.value) {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(Color.Transparent)
+                ) {
+                    screen()
+                    toc()
+                    /*HorizontalDivider(
+                        modifier = Modifier.width(1.dp),
+                        thickness = 1.dp,
+                        color = Color.Gray,
+                    )*/
+                }
+            } else {
+                screen()
+            }
         }
     }
 }
