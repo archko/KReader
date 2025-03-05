@@ -1,6 +1,7 @@
 package com.archko.reader.viewer
 
 import android.net.Uri
+import android.text.TextUtils
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,7 +34,6 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -97,7 +97,6 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 @Composable
@@ -208,7 +207,10 @@ private fun loadProgress(
     pdf: PdfState?
 ) {
     if (pdf != null && file.uri.lastPathSegment != null) {
-        val path = IntentFile.getPath(PdfApp.app!!, file.uri)
+        var path = IntentFile.getPath(PdfApp.app!!, file.uri)
+        if (TextUtils.isEmpty(path)) {
+            path = file.uri.toString()
+        }
         path?.run {
             viewModel.insertOrUpdate(path.toString(), pdf.pageCount.toLong())
         }
