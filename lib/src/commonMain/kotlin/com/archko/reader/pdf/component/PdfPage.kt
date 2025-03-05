@@ -5,13 +5,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
@@ -42,6 +47,65 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
+private fun PdfSubPage(
+    state: PdfState,
+    index: Int,
+    width: Int,
+    height: Int,
+    xOffset: Int,
+    yOffset: Int,
+    modifier: Modifier = Modifier,
+    loadingIconTint: Color = Color.White,
+    errorIconTint: Color = Color.Red,
+    iconSize: Dp = 40.dp,
+    loadingIndicator: @Composable () -> Unit = {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(loadingIconTint)
+        ) {
+        }
+    },
+) {
+    val cacheKey = "$index-$width-$height-$xOffset-$yOffset"
+    val imageState: MutableState<ImageBitmap?> = remember { mutableStateOf(ImageCache.get(cacheKey)) }
+
+    if (imageState.value == null) {
+        loadingIndicator()
+        DisposableEffect(index, width, height, xOffset, yOffset) {
+            val scope = CoroutineScope(SupervisorJob())
+            scope.launch {
+                snapshotFlow {
+                    if (isActive) {
+                        return@snapshotFlow state.renderPageRegion(index, width, height, xOffset, yOffset)
+                    } else {
+                        return@snapshotFlow null
+                    }
+                }.flowOn(Dispatcher.DECODE)
+                    .collectLatest {
+                        if (it != null) {
+                            ImageCache.put(cacheKey, it)
+                            imageState.value = it
+                        }
+                    }
+            }
+            onDispose {
+                scope.cancel()
+            }
+        }
+    } else {
+        Image(
+            painter = BitmapPainter(imageState.value!!),
+            contentDescription = null,
+            contentScale = ContentScale.FillWidth,
+            modifier = modifier
+                .width(with(LocalDensity.current) { width.toDp() })
+                .height(with(LocalDensity.current) { height.toDp() })
+        )
+    }
+}
+
+@Composable
 public fun PdfPage(
     state: PdfState,
     index: Int,
@@ -57,7 +121,6 @@ public fun PdfPage(
             val size = state.pageSizes[index]
             val xscale = 1f * width / size.width
             h = (size.height * xscale).toInt()
-            println("PdfPage: image>height:$h, view.w-h:$width-$height, page:${size.width}-${size.height}")
         } else {
             h = height
         }
@@ -66,80 +129,84 @@ public fun PdfPage(
         }
         Box(modifier = modifier.fillMaxWidth().height(hdp).background(loadingIconTint)) {
             LoadingView("Page $index / ${state.pageCount}")
-            /*Text(
-                modifier = Modifier.align(Alignment.Center),
-                color = Color.Black,
-                fontSize = 30.sp,
-                text = "Page $index"
-            )*/
         }
     },
     errorIndicator: @Composable () -> Unit = {
         Image(
             painter = BitmapPainter(state.renderPage(index, width, height)),
             contentDescription = null,
-            colorFilter = if (errorIconTint ==
-                Color.Unspecified
-            ) {
-                null
-            } else {
-                ColorFilter.tint(errorIconTint)
-            },
+            colorFilter = if (errorIconTint == Color.Unspecified) null else ColorFilter.tint(errorIconTint),
             modifier = Modifier.size(iconSize)
         )
     },
     contentScale: ContentScale = ContentScale.Fit
 ) {
-    //val loadState = if (state is RemotePdfState) state.loadState else LoadState.Success
-    val cacheKey = "$index-$width-$height"
-    val imageState: MutableState<ImageBitmap?> =
-        remember { mutableStateOf(ImageCache.get(cacheKey)) }
-    println("PdfPage: cacheKey:$cacheKey, ${imageState.value}")
-    if (imageState.value == null) {
-        loadingIndicator()
-
-        DisposableEffect(index, width, height) {
-            val scope = CoroutineScope(SupervisorJob())
-            scope.launch {
-                snapshotFlow {
-                    if (isActive) {
-                        return@snapshotFlow state.renderPage(index, width, height)
-                    } else {
-                        return@snapshotFlow null
-                    }
-                }.flowOn(Dispatcher.DECODE)
-                    .collectLatest {
-                        if (it != null) {
-                            ImageCache.put(cacheKey, it)
-                            imageState.value = it
-                        }
-                    }
-            }
-            onDispose {
-                scope.cancel()
-                //ImageCache.remove(cacheKey)
-            }
-        }
+    val h: Int
+    if (state.pageSizes.isNotEmpty()) {
+        val size = state.pageSizes[index]
+        val xscale = 1f * width / size.width
+        h = (size.height * xscale).toInt()
     } else {
-        Image(
-            painter = BitmapPainter(imageState.value!!),
-            contentDescription = null,
-            contentScale = ContentScale.FillWidth
-        )
+        h = height
     }
 
-    /*when (loadState) {
-        LoadState.Success -> Image(
-            modifier = modifier.background(Color.White),
-            painter = imageState.value!!,//state.renderPage(index, width, height),
-            contentDescription = null,
-            contentScale = contentScale
-        )
+    val subWidth = width / 2
+    val subHeight = h / 2
 
-        LoadState.Loading -> loadingIndicator()
-
-        LoadState.Error -> loadingIndicator()
-    }*/
+    Column(
+        modifier = modifier
+            .width(with(LocalDensity.current) { width.toDp() })
+            .height(with(LocalDensity.current) { h.toDp() })
+    ) {
+        Row(
+            modifier = Modifier
+                .width(with(LocalDensity.current) { width.toDp() })
+                //.height(with(LocalDensity.current) { subHeight.toDp() })
+        ) {
+            // 左上角子页面
+            PdfSubPage(
+                state = state,
+                index = index,
+                width = subWidth,
+                height = subHeight,
+                xOffset = 0,
+                yOffset = 0,
+            )
+            // 右上角子页面
+            PdfSubPage(
+                state = state,
+                index = index,
+                width = subWidth,
+                height = subHeight,
+                xOffset = subWidth,
+                yOffset = 0,
+            )
+        }
+        Row(
+            modifier = Modifier
+                .width(with(LocalDensity.current) { width.toDp() })
+                .height(with(LocalDensity.current) { subHeight.toDp() })
+        ) {
+            // 左下角子页面
+            PdfSubPage(
+                state = state,
+                index = index,
+                width = subWidth,
+                height = subHeight,
+                xOffset = 0,
+                yOffset = subHeight,
+            )
+            // 右下角子页面
+            PdfSubPage(
+                state = state,
+                index = index,
+                width = subWidth,
+                height = subHeight,
+                xOffset = subWidth,
+                yOffset = subHeight,
+            )
+        }
+    }
 }
 
 @Composable

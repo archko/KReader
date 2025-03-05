@@ -498,10 +498,9 @@ private fun PdfScreen(
                 }
                 LazyColumn(
                     modifier = Modifier
-                        .width(240.dp)
+                        .width(300.dp)
                         .background(Color.White)
                         .fillMaxHeight()
-                        //.hoverable(enabled = true, interactionSource = MutableInteractionSource())
                         .focusable(),
                     state = tocLazyListState,
                 ) {
@@ -555,18 +554,13 @@ private fun PdfScreen(
         }
 
         if (tocVisibile.value) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
             ) {
-                toc()
-                HorizontalDivider(
-                    modifier = Modifier.width(1.dp),
-                    thickness = 1.dp,
-                    color = Color.Gray,
-                )
                 screen()
+                toc()
             }
         } else {
             screen()

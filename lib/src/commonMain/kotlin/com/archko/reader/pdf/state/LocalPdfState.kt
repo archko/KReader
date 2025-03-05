@@ -12,6 +12,8 @@ public expect class LocalPdfState public constructor(file: File) : PdfState {
     public override var pageCount: Int
 
     public override fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): ImageBitmap
+
+    public override fun renderPageRegion(index: Int, viewWidth: Int, viewHeight: Int, xOffset: Int, yOffset: Int): ImageBitmap
 }
 
 /**

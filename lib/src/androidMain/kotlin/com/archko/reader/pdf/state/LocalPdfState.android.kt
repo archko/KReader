@@ -106,6 +106,41 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         return (bitmap.asImageBitmap())
     }
 
+    public actual override fun renderPageRegion(
+        index: Int,
+        viewWidth: Int,
+        viewHeight: Int,
+        xOffset: Int,
+        yOffset: Int
+    ): ImageBitmap {
+        if (viewWidth <= 0) {
+            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
+        }
+        val page = document.loadPage(index)
+        val bounds = page.bounds
+        
+        // 计算原始页面的缩放比例
+        val originalScale = (1f * viewWidth * 2 / (bounds.x1 - bounds.x0)) // 因为viewWidth是原页面的一半
+        val originalHeight = ((bounds.y1 - bounds.y0) * originalScale).toInt()
+        
+        // 计算子页面的实际尺寸
+        val subPageWidth = viewWidth
+        val subPageHeight = originalHeight / 2 // 因为viewHeight是原页面的一半
+        
+        println("renderPageRegion:index:$index, scale:$originalScale, w-h:$viewWidth-$viewHeight, offset:$xOffset-$yOffset, bounds:${page.bounds}")
+        
+        val ctm = Matrix()
+        ctm.scale(originalScale, originalScale)
+        val bitmap = BitmapPool.acquire(subPageWidth, subPageHeight)
+        val dev =
+            AndroidDrawDevice(bitmap, xOffset, yOffset, 0, 0, bitmap.getWidth(), bitmap.getHeight())
+        page.run(dev, ctm, null as Cookie?)
+        dev.close()
+        dev.destroy()
+
+        return (bitmap.asImageBitmap())
+    }
+
     override fun close() {
         document.destroy()
     }
