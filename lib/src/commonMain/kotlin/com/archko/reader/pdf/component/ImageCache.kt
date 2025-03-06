@@ -2,7 +2,7 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.ui.graphics.ImageBitmap
 
-private const val MAX_IMAGE_COUNT = 3
+private const val MAX_IMAGE_COUNT = 16
 
 /**
  * @author: archko 2025/2/25 :16:59
