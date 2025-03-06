@@ -23,7 +23,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
-const val CONTENT_HEIGHT = 6000f
+const val CONTENT_HEIGHT = 2000f
 
 @Composable
 fun CustomView() {
@@ -31,7 +31,7 @@ fun CustomView() {
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var scale by remember { mutableFloatStateOf(1f) }
-    var pages by remember { mutableStateOf<List<PageNode>>(emptyList()) }
+    var page by remember { mutableStateOf(Page(IntSize.Zero, 1f, Offset.Zero)) }
 
     // 定义背景渐变
     val gradientBrush = Brush.verticalGradient(
@@ -44,8 +44,8 @@ fun CustomView() {
             .height(CONTENT_HEIGHT.dp)
             .onSizeChanged {
                 viewSize = it
-                // 当视图大小改变时，重新计算页面
-                pages = caculatePage(viewSize, scale, offset)
+                // 当视图大小改变时，更新页面
+                page.update(viewSize, scale, offset)
             },
         contentAlignment = Alignment.Center
     ) {
@@ -61,18 +61,32 @@ fun CustomView() {
                             offset = offset + pan
 
                             // 限制移动范围
-                            val maxX = (viewSize.width * (scale - 1) / 2).coerceAtLeast(0f)
-                            val scaledContentHeight = CONTENT_HEIGHT * scale
-                            val maxY = (scaledContentHeight - viewSize.height) / 2
-                            val minY = -maxY
+                            val scaledWidth = viewSize.width * scale
+                            val scaledHeight = CONTENT_HEIGHT * scale
+                            
+                            // 计算水平方向的边界
+                            val horizontalExcess = (scaledWidth - viewSize.width) / 2
+                            val (minX, maxX) = if (scaledWidth > viewSize.width) {
+                                -horizontalExcess to horizontalExcess
+                            } else {
+                                0f to 0f
+                            }
+                            
+                            // 计算垂直方向的边界
+                            val verticalExcess = (scaledHeight - viewSize.height) / 2
+                            val (minY, maxY) = if (scaledHeight > viewSize.height) {
+                                -verticalExcess to verticalExcess
+                            } else {
+                                0f to 0f
+                            }
 
-                            offset = Offset(
-                                offset.x.coerceIn(-maxX, maxX),
-                                offset.y.coerceIn(minY, maxY)
-                            )
+                            // 限制offset在合法范围内
+                            val newX = if (minX != maxX) offset.x.coerceIn(minX, maxX) else 0f
+                            val newY = if (minY != maxY) offset.y.coerceIn(minY, maxY) else 0f
+                            offset = Offset(newX, newY)
 
-                            // 重新计算页面
-                            pages = caculatePage(viewSize, scale, offset)
+                            // 更新页面
+                            page.update(viewSize, scale, offset)
                         }
                     )
                 }
@@ -93,73 +107,8 @@ fun CustomView() {
                 )
             )
 
-            // 绘制所有页面
-            pages.forEach { page ->
-                page.draw(this)
-            }
+            // 绘制页面
+            page.draw(this)
         }
     }
-}
-
-private fun caculatePage(
-    viewSize: IntSize,
-    scale: Float,
-    offset: Offset
-): List<PageNode> {
-    val scaledSize = IntSize(
-        (viewSize.width * scale).toInt(),
-        (CONTENT_HEIGHT * scale).toInt()
-    )
-    val contentOffset = Offset(
-        (viewSize.width - scaledSize.width) / 2 + offset.x,
-        (viewSize.height - scaledSize.height) / 2 + offset.y
-    )
-    val pages = calculatePages(
-            PageNode(
-            "0",
-            Rect(
-                left = contentOffset.x,
-                top = contentOffset.y,
-                right = contentOffset.x + scaledSize.width,
-                bottom = contentOffset.y + scaledSize.height
-            ),
-                0
-            )
-    )
-    return pages
-}
-
-const val maxSize = 512 * 512f
-private fun calculatePages(page: PageNode): List<PageNode> {
-    val rect = page.rect
-    if (rect.width * rect.height > maxSize) {
-        val level = page.level + 1
-        val halfWidth = rect.width / 2
-        val halfHeight = rect.height / 2
-        return listOf(
-            PageNode(
-                "${level},0",
-                Rect(rect.left, rect.top, rect.left + halfWidth, rect.top + halfHeight),
-                level
-            ),
-            PageNode(
-                "${level},1",
-                Rect(rect.left + halfWidth, rect.top, rect.right, rect.top + halfHeight),
-                level
-            ),
-            PageNode(
-                "${level},2",
-                Rect(rect.left, rect.top + halfHeight, rect.left + halfWidth, rect.bottom),
-                level
-            ),
-            PageNode(
-                "${level},3",
-                Rect(rect.left + halfWidth, rect.top + halfHeight, rect.right, rect.bottom),
-                level
-            )
-        ).flatMap {
-            calculatePages(it)
-        }
-    }
-    return listOf(page)
 }
