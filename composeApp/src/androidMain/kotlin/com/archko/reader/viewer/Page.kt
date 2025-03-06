@@ -7,15 +7,18 @@ import androidx.compose.ui.unit.IntSize
 
 class Page(
     private var viewSize: IntSize,
-    private var scale: Float,
-    private var offset: Offset
+    private var zoom: Float,
+    private var offset: Offset,
+    private var aPage: APage,
+    private var pageOffset: Float = 0f  // 页面的垂直偏移量
 ) {
     private var nodes: List<PageNode> = emptyList()
 
-    fun update(viewSize: IntSize, scale: Float, offset: Offset) {
+    fun update(viewSize: IntSize, zoom: Float, offset: Offset, pageOffset: Float) {
         this.viewSize = viewSize
-        this.scale = scale
+        this.zoom = zoom
         this.offset = offset
+        this.pageOffset = pageOffset
         recalculateNodes()
     }
 
@@ -28,24 +31,30 @@ class Page(
     private fun recalculateNodes() {
         if (viewSize == IntSize.Zero) return
 
-        val scaledSize = IntSize(
-            (viewSize.width * scale).toInt(),
-            (CONTENT_HEIGHT * scale).toInt()
-        )
+        // 计算页面的实际尺寸
+        val viewWidth = viewSize.width.toFloat()
+        // 计算缩放比例：view宽度 / 原始宽度
+        val pageScale = viewWidth / aPage.width
+        // 计算实际高度
+        val pageHeight = aPage.height * pageScale
+
+        // 应用视图缩放
+        val scaledWidth = viewWidth * zoom
+        val scaledHeight = pageHeight * zoom
+
         val contentOffset = Offset(
-            (viewSize.width - scaledSize.width) / 2 + offset.x,
-            (viewSize.height - scaledSize.height) / 2 + offset.y
+            (viewSize.width - scaledWidth) / 2 + offset.x,
+            pageOffset * zoom + offset.y  // 使用缩放后的pageOffset
         )
 
         val rootNode = PageNode(
-            "0",
             Rect(
                 left = contentOffset.x,
                 top = contentOffset.y,
-                right = contentOffset.x + scaledSize.width,
-                bottom = contentOffset.y + scaledSize.height
+                right = contentOffset.x + scaledWidth,
+                bottom = contentOffset.y + scaledHeight
             ),
-            0
+            aPage
         )
 
         nodes = calculatePages(rootNode)
@@ -54,29 +63,24 @@ class Page(
     private fun calculatePages(page: PageNode): List<PageNode> {
         val rect = page.rect
         if (rect.width * rect.height > maxSize) {
-            val level = page.level + 1
             val halfWidth = rect.width / 2
             val halfHeight = rect.height / 2
             return listOf(
                 PageNode(
-                    "${level},0",
                     Rect(rect.left, rect.top, rect.left + halfWidth, rect.top + halfHeight),
-                    level
+                    page.aPage
                 ),
                 PageNode(
-                    "${level},1",
                     Rect(rect.left + halfWidth, rect.top, rect.right, rect.top + halfHeight),
-                    level
+                    page.aPage
                 ),
                 PageNode(
-                    "${level},2",
                     Rect(rect.left, rect.top + halfHeight, rect.left + halfWidth, rect.bottom),
-                    level
+                    page.aPage
                 ),
                 PageNode(
-                    "${level},3",
                     Rect(rect.left + halfWidth, rect.top + halfHeight, rect.right, rect.bottom),
-                    level
+                    page.aPage
                 )
             ).flatMap {
                 calculatePages(it)

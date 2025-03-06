@@ -7,9 +7,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 
 // 将 Page 类重命名为 PageNode
 class PageNode(
-    val id: String,
     val rect: Rect,
-    val level: Int
+    val aPage: APage  // 添加 APage 属性
 ) {
     fun draw(drawScope: DrawScope) {
         // 检查页面是否在可视区域内
@@ -27,7 +26,7 @@ class PageNode(
 
         // 绘制 ID
         drawScope.drawContext.canvas.nativeCanvas.drawText(
-            id,
+            aPage.index.toString(),
             rect.topLeft.x + rect.size.width / 2,
             rect.topLeft.y + rect.size.height / 2,
             android.graphics.Paint().apply {
