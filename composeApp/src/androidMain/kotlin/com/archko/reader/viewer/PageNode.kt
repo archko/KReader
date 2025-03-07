@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 
 // 将 Page 类重命名为 PageNode
 class PageNode(
-    val rect: Rect,
+    var rect: Rect,
     val aPage: APage  // 添加 APage 属性
 ) {
     fun draw(drawScope: DrawScope) {

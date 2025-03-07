@@ -117,7 +117,7 @@ fun CustomView(list: MutableList<APage>) {
                                             val scaledWidth = viewSize.width * vZoom
                                             val scaledHeight = totalHeight * vZoom
                                             
-                                            // 修正最大滚动范围计算
+                                            // 计算最大滚动范围
                                             val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
                                             val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
                                             
@@ -127,9 +127,9 @@ fun CustomView(list: MutableList<APage>) {
                                                 (offset.y + delta.y).coerceIn(-maxY, 0f)
                                             )
                                             
-                                            // 更新页面布局
-                                            pages.zip(pagePositions).forEach { (page, yPos) ->
-                                                page.update(viewSize, vZoom, offset, yPos)
+                                            // 仅在平移时更新页面和节点
+                                            pages.forEach { page ->
+                                                page.updateOffset(offset)
                                             }
                                         }
                                     }

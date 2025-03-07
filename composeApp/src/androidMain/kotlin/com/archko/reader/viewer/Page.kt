@@ -10,16 +10,23 @@ class Page(
     private var zoom: Float,
     private var offset: Offset,
     private var aPage: APage,
-    private var pageOffset: Float = 0f  // 页面的垂直偏移量
+    private var pageOffset: Float = 0f
 ) {
     private var nodes: List<PageNode> = emptyList()
+    private var lastContentOffset: Offset = Offset.Zero
 
     fun update(viewSize: IntSize, zoom: Float, offset: Offset, pageOffset: Float) {
+        val isViewSizeChanged = this.viewSize != viewSize
+        val isZoomChanged = this.zoom != zoom
+        
         this.viewSize = viewSize
         this.zoom = zoom
         this.offset = offset
         this.pageOffset = pageOffset
-        recalculateNodes()
+        
+        if (isViewSizeChanged || isZoomChanged) {
+            recalculateNodes()
+        }
     }
 
     fun draw(drawScope: DrawScope) {
@@ -28,25 +35,45 @@ class Page(
         }
     }
 
-    private fun recalculateNodes() {
-        if (viewSize == IntSize.Zero) return
+    fun updateOffset(newOffset: Offset) {
+        this.offset = newOffset
+        updateNodesPosition()
+    }
 
-        // 计算页面的实际尺寸
+    private fun updateNodesPosition() {
+        val contentOffset = calculateContentOffset()
+        if (contentOffset != lastContentOffset) {
+            nodes.forEach { node ->
+                node.rect = node.rect.translate(contentOffset - lastContentOffset)
+            }
+            lastContentOffset = contentOffset
+        }
+    }
+
+    private fun calculateContentOffset(): Offset {
         val viewWidth = viewSize.width.toFloat()
-        // 计算缩放比例：view宽度 / 原始宽度
         val pageScale = viewWidth / aPage.width
-        // 计算实际高度
         val pageHeight = aPage.height * pageScale
-
-        // 应用视图缩放
         val scaledWidth = viewWidth * zoom
         val scaledHeight = pageHeight * zoom
-
-        val contentOffset = Offset(
+        
+        return Offset(
             (viewSize.width - scaledWidth) / 2 + offset.x,
-            pageOffset * zoom + offset.y  // 使用缩放后的pageOffset
+            pageOffset * zoom + offset.y
         )
+    }
 
+    private fun recalculateNodes() {
+        if (viewSize == IntSize.Zero) return
+        
+        val contentOffset = calculateContentOffset()
+        lastContentOffset = contentOffset
+        
+        val viewWidth = viewSize.width.toFloat()
+        val pageScale = viewWidth / aPage.width
+        val scaledWidth = viewWidth * zoom
+        val scaledHeight = aPage.height * pageScale * zoom
+        
         val rootNode = PageNode(
             Rect(
                 left = contentOffset.x,
@@ -56,7 +83,7 @@ class Page(
             ),
             aPage
         )
-
+        
         nodes = calculatePages(rootNode)
     }
 
