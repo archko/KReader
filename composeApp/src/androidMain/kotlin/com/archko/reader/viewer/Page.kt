@@ -90,6 +90,6 @@ class Page(
     }
 
     companion object {
-        private const val maxSize = 512 * 512f
+        private const val maxSize = 256 * 384 * 4f
     }
 }

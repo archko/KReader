@@ -96,101 +96,97 @@ fun CustomView(list: MutableList<APage>) {
                 .pointerInput(Unit) {
                     forEachGesture {
                         awaitPointerEventScope {
-                            val down = awaitFirstDown()
-                            velocityTracker.resetTracking()
+                            var initialZoom = vZoom
+                            var startOffset = Offset.Zero
+                            var initialDistance = 0f
+                            var initialCenter = Offset.Zero
 
-                            var pastTouchSlop = false
-                            val touchSlop = viewConfiguration.touchSlop
+                            // 等待第一个触点
+                            val firstDown = awaitFirstDown()
+                            var pointerCount = 1
 
                             do {
                                 val event = awaitPointerEvent()
-                                val dragEvent = event.changes[0]
+                                pointerCount = event.changes.size
 
-                                if (!dragEvent.pressed) break
+                                when {
+                                    // 单指滑动处理
+                                    pointerCount == 1 -> {
+                                        event.changes[0].let { drag ->
+                                            val delta = drag.position - drag.previousPosition
+                                            val scaledWidth = viewSize.width * vZoom
+                                            val scaledHeight = totalHeight * vZoom
+                                            
+                                            // 修正最大滚动范围计算
+                                            val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                            val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
+                                            
+                                            // 更新偏移量
+                                            offset = Offset(
+                                                (offset.x + delta.x).coerceIn(-maxX, maxX),
+                                                (offset.y + delta.y).coerceIn(-maxY, 0f)
+                                            )
+                                            
+                                            // 更新页面布局
+                                            pages.zip(pagePositions).forEach { (page, yPos) ->
+                                                page.update(viewSize, vZoom, offset, yPos)
+                                            }
+                                        }
+                                    }
 
-                                if (!pastTouchSlop) {
-                                    val delta = dragEvent.position - dragEvent.previousPosition
-                                    if (abs(delta.y) > touchSlop) {
-                                        pastTouchSlop = true
+                                    // 双指缩放处理
+                                    pointerCount >= 2 -> {
+                                        val point1 = event.changes[0].position
+                                        val point2 = event.changes[1].position
+                                        val currentDistance = (point1 - point2).getDistance()
+
+                                        // 初始化缩放基准
+                                        if (initialDistance == 0f) {
+                                            initialDistance = currentDistance
+                                            initialZoom = vZoom
+                                            startOffset = offset
+                                            initialCenter = (point1 + point2) / 2f
+                                        }
+
+                                        // 计算缩放比例（防止除零错误）
+                                        val scaleFactor = if (initialDistance > 0) {
+                                            currentDistance / initialDistance
+                                        } else 1f
+
+                                        // 应用缩放限制
+                                        val newZoom = (initialZoom * scaleFactor).coerceIn(1f, 5f)
+
+                                        // 计算基于画布中心的缩放偏移
+                                        val contentCenter = Offset(
+                                            size.width / 2 + offset.x,
+                                            size.height / 2 + offset.y
+                                        )
+
+                                        // 计算新的偏移量
+                                        offset = Offset(
+                                            contentCenter.x * (1 - newZoom / vZoom) + startOffset.x * (newZoom / vZoom),
+                                            contentCenter.y * (1 - newZoom / vZoom) + startOffset.y * (newZoom / vZoom)
+                                        ).let { newOffset ->
+                                            val maxX = (viewSize.width * (newZoom - 1) / 2).coerceAtLeast(0f)
+                                            val maxY = (totalHeight * newZoom - viewSize.height).coerceAtLeast(0f)
+                                            Offset(
+                                                newOffset.x.coerceIn(-maxX, maxX),
+                                                newOffset.y.coerceIn(-maxY, 0f)
+                                            )
+                                        }
+
+                                        // 更新状态
+                                        vZoom = newZoom
+                                        pages.zip(pagePositions).forEach { (page, yPos) ->
+                                            page.update(viewSize, vZoom, offset, yPos)
+                                        }
                                     }
                                 }
+                            } while (event.changes.any { it.pressed })
 
-                                if (pastTouchSlop) {
-                                    dragEvent.consume()
-                                    velocityTracker.addPosition(
-                                        dragEvent.uptimeMillis,
-                                        dragEvent.position
-                                    )
-
-                                    val delta = dragEvent.position - dragEvent.previousPosition
-                                    val scaledHeight = totalHeight * vZoom
-                                    val maxScroll =
-                                        (scaledHeight - viewSize.height).coerceAtLeast(0f)
-                                    offset = offset.copy(
-                                        y = (offset.y + delta.y).coerceIn(-maxScroll, 0f)
-                                    )
-                                }
-                            } while (dragEvent.pressed)
-
-                            // 处理惯性滚动
-                            if (pastTouchSlop) {
-                                val velocity = velocityTracker.calculateVelocity()
-                                scope.launch {
-                                    // 显著增加初始速度
-                                    var velocityY = velocity.y * 3f
-                                    var lastValue = offset.y
-                                    var lastTime = System.nanoTime()
-
-                                    // 降低停止阈值，让滚动持续更长
-                                    while (abs(velocityY) > 0.1f) {
-                                        val currentTime = System.nanoTime()
-                                        val deltaSeconds = (currentTime - lastTime) / 1_000_000_000f
-                                        lastTime = currentTime
-
-                                        // 增加滚动系数使滚动更流畅
-                                        val scrollDelta = velocityY * deltaSeconds * 1.2f
-                                        val scaledHeight = totalHeight * vZoom
-                                        val maxScroll = (scaledHeight - viewSize.height).coerceAtLeast(0f)
-                                        val newY = (lastValue - scrollDelta).coerceIn(-maxScroll, 0f)
-                                        println("scroll:velocityY:$velocityY, second:$deltaSeconds, scrollDelta:$scrollDelta, maxScroll:$maxScroll, newY:$newY, lastValue:$lastValue")
-
-                                        if (newY == lastValue) break
-
-                                        offset = offset.copy(y = newY)
-                                        lastValue = newY
-
-                                        // 极慢的衰减率
-                                        velocityY *= 0.995f
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .pointerInput(Unit) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        vZoom = (vZoom * zoom).coerceIn(1.0f, 5f)
-
-                        val scaledWidth = viewSize.width * vZoom
-                        val scaledHeight = totalHeight * vZoom
-
-                        val horizontalExcess = (scaledWidth - viewSize.width) / 2
-                        val (minX, maxX) = if (scaledWidth > viewSize.width) {
-                            -horizontalExcess to horizontalExcess
-                        } else {
-                            0f to 0f
-                        }
-
-                        val maxScroll = (scaledHeight - viewSize.height).coerceAtLeast(0f)
-                        val minY = -maxScroll
-                        val maxY = 0f
-
-                        val newX = if (minX != maxX) (offset.x + pan.x).coerceIn(minX, maxX) else 0f
-                        val newY = (offset.y + pan.y).coerceIn(minY, maxY)
-                        offset = Offset(newX, newY)
-
-                        pages.zip(pagePositions).forEach { (page, yPos) ->
-                            page.update(viewSize, vZoom, offset, yPos)
+                            // 重置初始值
+                            initialDistance = 0f
+                            initialCenter = Offset.Zero
                         }
                     }
                 }
