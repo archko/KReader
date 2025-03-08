@@ -29,9 +29,9 @@ class Page(
         }
     }
 
-    fun draw(drawScope: DrawScope) {
+    fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
-            node.draw(drawScope)
+            node.draw(drawScope, offset)
         }
     }
 

@@ -17,9 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
@@ -181,14 +182,10 @@ fun CustomView(list: MutableList<APage>) {
                                             contentCenter.x * (1 - newZoom / vZoom) + startOffset.x * (newZoom / vZoom),
                                             contentCenter.y * (1 - newZoom / vZoom) + startOffset.y * (newZoom / vZoom)
                                         ).let { newOffset ->
-                                            val maxX =
-                                                (viewSize.width * (newZoom - 1) / 2).coerceAtLeast(
-                                                    0f
-                                                )
-                                            val maxY =
-                                                (totalHeight * newZoom - viewSize.height).coerceAtLeast(
-                                                    0f
-                                                )
+                                            val maxX = (viewSize.width * (newZoom - 1) / 2)
+                                                .coerceAtLeast(0f)
+                                            val maxY = (totalHeight * newZoom - viewSize.height)
+                                                .coerceAtLeast(0f)
                                             Offset(
                                                 newOffset.x.coerceIn(-maxX, maxX),
                                                 newOffset.y.coerceIn(-maxY, 0f)
@@ -215,10 +212,10 @@ fun CustomView(list: MutableList<APage>) {
                             val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                                 density = density,
                                 scrollConfiguration = FlingConfiguration.Builder()
-                                    .scrollViewFriction(0.015f)  // 减小摩擦力，使滑动更流畅
+                                    .scrollViewFriction(0.01f)  // 减小摩擦力，使滑动更流畅
                                     .numberOfSplinePoints(150)  // 提高采样率
                                     .splineInflection(0.1f)
-                                    .splineStartTension(0.5f)
+                                    .splineStartTension(0.2f)
                                     .splineEndTension(1f)
                                     .build()
                             )
@@ -259,15 +256,29 @@ fun CustomView(list: MutableList<APage>) {
                             }
 
                             // 重置初始值
-                            initialDistance = 0f
-                            initialCenter = Offset.Zero
+                            //initialDistance = 0f
+                            //initialCenter = Offset.Zero
                         }
                     }
                 }
         ) {
             val scaledHeight = totalHeight * vZoom
 
-            drawRect(
+            translate(left = offset.x, top = offset.y) {
+                //只绘制可见区域.
+                val visibleRect = Rect(
+                    left = -offset.x,
+                    top = -offset.y,
+                    right = size.width - offset.x,
+                    bottom = size.height - offset.y
+                )
+                drawRect(
+                    brush = gradientBrush,
+                    topLeft = visibleRect.topLeft,
+                    size = visibleRect.size
+                )
+            }
+            /*drawRect(
                 brush = gradientBrush,
                 topLeft = Offset(
                     (size.width - viewSize.width * vZoom) / 2 + offset.x,
@@ -277,9 +288,9 @@ fun CustomView(list: MutableList<APage>) {
                     width = viewSize.width * vZoom,
                     height = scaledHeight
                 )
-            )
+            )*/
 
-            pages.forEach { page -> page.draw(this) }
+            pages.forEach { page -> page.draw(this, offset) }
         }
     }
 }

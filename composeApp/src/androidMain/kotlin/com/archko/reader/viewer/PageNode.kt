@@ -1,5 +1,6 @@
 package com.archko.reader.viewer
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -10,9 +11,10 @@ class PageNode(
     var rect: Rect,
     val aPage: APage  // 添加 APage 属性
 ) {
-    fun draw(drawScope: DrawScope) {
+    fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
         if (!isVisible(drawScope)) {
+            println("is not Visible:${aPage.index}, $offset, $rect")
             return
         }
 
@@ -49,11 +51,11 @@ class PageNode(
         // 检查页面是否与可视区域相交
         return rect.intersectsWith(visibleRect)
     }
+}
 
-    private fun Rect.intersectsWith(other: Rect): Boolean {
-        return !(left > other.right ||
-                right < other.left ||
-                top > other.bottom ||
-                bottom < other.top)
-    }
+fun Rect.intersectsWith(other: Rect): Boolean {
+    return !(left > other.right ||
+            right < other.left ||
+            top > other.bottom ||
+            bottom < other.top)
 }
