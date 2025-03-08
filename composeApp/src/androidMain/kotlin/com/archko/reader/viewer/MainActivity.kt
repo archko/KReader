@@ -26,10 +26,10 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.DatabaseDriverFactory
 import com.archko.reader.pdf.cache.DriverFactory
+import com.archko.reader.pdf.viewmodel.PdfViewModel
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
@@ -66,6 +66,11 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
                 App(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
+                /*val list = mutableListOf<APage>()
+                for (i in 0..4) {
+                    list.add(APage(i, 1024, 1280, 1f))
+                }
+                CustomView(list)*/
             }
         }
     }

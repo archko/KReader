@@ -249,8 +249,8 @@ private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
                 model = recent.path?.let {
                     CustomImageData(
                         it,
-                        180.dp.toIntPx(),
-                        135.dp.toIntPx()
+                        135.dp.toIntPx(),
+                        180.dp.toIntPx()
                     )
                 },
                 contentDescription = null,

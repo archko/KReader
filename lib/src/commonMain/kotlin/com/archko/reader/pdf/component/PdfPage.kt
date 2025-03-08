@@ -97,7 +97,7 @@ private fun PdfSubPage(
         Image(
             painter = BitmapPainter(imageState.value!!),
             contentDescription = null,
-            contentScale = ContentScale.FillWidth,
+            contentScale = ContentScale.FillBounds,
             modifier = modifier
                 .width(with(LocalDensity.current) { width.toDp() })
                 .height(with(LocalDensity.current) { height.toDp() })
