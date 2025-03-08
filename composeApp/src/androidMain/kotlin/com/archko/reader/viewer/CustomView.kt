@@ -207,58 +207,53 @@ fun CustomView(list: MutableList<APage>) {
                                 }
                             } while (event.changes.any { it.pressed })
 
-                            // 修改fling部分代码：
+                            // 计算最终速度
+                            val velocity = velocityTracker.calculateVelocity()
+                            velocityTracker.resetTracking()
+
+                            // 创建优化后的decay动画spec
+                            val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
+                                density = density,
+                                scrollConfiguration = FlingConfiguration.Builder()
+                                    .scrollViewFriction(0.015f)  // 减小摩擦力，使滑动更流畅
+                                    .numberOfSplinePoints(150)  // 提高采样率
+                                    .splineInflection(0.1f)
+                                    .splineStartTension(0.5f)
+                                    .splineEndTension(1f)
+                                    .build()
+                            )
+
                             scope.launch {
-                                val velocity = velocityTracker.calculateVelocity()
+                                // 同时处理水平和垂直方向的惯性滑动
+                                val scaledWidth = viewSize.width * vZoom
+                                val scaledHeight = totalHeight * vZoom
+                                val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
 
-                                /*val scaledHeight = totalHeight * vZoom
-                                val maxScroll = (scaledHeight - viewSize.height).coerceAtLeast(0f)
-                                offsetY.animateTo(
-                                    targetValue = offset.y,
-                                    initialVelocity = velocity.y,
-                                    animationSpec = TweenSpec(
-                                        durationMillis = 2000,
-                                        easing = LinearEasing
-                                    )
-                                ) {
-                                    val newY = value.coerceIn(-maxScroll, 0f)
-                                    offset = offset.copy(y = newY)
-                                    pages.zip(pagePositions).forEach { (page, yPos) ->
-                                        page.updateOffset(offset)
-                                    }
-                                }*/
-
-                                // 创建decay动画spec
-                                val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
-                                    density, FlingConfiguration.Builder()
-                                        .build()
-                                )
-
-                                // 水平fling
-                                animateDecay(
-                                    initialValue = offset.x,
-                                    initialVelocity = velocity.x,
-                                    animationSpec = decayAnimationSpec
-                                ) { value, _ ->
-                                    val scaledWidth = viewSize.width * vZoom
-                                    val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
-                                    offset = offset.copy(x = value.coerceIn(-maxX, maxX))
-                                    pages.forEach { page ->
-                                        page.updateOffset(offset)
+                                // 创建两个协程同时处理x和y方向的动画
+                                launch {
+                                    if (kotlin.math.abs(velocity.x) > 50f) {  // 添加最小速度阈值
+                                        animateDecay(
+                                            initialValue = offset.x,
+                                            initialVelocity = velocity.x,
+                                            animationSpec = decayAnimationSpec
+                                        ) { value, _ ->
+                                            offset = offset.copy(x = value.coerceIn(-maxX, maxX))
+                                            pages.forEach { page -> page.updateOffset(offset) }
+                                        }
                                     }
                                 }
 
-                                // 垂直fling
-                                animateDecay(
-                                    initialValue = offset.y,
-                                    initialVelocity = velocity.y,
-                                    animationSpec = decayAnimationSpec
-                                ) { value, _ ->
-                                    val scaledHeight = totalHeight * vZoom
-                                    val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
-                                    offset = offset.copy(y = value.coerceIn(-maxY, 0f))
-                                    pages.forEach { page ->
-                                        page.updateOffset(offset)
+                                launch {
+                                    if (kotlin.math.abs(velocity.y) > 50f) {  // 添加最小速度阈值
+                                        animateDecay(
+                                            initialValue = offset.y,
+                                            initialVelocity = velocity.y,
+                                            animationSpec = decayAnimationSpec
+                                        ) { value, _ ->
+                                            offset = offset.copy(y = value.coerceIn(-maxY, 0f))
+                                            pages.forEach { page -> page.updateOffset(offset) }
+                                        }
                                     }
                                 }
                             }
