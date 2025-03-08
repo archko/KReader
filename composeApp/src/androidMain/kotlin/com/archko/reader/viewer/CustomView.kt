@@ -1,8 +1,11 @@
 package com.archko.reader.viewer
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +26,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.archko.reader.pdf.flinger.FlingConfiguration
+import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 data class APage(val index: Int, val width: Int, val height: Int, val scale: Float = 1f)
 
@@ -38,6 +43,11 @@ fun CustomView(list: MutableList<APage>) {
     var vZoom by remember { mutableFloatStateOf(1f) }
     val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
+    // 在scope.launch之前添加：
+    val density = LocalDensity.current
+    val velocityDecay: DecayAnimationSpec<Float> = remember { exponentialDecay() }
+    var offsetX = remember { Animatable(0f) }
+    var offsetY = remember { Animatable(0f) }
 
     // 计算每个页面的位置和总高度
     val pagePositions = remember(viewSize.width, list) {
@@ -114,20 +124,27 @@ fun CustomView(list: MutableList<APage>) {
                                     pointerCount == 1 -> {
                                         event.changes[0].let { drag ->
                                             val delta = drag.position - drag.previousPosition
+                                            velocityTracker.addPosition(
+                                                drag.uptimeMillis,
+                                                drag.position
+                                            )
+
                                             val scaledWidth = viewSize.width * vZoom
                                             val scaledHeight = totalHeight * vZoom
-                                            
+
                                             // 计算最大滚动范围
-                                            val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
-                                            val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
-                                            
+                                            val maxX =
+                                                (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                            val maxY =
+                                                (scaledHeight - viewSize.height).coerceAtLeast(0f)
+
                                             // 更新偏移量
                                             offset = Offset(
                                                 (offset.x + delta.x).coerceIn(-maxX, maxX),
                                                 (offset.y + delta.y).coerceIn(-maxY, 0f)
                                             )
-                                            
-                                            // 仅在平移时更新页面和节点
+
+                                            // 更新页面位置
                                             pages.forEach { page ->
                                                 page.updateOffset(offset)
                                             }
@@ -167,8 +184,14 @@ fun CustomView(list: MutableList<APage>) {
                                             contentCenter.x * (1 - newZoom / vZoom) + startOffset.x * (newZoom / vZoom),
                                             contentCenter.y * (1 - newZoom / vZoom) + startOffset.y * (newZoom / vZoom)
                                         ).let { newOffset ->
-                                            val maxX = (viewSize.width * (newZoom - 1) / 2).coerceAtLeast(0f)
-                                            val maxY = (totalHeight * newZoom - viewSize.height).coerceAtLeast(0f)
+                                            val maxX =
+                                                (viewSize.width * (newZoom - 1) / 2).coerceAtLeast(
+                                                    0f
+                                                )
+                                            val maxY =
+                                                (totalHeight * newZoom - viewSize.height).coerceAtLeast(
+                                                    0f
+                                                )
                                             Offset(
                                                 newOffset.x.coerceIn(-maxX, maxX),
                                                 newOffset.y.coerceIn(-maxY, 0f)
@@ -183,6 +206,62 @@ fun CustomView(list: MutableList<APage>) {
                                     }
                                 }
                             } while (event.changes.any { it.pressed })
+
+                            // 修改fling部分代码：
+                            scope.launch {
+                                val velocity = velocityTracker.calculateVelocity()
+
+                                /*val scaledHeight = totalHeight * vZoom
+                                val maxScroll = (scaledHeight - viewSize.height).coerceAtLeast(0f)
+                                offsetY.animateTo(
+                                    targetValue = offset.y,
+                                    initialVelocity = velocity.y,
+                                    animationSpec = TweenSpec(
+                                        durationMillis = 2000,
+                                        easing = LinearEasing
+                                    )
+                                ) {
+                                    val newY = value.coerceIn(-maxScroll, 0f)
+                                    offset = offset.copy(y = newY)
+                                    pages.zip(pagePositions).forEach { (page, yPos) ->
+                                        page.updateOffset(offset)
+                                    }
+                                }*/
+
+                                // 创建decay动画spec
+                                val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
+                                    density, FlingConfiguration.Builder()
+                                        .build()
+                                )
+
+                                // 水平fling
+                                animateDecay(
+                                    initialValue = offset.x,
+                                    initialVelocity = velocity.x,
+                                    animationSpec = decayAnimationSpec
+                                ) { value, _ ->
+                                    val scaledWidth = viewSize.width * vZoom
+                                    val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                    offset = offset.copy(x = value.coerceIn(-maxX, maxX))
+                                    pages.forEach { page ->
+                                        page.updateOffset(offset)
+                                    }
+                                }
+
+                                // 垂直fling
+                                animateDecay(
+                                    initialValue = offset.y,
+                                    initialVelocity = velocity.y,
+                                    animationSpec = decayAnimationSpec
+                                ) { value, _ ->
+                                    val scaledHeight = totalHeight * vZoom
+                                    val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
+                                    offset = offset.copy(y = value.coerceIn(-maxY, 0f))
+                                    pages.forEach { page ->
+                                        page.updateOffset(offset)
+                                    }
+                                }
+                            }
 
                             // 重置初始值
                             initialDistance = 0f
