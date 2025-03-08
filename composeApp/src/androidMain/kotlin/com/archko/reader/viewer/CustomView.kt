@@ -1,9 +1,6 @@
 package com.archko.reader.viewer
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.DecayAnimationSpec
 import androidx.compose.animation.core.animateDecay
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.forEachGesture
@@ -31,6 +28,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 data class APage(val index: Int, val width: Int, val height: Int, val scale: Float = 1f)
@@ -43,11 +41,8 @@ fun CustomView(list: MutableList<APage>) {
     var vZoom by remember { mutableFloatStateOf(1f) }
     val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
-    // 在scope.launch之前添加：
     val density = LocalDensity.current
-    val velocityDecay: DecayAnimationSpec<Float> = remember { exponentialDecay() }
-    var offsetX = remember { Animatable(0f) }
-    var offsetY = remember { Animatable(0f) }
+    var flingJob by remember { mutableStateOf<Job?>(null) }
 
     // 计算每个页面的位置和总高度
     val pagePositions = remember(viewSize.width, list) {
@@ -116,6 +111,8 @@ fun CustomView(list: MutableList<APage>) {
                             var pointerCount = 1
 
                             do {
+                                flingJob?.cancel()
+                                flingJob = null
                                 val event = awaitPointerEvent()
                                 pointerCount = event.changes.size
 
@@ -207,6 +204,9 @@ fun CustomView(list: MutableList<APage>) {
                                 }
                             } while (event.changes.any { it.pressed })
 
+                            if (pointerCount > 1) {
+                                return@awaitPointerEventScope
+                            }
                             // 计算最终速度
                             val velocity = velocityTracker.calculateVelocity()
                             velocityTracker.resetTracking()
@@ -223,7 +223,7 @@ fun CustomView(list: MutableList<APage>) {
                                     .build()
                             )
 
-                            scope.launch {
+                            flingJob = scope.launch {
                                 // 同时处理水平和垂直方向的惯性滑动
                                 val scaledWidth = viewSize.width * vZoom
                                 val scaledHeight = totalHeight * vZoom
