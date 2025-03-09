@@ -36,12 +36,13 @@ data class APage(val index: Int, val width: Int, val height: Int, val scale: Flo
 
 class PdfState(
     val list: MutableList<APage>,
-    vs: IntSize
 ) {
     var totalHeight by mutableFloatStateOf(0f)
     var pages by mutableStateOf(createPages())
+    var viewSize by mutableStateOf(IntSize.Zero)
+    var vZoom by mutableFloatStateOf(1f)
 
-    private fun invalidatePageSizes(viewSize: IntSize, vZoom: Float) {
+    fun invalidatePageSizes() {
         println("invalidatePageSizes:$totalHeight, zoom:$vZoom, $viewSize")
         var currentY = 0f
         if (viewSize.width == 0 || list.size == 0) {
@@ -64,12 +65,14 @@ class PdfState(
 
     private fun createPages(): List<Page> {
         return list.map { aPage ->
-            Page(IntSize.Zero, 1f, aPage, Rect(0f, 0f, 0f, 0f))
+            Page(this, IntSize.Zero, 1f, aPage, Rect(0f, 0f, 0f, 0f))
         }
     }
 
     fun updateViewSize(viewSize: IntSize, vZoom: Float) {
-        invalidatePageSizes(viewSize, vZoom)
+        this.viewSize = viewSize
+        this.vZoom = vZoom
+        invalidatePageSizes()
     }
 }
 
@@ -80,7 +83,7 @@ private const val max_zoom = 8f
 fun CustomView(list: MutableList<APage>) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    val pdfState = remember { PdfState(list, viewSize) }
+    val pdfState = remember { PdfState(list) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
     val velocityTracker = remember { VelocityTracker() }
@@ -136,7 +139,7 @@ fun CustomView(list: MutableList<APage>) {
                                             )
 
                                             val scaledWidth = viewSize.width * vZoom
-                                            val scaledHeight = pdfState.totalHeight * vZoom
+                                            val scaledHeight = pdfState.totalHeight// * vZoom
 
                                             // 计算最大滚动范围
                                             val maxX =
@@ -192,7 +195,7 @@ fun CustomView(list: MutableList<APage>) {
                                             val maxX = (viewSize.width * (newZoom - 1) / 2)
                                                 .coerceAtLeast(0f)
                                             val maxY =
-                                                (pdfState.totalHeight * newZoom - viewSize.height)
+                                                (pdfState.totalHeight - viewSize.height)
                                                     .coerceAtLeast(0f)
                                             Offset(
                                                 newOffset.x.coerceIn(-maxX, maxX),
@@ -222,13 +225,13 @@ fun CustomView(list: MutableList<APage>) {
                             val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                                 density = density,
                                 scrollConfiguration = FlingConfiguration.Builder()
-                                    .scrollViewFriction(0.0095f)  // 减小摩擦力，使滑动更流畅
+                                    .scrollViewFriction(0.009f)  // 减小摩擦力，使滑动更流畅
                                     // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
-                                    .numberOfSplinePoints(90)  // 提高采样率
+                                    .numberOfSplinePoints(100)  // 提高采样率
                                     // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
                                     .splineInflection(0.25f)     // 控制曲线拐点位置
                                     // 减小这个值可以使滚动更快减速，建议范围 0.1f - 0.3f
-                                    .splineStartTension(0.45f)   // 控制曲线起始张力
+                                    .splineStartTension(0.55f)   // 控制曲线起始张力
                                     // 增加这个值可以使滚动初速度更快，建议范围 0.5f - 1.0f
                                     .splineEndTension(0.7f)       // 控制曲线结束张力
                                     // 增加这个值可以使滚动持续时间更长，建议范围 0.8f - 1.2f
@@ -238,7 +241,7 @@ fun CustomView(list: MutableList<APage>) {
                             flingJob = scope.launch {
                                 // 同时处理水平和垂直方向的惯性滑动
                                 val scaledWidth = viewSize.width * vZoom
-                                val scaledHeight = pdfState.totalHeight * vZoom
+                                val scaledHeight = pdfState.totalHeight// * vZoom
                                 val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
                                 val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
 

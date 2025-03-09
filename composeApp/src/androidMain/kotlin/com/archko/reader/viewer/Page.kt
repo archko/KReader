@@ -6,12 +6,13 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntSize
 
 class Page(
+    private var pdfState: PdfState,
     private var viewSize: IntSize,
     private var zoom: Float,
     private var aPage: APage,
     private var bounds: Rect,
 ) {
-    private var aspectRatio = 0f
+    private var aspectRatio = 1f
     private var nodes: List<PageNode> = emptyList()
 
     fun getAspectRatio(): Float {
@@ -21,7 +22,7 @@ class Page(
     fun setAspectRatio(aspectRatio: Float) {
         if (this.aspectRatio != aspectRatio) {
             this.aspectRatio = aspectRatio
-            //documentView.invalidatePageSizes()
+            pdfState.invalidatePageSizes()
         }
     }
 
@@ -52,9 +53,6 @@ class Page(
     }
 
     private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {
-        if (null == bounds) {
-            return false
-        }
         val visibleRect = Rect(
             left = -offset.x,
             top = -offset.y,
