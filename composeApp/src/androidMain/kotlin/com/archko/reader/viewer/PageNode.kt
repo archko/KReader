@@ -13,15 +13,21 @@ class PageNode(
 ) {
     fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
-        if (!isVisible(drawScope)) {
-            println("is not Visible:${aPage.index}, $offset, $rect")
+        if (!isVisible(drawScope, offset)) {
+            //println("is not Visible:${aPage.index}, $offset, $rect")
             return
         }
 
         // 绘制边框
+        val drawRect = Rect(
+            rect.left + offset.x,
+            rect.top + offset.y,
+            rect.right + offset.x,
+            rect.bottom + offset.y
+        )
         drawScope.drawRect(
             color = Color.Green,
-            topLeft = rect.topLeft,
+            topLeft = drawRect.topLeft,
             size = rect.size,
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
         )
@@ -29,8 +35,8 @@ class PageNode(
         // 绘制 ID
         drawScope.drawContext.canvas.nativeCanvas.drawText(
             aPage.index.toString(),
-            rect.topLeft.x + rect.size.width / 2,
-            rect.topLeft.y + rect.size.height / 2,
+            drawRect.topLeft.x + drawRect.size.width / 2,
+            drawRect.topLeft.y + drawRect.size.height / 2,
             android.graphics.Paint().apply {
                 color = android.graphics.Color.WHITE
                 textSize = 60f
@@ -39,17 +45,19 @@ class PageNode(
         )
     }
 
-    private fun isVisible(drawScope: DrawScope): Boolean {
+    private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {
         // 获取画布的可视区域
         val visibleRect = Rect(
-            left = 0f,
-            top = 0f,
-            right = drawScope.size.width,
-            bottom = drawScope.size.height
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScope.size.width - offset.x,
+            bottom = drawScope.size.height - offset.y
         )
 
         // 检查页面是否与可视区域相交
-        return rect.intersectsWith(visibleRect)
+        val flag = rect.intersectsWith(visibleRect)
+        //println("isVisible:${aPage.index}, $flag, $visibleRect, $rect")
+        return flag
     }
 }
 

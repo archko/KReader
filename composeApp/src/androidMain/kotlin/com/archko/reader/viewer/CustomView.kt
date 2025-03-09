@@ -36,54 +36,51 @@ data class APage(val index: Int, val width: Int, val height: Int, val scale: Flo
 
 class PdfState(
     val list: MutableList<APage>,
-    viewSize: IntSize
+    vs: IntSize
 ) {
-    var pagePositions by mutableStateOf(calculatePagePositions(viewSize))
-    var totalHeight by mutableFloatStateOf(calculateTotalHeight(viewSize))
+    var totalHeight by mutableFloatStateOf(0f)
     var pages by mutableStateOf(createPages())
 
-    private fun calculatePagePositions(viewSize: IntSize): List<Float> {
-        return if (viewSize.width == 0) emptyList() else {
-            var currentY = 0f
-            list.map { aPage ->
-                val pageScale = viewSize.width.toFloat() / aPage.width
+    private fun invalidatePageSizes(viewSize: IntSize, vZoom: Float) {
+        println("invalidatePageSizes:$totalHeight, zoom:$vZoom, $viewSize")
+        var currentY = 0f
+        if (viewSize.width == 0 || list.size == 0) {
+            totalHeight = viewSize.height.toFloat()
+        } else {
+            list.zip(pages).forEach { (aPage, page) ->
+                val pageScale = viewSize.width.toFloat() / aPage.width * vZoom
                 val pageHeight = aPage.height * pageScale
-                val position = currentY
+                val bounds = Rect(
+                    0f, currentY,
+                    viewSize.width.toFloat() * vZoom,
+                    currentY + pageHeight
+                )
                 currentY += pageHeight
-                position
+                page.update(viewSize, vZoom, bounds)
             }
         }
-    }
-
-    private fun calculateTotalHeight(viewSize: IntSize): Float {
-        return if (pagePositions.isEmpty()) 0f else {
-            var currentY = 0f
-            list.forEachIndexed { index, aPage ->
-                val pageScale = viewSize.width.toFloat() / aPage.width
-                currentY += aPage.height * pageScale
-            }
-            currentY
-        }
+        totalHeight = currentY
     }
 
     private fun createPages(): List<Page> {
-        return list.zip(pagePositions).map { (aPage, yPos) ->
-            Page(IntSize.Zero, 1f, Offset.Zero, aPage, yPos)
+        return list.map { aPage ->
+            Page(IntSize.Zero, 1f, aPage, Rect(0f, 0f, 0f, 0f))
         }
     }
 
-    fun updateViewSize(viewSize: IntSize) {
-        pagePositions = calculatePagePositions(viewSize)
-        totalHeight = calculateTotalHeight(viewSize)
-        pages = createPages()
+    fun updateViewSize(viewSize: IntSize, vZoom: Float) {
+        invalidatePageSizes(viewSize, vZoom)
     }
 }
+
+private const val min_zoom = 1f
+private const val max_zoom = 8f
 
 @Composable
 fun CustomView(list: MutableList<APage>) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    val pdfState = remember(list, viewSize) { PdfState(list, viewSize) }
+    val pdfState = remember { PdfState(list, viewSize) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
     val velocityTracker = remember { VelocityTracker() }
@@ -102,10 +99,7 @@ fun CustomView(list: MutableList<APage>) {
             .height(pdfState.totalHeight.dp)
             .onSizeChanged {
                 viewSize = it
-                pdfState.updateViewSize(it)
-                pdfState.pages.zip(pdfState.pagePositions).forEach { (page, yPos) ->
-                    page.update(viewSize, vZoom, offset, yPos)
-                }
+                pdfState.updateViewSize(it, vZoom)
             },
         contentAlignment = Alignment.TopStart
     ) {
@@ -123,7 +117,7 @@ fun CustomView(list: MutableList<APage>) {
 
                             // 等待第一个触点
                             val firstDown = awaitFirstDown()
-                            var pointerCount = 1
+                            var pointerCount: Int
 
                             do {
                                 flingJob?.cancel()
@@ -157,9 +151,6 @@ fun CustomView(list: MutableList<APage>) {
                                             )
 
                                             // 更新页面位置
-                                            pdfState.pages.forEach { page ->
-                                                page.updateOffset(offset)
-                                            }
                                         }
                                     }
 
@@ -180,10 +171,12 @@ fun CustomView(list: MutableList<APage>) {
                                         // 计算缩放比例（防止除零错误）
                                         val scaleFactor = if (initialDistance > 0) {
                                             currentDistance / initialDistance
-                                        } else 1f
+                                        } else min_zoom
 
                                         // 应用缩放限制
-                                        val newZoom = (initialZoom * scaleFactor).coerceIn(1f, 5f)
+                                        val newZoom = (initialZoom * scaleFactor).coerceIn(
+                                            min_zoom, max_zoom
+                                        )
 
                                         // 计算基于画布中心的缩放偏移
                                         val contentCenter = Offset(
@@ -198,26 +191,29 @@ fun CustomView(list: MutableList<APage>) {
                                         ).let { newOffset ->
                                             val maxX = (viewSize.width * (newZoom - 1) / 2)
                                                 .coerceAtLeast(0f)
-                                            val maxY = (pdfState.totalHeight * newZoom - viewSize.height)
-                                                .coerceAtLeast(0f)
+                                            val maxY =
+                                                (pdfState.totalHeight * newZoom - viewSize.height)
+                                                    .coerceAtLeast(0f)
                                             Offset(
                                                 newOffset.x.coerceIn(-maxX, maxX),
                                                 newOffset.y.coerceIn(-maxY, 0f)
                                             )
                                         }
+                                        println("newZoom:$newZoom, vZoom:$vZoom, $offset, $viewSize")
 
                                         // 更新状态
                                         vZoom = newZoom
-                                        pdfState.pages.zip(pdfState.pagePositions).forEach { (page, yPos) ->
-                                            page.update(viewSize, vZoom, offset, yPos)
-                                        }
+                                        pdfState.updateViewSize(viewSize, vZoom)
                                     }
                                 }
                             } while (event.changes.any { it.pressed })
+                            //println("pointerCount:$pointerCount, $vZoom, $offset, $viewSize")
 
-                            if (pointerCount > 1) {
+                            /*if (pointerCount > 1) {
+                                println("vzoom:$vZoom, $viewSize")
+                                pdfState.updateViewSize(viewSize, vZoom)
                                 return@awaitPointerEventScope
-                            }
+                            }*/
                             // 计算最终速度
                             val velocity = velocityTracker.calculateVelocity()
                             velocityTracker.resetTracking()
@@ -226,15 +222,15 @@ fun CustomView(list: MutableList<APage>) {
                             val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                                 density = density,
                                 scrollConfiguration = FlingConfiguration.Builder()
-                                    .scrollViewFriction(0.009f)  // 减小摩擦力，使滑动更流畅
+                                    .scrollViewFriction(0.0095f)  // 减小摩擦力，使滑动更流畅
                                     // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
-                                    .numberOfSplinePoints(100)  // 提高采样率
+                                    .numberOfSplinePoints(90)  // 提高采样率
                                     // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
                                     .splineInflection(0.25f)     // 控制曲线拐点位置
                                     // 减小这个值可以使滚动更快减速，建议范围 0.1f - 0.3f
-                                    .splineStartTension(0.5f)   // 控制曲线起始张力
+                                    .splineStartTension(0.45f)   // 控制曲线起始张力
                                     // 增加这个值可以使滚动初速度更快，建议范围 0.5f - 1.0f
-                                    .splineEndTension(1.0f)       // 控制曲线结束张力
+                                    .splineEndTension(0.7f)       // 控制曲线结束张力
                                     // 增加这个值可以使滚动持续时间更长，建议范围 0.8f - 1.2f
                                     .build()
                             )
@@ -255,7 +251,6 @@ fun CustomView(list: MutableList<APage>) {
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(x = value.coerceIn(-maxX, maxX))
-                                            pdfState.pages.forEach { page -> page.updateOffset(offset) }
                                         }
                                     }
                                 }
@@ -268,7 +263,6 @@ fun CustomView(list: MutableList<APage>) {
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(y = value.coerceIn(-maxY, 0f))
-                                            pdfState.pages.forEach { page -> page.updateOffset(offset) }
                                         }
                                     }
                                 }

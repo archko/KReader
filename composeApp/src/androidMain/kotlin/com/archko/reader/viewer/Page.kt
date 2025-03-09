@@ -8,22 +8,35 @@ import androidx.compose.ui.unit.IntSize
 class Page(
     private var viewSize: IntSize,
     private var zoom: Float,
-    private var offset: Offset,
     private var aPage: APage,
-    private var pageOffset: Float = 0f
+    private var bounds: Rect,
 ) {
+    private var aspectRatio = 0f
     private var nodes: List<PageNode> = emptyList()
-    private var lastContentOffset: Offset = Offset.Zero
 
-    fun update(viewSize: IntSize, zoom: Float, offset: Offset, pageOffset: Float) {
+    fun getAspectRatio(): Float {
+        return aspectRatio
+    }
+
+    fun setAspectRatio(aspectRatio: Float) {
+        if (this.aspectRatio != aspectRatio) {
+            this.aspectRatio = aspectRatio
+            //documentView.invalidatePageSizes()
+        }
+    }
+
+    fun setAspectRatio(width: Int, height: Int) {
+        setAspectRatio(width * 1.0f / height)
+    }
+
+    fun update(viewSize: IntSize, zoom: Float, bounds: Rect) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.zoom != zoom
-        
+
         this.viewSize = viewSize
         this.zoom = zoom
-        this.offset = offset
-        this.pageOffset = pageOffset
-        
+        this.bounds = bounds
+
         if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
         }
@@ -31,59 +44,42 @@ class Page(
 
     fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
-            node.draw(drawScope, offset)
-        }
-    }
-
-    fun updateOffset(newOffset: Offset) {
-        this.offset = newOffset
-        updateNodesPosition()
-    }
-
-    private fun updateNodesPosition() {
-        val contentOffset = calculateContentOffset()
-        if (contentOffset != lastContentOffset) {
-            nodes.forEach { node ->
-                node.rect = node.rect.translate(contentOffset - lastContentOffset)
+            if (isVisible(drawScope, offset)) {
+                //println("page.draw:${aPage.index}, $zoom, $viewSize, $bounds")
+                node.draw(drawScope, offset)
             }
-            lastContentOffset = contentOffset
         }
     }
 
-    private fun calculateContentOffset(): Offset {
-        val viewWidth = viewSize.width.toFloat()
-        val pageScale = viewWidth / aPage.width
-        val pageHeight = aPage.height * pageScale
-        val scaledWidth = viewWidth * zoom
-        val scaledHeight = pageHeight * zoom
-        
-        return Offset(
-            (viewSize.width - scaledWidth) / 2 + offset.x,
-            pageOffset * zoom + offset.y
+    private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {
+        if (null == bounds) {
+            return false
+        }
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScope.size.width - offset.x,
+            bottom = drawScope.size.height - offset.y
         )
+        val flag = bounds.intersectsWith(visibleRect)
+        //println("page:${aPage.index}, isVisible:$flag, $visibleRect, $bounds, $viewSize")
+        return flag
     }
 
     private fun recalculateNodes() {
-        if (viewSize == IntSize.Zero) return
-        
-        val contentOffset = calculateContentOffset()
-        lastContentOffset = contentOffset
-        
-        val viewWidth = viewSize.width.toFloat()
-        val pageScale = viewWidth / aPage.width
-        val scaledWidth = viewWidth * zoom
-        val scaledHeight = aPage.height * pageScale * zoom
-        
+        if (viewSize.width == 0 || viewSize.height == 0) return
+        println("recalculateNodes:$zoom, $viewSize, bounds:$bounds")
+
         val rootNode = PageNode(
             Rect(
-                left = contentOffset.x,
-                top = contentOffset.y,
-                right = contentOffset.x + scaledWidth,
-                bottom = contentOffset.y + scaledHeight
+                left = bounds.left,
+                top = bounds.top,
+                right = bounds.right,
+                bottom = bounds.bottom
             ),
             aPage
         )
-        
+
         nodes = calculatePages(rootNode)
     }
 
@@ -117,6 +113,6 @@ class Page(
     }
 
     companion object {
-        private const val maxSize = 256 * 384 * 4f
+        private const val maxSize = 256 * 384 * 4f * 2
     }
 }
