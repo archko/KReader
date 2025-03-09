@@ -226,11 +226,16 @@ fun CustomView(list: MutableList<APage>) {
                             val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                                 density = density,
                                 scrollConfiguration = FlingConfiguration.Builder()
-                                    .scrollViewFriction(0.01f)  // 减小摩擦力，使滑动更流畅
-                                    .numberOfSplinePoints(150)  // 提高采样率
-                                    .splineInflection(0.1f)
-                                    .splineStartTension(0.2f)
-                                    .splineEndTension(1f)
+                                    .scrollViewFriction(0.009f)  // 减小摩擦力，使滑动更流畅
+                                    // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
+                                    .numberOfSplinePoints(100)  // 提高采样率
+                                    // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
+                                    .splineInflection(0.25f)     // 控制曲线拐点位置
+                                    // 减小这个值可以使滚动更快减速，建议范围 0.1f - 0.3f
+                                    .splineStartTension(0.5f)   // 控制曲线起始张力
+                                    // 增加这个值可以使滚动初速度更快，建议范围 0.5f - 1.0f
+                                    .splineEndTension(1.0f)       // 控制曲线结束张力
+                                    // 增加这个值可以使滚动持续时间更长，建议范围 0.8f - 1.2f
                                     .build()
                             )
 
