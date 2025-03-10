@@ -1,11 +1,9 @@
 package com.archko.reader.viewer
 
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,13 +24,14 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.component.ImageCache
@@ -41,7 +40,6 @@ import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.FileInputStream
-import androidx.compose.ui.graphics.drawscope.translate
 
 /**
  * @author: archko 2025/3/10 :20:09
@@ -243,31 +241,41 @@ fun PdfPage(page: Page, offset: Offset, size: IntSize) {
             .width(width)
             .height(height)
     ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
-            if (bitmap != null) {
-                //drawImage(bitmap)
-            } else if (loading) {
-                //drawRect(color = Color.LightGray)
-            } else {
-                //drawRect(color = Color.Red)
-            }
-
-            val drawRect = Rect(
-                page.bounds.left + offset.x,
-                page.bounds.top + offset.y,
-                page.bounds.right + offset.x,
-                page.bounds.bottom + offset.y
-            )
-            drawContext.canvas.nativeCanvas.drawText(
-                page.aPage.index.toString(),
-                drawRect.topLeft.x + drawRect.size.width / 2,
-                drawRect.topLeft.y + drawRect.size.height / 2,
-                android.graphics.Paint().apply {
-                    color = android.graphics.Color.WHITE
-                    textSize = 60f
-                    textAlign = android.graphics.Paint.Align.CENTER
+        if (isVisible) {
+            println("isVisible.draw:${page.aPage.index}, $offset, ${page.bounds}")
+            Canvas(modifier = Modifier.matchParentSize()) {
+                if (bitmap != null) {
+                    drawImage(
+                        bitmap,
+                        dstSize = IntSize(page.bounds.width.toInt(), page.bounds.height.toInt()),
+                        dstOffset = IntOffset(
+                            page.bounds.left.toInt() + offset.x.toInt(),
+                            page.bounds.top.toInt() + offset.y.toInt()
+                        )
+                    )
+                } else if (loading) {
+                    drawRect(color = Color.LightGray)
+                } else {
+                    //drawRect(color = Color.Red)
                 }
-            )
+
+                val drawRect = Rect(
+                    page.bounds.left + offset.x,
+                    page.bounds.top + offset.y,
+                    page.bounds.right + offset.x,
+                    page.bounds.bottom + offset.y
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    page.aPage.index.toString(),
+                    drawRect.topLeft.x + drawRect.size.width / 2,
+                    drawRect.topLeft.y + drawRect.size.height / 2,
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.RED
+                        textSize = 90f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                )
+            }
         }
     }
 }
