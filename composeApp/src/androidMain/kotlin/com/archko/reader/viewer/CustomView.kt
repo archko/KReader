@@ -77,8 +77,8 @@ class PdfState(
     }
 }
 
-private const val min_zoom = 1f
-private const val max_zoom = 8f
+const val min_zoom = 1f
+const val max_zoom = 8f
 
 @Composable
 fun CustomView(list: MutableList<APage>) {

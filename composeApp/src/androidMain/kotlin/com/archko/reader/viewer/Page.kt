@@ -10,8 +10,8 @@ class Page(
     private var pdfState: PdfState,
     private var viewSize: IntSize,
     private var zoom: Float,
-    private var aPage: APage,
-    private var bounds: Rect,
+    var aPage: APage,
+    var bounds: Rect,
 ) {
     private var aspectRatio = 1f
     private var nodes: List<PageNode> = emptyList()
