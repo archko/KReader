@@ -3,21 +3,26 @@ package com.archko.reader.viewer
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
+import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 
@@ -26,44 +31,73 @@ fun QuadImageView(imageUrls: List<String>) {
     // 确保我们有四个URLs来分别加载四个图片
     require(imageUrls.size == 4) { "Exactly four image URLs are required." }
 
-    // 使用remember保存图片状态
-    val bitmaps = remember { mutableStateListOf<ImageBitmap?>(null, null, null, null) }
-
-    // 对每个URL启动协程进行异步加载
-    imageUrls.forEachIndexed { index, url ->
-        LaunchedEffect(url) {
-            val bitmap = loadPicture(url)
-            bitmaps[index] = bitmap?.asImageBitmap()
+    var viewSize by remember { mutableStateOf(IntSize.Zero) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged {
+                viewSize = it
+            },
+        contentAlignment = Alignment.TopStart
+    ) {
+        val canvasWidth = viewSize.width
+        val canvasHeight = viewSize.width
+        // 计算四个区域
+        val canvasSize = Size(viewSize.width / 2F, viewSize.height / 2F)
+        val rects = listOf(
+            Rect(offset = Offset(0f, 0f), size = canvasSize),
+            Rect(offset = Offset(canvasWidth / 2f, 0f), size = canvasSize),
+            Rect(offset = Offset(0f, canvasHeight / 2f), size = canvasSize),
+            Rect(offset = Offset(canvasWidth / 2f, canvasHeight / 2f), size = canvasSize)
+        )
+        // 分别绘制四个页面
+        rects.forEachIndexed { index, rect ->
+            Page(
+                imageUrl = imageUrls[index],
+                rect = rect,
+                modifier = Modifier.matchParentSize()
+            )
         }
     }
+}
 
-    // Canvas 绘制逻辑
-    Canvas(modifier = Modifier.size(400.dp)) { // 设置Canvas大小
-        val canvasWidth = size.width
-        val canvasHeight = size.height
+@Composable
+fun Page(imageUrl: String, rect: Rect, modifier: Modifier = Modifier) {
+    // 状态：bitmap和加载状态
+    val (bitmap, setBitmap) = remember { mutableStateOf<ImageBitmap?>(null) }
+    val (loading, setLoading) = remember { mutableStateOf(true) }
 
-        // 分割成四部分
-        val rects = listOf(
-            Rect(offset = Offset(0f, 0f), size = size / 2F),
-            Rect(offset = Offset(canvasWidth / 2, 0f), size = size / 2F),
-            Rect(offset = Offset(0f, canvasHeight / 2), size = size / 2F),
-            Rect(offset = Offset(canvasWidth / 2, canvasHeight / 2), size = size / 2F)
-        )
+    // 加载图片
+    LaunchedEffect(key1 = imageUrl) {
+        setLoading(true)
+        val loadedBitmap = loadPicture(imageUrl)
+        setBitmap(loadedBitmap?.asImageBitmap())
+        setLoading(false)
+    }
 
-        // 绘制每个bitmap到对应的rect或者占位符
-        bitmaps.forEachIndexed { index, imageBitmap ->
-            if (imageBitmap != null) {
+    Box(modifier = Modifier) {
+        if (bitmap != null) {
+            Canvas(modifier = Modifier.matchParentSize()) {
                 drawImage(
-                    imageBitmap,
-                    dstSize = IntSize(rects[index].width.toInt(), rects[index].height.toInt()),
-                    dstOffset = IntOffset(rects[index].left.toInt(), rects[index].top.toInt())
+                    bitmap,
+                    dstSize = IntSize(rect.width.toInt(), rect.height.toInt()),
+                    dstOffset = IntOffset(rect.left.toInt(), rect.top.toInt())
                 )
-            } else {
-                // 加载中显示的占位框
+            }
+        } else if (!loading) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawRect(
+                    color = Color.Red,
+                    topLeft = rect.topLeft,
+                    size = rect.size
+                )
+            }
+        } else {
+            Canvas(modifier = Modifier.matchParentSize()) {
                 drawRect(
                     color = Color.LightGray,
-                    topLeft = rects[index].topLeft,
-                    size = rects[index].size
+                    topLeft = rect.topLeft,
+                    size = rect.size
                 )
             }
         }
@@ -71,9 +105,9 @@ fun QuadImageView(imageUrls: List<String>) {
 }
 
 // 异步加载图片的方法
-private suspend fun loadPicture(imageUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+private suspend fun loadPicture(imageUrl: String): Bitmap? = withContext(Dispatcher.DECODE) {
     return@withContext try {
-        Thread.sleep(1000L)
+        Thread.sleep(50L)
         val inputStream = FileInputStream(imageUrl)
         BitmapFactory.decodeStream(inputStream)
     } catch (e: Exception) {
