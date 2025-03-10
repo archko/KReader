@@ -3,6 +3,7 @@ package com.archko.reader.viewer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntSize
 
 class Page(
@@ -46,6 +47,22 @@ class Page(
     fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
             if (isVisible(drawScope, offset)) {
+                val drawRect = Rect(
+                    bounds.left + offset.x,
+                    bounds.top + offset.y,
+                    bounds.right + offset.x,
+                    bounds.bottom + offset.y
+                )
+                drawScope.drawContext.canvas.nativeCanvas.drawText(
+                    aPage.index.toString(),
+                    drawRect.topLeft.x + drawRect.size.width / 2,
+                    drawRect.topLeft.y + drawRect.size.height / 2,
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 60f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                )
                 //println("page.draw:${aPage.index}, $zoom, $viewSize, $bounds")
                 node.draw(drawScope, offset)
             }
@@ -66,7 +83,6 @@ class Page(
 
     private fun recalculateNodes() {
         if (viewSize.width == 0 || viewSize.height == 0) return
-        println("recalculateNodes:$zoom, $viewSize, bounds:$bounds")
 
         val rootNode = PageNode(
             Rect(
@@ -77,6 +93,7 @@ class Page(
             ),
             aPage
         )
+        println("recalculateNodes:$zoom, $viewSize, bounds:$bounds, rootNode:$rootNode")
 
         nodes = calculatePages(rootNode)
     }

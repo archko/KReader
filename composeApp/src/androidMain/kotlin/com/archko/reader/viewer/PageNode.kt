@@ -33,7 +33,7 @@ class PageNode(
         )
 
         // 绘制 ID
-        drawScope.drawContext.canvas.nativeCanvas.drawText(
+        /*drawScope.drawContext.canvas.nativeCanvas.drawText(
             aPage.index.toString(),
             drawRect.topLeft.x + drawRect.size.width / 2,
             drawRect.topLeft.y + drawRect.size.height / 2,
@@ -42,7 +42,7 @@ class PageNode(
                 textSize = 60f
                 textAlign = android.graphics.Paint.Align.CENTER
             }
-        )
+        )*/
     }
 
     private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {

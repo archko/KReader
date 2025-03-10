@@ -45,15 +45,16 @@ class PdfState(
     fun invalidatePageSizes() {
         println("invalidatePageSizes:$totalHeight, zoom:$vZoom, $viewSize")
         var currentY = 0f
-        if (viewSize.width == 0 || list.size == 0) {
+        if (viewSize.width == 0 || list.isEmpty()) {
             totalHeight = viewSize.height.toFloat()
         } else {
             list.zip(pages).forEach { (aPage, page) ->
-                val pageScale = viewSize.width.toFloat() / aPage.width * vZoom
+                val pageWidth = viewSize.width * vZoom
+                val pageScale = pageWidth / aPage.width
                 val pageHeight = aPage.height * pageScale
                 val bounds = Rect(
                     0f, currentY,
-                    viewSize.width.toFloat() * vZoom,
+                    pageWidth,
                     currentY + pageHeight
                 )
                 currentY += pageHeight
@@ -152,8 +153,6 @@ fun CustomView(list: MutableList<APage>) {
                                                 (offset.x + delta.x).coerceIn(-maxX, maxX),
                                                 (offset.y + delta.y).coerceIn(-maxY, 0f)
                                             )
-
-                                            // 更新页面位置
                                         }
                                     }
 
@@ -194,9 +193,8 @@ fun CustomView(list: MutableList<APage>) {
                                         ).let { newOffset ->
                                             val maxX = (viewSize.width * (newZoom - 1) / 2)
                                                 .coerceAtLeast(0f)
-                                            val maxY =
-                                                (pdfState.totalHeight - viewSize.height)
-                                                    .coerceAtLeast(0f)
+                                            val maxY = (pdfState.totalHeight - viewSize.height)
+                                                .coerceAtLeast(0f)
                                             Offset(
                                                 newOffset.x.coerceIn(-maxX, maxX),
                                                 newOffset.y.coerceIn(-maxY, 0f)
@@ -278,8 +276,9 @@ fun CustomView(list: MutableList<APage>) {
                     }
                 }
         ) {
-            val scaledHeight = pdfState.totalHeight * vZoom
+            //val scaledHeight = pdfState.totalHeight * vZoom
 
+            //println("drawtranslate:$offset, zoom:$vZoom, $viewSize")
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.
                 val visibleRect = Rect(
