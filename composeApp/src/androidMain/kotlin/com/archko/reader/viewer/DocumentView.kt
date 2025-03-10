@@ -41,6 +41,7 @@ import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.FileInputStream
+import androidx.compose.ui.graphics.drawscope.translate
 
 /**
  * @author: archko 2025/3/10 :20:09
@@ -137,7 +138,7 @@ fun DocumentView(list: MutableList<APage>) {
                                 .build()
                         )
 
-                        /*flingJob = scope.launch {
+                        flingJob = scope.launch {
                             // 同时处理水平和垂直方向的惯性滑动
                             val scaledWidth = viewSize.width * vZoom
                             val scaledHeight = pdfState.totalHeight// * vZoom
@@ -168,12 +169,30 @@ fun DocumentView(list: MutableList<APage>) {
                                     }
                                 }
                             }
-                        }*/
+                        }
                     }
                 }
             },
         contentAlignment = Alignment.TopStart
     ) {
+        Canvas(
+            modifier = Modifier.matchParentSize()
+        ) {
+            translate(left = offset.x, top = offset.y) {
+                //只绘制可见区域.
+                val visibleRect = Rect(
+                    left = -offset.x,
+                    top = -offset.y,
+                    right = size.width - offset.x,
+                    bottom = size.height - offset.y
+                )
+                drawRect(
+                    brush = gradientBrush,
+                    topLeft = visibleRect.topLeft,
+                    size = visibleRect.size
+                )
+            }
+        }
         pdfState.pages.forEach { page ->
             PdfPage(
                 page = page,
@@ -226,11 +245,11 @@ fun PdfPage(page: Page, offset: Offset, size: IntSize) {
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
             if (bitmap != null) {
-                drawImage(bitmap)
+                //drawImage(bitmap)
             } else if (loading) {
-                drawRect(color = Color.LightGray)
+                //drawRect(color = Color.LightGray)
             } else {
-                drawRect(color = Color.Red)
+                //drawRect(color = Color.Red)
             }
 
             val drawRect = Rect(
