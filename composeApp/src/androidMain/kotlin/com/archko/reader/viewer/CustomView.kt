@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 
 data class APage(val index: Int, val width: Int, val height: Int, val scale: Float = 1f)
 
-class PdfState(
+class PdfViewState(
     val list: MutableList<APage>,
 ) {
     var totalHeight by mutableFloatStateOf(0f)
@@ -84,7 +84,7 @@ private const val max_zoom = 8f
 fun CustomView(list: MutableList<APage>) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    val pdfState = remember { PdfState(list) }
+    val pdfState = remember { PdfViewState(list) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
     val velocityTracker = remember { VelocityTracker() }

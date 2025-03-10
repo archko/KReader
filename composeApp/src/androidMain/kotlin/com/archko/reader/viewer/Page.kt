@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntSize
 
 class Page(
-    private var pdfState: PdfState,
+    private var pdfViewState: PdfViewState,
     private var viewSize: IntSize,
     private var zoom: Float,
     private var aPage: APage,
@@ -23,7 +23,7 @@ class Page(
     fun setAspectRatio(aspectRatio: Float) {
         if (this.aspectRatio != aspectRatio) {
             this.aspectRatio = aspectRatio
-            pdfState.invalidatePageSizes()
+            pdfViewState.invalidatePageSizes()
         }
     }
 
