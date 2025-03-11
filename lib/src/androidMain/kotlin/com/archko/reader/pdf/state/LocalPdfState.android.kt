@@ -85,7 +85,7 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         viewHeight: Int
     ): ImageBitmap {
         if (viewWidth <= 0) {
-            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
+            return (ImageBitmap(1024, viewHeight, ImageBitmapConfig.Rgb565))
         }
         val page = document.loadPage(index)
         val bounds = page.bounds

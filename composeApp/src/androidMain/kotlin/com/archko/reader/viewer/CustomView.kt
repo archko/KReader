@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -76,8 +77,7 @@ fun CustomView(
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(if (pdfState.totalHeight.toInt() == 0) height.dp else pdfState.totalHeight.dp)
+            .fillMaxSize()
             .onSizeChanged {
                 println("onSizeChanged:$it, zoom:$vZoom, $viewSize")
                 viewSize = it

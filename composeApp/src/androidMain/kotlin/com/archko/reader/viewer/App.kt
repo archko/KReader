@@ -303,7 +303,6 @@ private fun PdfScreen(
     // 在组合完成后请求焦点
     LaunchedEffect(Unit) {
         println("开始计算页面列表，总页数: ${pdf.pageCount}")
-        val scope = CoroutineScope(SupervisorJob())
         scope.launch {
             snapshotFlow {
                 if (isActive) {

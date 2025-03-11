@@ -4,7 +4,7 @@ import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -20,8 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -32,7 +34,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
@@ -86,8 +87,7 @@ public fun DocumentView(
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(if (pdfState.totalHeight.toInt() == 0) height.dp else pdfState.totalHeight.dp)
+            .fillMaxSize()//画布是屏幕大就行了,否则页数多的情况,canvas无法创建
             .onSizeChanged {
                 println("onSizeChanged:$it, zoom:$vZoom, $viewSize")
                 viewSize = it
@@ -106,6 +106,8 @@ public fun DocumentView(
 
                             when (event.changes.size) {
                                 1 -> { // 单指滑动
+                                    flingJob?.cancel()
+                                    flingJob = null
                                     event.changes[0].let { drag ->
                                         val delta = drag.position - drag.previousPosition
                                         velocityTracker.addPosition(
@@ -224,6 +226,9 @@ public fun DocumentView(
         /*Canvas(
             modifier = Modifier.matchParentSize()
         ) {
+            val gradientBrush = Brush.verticalGradient(
+                colors = listOf(Color.Green, Color.Red)
+            )
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.
                 val visibleRect = Rect(
