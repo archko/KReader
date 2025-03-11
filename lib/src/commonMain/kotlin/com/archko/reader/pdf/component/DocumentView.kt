@@ -28,9 +28,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
@@ -325,6 +329,8 @@ public fun PdfPage(
             .width(width)
             .height(height)
     ) {
+        val textMeasurer = rememberTextMeasurer()
+
         if (isVisible) {
             //println("isVisible.draw:${page.aPage.index}, $offset, ${page.bounds}")
             Canvas(modifier = Modifier.matchParentSize()) {
@@ -346,22 +352,23 @@ public fun PdfPage(
                     //drawRect(color = Color.Red)
                 }
 
-                /*val drawRect = Rect(
-                    page.bounds.left + offset.x,
-                    page.bounds.top + offset.y,
-                    page.bounds.right + offset.x,
-                    page.bounds.bottom + offset.y
+                // 示例文字内容
+                val textToDraw = page.aPage.index.toString()
+                val textStyle = TextStyle(color = Color.Red, fontSize = 60.sp)
+
+                val textLayoutResult = textMeasurer.measure(textToDraw, style = textStyle)
+
+                // 计算文本位置使其水平和垂直居中
+                val x =
+                    (page.bounds.width - textLayoutResult.size.width) / 2 + page.bounds.left + offset.x
+                val y =
+                    (page.bounds.height - textLayoutResult.size.height) / 2 + page.bounds.top + offset.y
+
+                // 绘制文本
+                drawText(
+                    textLayoutResult = textLayoutResult,
+                    topLeft = Offset(x.toFloat(), y.toFloat())
                 )
-                drawContext.canvas.nativeCanvas.drawText(
-                    page.aPage.index.toString(),
-                    drawRect.topLeft.x + drawRect.size.width / 2,
-                    drawRect.topLeft.y + drawRect.size.height / 2,
-                    android.graphics.Paint().apply {
-                        color = android.graphics.Color.RED
-                        textSize = 90f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
-                )*/
             }
         }
     }
