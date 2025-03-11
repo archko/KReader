@@ -5,11 +5,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,43 +30,52 @@ import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
-import com.archko.reader.pdf.state.PdfState
-import com.archko.reader.pdf.state.PdfViewState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-private const val min_zoom = 1f
-private const val max_zoom = 8f
-
 @Composable
-fun CustomView(
-    state: PdfState,
-    list: List<APage>,
-    width: Int,
-    height: Int
-) {
+fun CustomView(list: MutableList<APage>) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
-
-    // 使用 derivedStateOf 来处理 list 变化
-    val pdfState = remember(list) {
-        println("CustomView: 创建新的 PdfViewState，list size: ${list.size}")
-        PdfViewState(list, state)
-    }
-
-    // 确保在 list 变化时重新计算总高度
-    LaunchedEffect(list, viewSize) {
-        if (viewSize != IntSize.Zero) {
-            println("CustomView: 更新 ViewSize，size: $viewSize, list size: ${list.size}")
-            pdfState.updateViewSize(viewSize, vZoom)
-        }
-    }
     val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     var flingJob by remember { mutableStateOf<Job?>(null) }
+
+    // 计算每个页面的位置和总高度
+    val pagePositions = remember(viewSize.width, list) {
+        if (viewSize.width == 0) emptyList() else {
+            var currentY = 0f
+            list.map { aPage ->
+                val pageScale = viewSize.width.toFloat() / aPage.width
+                val pageHeight = aPage.height * pageScale
+                val position = currentY
+                currentY += pageHeight
+                position
+            }
+        }
+    }
+
+    // 计算总高度
+    val totalHeight = remember(pagePositions) {
+        if (pagePositions.isEmpty()) 0f else {
+            var currentY = 0f
+            list.forEachIndexed { index, aPage ->
+                val pageScale = viewSize.width.toFloat() / aPage.width
+                currentY += aPage.height * pageScale
+            }
+            currentY
+        }
+    }
+
+    // 创建并记住每个页面的Page对象
+    var pages by remember(list, pagePositions) {
+        mutableStateOf(list.zip(pagePositions).map { (aPage, yPos) ->
+            com.archko.reader.pdf.component.Page(IntSize.Zero, 1f, Offset.Zero, aPage, yPos)
+        })
+    }
 
     // 定义背景渐变
     val gradientBrush = Brush.verticalGradient(
@@ -77,18 +84,20 @@ fun CustomView(
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
+            .height(totalHeight.dp)
             .onSizeChanged {
-                println("onSizeChanged:$it, zoom:$vZoom, $viewSize")
                 viewSize = it
-                pdfState.updateViewSize(it, vZoom)
+                pages.zip(pagePositions).forEach { (page, yPos) ->
+                    page.update(viewSize, vZoom, offset, yPos)
+                }
             },
         contentAlignment = Alignment.TopStart
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(pdfState.totalHeight.dp)
+                .height(totalHeight.dp)
                 .pointerInput(Unit) {
                     forEachGesture {
                         awaitPointerEventScope {
@@ -99,7 +108,7 @@ fun CustomView(
 
                             // 等待第一个触点
                             val firstDown = awaitFirstDown()
-                            var pointerCount: Int
+                            var pointerCount = 1
 
                             do {
                                 flingJob?.cancel()
@@ -118,7 +127,7 @@ fun CustomView(
                                             )
 
                                             val scaledWidth = viewSize.width * vZoom
-                                            val scaledHeight = pdfState.totalHeight// * vZoom
+                                            val scaledHeight = totalHeight * vZoom
 
                                             // 计算最大滚动范围
                                             val maxX =
@@ -131,6 +140,11 @@ fun CustomView(
                                                 (offset.x + delta.x).coerceIn(-maxX, maxX),
                                                 (offset.y + delta.y).coerceIn(-maxY, 0f)
                                             )
+
+                                            // 更新页面位置
+                                            pages.forEach { page ->
+                                                page.updateOffset(offset)
+                                            }
                                         }
                                     }
 
@@ -151,12 +165,10 @@ fun CustomView(
                                         // 计算缩放比例（防止除零错误）
                                         val scaleFactor = if (initialDistance > 0) {
                                             currentDistance / initialDistance
-                                        } else min_zoom
+                                        } else 1f
 
                                         // 应用缩放限制
-                                        val newZoom = (initialZoom * scaleFactor).coerceIn(
-                                            min_zoom, max_zoom
-                                        )
+                                        val newZoom = (initialZoom * scaleFactor).coerceIn(1f, 5f)
 
                                         // 计算基于画布中心的缩放偏移
                                         val contentCenter = Offset(
@@ -171,28 +183,26 @@ fun CustomView(
                                         ).let { newOffset ->
                                             val maxX = (viewSize.width * (newZoom - 1) / 2)
                                                 .coerceAtLeast(0f)
-                                            val maxY = (pdfState.totalHeight - viewSize.height)
+                                            val maxY = (totalHeight * newZoom - viewSize.height)
                                                 .coerceAtLeast(0f)
                                             Offset(
                                                 newOffset.x.coerceIn(-maxX, maxX),
                                                 newOffset.y.coerceIn(-maxY, 0f)
                                             )
                                         }
-                                        println("newZoom:$newZoom, vZoom:$vZoom, $offset, $viewSize")
 
                                         // 更新状态
                                         vZoom = newZoom
-                                        pdfState.updateViewSize(viewSize, vZoom)
+                                        pages.zip(pagePositions).forEach { (page, yPos) ->
+                                            page.update(viewSize, vZoom, offset, yPos)
+                                        }
                                     }
                                 }
                             } while (event.changes.any { it.pressed })
-                            //println("pointerCount:$pointerCount, $vZoom, $offset, $viewSize")
 
-                            /*if (pointerCount > 1) {
-                                println("vzoom:$vZoom, $viewSize")
-                                pdfState.updateViewSize(viewSize, vZoom)
+                            if (pointerCount > 1) {
                                 return@awaitPointerEventScope
-                            }*/
+                            }
                             // 计算最终速度
                             val velocity = velocityTracker.calculateVelocity()
                             velocityTracker.resetTracking()
@@ -201,23 +211,18 @@ fun CustomView(
                             val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                                 density = density,
                                 scrollConfiguration = FlingConfiguration.Builder()
-                                    .scrollViewFriction(0.009f)  // 减小摩擦力，使滑动更流畅
-                                    // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
-                                    .numberOfSplinePoints(100)  // 提高采样率
-                                    // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
-                                    .splineInflection(0.25f)     // 控制曲线拐点位置
-                                    // 减小这个值可以使滚动更快减速，建议范围 0.1f - 0.3f
-                                    .splineStartTension(0.55f)   // 控制曲线起始张力
-                                    // 增加这个值可以使滚动初速度更快，建议范围 0.5f - 1.0f
-                                    .splineEndTension(0.7f)       // 控制曲线结束张力
-                                    // 增加这个值可以使滚动持续时间更长，建议范围 0.8f - 1.2f
+                                    .scrollViewFriction(0.01f)  // 减小摩擦力，使滑动更流畅
+                                    .numberOfSplinePoints(150)  // 提高采样率
+                                    .splineInflection(0.1f)
+                                    .splineStartTension(0.2f)
+                                    .splineEndTension(1f)
                                     .build()
                             )
 
                             flingJob = scope.launch {
                                 // 同时处理水平和垂直方向的惯性滑动
                                 val scaledWidth = viewSize.width * vZoom
-                                val scaledHeight = pdfState.totalHeight// * vZoom
+                                val scaledHeight = totalHeight * vZoom
                                 val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
                                 val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
 
@@ -230,6 +235,7 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(x = value.coerceIn(-maxX, maxX))
+                                            pages.forEach { page -> page.updateOffset(offset) }
                                         }
                                     }
                                 }
@@ -242,6 +248,7 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(y = value.coerceIn(-maxY, 0f))
+                                            pages.forEach { page -> page.updateOffset(offset) }
                                         }
                                     }
                                 }
@@ -254,9 +261,8 @@ fun CustomView(
                     }
                 }
         ) {
-            //val scaledHeight = pdfState.totalHeight * vZoom
+            val scaledHeight = totalHeight * vZoom
 
-            println("drawtranslate:$offset, zoom:$vZoom, $viewSize")
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.
                 val visibleRect = Rect(
@@ -283,7 +289,7 @@ fun CustomView(
                 )
             )*/
 
-            pdfState.pages.forEach { page -> page.draw(this, offset) }
+            pages.forEach { page -> page.draw(this, offset) }
         }
     }
 }
