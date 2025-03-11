@@ -8,9 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,35 +42,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.referentialEqualityPolicy
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -85,13 +64,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.component.ImageCache
-import com.archko.reader.pdf.component.PdfColumn
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.scrollbar.DraggableScrollbar
-import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
 import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.util.Dispatcher
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -100,6 +77,10 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -306,6 +287,8 @@ private fun PdfScreen(
         itemsAvailable = pdf.pageCount,
     )
 
+    var aPageList by remember { mutableStateOf(listOf<APage>()) }
+
     // 处理系统后退手势
     BackHandler(enabled = true) {
         if (showTopBar.value) {
@@ -317,6 +300,30 @@ private fun PdfScreen(
 
     // 在组合完成后请求焦点
     LaunchedEffect(Unit) {
+        println("开始计算页面列表，总页数: ${pdf.pageCount}")
+        val scope = CoroutineScope(SupervisorJob())
+        scope.launch {
+            snapshotFlow {
+                if (isActive) {
+                    val list = mutableListOf<APage>()
+                    for (i in 0 until pdf.pageCount) {
+                        val pageSize = pdf.pageSizes[i]
+                        val aPage = APage(i, pageSize.width, pageSize.height, 1f)
+                        list.add(aPage)
+                    }
+                    return@snapshotFlow list
+                } else {
+                    return@snapshotFlow null
+                }
+            }.flowOn(Dispatcher.DECODE)
+                .collectLatest {
+                    if (it != null) {
+                        println("更新页面列表，大小: ${it.size}")
+                        aPageList = it
+                    }
+                }
+        }
+
         println("launch.progress:${viewModel.progress}")
         viewModel.progress?.page?.let { lazyListState.scrollToItem(it.toInt()) }
     }
@@ -413,61 +420,13 @@ private fun PdfScreen(
                         )
                     }
             ) {
-                PdfColumn(
+                /*PdfColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .onSizeChanged {
                             width = it.width
                             height = it.height
                             println("app.LazyColumn:$width-$height, $screenWidth-$screenHeight")
-                        }
-                        .focusable()
-                        .onKeyEvent { event ->
-                            // 处理按键按下事件
-                            if (event.type == KeyEventType.KeyDown) {
-                                //println("${event.type}, ${event.key}")
-                                when (event.key) {
-                                    Key.Enter,
-                                    Key.Spacebar -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(height.toFloat() - 10)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.PageUp -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(-height.toFloat() + 10)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.PageDown -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(height.toFloat() - 10)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.DirectionUp -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(-120f)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.DirectionDown -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(120f)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    else -> return@onKeyEvent false
-                                }
-                            } else {
-                                return@onKeyEvent false // 返回 false 表示事件未处理
-                            }
                         },
                     viewWidth = width,
                     viewHeight = height,
@@ -484,7 +443,8 @@ private fun PdfScreen(
                     onThumbMoved = lazyListState.rememberDraggableScroller(
                         itemsAvailable = pdf.pageCount,
                     ),
-                )
+                )*/
+                DocumentView(pdf, aPageList, width, height)
             }
         }
 

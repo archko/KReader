@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,13 +30,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
+import com.archko.reader.pdf.state.PdfState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 data class APage(val index: Int, val width: Int, val height: Int, val scale: Float = 1f)
 
 class PdfViewState(
-    val list: MutableList<APage>,
+    val list: List<APage>,
+    val state: PdfState,
 ) {
     var totalHeight by mutableFloatStateOf(0f)
     var pages by mutableStateOf(createPages())
@@ -43,9 +46,9 @@ class PdfViewState(
     var vZoom by mutableFloatStateOf(1f)
 
     fun invalidatePageSizes() {
-        println("invalidatePageSizes:$totalHeight, zoom:$vZoom, $viewSize")
         var currentY = 0f
-        if (viewSize.width == 0 || list.isEmpty()) {
+        if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
+            println("PdfViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, list:$list, totalHeight:$totalHeight")
             totalHeight = viewSize.height.toFloat()
         } else {
             list.zip(pages).forEach { (aPage, page) ->
@@ -59,34 +62,61 @@ class PdfViewState(
                 )
                 currentY += pageHeight
                 page.update(viewSize, vZoom, bounds)
+                //println("PdfViewState.bounds:$currentY, bounds:$bounds, page:${page.bounds}")
             }
         }
         totalHeight = currentY
+        println("invalidatePageSizes.totalHeight:$totalHeight, zoom:$vZoom, viewSize:$viewSize")
     }
 
     private fun createPages(): List<Page> {
         return list.map { aPage ->
-            Page(this, IntSize.Zero, 1f, aPage, Rect(0f, 0f, 0f, 0f))
+            Page(this, state, IntSize.Zero, 1f, aPage, Rect(0f, 0f, 0f, 0f))
         }
     }
 
     fun updateViewSize(viewSize: IntSize, vZoom: Float) {
+        val isViewSizeChanged = this.viewSize != viewSize
+        val isZoomChanged = this.vZoom != vZoom
+
         this.viewSize = viewSize
         this.vZoom = vZoom
-        invalidatePageSizes()
+        if (isViewSizeChanged || isZoomChanged) {
+            invalidatePageSizes()
+        } else {
+            println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
+        }
     }
 }
 
-const val min_zoom = 1f
-const val max_zoom = 8f
+private const val min_zoom = 1f
+private const val max_zoom = 8f
 
 @Composable
-fun CustomView(list: MutableList<APage>) {
+fun CustomView(
+    state: PdfState,
+    list: List<APage>,
+    width: Int,
+    height: Int
+) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    val pdfState = remember { PdfViewState(list) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
+
+    // 使用 derivedStateOf 来处理 list 变化
+    val pdfState = remember(list) {
+        println("CustomView: 创建新的 PdfViewState，list size: ${list.size}")
+        PdfViewState(list, state)
+    }
+
+    // 确保在 list 变化时重新计算总高度
+    LaunchedEffect(list, viewSize) {
+        if (viewSize != IntSize.Zero) {
+            println("CustomView: 更新 ViewSize，size: $viewSize, list size: ${list.size}")
+            pdfState.updateViewSize(viewSize, vZoom)
+        }
+    }
     val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -100,8 +130,9 @@ fun CustomView(list: MutableList<APage>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(pdfState.totalHeight.dp)
+            .height(if (pdfState.totalHeight.toInt() == 0) height.dp else pdfState.totalHeight.dp)
             .onSizeChanged {
+                println("onSizeChanged:$it, zoom:$vZoom, $viewSize")
                 viewSize = it
                 pdfState.updateViewSize(it, vZoom)
             },
@@ -278,7 +309,7 @@ fun CustomView(list: MutableList<APage>) {
         ) {
             //val scaledHeight = pdfState.totalHeight * vZoom
 
-            //println("drawtranslate:$offset, zoom:$vZoom, $viewSize")
+            println("drawtranslate:$offset, zoom:$vZoom, $viewSize")
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.
                 val visibleRect = Rect(

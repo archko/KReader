@@ -6,7 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -25,7 +26,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -37,7 +37,14 @@ import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.component.ImageCache
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
+import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.util.Dispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.FileInputStream
 
@@ -45,11 +52,30 @@ import java.io.FileInputStream
  * @author: archko 2025/3/10 :20:09
  */
 @Composable
-fun DocumentView(list: MutableList<APage>) {
+fun DocumentView(
+    state: PdfState,
+    list: List<APage>,
+    width: Int,
+    height: Int
+) {
+    // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    val pdfState = remember { PdfState(list) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
+
+    // 使用 derivedStateOf 来处理 list 变化
+    val pdfState = remember(list) {
+        println("DocumentView: 创建新的PdfViewState，list: ${list.size}")
+        PdfViewState(list, state)
+    }
+
+    // 确保在 list 变化时重新计算总高度
+    LaunchedEffect(list, viewSize) {
+        if (viewSize != IntSize.Zero) {
+            println("DocumentView: 更新ViewSize: $viewSize, list: ${list.size}")
+            pdfState.updateViewSize(viewSize, vZoom)
+        }
+    }
     val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -62,12 +88,13 @@ fun DocumentView(list: MutableList<APage>) {
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
+            .height(if (pdfState.totalHeight.toInt() == 0) height.dp else pdfState.totalHeight.dp)
             .onSizeChanged {
+                println("onSizeChanged:$it, zoom:$vZoom, $viewSize")
                 viewSize = it
                 pdfState.updateViewSize(it, vZoom)
             }
-            .height(pdfState.totalHeight.dp)
             .pointerInput(Unit) {
                 forEachGesture {
                     awaitPointerEventScope {
@@ -173,7 +200,7 @@ fun DocumentView(list: MutableList<APage>) {
             },
         contentAlignment = Alignment.TopStart
     ) {
-        Canvas(
+        /*Canvas(
             modifier = Modifier.matchParentSize()
         ) {
             translate(left = offset.x, top = offset.y) {
@@ -190,9 +217,11 @@ fun DocumentView(list: MutableList<APage>) {
                     size = visibleRect.size
                 )
             }
-        }
+        }*/
         pdfState.pages.forEach { page ->
             PdfPage(
+                state = state,
+                pdfState = pdfState,
                 page = page,
                 offset = offset,
                 size = viewSize
@@ -201,7 +230,7 @@ fun DocumentView(list: MutableList<APage>) {
     }
 }
 
-private fun isPageVisible(index: Int, rect: Rect, offset: Offset, size: IntSize): Boolean {
+private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSize): Boolean {
     val visibleRect = Rect(
         left = -offset.x,
         top = -offset.y,
@@ -210,24 +239,59 @@ private fun isPageVisible(index: Int, rect: Rect, offset: Offset, size: IntSize)
     )
 
     // 检查页面是否与可视区域相交
-    val flag = rect.intersectsWith(visibleRect)
-    println("isVisible.index:$index, $flag, $visibleRect, $rect")
+    val flag = bounds.intersectsWith(visibleRect)
+    println("isVisible.index:$index, $flag, $visibleRect, $bounds")
     return flag
 }
 
 @Composable
-fun PdfPage(page: Page, offset: Offset, size: IntSize) {
+fun PdfPage(
+    state: PdfState,
+    pdfState: PdfViewState,
+    page: Page,
+    offset: Offset,
+    size: IntSize
+) {
     val (bitmap, setBitmap) = remember { mutableStateOf<ImageBitmap?>(null) }
     val (loading, setLoading) = remember { mutableStateOf(true) }
     val isVisible = isPageVisible(page.aPage.index, page.bounds, offset, size)
 
     LaunchedEffect(isVisible) {
-        if (isVisible && bitmap == null) {
-            setLoading(true)
-            val loadedBitmap = loadPicture("/storage/emulated/0/DCIM/test.png")
-            println("bitmap:$loadedBitmap")
-            setBitmap(loadedBitmap)
-            setLoading(false)
+        if (isVisible && bitmap == null && (page.bounds.width > 0f && page.bounds.height > 0)) {
+            val cacheKey = "${page.aPage.index}-${page.bounds}-$size"
+            var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
+
+            if (loadedBitmap == null) {
+                setLoading(true)
+                val scope = CoroutineScope(SupervisorJob())
+                scope.launch {
+                    snapshotFlow {
+                        if (isActive) {
+                            return@snapshotFlow state.renderPage(
+                                page.aPage.index,
+                                page.bounds.width.toInt(),
+                                page.bounds.height.toInt(),
+                            )
+                        } else {
+                            return@snapshotFlow null
+                        }
+                    }.flowOn(Dispatcher.DECODE)
+                        .collectLatest {
+                            if (it != null) {
+                                ImageCache.put(cacheKey, it)
+                                loadedBitmap = it
+                                println("bitmap:${page.aPage.index}, $loadedBitmap")
+                                setBitmap(loadedBitmap)
+                                setLoading(false)
+                            }
+                        }
+                }
+            } else {
+                //val loadedBitmap = loadPicture("/storage/emulated/0/DCIM/test.png")
+                println("bitmap:$loadedBitmap")
+                setBitmap(loadedBitmap)
+                setLoading(false)
+            }
         } else if (!isVisible) {
             setBitmap(null)
             setLoading(true)
@@ -242,19 +306,22 @@ fun PdfPage(page: Page, offset: Offset, size: IntSize) {
             .height(height)
     ) {
         if (isVisible) {
-            println("isVisible.draw:${page.aPage.index}, $offset, ${page.bounds}")
+            //println("isVisible.draw:${page.aPage.index}, $offset, ${page.bounds}")
             Canvas(modifier = Modifier.matchParentSize()) {
                 if (bitmap != null) {
                     drawImage(
                         bitmap,
-                        dstSize = IntSize(page.bounds.width.toInt(), page.bounds.height.toInt()),
+                        dstSize = IntSize(
+                            page.bounds.width.toInt(),
+                            page.bounds.height.toInt()
+                        ),
                         dstOffset = IntOffset(
                             page.bounds.left.toInt() + offset.x.toInt(),
                             page.bounds.top.toInt() + offset.y.toInt()
                         )
                     )
                 } else if (loading) {
-                    drawRect(color = Color.LightGray)
+                    //drawRect(color = Color.LightGray)
                 } else {
                     //drawRect(color = Color.Red)
                 }

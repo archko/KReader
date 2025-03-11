@@ -2,12 +2,17 @@ package com.archko.reader.viewer
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.toIntSize
+import com.archko.reader.pdf.state.PdfState
 
 class Page(
     private var pdfViewState: PdfViewState,
+    private var pdfState: PdfState,
     private var viewSize: IntSize,
     private var zoom: Float,
     var aPage: APage,
@@ -65,6 +70,18 @@ class Page(
                 )
                 //println("page.draw:${aPage.index}, $zoom, $viewSize, $bounds")
                 node.draw(drawScope, offset)
+                val bitmap = pdfState.renderPageRegion(
+                    aPage.index,
+                    bounds.width.toInt(),
+                    bounds.height.toInt(),
+                    0,
+                    0
+                )
+                drawScope.drawImage(
+                    bitmap,
+                    dstSize = Size(bounds.width, bounds.height).toIntSize(),
+                    dstOffset = IntOffset(bounds.width.toInt(), bounds.height.toInt())
+                )
             }
         }
     }
