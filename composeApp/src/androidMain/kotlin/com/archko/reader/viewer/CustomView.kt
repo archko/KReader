@@ -28,69 +28,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.PdfViewState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-
-data class APage(val index: Int, val width: Int, val height: Int, val scale: Float = 1f)
-
-class PdfViewState(
-    val list: List<APage>,
-    val state: PdfState,
-) {
-    var init by mutableStateOf(false)
-    var totalHeight by mutableFloatStateOf(0f)
-    var pages by mutableStateOf(createPages())
-    var viewSize by mutableStateOf(IntSize.Zero)
-    var vZoom by mutableFloatStateOf(1f)
-
-    fun invalidatePageSizes() {
-        var currentY = 0f
-        if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
-            println("PdfViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, list:$list, totalHeight:$totalHeight")
-            totalHeight = viewSize.height.toFloat()
-            init = false
-        } else {
-            list.zip(pages).forEach { (aPage, page) ->
-                val pageWidth = viewSize.width * vZoom
-                val pageScale = pageWidth / aPage.width
-                val pageHeight = aPage.height * pageScale
-                val bounds = Rect(
-                    0f, currentY,
-                    pageWidth,
-                    currentY + pageHeight
-                )
-                currentY += pageHeight
-                page.update(viewSize, vZoom, bounds)
-                //println("PdfViewState.bounds:$currentY, bounds:$bounds, page:${page.bounds}")
-            }
-            init = true
-        }
-        totalHeight = currentY
-        println("invalidatePageSizes.totalHeight:$totalHeight, zoom:$vZoom, viewSize:$viewSize")
-    }
-
-    private fun createPages(): List<Page> {
-        return list.map { aPage ->
-            Page(this, state, IntSize.Zero, 1f, aPage, Rect(0f, 0f, 0f, 0f))
-        }
-    }
-
-    fun updateViewSize(viewSize: IntSize, vZoom: Float) {
-        val isViewSizeChanged = this.viewSize != viewSize
-        val isZoomChanged = this.vZoom != vZoom
-
-        this.viewSize = viewSize
-        this.vZoom = vZoom
-        if (isViewSizeChanged || isZoomChanged) {
-            invalidatePageSizes()
-        } else {
-            println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
-        }
-    }
-}
 
 private const val min_zoom = 1f
 private const val max_zoom = 8f

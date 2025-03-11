@@ -1,42 +1,43 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.toIntSize
+import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.PdfViewState
 
-class Page(
+public class Page(
     private var pdfViewState: PdfViewState,
     private var pdfState: PdfState,
     private var viewSize: IntSize,
     private var zoom: Float,
-    var aPage: APage,
-    var bounds: Rect,
+    public var aPage: APage,
+    public var bounds: Rect,
 ) {
     private var aspectRatio = 1f
     private var nodes: List<PageNode> = emptyList()
 
-    fun getAspectRatio(): Float {
+    public fun getAspectRatio(): Float {
         return aspectRatio
     }
 
-    fun setAspectRatio(aspectRatio: Float) {
+    public fun setAspectRatio(aspectRatio: Float) {
         if (this.aspectRatio != aspectRatio) {
             this.aspectRatio = aspectRatio
             pdfViewState.invalidatePageSizes()
         }
     }
 
-    fun setAspectRatio(width: Int, height: Int) {
+    public fun setAspectRatio(width: Int, height: Int) {
         setAspectRatio(width * 1.0f / height)
     }
 
-    fun update(viewSize: IntSize, zoom: Float, bounds: Rect) {
+    public fun update(viewSize: IntSize, zoom: Float, bounds: Rect) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.zoom != zoom
 
@@ -49,7 +50,7 @@ class Page(
         }
     }
 
-    fun draw(drawScope: DrawScope, offset: Offset) {
+    public fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
             if (isVisible(drawScope, offset)) {
                 val drawRect = Rect(
@@ -58,7 +59,7 @@ class Page(
                     bounds.right + offset.x,
                     bounds.bottom + offset.y
                 )
-                drawScope.drawContext.canvas.nativeCanvas.drawText(
+                /*drawScope.drawContext.canvas.nativeCanvas.drawText(
                     aPage.index.toString(),
                     drawRect.topLeft.x + drawRect.size.width / 2,
                     drawRect.topLeft.y + drawRect.size.height / 2,
@@ -67,7 +68,7 @@ class Page(
                         textSize = 60f
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
-                )
+                )*/
                 //println("page.draw:${aPage.index}, $zoom, $viewSize, $bounds")
                 node.draw(drawScope, offset)
                 val bitmap = pdfState.renderPageRegion(
@@ -144,7 +145,7 @@ class Page(
         return listOf(page)
     }
 
-    companion object {
+    public companion object {
         private const val maxSize = 256 * 384 * 4f * 2
     }
 }

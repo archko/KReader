@@ -1,6 +1,5 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
-import android.graphics.BitmapFactory
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -25,8 +24,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
@@ -34,10 +31,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.archko.reader.pdf.component.ImageCache
+import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.PdfViewState
 import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -46,13 +44,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.FileInputStream
+import kotlin.math.abs
 
 /**
  * @author: archko 2025/3/10 :20:09
  */
 @Composable
-fun DocumentView(
+public fun DocumentView(
     state: PdfState,
     list: List<APage>,
     width: Int,
@@ -172,7 +170,7 @@ fun DocumentView(
 
                             // 创建两个协程同时处理x和y方向的动画
                             launch {
-                                if (kotlin.math.abs(velocity.x) > 50f) {  // 添加最小速度阈值
+                                if (abs(velocity.x) > 50f) {  // 添加最小速度阈值
                                     animateDecay(
                                         initialValue = offset.x,
                                         initialVelocity = velocity.x,
@@ -184,7 +182,7 @@ fun DocumentView(
                             }
 
                             launch {
-                                if (kotlin.math.abs(velocity.y) > 50f) {  // 添加最小速度阈值
+                                if (abs(velocity.y) > 50f) {  // 添加最小速度阈值
                                     animateDecay(
                                         initialValue = offset.y,
                                         initialVelocity = velocity.y,
@@ -263,12 +261,12 @@ private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSiz
 
     // 检查页面是否与可视区域相交
     val flag = bounds.intersectsWith(visibleRect)
-    println("isVisible.index:$index, $flag, $visibleRect, $bounds")
+    //println("isVisible.index:$index, $flag, $visibleRect, $bounds")
     return flag
 }
 
 @Composable
-fun PdfPage(
+public fun PdfPage(
     state: PdfState,
     pdfState: PdfViewState,
     page: Page,
@@ -303,7 +301,7 @@ fun PdfPage(
                             if (it != null) {
                                 ImageCache.put(cacheKey, it)
                                 loadedBitmap = it
-                                println("bitmap:${page.aPage.index}, $loadedBitmap")
+                                //println("bitmap:${page.aPage.index}, $loadedBitmap")
                                 setBitmap(loadedBitmap)
                                 setLoading(false)
                             }
@@ -348,7 +346,7 @@ fun PdfPage(
                     //drawRect(color = Color.Red)
                 }
 
-                val drawRect = Rect(
+                /*val drawRect = Rect(
                     page.bounds.left + offset.x,
                     page.bounds.top + offset.y,
                     page.bounds.right + offset.x,
@@ -363,20 +361,21 @@ fun PdfPage(
                         textSize = 90f
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
-                )
+                )*/
             }
         }
     }
 }
 
 // 异步加载图片的方法
+/*
 private suspend fun loadPicture(imageUrl: String): ImageBitmap? {
     return try {
         val imageBitmap = ImageCache.get(imageUrl)
         if (null != imageBitmap) {
             return imageBitmap
         }
-        kotlinx.coroutines.delay(50L)
+        delay(50L)
         val inputStream = FileInputStream(imageUrl)
         val bitmap = BitmapFactory.decodeStream(inputStream)
         ImageCache.put(imageUrl, bitmap.asImageBitmap())
@@ -385,4 +384,4 @@ private suspend fun loadPicture(imageUrl: String): ImageBitmap? {
         e.printStackTrace()
         null
     }
-}
+}*/

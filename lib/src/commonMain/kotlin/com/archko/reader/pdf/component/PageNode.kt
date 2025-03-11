@@ -1,17 +1,18 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.archko.reader.pdf.entity.APage
 
 // 将 Page 类重命名为 PageNode
-class PageNode(
-    var rect: Rect,
-    val aPage: APage  // 添加 APage 属性
+public class PageNode(
+    public var rect: Rect,
+    public val aPage: APage  // 添加 APage 属性
 ) {
-    fun draw(drawScope: DrawScope, offset: Offset) {
+    public fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
         if (!isVisible(drawScope, offset)) {
             //println("is not Visible:${aPage.index}, $offset, $rect")
@@ -29,7 +30,7 @@ class PageNode(
             color = Color.Green,
             topLeft = drawRect.topLeft,
             size = rect.size,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+            style = Stroke(width = 2f)
         )
 
         // 绘制 ID
@@ -61,7 +62,7 @@ class PageNode(
     }
 }
 
-fun Rect.intersectsWith(other: Rect): Boolean {
+public fun Rect.intersectsWith(other: Rect): Boolean {
     return !(left > other.right ||
             right < other.left ||
             top > other.bottom ||
