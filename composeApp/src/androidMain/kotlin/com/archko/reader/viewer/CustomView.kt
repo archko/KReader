@@ -40,6 +40,7 @@ class PdfViewState(
     val list: List<APage>,
     val state: PdfState,
 ) {
+    var init by mutableStateOf(false)
     var totalHeight by mutableFloatStateOf(0f)
     var pages by mutableStateOf(createPages())
     var viewSize by mutableStateOf(IntSize.Zero)
@@ -50,6 +51,7 @@ class PdfViewState(
         if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
             println("PdfViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, list:$list, totalHeight:$totalHeight")
             totalHeight = viewSize.height.toFloat()
+            init = false
         } else {
             list.zip(pages).forEach { (aPage, page) ->
                 val pageWidth = viewSize.width * vZoom
@@ -64,6 +66,7 @@ class PdfViewState(
                 page.update(viewSize, vZoom, bounds)
                 //println("PdfViewState.bounds:$currentY, bounds:$bounds, page:${page.bounds}")
             }
+            init = true
         }
         totalHeight = currentY
         println("invalidatePageSizes.totalHeight:$totalHeight, zoom:$vZoom, viewSize:$viewSize")

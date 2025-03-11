@@ -218,18 +218,41 @@ fun DocumentView(
                 )
             }
         }*/
-        pdfState.pages.forEach { page ->
-            PdfPage(
-                state = state,
-                pdfState = pdfState,
-                page = page,
-                offset = offset,
-                size = viewSize
-            )
+        if (pdfState.init) {
+            pdfState.pages.forEach { page ->
+                PdfPage(
+                    state = state,
+                    pdfState = pdfState,
+                    page = page,
+                    offset = offset,
+                    size = viewSize
+                )
+            }
         }
     }
 }
 
+/*private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSize): Boolean {
+    val visibleRect = Rect(
+        left = 0f,
+        top = 0f,
+        right = size.width.toFloat(),
+        bottom = size.height.toFloat()
+    )
+
+    // 计算页面实际位置（考虑偏移）
+    val actualPageBounds = Rect(
+        left = bounds.left + offset.x,
+        top = bounds.top + offset.y,
+        right = bounds.right + offset.x,
+        bottom = bounds.bottom + offset.y
+    )
+
+    // 检查页面是否与可视区域相交
+    val flag = actualPageBounds.intersectsWith(visibleRect)
+    println("isVisible.index:$index, $flag, $visibleRect, $actualPageBounds")
+    return flag
+}*/
 private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSize): Boolean {
     val visibleRect = Rect(
         left = -offset.x,
@@ -288,7 +311,6 @@ fun PdfPage(
                 }
             } else {
                 //val loadedBitmap = loadPicture("/storage/emulated/0/DCIM/test.png")
-                println("bitmap:$loadedBitmap")
                 setBitmap(loadedBitmap)
                 setLoading(false)
             }
