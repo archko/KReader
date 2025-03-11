@@ -2,7 +2,6 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
@@ -49,6 +48,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * @author: archko 2025/3/10 :20:09
@@ -83,11 +84,6 @@ public fun DocumentView(
     val density = LocalDensity.current
     var flingJob by remember { mutableStateOf<Job?>(null) }
 
-    // 定义背景渐变
-    val gradientBrush = Brush.verticalGradient(
-        colors = listOf(Color.Green, Color.Red)
-    )
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -105,19 +101,11 @@ public fun DocumentView(
                         var initialDistance = 0f
                         var initialCenter = Offset.Zero
 
-                        // 等待第一个触点
-                        val firstDown = awaitFirstDown()
-                        var pointerCount: Int
-
-                        do {
-                            flingJob?.cancel()
-                            flingJob = null
+                        while (true) {
                             val event = awaitPointerEvent()
-                            pointerCount = event.changes.size
 
-                            when {
-                                // 单指滑动处理
-                                pointerCount == 1 -> {
+                            when (event.changes.size) {
+                                1 -> { // 单指滑动
                                     event.changes[0].let { drag ->
                                         val delta = drag.position - drag.previousPosition
                                         velocityTracker.addPosition(
@@ -141,8 +129,39 @@ public fun DocumentView(
                                         )
                                     }
                                 }
+
+                                2 -> { // 双指缩放
+                                    if (event.changes.all { it.pressed }) {
+                                        if (initialDistance == 0f) {
+                                            // 第一次双指事件，记录初始距离和中心点
+                                            initialDistance = calculateDistance(event)
+                                            initialCenter = calculateCenter(event)
+                                            startOffset = offset
+                                            initialZoom = vZoom
+                                        } else {
+                                            val currentDistance = calculateDistance(event)
+                                            val scale = currentDistance / initialDistance
+                                            vZoom = (initialZoom * scale).coerceIn(1f, 5f)
+
+                                            // 调整偏移量以保持缩放中心点不变
+                                            val newCenter = calculateCenter(event)
+                                            offset = Offset(
+                                                startOffset.x + (newCenter.x - initialCenter.x) / vZoom,
+                                                startOffset.y + (newCenter.y - initialCenter.y) / vZoom
+                                            )
+
+                                            pdfState.updateViewSize(viewSize, vZoom)
+                                        }
+                                    }
+                                }
+
+                                else -> break
                             }
-                        } while (event.changes.any { it.pressed })
+
+                            if (!event.changes.any { it.pressed }) {
+                                break
+                            }
+                        }
 
                         // 计算最终速度
                         val velocity = velocityTracker.calculateVelocity()
@@ -232,6 +251,20 @@ public fun DocumentView(
             }
         }
     }
+}
+
+// 辅助函数：计算两点之间的距离
+private fun calculateDistance(event: PointerEvent): Float {
+    val first = event.changes[0].position
+    val second = event.changes[1].position
+    return sqrt((first.x - second.x).pow(2) + (first.y - second.y).pow(2))
+}
+
+// 辅助函数：计算两个触点的中心点
+private fun calculateCenter(event: PointerEvent): Offset {
+    val first = event.changes[0].position
+    val second = event.changes[1].position
+    return Offset((first.x + second.x) / 2, (first.y + second.y) / 2)
 }
 
 /*private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSize): Boolean {
@@ -337,6 +370,7 @@ public fun PdfPage(
                 if (bitmap != null) {
                     drawImage(
                         bitmap,
+                        //srcOffset = IntOffset(-offset.x.toInt(), 0),
                         dstSize = IntSize(
                             page.bounds.width.toInt(),
                             page.bounds.height.toInt()
