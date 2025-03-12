@@ -446,6 +446,11 @@ private fun PdfScreen(
                     ),
                 )*/
                 DocumentView(pdf, aPageList, width, height)
+                /*val list= mutableListOf<APage>()
+                for(i in 0..6){
+                    list.add(APage(i,1024,1280))
+                }
+                CustomView(list)*/
             }
         }
 

@@ -20,10 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -173,7 +171,7 @@ public fun DocumentView(
                         val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                             density = density,
                             scrollConfiguration = FlingConfiguration.Builder()
-                                .scrollViewFriction(0.009f)  // 减小摩擦力，使滑动更流畅
+                                .scrollViewFriction(0.0095f)  // 减小摩擦力，使滑动更流畅
                                 // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
                                 .numberOfSplinePoints(100)  // 提高采样率
                                 // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
@@ -223,27 +221,6 @@ public fun DocumentView(
             },
         contentAlignment = Alignment.TopStart
     ) {
-        /*Canvas(
-            modifier = Modifier.matchParentSize()
-        ) {
-            val gradientBrush = Brush.verticalGradient(
-                colors = listOf(Color.Green, Color.Red)
-            )
-            translate(left = offset.x, top = offset.y) {
-                //只绘制可见区域.
-                val visibleRect = Rect(
-                    left = -offset.x,
-                    top = -offset.y,
-                    right = size.width - offset.x,
-                    bottom = size.height - offset.y
-                )
-                drawRect(
-                    brush = gradientBrush,
-                    topLeft = visibleRect.topLeft,
-                    size = visibleRect.size
-                )
-            }
-        }*/
         if (pdfState.init) {
             pdfState.pages.forEach { page ->
                 PdfPage(
@@ -406,28 +383,9 @@ public fun PdfPage(
                 // 绘制文本
                 drawText(
                     textLayoutResult = textLayoutResult,
-                    topLeft = Offset(x.toFloat(), y.toFloat())
+                    topLeft = Offset(x, y)
                 )
             }
         }
     }
 }
-
-// 异步加载图片的方法
-/*
-private suspend fun loadPicture(imageUrl: String): ImageBitmap? {
-    return try {
-        val imageBitmap = ImageCache.get(imageUrl)
-        if (null != imageBitmap) {
-            return imageBitmap
-        }
-        delay(50L)
-        val inputStream = FileInputStream(imageUrl)
-        val bitmap = BitmapFactory.decodeStream(inputStream)
-        ImageCache.put(imageUrl, bitmap.asImageBitmap())
-        bitmap.asImageBitmap()
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
-    }
-}*/

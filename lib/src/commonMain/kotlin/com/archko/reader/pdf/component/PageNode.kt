@@ -1,9 +1,10 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import com.archko.reader.pdf.entity.APage
 
 // 将 Page 类重命名为 PageNode
@@ -19,18 +20,24 @@ public class PageNode(
         }
 
         // 绘制边框
+        val drawRect = Rect(
+            rect.left + offset.x,
+            rect.top + offset.y,
+            rect.right + offset.x,
+            rect.bottom + offset.y
+        )
         drawScope.drawRect(
             color = Color.Green,
-            topLeft = rect.topLeft,
+            topLeft = drawRect.topLeft,
             size = rect.size,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
+            style = Stroke(width = 2f)
         )
 
         // 绘制 ID
         /*drawScope.drawContext.canvas.nativeCanvas.drawText(
             aPage.index.toString(),
-            rect.topLeft.x + rect.size.width / 2,
-            rect.topLeft.y + rect.size.height / 2,
+            drawRect.topLeft.x + drawRect.size.width / 2,
+            drawRect.topLeft.y + drawRect.size.height / 2,
             android.graphics.Paint().apply {
                 color = android.graphics.Color.WHITE
                 textSize = 60f
@@ -42,15 +49,15 @@ public class PageNode(
     private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {
         // 获取画布的可视区域
         val visibleRect = Rect(
-            left = 0f,
-            top = 0f,
-            right = drawScope.size.width,
-            bottom = drawScope.size.height
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScope.size.width - offset.x,
+            bottom = drawScope.size.height - offset.y
         )
 
         // 检查页面是否与可视区域相交
         val flag = rect.intersectsWith(visibleRect)
-        println("${aPage.index}.node.isVisible:$flag, offset:$offset, size:${drawScope.size}, $visibleRect, $rect")
+        //println("isVisible:${aPage.index}, $flag, $visibleRect, $rect")
         return flag
     }
 }

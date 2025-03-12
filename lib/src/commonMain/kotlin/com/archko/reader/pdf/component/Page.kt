@@ -2,42 +2,48 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.toIntSize
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.viewer.PageNode
+import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.PdfViewState
 
 public class Page(
-    public var viewSize: IntSize,
-    public var zoom: Float,
-    public var offset: Offset,
+    private var pdfViewState: PdfViewState,
+    private var pdfState: PdfState,
+    private var viewSize: IntSize,
+    private var zoom: Float,
     public var aPage: APage,
+    public var bounds: Rect,
 ) {
+    private var aspectRatio = 1f
     private var nodes: List<PageNode> = emptyList()
-    private var lastContentOffset: Offset = Offset.Zero
-    public var bounds: Rect = Rect(0f, 0f, 0f, 0f)
+
+    public fun getAspectRatio(): Float {
+        return aspectRatio
+    }
+
+    public fun setAspectRatio(aspectRatio: Float) {
+        if (this.aspectRatio != aspectRatio) {
+            this.aspectRatio = aspectRatio
+            pdfViewState.invalidatePageSizes()
+        }
+    }
+
+    public fun setAspectRatio(width: Int, height: Int) {
+        setAspectRatio(width * 1.0f / height)
+    }
 
     public fun update(viewSize: IntSize, zoom: Float, bounds: Rect) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.zoom != zoom
 
+        this.viewSize = viewSize
+        this.zoom = zoom
         this.bounds = bounds
-        this.viewSize = viewSize
-        this.zoom = zoom
-        this.offset = offset
-
-        if (isViewSizeChanged || isZoomChanged) {
-            recalculateNodes()
-        }
-    }
-
-    public fun update(viewSize: IntSize, zoom: Float, offset: Offset) {
-        val isViewSizeChanged = this.viewSize != viewSize
-        val isZoomChanged = this.zoom != zoom
-
-        this.viewSize = viewSize
-        this.zoom = zoom
-        this.offset = offset
 
         if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
@@ -46,56 +52,66 @@ public class Page(
 
     public fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
-            node.draw(drawScope, offset)
-        }
-    }
-
-    public fun updateOffset(newOffset: Offset) {
-        this.offset = newOffset
-        updateNodesPosition()
-    }
-
-    private fun updateNodesPosition() {
-        val contentOffset = calculateContentOffset()
-        if (contentOffset != lastContentOffset) {
-            nodes.forEach { node ->
-                node.rect = node.rect.translate(contentOffset - lastContentOffset)
+            if (isVisible(drawScope, offset)) {
+                val drawRect = Rect(
+                    bounds.left + offset.x,
+                    bounds.top + offset.y,
+                    bounds.right + offset.x,
+                    bounds.bottom + offset.y
+                )
+                /*drawScope.drawContext.canvas.nativeCanvas.drawText(
+                    aPage.index.toString(),
+                    drawRect.topLeft.x + drawRect.size.width / 2,
+                    drawRect.topLeft.y + drawRect.size.height / 2,
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.WHITE
+                        textSize = 60f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                )*/
+                //println("page.draw:${aPage.index}, $zoom, $viewSize, $bounds")
+                node.draw(drawScope, offset)
+                val bitmap = pdfState.renderPageRegion(
+                    aPage.index,
+                    bounds.width.toInt(),
+                    bounds.height.toInt(),
+                    0,
+                    0
+                )
+                drawScope.drawImage(
+                    bitmap,
+                    dstSize = Size(bounds.width, bounds.height).toIntSize(),
+                    dstOffset = IntOffset(bounds.width.toInt(), bounds.height.toInt())
+                )
             }
-            lastContentOffset = contentOffset
         }
     }
 
-    private fun calculateContentOffset(): Offset {
-        val viewWidth = viewSize.width.toFloat()
-        val pageScale = viewWidth / aPage.width
-        val scaledWidth = viewWidth * zoom
-
-        return Offset(
-            (viewSize.width - scaledWidth) / 2 + offset.x,
-            bounds.top * zoom + offset.y
+    private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScope.size.width - offset.x,
+            bottom = drawScope.size.height - offset.y
         )
+        val flag = bounds.intersectsWith(visibleRect)
+        //println("page:${aPage.index}, isVisible:$flag, $visibleRect, $bounds, $viewSize")
+        return flag
     }
 
     private fun recalculateNodes() {
-        if (viewSize == IntSize.Zero) return
-
-        val contentOffset = calculateContentOffset()
-        lastContentOffset = contentOffset
-
-        val viewWidth = viewSize.width.toFloat()
-        val pageScale = viewWidth / aPage.width
-        val scaledWidth = viewWidth * zoom
-        val scaledHeight = aPage.height * pageScale * zoom
+        if (viewSize.width == 0 || viewSize.height == 0) return
 
         val rootNode = PageNode(
             Rect(
-                left = contentOffset.x,
-                top = contentOffset.y,
-                right = contentOffset.x + scaledWidth,
-                bottom = contentOffset.y + scaledHeight
+                left = bounds.left,
+                top = bounds.top,
+                right = bounds.right,
+                bottom = bounds.bottom
             ),
             aPage
         )
+        println("recalculateNodes:$zoom, $viewSize, bounds:$bounds, rootNode:$rootNode")
 
         nodes = calculatePages(rootNode)
     }
