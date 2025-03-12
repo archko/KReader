@@ -3,29 +3,44 @@ package com.archko.reader.pdf.component
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.viewer.PageNode
 
 public class Page(
-    private var viewSize: IntSize,
-    private var zoom: Float,
-    private var offset: Offset,
-    private var aPage: APage,
-    private var pageOffset: Float = 0f
+    public var viewSize: IntSize,
+    public var zoom: Float,
+    public var offset: Offset,
+    public var aPage: APage,
 ) {
     private var nodes: List<PageNode> = emptyList()
     private var lastContentOffset: Offset = Offset.Zero
+    public var bounds: Rect = Rect(0f, 0f, 0f, 0f)
+    private var pageOffset: Float = 0f
 
-    public fun update(viewSize: IntSize, zoom: Float, offset: Offset, pageOffset: Float) {
+    public fun update(viewSize: IntSize, zoom: Float, bounds: Rect) {
+        val isViewSizeChanged = this.viewSize != viewSize
+        val isZoomChanged = this.zoom != zoom
+
+        this.bounds = bounds
+        this.viewSize = viewSize
+        this.zoom = zoom
+        this.offset = offset
+        this.pageOffset = bounds.top
+
+        if (isViewSizeChanged || isZoomChanged) {
+            recalculateNodes()
+        }
+    }
+
+    public fun update(viewSize: IntSize, zoom: Float, offset: Offset) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.zoom != zoom
 
         this.viewSize = viewSize
         this.zoom = zoom
         this.offset = offset
-        this.pageOffset = pageOffset
+        this.pageOffset = bounds.top
 
         if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
