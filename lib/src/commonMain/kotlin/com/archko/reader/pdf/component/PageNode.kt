@@ -4,7 +4,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.nativeCanvas
 import com.archko.reader.pdf.entity.APage
 
 // 将 Page 类重命名为 PageNode
@@ -14,8 +13,8 @@ public class PageNode(
 ) {
     public fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
-        if (!isVisible(drawScope)) {
-            println("is not Visible:${aPage.index}, $offset, $rect")
+        if (!isVisible(drawScope, offset)) {
+            //println("is not Visible:${aPage.index}, $offset, $rect")
             return
         }
 
@@ -24,7 +23,7 @@ public class PageNode(
             color = Color.Green,
             topLeft = rect.topLeft,
             size = rect.size,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
         )
 
         // 绘制 ID
@@ -40,7 +39,7 @@ public class PageNode(
         )*/
     }
 
-    private fun isVisible(drawScope: DrawScope): Boolean {
+    private fun isVisible(drawScope: DrawScope, offset: Offset): Boolean {
         // 获取画布的可视区域
         val visibleRect = Rect(
             left = 0f,
@@ -50,7 +49,9 @@ public class PageNode(
         )
 
         // 检查页面是否与可视区域相交
-        return rect.intersectsWith(visibleRect)
+        val flag = rect.intersectsWith(visibleRect)
+        println("${aPage.index}.node.isVisible:$flag, offset:$offset, size:${drawScope.size}, $visibleRect, $rect")
+        return flag
     }
 }
 

@@ -16,7 +16,6 @@ public class Page(
     private var nodes: List<PageNode> = emptyList()
     private var lastContentOffset: Offset = Offset.Zero
     public var bounds: Rect = Rect(0f, 0f, 0f, 0f)
-    private var pageOffset: Float = 0f
 
     public fun update(viewSize: IntSize, zoom: Float, bounds: Rect) {
         val isViewSizeChanged = this.viewSize != viewSize
@@ -26,7 +25,6 @@ public class Page(
         this.viewSize = viewSize
         this.zoom = zoom
         this.offset = offset
-        this.pageOffset = bounds.top
 
         if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
@@ -40,7 +38,6 @@ public class Page(
         this.viewSize = viewSize
         this.zoom = zoom
         this.offset = offset
-        this.pageOffset = bounds.top
 
         if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
@@ -71,13 +68,11 @@ public class Page(
     private fun calculateContentOffset(): Offset {
         val viewWidth = viewSize.width.toFloat()
         val pageScale = viewWidth / aPage.width
-        val pageHeight = aPage.height * pageScale
         val scaledWidth = viewWidth * zoom
-        val scaledHeight = pageHeight * zoom
 
         return Offset(
             (viewSize.width - scaledWidth) / 2 + offset.x,
-            pageOffset * zoom + offset.y
+            bounds.top * zoom + offset.y
         )
     }
 
