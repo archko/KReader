@@ -41,7 +41,7 @@ public fun PdfColumn(
         alignment = if (!reverseLayout) Alignment.Top else Alignment.Bottom
     ),
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    flingBehavior: FlingBehavior = StockFlingBehaviours.smoothScroll(),
+    flingBehavior: FlingBehavior = StockFlingBehaviours.custom(),
     userScrollEnabled: Boolean = true
 ) {
     var width by remember { mutableIntStateOf(viewWidth) }

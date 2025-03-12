@@ -86,4 +86,20 @@ public object StockFlingBehaviours {
             .build()
     )
 
+    @Composable
+    public fun custom(): FlingBehavior = flingBehavior(
+        scrollConfiguration = FlingConfiguration.Builder()
+            .scrollViewFriction(0.008f)  // 减小摩擦力，使滑动更流畅
+            // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
+            .numberOfSplinePoints(100)  // 提高采样率
+            // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
+            .splineInflection(0.3f)     // 控制曲线拐点位置
+            // 减小这个值可以使滚动更快减速，建议范围 0.1f - 0.3f
+            .splineStartTension(0.5f)   // 控制曲线起始张力
+            // 增加这个值可以使滚动初速度更快，建议范围 0.5f - 1.0f
+            .splineEndTension(0.7f)       // 控制曲线结束张力
+            // 增加这个值可以使滚动持续时间更长，建议范围 0.8f - 1.2f
+            .build()
+    )
+
 }

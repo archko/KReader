@@ -171,7 +171,7 @@ public fun DocumentView(
                         val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
                             density = density,
                             scrollConfiguration = FlingConfiguration.Builder()
-                                .scrollViewFriction(0.0095f)  // 减小摩擦力，使滑动更流畅
+                                .scrollViewFriction(0.008f)  // 减小摩擦力，使滑动更流畅
                                 // 减小这个值可以增加滚动速度，建议范围 0.01f - 0.02f
                                 .numberOfSplinePoints(100)  // 提高采样率
                                 // 增加这个值可以使滚动更平滑，但会略微增加计算量，建议范围 100 - 200
@@ -348,7 +348,7 @@ public fun PdfPage(
                 }
 
                 // 示例文字内容
-                val textToDraw = page.aPage.index.toString()
+                /*val textToDraw = page.aPage.index.toString()
                 val textStyle = TextStyle(color = Color.Red, fontSize = 60.sp)
 
                 val textLayoutResult = textMeasurer.measure(textToDraw, style = textStyle)
@@ -363,7 +363,7 @@ public fun PdfPage(
                 drawText(
                     textLayoutResult = textLayoutResult,
                     topLeft = Offset(x, y)
-                )
+                )*/
             }
         }
     }

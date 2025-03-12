@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -65,9 +67,12 @@ import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.ImageCache
+import com.archko.reader.pdf.component.PdfColumn
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
+import com.archko.reader.pdf.scrollbar.DraggableScrollbar
+import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
 import com.archko.reader.pdf.state.PdfState
 import com.archko.reader.pdf.util.Dispatcher
@@ -303,7 +308,7 @@ private fun PdfScreen(
     // 在组合完成后请求焦点
     LaunchedEffect(Unit) {
         println("开始计算页面列表，总页数: ${pdf.pageCount}")
-        scope.launch {
+        /*scope.launch {
             snapshotFlow {
                 if (isActive) {
                     val list = mutableListOf<APage>()
@@ -323,7 +328,7 @@ private fun PdfScreen(
                         aPageList = it
                     }
                 }
-        }
+        }*/
 
         println("launch.progress:${viewModel.progress}")
         viewModel.progress?.page?.let { lazyListState.scrollToItem(it.toInt()) }
@@ -421,7 +426,7 @@ private fun PdfScreen(
                         )
                     }
             ) {
-                /*PdfColumn(
+                PdfColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .onSizeChanged {
@@ -444,8 +449,8 @@ private fun PdfScreen(
                     onThumbMoved = lazyListState.rememberDraggableScroller(
                         itemsAvailable = pdf.pageCount,
                     ),
-                )*/
-                DocumentView(pdf, aPageList, width, height)
+                )
+                //DocumentView(pdf, aPageList, width, height)
                 /*val list= mutableListOf<APage>()
                 for(i in 0..6){
                     list.add(APage(i,1024,1280))
