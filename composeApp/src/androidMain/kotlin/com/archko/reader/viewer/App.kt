@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,8 +44,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.referentialEqualityPolicy
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -65,7 +79,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
-import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.ImageCache
 import com.archko.reader.pdf.component.PdfColumn
 import com.archko.reader.pdf.entity.APage
@@ -75,7 +88,6 @@ import com.archko.reader.pdf.scrollbar.DraggableScrollbar
 import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
 import com.archko.reader.pdf.state.PdfState
-import com.archko.reader.pdf.util.Dispatcher
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -84,10 +96,6 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -413,15 +421,33 @@ private fun PdfScreen(
     ) { paddingValues ->
         @Composable
         fun screen() {
+            val density = LocalDensity.current
+            val scrollDistance = remember(density) { with(density) { 16.dp.toPx() } }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
-                    .padding(paddingValues)
+                    .padding(if (showTopBar.value) paddingValues else PaddingValues(0.dp))
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onDoubleTap = {
                                 showTopBar.value = !showTopBar.value
+                            },
+                            onTap = { offset ->
+                                val tapY = offset.y
+                                val quarterHeight = height / 4
+
+                                if (tapY < quarterHeight) {
+                                    // 向上滚动
+                                    scope.launch {
+                                        lazyListState.scrollBy(-height.toFloat() + scrollDistance)
+                                    }
+                                } else if (tapY > 3 * quarterHeight) {
+                                    // 向下滚动
+                                    scope.launch {
+                                        lazyListState.scrollBy(height.toFloat() - scrollDistance)
+                                    }
+                                }
                             }
                         )
                     }
