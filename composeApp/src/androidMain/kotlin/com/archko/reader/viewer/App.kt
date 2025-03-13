@@ -29,8 +29,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Toc
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
@@ -41,7 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -369,56 +368,7 @@ private fun PdfScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (showTopBar.value) {
-                TopAppBar(
-                    modifier = Modifier.background(Color.White),
-                    title = {
-                        Column {
-                            Text(
-                                fontSize = 16.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = Color.White,
-                                text = "${viewModel.progress?.path}"
-                            )
-                            Text(
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                text = "$currentPage/${pdf.pageCount}"
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onClickBack) {
-                            Icon(Icons.Default.Close, contentDescription = null)
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = {
-                            scope.launch {
-                                ImageCache.clear()
-                                tocVisibile.value = !tocVisibile.value
-                            }
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
-                        }
-
-                        IconButton(onClick = { scale -= 0.1f }) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = null)
-                        }
-
-                        IconButton(onClick = { scale += 0.1f }) {
-                            Icon(Icons.Default.ZoomIn, contentDescription = null)
-                        }
-                    },
-                    scrollBehavior = scrollBehavior
-                )
-            }
-        },
-        //snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
+    Scaffold { paddingValues ->
         @Composable
         fun screen() {
             val density = LocalDensity.current
@@ -427,7 +377,6 @@ private fun PdfScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent)
-                    .padding(if (showTopBar.value) paddingValues else PaddingValues(0.dp))
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onDoubleTap = {
@@ -488,7 +437,11 @@ private fun PdfScreen(
         @Composable
         fun toc() {
             if (pdf.outlineItems == null || pdf.outlineItems!!.isEmpty()) {
-                Box(modifier = Modifier.background(Color.White)) {
+                Box(
+                    modifier = Modifier
+                        .background(Color.White)
+                        .padding(paddingValues)
+                ) {
                     Text(
                         modifier = Modifier
                             .width(240.dp)
@@ -519,6 +472,7 @@ private fun PdfScreen(
                         .width(300.dp)
                         .background(Color.White)
                         .fillMaxHeight()
+                        .padding(paddingValues)
                         .focusable(),
                     state = tocLazyListState,
                 ) {
@@ -571,6 +525,66 @@ private fun PdfScreen(
             }
         }
 
+        @Composable
+        fun topBar() {
+            if (showTopBar.value) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black)
+                        .padding(paddingValues),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 左边部分，使用 Modifier.weight 让其可伸缩
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onClickBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                        Column(
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = Color.White,
+                                text = "${viewModel.progress?.path}"
+                            )
+                            Text(
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                text = "$currentPage/${pdf.pageCount}"
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                ImageCache.clear()
+                                tocVisibile.value = !tocVisibile.value
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
+                        }
+                        IconButton(onClick = { scale -= 0.1f }) {
+                            Icon(Icons.Default.ZoomOut, contentDescription = null)
+                        }
+
+                        IconButton(onClick = { scale += 0.1f }) {
+                            Icon(Icons.Default.ZoomIn, contentDescription = null)
+                        }
+                    }
+                }
+            }
+        }
+
         if (tocVisibile.value) {
             Box(
                 modifier = Modifier
@@ -579,9 +593,11 @@ private fun PdfScreen(
             ) {
                 screen()
                 toc()
+                topBar()
             }
         } else {
             screen()
+            topBar()
         }
     }
 }
