@@ -236,7 +236,7 @@ public fun DocumentView(
 }
 
 // 辅助函数：计算两点之间的距离
-private fun calculateDistance(event: PointerEvent): Float {
+public fun calculateDistance(event: PointerEvent): Float {
     val first = event.changes[0].position
     val second = event.changes[1].position
     return sqrt((first.x - second.x).pow(2) + (first.y - second.y).pow(2))
