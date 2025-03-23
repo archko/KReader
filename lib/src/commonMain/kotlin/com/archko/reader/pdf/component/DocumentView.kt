@@ -29,8 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
@@ -55,7 +53,6 @@ import com.archko.reader.pdf.state.PdfViewState
 import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
@@ -63,8 +60,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 /**
  * @author: archko 2025/3/10 :20:09
@@ -167,25 +162,26 @@ public fun DocumentView(
                                     val centroid = event.calculateCentroid(useCurrent = false)
                                     if (zoomChange != 1f) {
                                         val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
-                                        val contentCenter = Offset(
-                                            offset.x + panChange.x,
-                                            offset.x + panChange.y
+                                        // 计算缩放前后的偏移量变化
+                                        val zoomFactor = newZoom / vZoom
+                                        val newOffset = Offset(
+                                            centroid.x + (offset.x - centroid.x) * zoomFactor,
+                                            centroid.y + (offset.y - centroid.y) * zoomFactor
                                         )
-                                        // 计算新的偏移量
+
+                                        // 计算最大滚动范围
+                                        val scaledWidth = viewSize.width * newZoom
+                                        val scaledHeight = pdfState.totalHeight/* newZoom*/
+                                        val maxX =
+                                            (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                        val maxY =
+                                            (scaledHeight - viewSize.height).coerceAtLeast(0f)
+
+                                        // 更新偏移量
                                         offset = Offset(
-                                            contentCenter.x,
-                                            contentCenter.y
-                                        ).let { newOffset ->
-                                            val maxX = (viewSize.width * (newZoom - 1) / 2)
-                                                .coerceAtLeast(0f)
-                                            val maxY =
-                                                (pdfState.totalHeight /* newZoom*/ - viewSize.height)
-                                                    .coerceAtLeast(0f)
-                                            Offset(
-                                                newOffset.x.coerceIn(-maxX, maxX),
-                                                newOffset.y.coerceIn(-maxY, 0f)
-                                            )
-                                        }
+                                            newOffset.x.coerceIn(-maxX, maxX),
+                                            newOffset.y.coerceIn(-maxY, 0f)
+                                        )
 
                                         // 更新状态
                                         vZoom = newZoom

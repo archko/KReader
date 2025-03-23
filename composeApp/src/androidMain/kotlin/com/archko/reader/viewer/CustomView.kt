@@ -440,32 +440,31 @@ fun CustomView(
                                         val centroid = event.calculateCentroid(useCurrent = false)
                                         if (zoomChange != 1f) {
                                             val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
-                                            val contentCenter = Offset(
-                                                offset.x + panChange.x,
-                                                offset.x + panChange.y
+                                            // 计算缩放前后的偏移量变化
+                                            val zoomFactor = newZoom / vZoom
+                                            val newOffset = Offset(
+                                                centroid.x + (offset.x - centroid.x) * zoomFactor,
+                                                centroid.y + (offset.y - centroid.y) * zoomFactor
                                             )
-                                            // 计算新的偏移量
+
+                                            // 计算最大滚动范围
+                                            val scaledWidth = viewSize.width * newZoom
+                                            val scaledHeight = pdfState.totalHeight/* newZoom*/
+                                            val maxX =
+                                                (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                            val maxY =
+                                                (scaledHeight - viewSize.height).coerceAtLeast(0f)
+
+                                            // 更新偏移量
                                             offset = Offset(
-                                                contentCenter.x,
-                                                contentCenter.y
-                                            ).let { newOffset ->
-                                                val maxX = (viewSize.width * (newZoom - 1) / 2)
-                                                    .coerceAtLeast(0f)
-                                                val maxY =
-                                                    (pdfState.totalHeight * newZoom - viewSize.height)
-                                                        .coerceAtLeast(0f)
-                                                Offset(
-                                                    newOffset.x.coerceIn(-maxX, maxX),
-                                                    newOffset.y.coerceIn(-maxY, 0f)
-                                                )
-                                            }
+                                                newOffset.x.coerceIn(-maxX, maxX),
+                                                newOffset.y.coerceIn(-maxY, 0f)
+                                            )
 
                                             // 更新状态
                                             vZoom = newZoom
-                                            pdfState.pages.zip(pdfState.pagePositions)
-                                                .forEach { (page, yPos) ->
-                                                    page.update(viewSize, vZoom, offset, yPos)
-                                                }
+                                            println("zoom:$vZoom, $centroid, $offset")
+                                            pdfState.updateViewSize(viewSize, vZoom)
                                         }
                                         event.changes.fastForEach {
                                             if (it.positionChanged()) {
