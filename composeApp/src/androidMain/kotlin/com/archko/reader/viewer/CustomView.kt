@@ -446,7 +446,6 @@ fun CustomView(
                                                 centroid.x + (offset.x - centroid.x) * zoomFactor,
                                                 centroid.y + (offset.y - centroid.y) * zoomFactor
                                             )
-
                                             // 计算最大滚动范围
                                             val scaledWidth = viewSize.width * newZoom
                                             val scaledHeight = pdfState.totalHeight/* newZoom*/
@@ -463,8 +462,10 @@ fun CustomView(
 
                                             // 更新状态
                                             vZoom = newZoom
-                                            println("zoom:$vZoom, $centroid, $offset")
-                                            pdfState.updateViewSize(viewSize, vZoom)
+                                            pdfState.pages.zip(pdfState.pagePositions)
+                                                .forEach { (page, yPos) ->
+                                                    page.update(viewSize, vZoom, offset, yPos)
+                                                }
                                         }
                                         event.changes.fastForEach {
                                             if (it.positionChanged()) {
