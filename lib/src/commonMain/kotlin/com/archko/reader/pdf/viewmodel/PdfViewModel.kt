@@ -17,7 +17,7 @@ public class PdfViewModel : ViewModel() {
     private val _recentList = MutableStateFlow<List<Recent>>(mutableListOf())
     public val recentList: StateFlow<List<Recent>> = _recentList
     public var progress: Progress? = null
-    public var path: String? = null
+    public var path:String?=null
 
     public fun insertOrUpdate(path: String, pageCount: Long) {
         this.path = path

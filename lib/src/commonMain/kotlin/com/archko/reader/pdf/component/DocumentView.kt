@@ -2,7 +2,11 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.forEachGesture
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -22,17 +26,25 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastAny
+import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
@@ -46,6 +58,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -92,77 +105,100 @@ public fun DocumentView(
                 pdfState.updateViewSize(it, vZoom)
             }
             .pointerInput(Unit) {
-                forEachGesture {
-                    awaitPointerEventScope {
-                        var initialZoom = vZoom
-                        var startOffset = Offset.Zero
-                        var initialDistance = 0f
-                        var initialCenter = Offset.Zero
+                awaitEachGesture {
+                    var wasCancelled = false
 
-                        while (true) {
+                    try {
+                        var zoom = 1f
+                        var pastTouchSlop = false
+
+                        // 等待第一个触点
+                        val trackingPointerId = awaitFirstDown(requireUnconsumed = false).id
+                        var pointerCount = 1
+                        do {
+                            flingJob?.cancel()
+                            flingJob = null
                             val event = awaitPointerEvent()
+                            val canceled = event.changes.fastAny { it.isConsumed }
+                            pointerCount = event.changes.size
+                            if (!canceled) {
+                                event.changes.fastForEach {
+                                    if (it.id == trackingPointerId) {
+                                        velocityTracker.addPointerInputChange(it)
+                                    }
+                                }
+                                val zoomChange = event.calculateZoom()
+                                val panChange = event.calculatePan()
+                                if (!pastTouchSlop) {
+                                    zoom *= zoomChange
+                                    //pan += panChange
+                                    val scaledWidth = viewSize.width * vZoom
+                                    val scaledHeight = pdfState.totalHeight //* vZoom
 
-                            when (event.changes.size) {
-                                1 -> { // 单指滑动
-                                    flingJob?.cancel()
-                                    flingJob = null
-                                    event.changes[0].let { drag ->
-                                        val delta = drag.position - drag.previousPosition
-                                        velocityTracker.addPosition(
-                                            drag.uptimeMillis,
-                                            drag.position
+                                    // 计算最大滚动范围
+                                    val maxX =
+                                        (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
+                                    val maxY =
+                                        (scaledHeight - viewSize.height).coerceAtLeast(
+                                            0f
                                         )
 
-                                        val scaledWidth = viewSize.width * vZoom
-                                        val scaledHeight = pdfState.totalHeight// * vZoom
+                                    // 更新偏移量
+                                    offset = Offset(
+                                        (offset.x + panChange.x).coerceIn(-maxX, maxX),
+                                        (offset.y + panChange.y).coerceIn(-maxY, 0f)
+                                    )
 
-                                        // 计算最大滚动范围
-                                        val maxX =
-                                            (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
-                                        val maxY =
-                                            (scaledHeight - viewSize.height).coerceAtLeast(0f)
-
-                                        // 更新偏移量
-                                        offset = Offset(
-                                            (offset.x + delta.x).coerceIn(-maxX, maxX),
-                                            (offset.y + delta.y).coerceIn(-maxY, 0f)
-                                        )
+                                    println("pan.zoom:$vZoom, $zoomChange, ${event.changes.size}, $offset")
+                                    if (event.changes.size > 1) {
+                                        pastTouchSlop = true
                                     }
                                 }
 
-                                2 -> { // 双指缩放
-                                    if (event.changes.all { it.pressed }) {
-                                        if (initialDistance == 0f) {
-                                            // 第一次双指事件，记录初始距离和中心点
-                                            initialDistance = calculateDistance(event)
-                                            initialCenter = calculateCenter(event)
-                                            startOffset = offset
-                                            initialZoom = vZoom
-                                        } else {
-                                            val currentDistance = calculateDistance(event)
-                                            val scale = currentDistance / initialDistance
-                                            vZoom = (initialZoom * scale).coerceIn(1f, 5f)
-
-                                            // 调整偏移量以保持缩放中心点不变
-                                            val newCenter = calculateCenter(event)
-                                            offset = Offset(
-                                                startOffset.x + (newCenter.x - initialCenter.x) / vZoom,
-                                                startOffset.y + (newCenter.y - initialCenter.y) / vZoom
+                                if (pastTouchSlop) { // 双指缩放
+                                    val centroid = event.calculateCentroid(useCurrent = false)
+                                    if (zoomChange != 1f) {
+                                        val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
+                                        val contentCenter = Offset(
+                                            offset.x + panChange.x,
+                                            offset.x + panChange.y
+                                        )
+                                        // 计算新的偏移量
+                                        offset = Offset(
+                                            contentCenter.x,
+                                            contentCenter.y
+                                        ).let { newOffset ->
+                                            val maxX = (viewSize.width * (newZoom - 1) / 2)
+                                                .coerceAtLeast(0f)
+                                            val maxY =
+                                                (pdfState.totalHeight /* newZoom*/ - viewSize.height)
+                                                    .coerceAtLeast(0f)
+                                            Offset(
+                                                newOffset.x.coerceIn(-maxX, maxX),
+                                                newOffset.y.coerceIn(-maxY, 0f)
                                             )
+                                        }
 
-                                            pdfState.updateViewSize(viewSize, vZoom)
+                                        // 更新状态
+                                        vZoom = newZoom
+                                        println("zoom:$vZoom, $centroid, $offset")
+                                        pdfState.updateViewSize(viewSize, vZoom)
+                                    }
+                                    event.changes.fastForEach {
+                                        if (it.positionChanged()) {
+                                            it.consume()
                                         }
                                     }
                                 }
-
-                                else -> break
                             }
-
-                            if (!event.changes.any { it.pressed }) {
-                                break
-                            }
-                        }
-
+                            val finalEvent = awaitPointerEvent(pass = PointerEventPass.Final)
+                            val finallyCanceled =
+                                finalEvent.changes.fastAny { it.isConsumed } && !pastTouchSlop
+                        } while (!canceled && !finallyCanceled && event.changes.fastAny { it.pressed })
+                    } catch (exception: CancellationException) {
+                        wasCancelled = true
+                        //if (!isActive) throw exception
+                    } finally {
                         // 计算最终速度
                         val velocity = velocityTracker.calculateVelocity()
                         velocityTracker.resetTracking()
@@ -258,7 +294,7 @@ private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSiz
     )
 
     // 检查页面是否与可视区域相交
-    val flag = bounds.intersectsWith(visibleRect)
+    val flag = bounds.overlaps(visibleRect)
     //println("isVisible.index:$index, $flag, $visibleRect, $bounds")
     return flag
 }
@@ -347,24 +383,46 @@ public fun PdfPage(
                     //drawRect(color = Color.Red)
                 }
 
-                // 示例文字内容
-                /*val textToDraw = page.aPage.index.toString()
-                val textStyle = TextStyle(color = Color.Red, fontSize = 60.sp)
-
-                val textLayoutResult = textMeasurer.measure(textToDraw, style = textStyle)
-
-                // 计算文本位置使其水平和垂直居中
-                val x =
-                    (page.bounds.width - textLayoutResult.size.width) / 2 + page.bounds.left + offset.x
-                val y =
-                    (page.bounds.height - textLayoutResult.size.height) / 2 + page.bounds.top + offset.y
-
-                // 绘制文本
-                drawText(
-                    textLayoutResult = textLayoutResult,
-                    topLeft = Offset(x, y)
-                )*/
+                drawPage(page, offset, textMeasurer)
             }
         }
     }
+}
+
+private fun DrawScope.drawPage(
+    page: Page,
+    offset: Offset,
+    textMeasurer: TextMeasurer
+) {
+    val rect = page.bounds
+    val drawRect = Rect(
+        rect.left,
+        rect.top + offset.y,
+        rect.right,
+        rect.bottom + offset.y
+    )
+    drawRect(
+        color = Color.Green,
+        topLeft = drawRect.topLeft,
+        size = rect.size,
+        style = Stroke(width = 20f)
+    )
+
+    // 示例文字内容
+    val textToDraw = page.aPage.index.toString()
+    val textStyle = TextStyle(color = Color.Red, fontSize = 60.sp)
+
+    val textLayoutResult = textMeasurer.measure(textToDraw, style = textStyle)
+
+    // 计算文本位置使其水平和垂直居中
+    val x =
+        (page.bounds.width - textLayoutResult.size.width) / 2 + page.bounds.left + offset.x
+    val y =
+        (page.bounds.height - textLayoutResult.size.height) / 2 + page.bounds.top + offset.y
+
+    // 绘制文本
+    drawText(
+        textLayoutResult = textLayoutResult,
+        topLeft = Offset(x, y)
+    )
 }

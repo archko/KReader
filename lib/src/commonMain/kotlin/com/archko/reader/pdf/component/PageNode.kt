@@ -56,15 +56,8 @@ public class PageNode(
         )
 
         // 检查页面是否与可视区域相交
-        val flag = rect.intersectsWith(visibleRect)
+        val flag = rect.overlaps(visibleRect)
         //println("isVisible:${aPage.index}, $flag, $visibleRect, $rect")
         return flag
     }
-}
-
-public fun Rect.intersectsWith(other: Rect): Boolean {
-    return !(left > other.right ||
-            right < other.left ||
-            top > other.bottom ||
-            bottom < other.top)
 }

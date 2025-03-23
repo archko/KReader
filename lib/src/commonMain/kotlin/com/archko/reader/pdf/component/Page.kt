@@ -94,7 +94,7 @@ public class Page(
             right = drawScope.size.width - offset.x,
             bottom = drawScope.size.height - offset.y
         )
-        val flag = bounds.intersectsWith(visibleRect)
+        val flag = bounds.overlaps(visibleRect)
         //println("page:${aPage.index}, isVisible:$flag, $visibleRect, $bounds, $viewSize")
         return flag
     }
