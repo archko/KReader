@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
@@ -126,6 +127,17 @@ private class Page(
     public fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
             node.draw(drawScope, offset)
+            val contentOffset = calculateContentOffset()
+            drawScope.drawContext.canvas.nativeCanvas.drawText(
+                aPage.index.toString(),
+                contentOffset.x + drawScope.size.width / 2,
+                contentOffset.y + drawScope.size.height / 2,
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.YELLOW
+                    textSize = 160f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
         }
     }
 

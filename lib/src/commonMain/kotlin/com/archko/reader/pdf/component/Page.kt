@@ -71,7 +71,7 @@ public class Page(
                 )*/
                 //println("page.draw:${aPage.index}, $zoom, $viewSize, $bounds")
                 node.draw(drawScope, offset)
-                val bitmap = pdfState.renderPageRegion(
+                /*val bitmap = pdfState.renderPageRegion(
                     aPage.index,
                     bounds.width.toInt(),
                     bounds.height.toInt(),
@@ -82,7 +82,7 @@ public class Page(
                     bitmap,
                     dstSize = Size(bounds.width, bounds.height).toIntSize(),
                     dstOffset = IntOffset(bounds.width.toInt(), bounds.height.toInt())
-                )
+                )*/
             }
         }
     }

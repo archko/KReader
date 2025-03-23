@@ -30,7 +30,7 @@ public class PageNode(
             color = Color.Green,
             topLeft = drawRect.topLeft,
             size = rect.size,
-            style = Stroke(width = 2f)
+            style = Stroke(width = 8f)
         )
 
         // 绘制 ID
