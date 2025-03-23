@@ -326,7 +326,7 @@ private class PdfViewState(
 
         this.viewSize = viewSize
         this.vZoom = vZoom
-        if (isViewSizeChanged || isZoomChanged) {
+        if (isViewSizeChanged || isZoomChanged || totalHeight == 0f) {
             invalidatePageSizes()
             println("PdfViewState.viewSize变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         } else {

@@ -24,10 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,6 +55,7 @@ import com.archko.reader.pdf.state.PdfViewState
 import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
@@ -95,6 +98,11 @@ public fun DocumentView(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     var flingJob by remember { mutableStateOf<Job?>(null) }
+
+    // 定义背景渐变
+    val gradientBrush = Brush.verticalGradient(
+        colors = listOf(Color.Green, Color.Red)
+    )
 
     Box(
         modifier = Modifier
@@ -258,6 +266,27 @@ public fun DocumentView(
         contentAlignment = Alignment.TopStart
     ) {
         if (pdfState.init) {
+            /*Canvas(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                translate(left = offset.x, top = offset.y) {
+                    //只绘制可见区域.
+                    val visibleRect = Rect(
+                        left = -offset.x,
+                        top = -offset.y,
+                        right = size.width - offset.x,
+                        bottom = size.height - offset.y
+                    )
+                    drawRect(
+                        brush = gradientBrush,
+                        topLeft = visibleRect.topLeft,
+                        size = visibleRect.size
+                    )
+                }
+
+                pdfState.pages.forEach { page -> page.draw(this, offset) }
+            }*/
+
             pdfState.pages.forEach { page ->
                 PdfPage(
                     state = state,
@@ -269,20 +298,6 @@ public fun DocumentView(
             }
         }
     }
-}
-
-// 辅助函数：计算两点之间的距离
-public fun calculateDistance(event: PointerEvent): Float {
-    val first = event.changes[0].position
-    val second = event.changes[1].position
-    return sqrt((first.x - second.x).pow(2) + (first.y - second.y).pow(2))
-}
-
-// 辅助函数：计算两个触点的中心点
-private fun calculateCenter(event: PointerEvent): Offset {
-    val first = event.changes[0].position
-    val second = event.changes[1].position
-    return Offset((first.x + second.x) / 2, (first.y + second.y) / 2)
 }
 
 private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSize): Boolean {
