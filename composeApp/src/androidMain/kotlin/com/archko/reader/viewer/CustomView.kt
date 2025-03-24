@@ -112,14 +112,13 @@ private class Page(
     public fun update(viewSize: IntSize, zoom: Float, offset: Offset, pageOffset: Float) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.zoom != zoom
-        val offsetChanged = this.offset != offset
 
         this.viewSize = viewSize
         this.zoom = zoom
         this.offset = offset
         this.pageOffset = pageOffset
 
-        if (isViewSizeChanged || isZoomChanged || offsetChanged || nodes.isEmpty()) {
+        if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
         }
     }
@@ -222,11 +221,6 @@ private class Page(
         return listOf(page)
     }
 
-    override fun toString(): String {
-        //return "Page(viewSize=$viewSize, zoom=$zoom, offset=$offset, aPage=$aPage, pageOffset=$pageOffset, lastContentOffset=$lastContentOffset)"
-        return "Page(viewSize=$viewSize, offset=$offset"
-    }
-
     public companion object {
         private const val maxSize = 256 * 384 * 4f * 2
     }
@@ -235,14 +229,12 @@ private class Page(
 private class PdfViewState(
     public val list: List<APage>,
     public val state: PdfState,
-    public var viewSize: IntSize,
 ) {
     public var init: Boolean by mutableStateOf(false)
     public var totalHeight: Float by mutableFloatStateOf(0f)
 
-    public var pages: List<Page> by mutableStateOf(createPages())
-
-    //public var viewSize: IntSize by mutableStateOf(IntSize.Zero)
+    //public var pages: List<Page> by mutableStateOf(createPages())
+    public var viewSize: IntSize by mutableStateOf(IntSize.Zero)
     public var vZoom: Float by mutableFloatStateOf(1f)
     var pagePositions: List<Float> by mutableStateOf(createPositions())
 
@@ -261,7 +253,6 @@ private class PdfViewState(
                 position
             }
         }
-        println("PdfViewState.updatePositions:$pagePositions")
     }
 
     fun updateHeight() {
@@ -278,7 +269,6 @@ private class PdfViewState(
     public fun invalidatePageSizes() {
         updatePositions()
         updateHeight()
-        updatePage()
         var currentY = 0f
         /*if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
             println("PdfViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, list:$list, totalHeight:$totalHeight")
@@ -304,21 +294,17 @@ private class PdfViewState(
         println("invalidatePageSizes.totalHeight:$totalHeight, zoom:$vZoom, viewSize:$viewSize")
     }
 
-    fun updatePage() {
-        if (pages.isEmpty()) {
-            pages = list.zip(pagePositions).map { (aPage, yPos) ->
-                Page(viewSize, 1f, Offset.Zero, aPage, yPos)
-            }
+    /*private fun createPages(): List<Page> {
+        return list.map { aPage ->
+            Page(
+                viewSize,
+                1f,
+                IntSize.Zero,
+                aPage,
+                1f,
+            )
         }
-        pages.zip(pagePositions).map { (page, yPos) ->
-            page.update(viewSize, 1f, Offset(0f, yPos), yPos)
-        }
-        println("PdfViewState.updatePage:$pages")
-    }
-
-    private fun createPages(): List<Page> {
-        return emptyList()
-    }
+    }*/
 
     public fun updateViewSize(viewSize: IntSize, vZoom: Float) {
         val isViewSizeChanged = this.viewSize != viewSize
@@ -326,7 +312,7 @@ private class PdfViewState(
 
         this.viewSize = viewSize
         this.vZoom = vZoom
-        if (isViewSizeChanged || isZoomChanged || totalHeight == 0f) {
+        if (isViewSizeChanged || isZoomChanged) {
             invalidatePageSizes()
             println("PdfViewState.viewSize变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         } else {
@@ -351,7 +337,7 @@ fun CustomView(
 
     val pdfState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}")
-        PdfViewState(list, state, viewSize)
+        PdfViewState(list, state)
     }
     // 确保在 list 变化时重新计算总高度
     LaunchedEffect(list, viewSize) {
@@ -361,7 +347,12 @@ fun CustomView(
         }
     }
 
-    //这里存在pages的变化监听不到的问题.
+    // 创建并记住每个页面的Page对象
+    var pages by remember(list, pdfState.pagePositions) {
+        mutableStateOf(list.zip(pdfState.pagePositions).map { (aPage, yPos) ->
+            Page(IntSize.Zero, 1f, Offset.Zero, aPage, yPos)
+        })
+    }
 
     // 定义背景渐变
     val gradientBrush = Brush.verticalGradient(
@@ -373,7 +364,7 @@ fun CustomView(
             .fillMaxSize()
             .onSizeChanged {
                 viewSize = it
-                pdfState.pages.zip(pdfState.pagePositions).forEach { (page, yPos) ->
+                pages.zip(pdfState.pagePositions).forEach { (page, yPos) ->
                     page.update(viewSize, vZoom, offset, yPos)
                 }
             },
@@ -428,7 +419,7 @@ fun CustomView(
                                         )
 
                                         // 更新页面位置
-                                        pdfState.pages.forEach { page ->
+                                        pages.forEach { page ->
                                             page.updateOffset(offset)
                                         }
 
@@ -446,6 +437,7 @@ fun CustomView(
                                                 centroid.x + (offset.x - centroid.x) * zoomFactor,
                                                 centroid.y + (offset.y - centroid.y) * zoomFactor
                                             )
+
                                             // 计算最大滚动范围
                                             val scaledWidth = viewSize.width * newZoom
                                             val scaledHeight = pdfState.totalHeight/* newZoom*/
@@ -462,7 +454,8 @@ fun CustomView(
 
                                             // 更新状态
                                             vZoom = newZoom
-                                            pdfState.pages.zip(pdfState.pagePositions)
+                                            println("zoom:$vZoom, $centroid, $offset")
+                                            pages.zip(pdfState.pagePositions)
                                                 .forEach { (page, yPos) ->
                                                     page.update(viewSize, vZoom, offset, yPos)
                                                 }
@@ -514,11 +507,7 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(x = value.coerceIn(-maxX, maxX))
-                                            pdfState.pages.forEach { page ->
-                                                page.updateOffset(
-                                                    offset
-                                                )
-                                            }
+                                            pages.forEach { page -> page.updateOffset(offset) }
                                         }
                                     }
                                 }
@@ -531,11 +520,7 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(y = value.coerceIn(-maxY, 0f))
-                                            pdfState.pages.forEach { page ->
-                                                page.updateOffset(
-                                                    offset
-                                                )
-                                            }
+                                            pages.forEach { page -> page.updateOffset(offset) }
                                         }
                                     }
                                 }
@@ -544,8 +529,6 @@ fun CustomView(
                     }
                 }
         ) {
-            val scaledHeight = pdfState.totalHeight * vZoom
-
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.
                 val visibleRect = Rect(
@@ -560,19 +543,8 @@ fun CustomView(
                     size = visibleRect.size
                 )
             }
-            /*drawRect(
-                brush = gradientBrush,
-                topLeft = Offset(
-                    (size.width - viewSize.width * vZoom) / 2 + offset.x,
-                    offset.y
-                ),
-                size = Size(
-                    width = viewSize.width * vZoom,
-                    height = scaledHeight
-                )
-            )*/
 
-            pdfState.pages.forEach { page -> page.draw(this, offset) }
+            pages.forEach { page -> page.draw(this, offset) }
         }
     }
 }
