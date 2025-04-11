@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import com.archko.reader.pdf.subsampling.SamplingImageSource
 import com.archko.reader.pdf.subsampling.SubSamplingImage
 import com.archko.reader.pdf.subsampling.rememberSubSamplingImageState
+import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
 import okio.Path.Companion.toPath
@@ -20,7 +21,7 @@ import okio.Path.Companion.toPath
 @Composable
 fun TestSubSampling(path: String) {
     val imageSource = remember { SamplingImageSource(path.toPath(true), null) }
-    val zoomableState = rememberZoomableState()
+    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 5f))
     Box(
         modifier = Modifier
             .fillMaxSize()

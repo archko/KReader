@@ -7,7 +7,6 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.subsampling.internal.ExifMetadata
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
-import com.archko.reader.pdf.subsampling.internal.RotatedBitmapPainter
 import com.archko.reader.pdf.subsampling.internal.rotateBy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -49,21 +48,8 @@ internal class AndroidImageRegionDecoder private constructor(
     }
 
     override fun close() {
+        decoder.close()
     }
-
-    /*private fun ImageDecoder.size(): IntSize {
-        val shouldFlip = when (exif.orientation) {
-            ExifMetadata.ImageOrientation.Orientation90,
-            ExifMetadata.ImageOrientation.Orientation270 -> true
-
-            else -> false
-        }
-
-        return IntSize(
-            width = if (shouldFlip) imageSize.height else imageSize.width,
-            height = if (shouldFlip) imageSize.width else imageSize.height,
-        )
-    }*/
 
     companion object {
         @OptIn(ExperimentalCoroutinesApi::class)

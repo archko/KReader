@@ -47,21 +47,9 @@ public class PdfDecoder(file: File) : ImageDecoder {
         pageSizes = prepareSizes()
         outlineItems = prepareOutlines()
 
-        val list = mutableListOf<Size>()
-        for (i in 0 until pageCount) {
-            val page = document.loadPage(i)
-            val bounds = page.bounds
-            val size = Size(
-                bounds.x1.toInt() - bounds.x0.toInt(),
-                bounds.y1.toInt() - bounds.y0.toInt(),
-                i
-            )
-            page.destroy()
-            list.add(size)
-        }
         var width = 0
         var height = 0
-        val size = list[0]
+        val size = pageSizes[0]
         width = size.width
         height = size.height
         imageSize = IntSize(width, height)
@@ -77,6 +65,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     override fun size(): IntSize {
         return imageSize
+    }
+
+    override fun close() {
+        document.destroy()
     }
 
     private fun prepareSizes(): List<Size> {

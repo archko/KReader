@@ -2,7 +2,6 @@ package com.archko.reader.pdf.subsampling
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.ImageBitmapConfig
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import okio.Closeable
 import okio.Path
@@ -16,7 +15,7 @@ public class SamplingImageSource(
         check(path.isAbsolute)
     }
 
-    override val preview: ImageBitmap? = ImageBitmap(100, 100, ImageBitmapConfig.Argb8888)
+    override val preview: ImageBitmap? = null
 
     override suspend fun decoder(): ImageRegionDecoder.Factory {
         return AndroidImageRegionDecoder.Factory(this) {

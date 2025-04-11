@@ -10,4 +10,5 @@ import androidx.compose.ui.unit.IntSize
 public interface ImageDecoder {
     public fun decodeRegion(rect: IntRect, index: Int): ImageBitmap?
     public fun size(): IntSize
+    public fun close()
 }
