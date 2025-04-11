@@ -137,6 +137,8 @@ fun App(
                     scope.launch {
                         files.singleOrNull()?.let { file ->
                             pdf = LocalPdfState(file)
+                            viewModel.path =
+                                IntentFile.getPath(PdfApp.app!!.applicationContext, file.uri)
                             loadProgress(viewModel, file, pdf)
                         }
                     }
@@ -180,6 +182,7 @@ fun App(
                             recentItem(recentList[i]) {
                                 val file = KmpFile(Uri.parse(it.path))
                                 pdf = LocalPdfState(file)
+                                viewModel.path = it.path
                                 loadProgress(viewModel, file, pdf)
                             }
                         }

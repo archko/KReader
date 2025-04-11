@@ -69,7 +69,7 @@ private val matrix by lazy(NONE) { Matrix() }
  *
  * Code adapted from [subsampling-scale-image-view](https://github.com/davemorrissey/subsampling-scale-image-view).
  */
-internal inline fun createRotationMatrix(
+/*internal inline fun createRotationMatrix(
     bitmapSize: Size,
     orientation: ImageOrientation,
     bounds: Size,
@@ -115,7 +115,7 @@ internal inline fun createRotationMatrix(
     )
 
     return matrix
-}
+}*/
 
 private fun IntOffset.flip(): IntOffset = IntOffset(x = y, y = x)
 private fun IntSize.flip(): IntSize = IntSize(width = height, height = width)

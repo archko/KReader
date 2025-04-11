@@ -8,10 +8,6 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 public class ImageBitmapOptions internal constructor(
     public val config: ImageBitmapConfig = ImageBitmapConfig.Argb8888,
 ) {
-    @Deprecated("", level = DeprecationLevel.HIDDEN)
-    public constructor(config: ImageBitmapConfig) : this() {
-    }
-
     public companion object {
         public val Default: ImageBitmapOptions = ImageBitmapOptions()
     }
