@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.subsampling
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -16,7 +17,7 @@ import kotlinx.coroutines.withContext
 internal class AndroidImageRegionDecoder private constructor(
     private val imageSource: SubSamplingImageSource,
     private val imageOptions: ImageBitmapOptions,
-    private val decoder: ImageRegionDecoder,
+    private val decoder: ImageDecoder,
     private val exif: ExifMetadata,
     private val dispatcher: CoroutineDispatcher,
 ) : ImageRegionDecoder {
@@ -35,13 +36,11 @@ internal class AndroidImageRegionDecoder private constructor(
 
         val bitmap: ImageBitmap? = withContext(dispatcher) {
             decoder.decodeRegion(bounds, 1)
-            null
         }
         if (bitmap != null) {
             return ImageRegionDecoder.DecodeResult(
-                painter = RotatedBitmapPainter(
+                painter = BitmapPainter(
                     image = bitmap,
-                    orientation = exif.orientation,
                 )
             )
         } else {
@@ -52,7 +51,7 @@ internal class AndroidImageRegionDecoder private constructor(
     override fun close() {
     }
 
-    private fun ImageRegionDecoder.size(): IntSize {
+    /*private fun ImageDecoder.size(): IntSize {
         val shouldFlip = when (exif.orientation) {
             ExifMetadata.ImageOrientation.Orientation90,
             ExifMetadata.ImageOrientation.Orientation270 -> true
@@ -64,13 +63,13 @@ internal class AndroidImageRegionDecoder private constructor(
             width = if (shouldFlip) imageSize.height else imageSize.width,
             height = if (shouldFlip) imageSize.width else imageSize.height,
         )
-    }
+    }*/
 
     companion object {
         @OptIn(ExperimentalCoroutinesApi::class)
         fun Factory(
             imageSource: SubSamplingImageSource,
-            createDecoder: () -> ImageRegionDecoder,
+            createDecoder: () -> ImageDecoder,
         ) = ImageRegionDecoder.Factory { params ->
             val dispatcher = Dispatchers.IO.limitedParallelism(1)
 

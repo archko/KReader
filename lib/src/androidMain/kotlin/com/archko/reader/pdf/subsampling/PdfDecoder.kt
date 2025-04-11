@@ -8,9 +8,6 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
-import com.archko.reader.pdf.subsampling.internal.ExifMetadata
-import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
-import com.archko.reader.pdf.subsampling.internal.RotatedBitmapPainter
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -21,7 +18,7 @@ import java.io.File
 /**
  * @author: archko 2025/4/11 :11:26
  */
-public class PdfDecoder(file: File) : ImageRegionDecoder {
+public class PdfDecoder(file: File) : ImageDecoder {
 
     private val document: Document = Document.openDocument(file.absolutePath)
     public var pageCount: Int = document.countPages()
@@ -37,31 +34,49 @@ public class PdfDecoder(file: File) : ImageRegionDecoder {
             field = value
         }
 
+    public var imageSize: IntSize = IntSize.Zero
+        get() = field
+        set(value) {
+            field = value
+        }
+
     init {
         val fontSize = 54f
         document.layout(1280f, 2160f, fontSize)
         pageCount = document.countPages()
         pageSizes = prepareSizes()
         outlineItems = prepareOutlines()
+
+        val list = mutableListOf<Size>()
+        for (i in 0 until pageCount) {
+            val page = document.loadPage(i)
+            val bounds = page.bounds
+            val size = Size(
+                bounds.x1.toInt() - bounds.x0.toInt(),
+                bounds.y1.toInt() - bounds.y0.toInt(),
+                i
+            )
+            page.destroy()
+            list.add(size)
+        }
+        var width = 0
+        var height = 0
+        val size = list[0]
+        width = size.width
+        height = size.height
+        imageSize = IntSize(width, height)
     }
 
-    override var imageSize: IntSize = IntSize.Zero
-        get() = field
-        set(value) {
-            field = value
-        }
-
-    override suspend fun decodeRegion(
+    override fun decodeRegion(
         region: IntRect,
-        sampleSize: Int
-    ): ImageRegionDecoder.DecodeResult {
+        index: Int
+    ): ImageBitmap? {
         val bitmap = renderPageRegion(0, region.width, region.height, region.left, region.top)
-        return ImageRegionDecoder.DecodeResult(
-            painter = RotatedBitmapPainter(
-                image = bitmap,
-                orientation = ExifMetadata.ImageOrientation.None,
-            )
-        )
+        return bitmap
+    }
+
+    override fun size(): IntSize {
+        return imageSize
     }
 
     private fun prepareSizes(): List<Size> {
