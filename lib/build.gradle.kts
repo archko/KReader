@@ -37,6 +37,8 @@ kotlin {
                 api(libs.coil.kt)
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)
+                api(libs.kotlinx.immutableCollections)
+                api(libs.telephoto)
             }
         }
 

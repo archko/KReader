@@ -22,6 +22,7 @@ junit = "4.13.2"
 coil = "3.0.4"
 ktor = "3.0.3"
 kotlinx-coroutines = "1.10.1"
+kotlinx-immutableCollections = "0.3.8" # https://github.com/Kotlin/kotlinx.collections.immutable/releases
 
 calf = "0.7.0"
 mupdfFitz = "1.25.1"
@@ -31,6 +32,8 @@ gson = "2.10.1"
 sqlDelight = "2.0.2"
 core = "1.15.0"
 lifecycleViewmodelComposeAndroid = "2.8.7"
+zoomable = "0.15.1"
+okio = "3.9.1"
 
 [libraries]
 android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "androidDriver" }
@@ -44,12 +47,17 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 filePicker = { module = "com.mohamedrejeb.calf:calf-file-picker", version.ref = "calf" }
 mupdf-fitz = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitz" }
 mupdf-fitz-aar = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitzAar" }
+telephoto = { module = "me.saket.telephoto:zoomable", version.ref = "zoomable" }
+telephoto-coil = { module = "me.saket.telephoto:zoomable-image-coil3", version.ref = "zoomable" }
 
 jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "jetbrains-lifecycle" }
 jetbrains-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
 jetbrains-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "jetbrains-lifecycle" }
 androidx-lifecycle-viewmodel-compose-android = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose-android", version.ref = "lifecycleViewmodelComposeAndroid" }
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
+kotlinx-immutableCollections = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-immutableCollections" }
+
+okio-core = { module = "com.squareup.okio:okio", version.ref = "okio" }
 
 mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }

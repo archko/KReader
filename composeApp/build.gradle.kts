@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    id("kotlin-parcelize")
 }
 
 kotlin {
@@ -45,6 +46,8 @@ kotlin {
             api(libs.coil.kt)
             api(libs.coil.kt.compose)
             api(libs.coil.kt.okhttp)
+            api(libs.kotlinx.immutableCollections)
+            api(libs.telephoto)
         }
         desktopMain.dependencies {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
