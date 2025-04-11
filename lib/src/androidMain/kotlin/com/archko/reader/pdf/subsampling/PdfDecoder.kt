@@ -34,6 +34,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
             field = value
         }
 
+    public var viewSize: IntSize = IntSize.Zero
     public var imageSize: IntSize = IntSize.Zero
         get() = field
         set(value) {
@@ -57,7 +58,11 @@ public class PdfDecoder(file: File) : ImageDecoder {
     }
 
     override fun size(viewportSize: IntSize): IntSize {
-        if (imageSize == IntSize.Zero && viewportSize.width > 0 && viewportSize.height > 0) {
+        if (imageSize == IntSize.Zero
+            && viewSize != viewportSize
+            && viewportSize.width > 0 && viewportSize.height > 0
+        ) {
+            viewSize = viewportSize
             caculateSize(viewportSize)
         }
         return imageSize
