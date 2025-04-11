@@ -1,11 +1,13 @@
 package com.archko.reader.pdf.subsampling.internal.tile
 
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.toSize
 
 internal fun ImageRegionTileGrid.Companion.generate(
+    scale: ScaleFactor,
     viewportSize: IntSize,
     unscaledImageSize: IntSize,
     minTileSize: IntSize = viewportSize / 2,
@@ -16,6 +18,8 @@ internal fun ImageRegionTileGrid.Companion.generate(
     )
 
     val baseTile = ImageRegionTile(
+        scale = scale,
+        index = 0,
         sampleSize = baseSampleSize,
         bounds = IntRect(IntOffset.Zero, unscaledImageSize)
     )
@@ -44,6 +48,8 @@ internal fun ImageRegionTileGrid.Companion.generate(
                 val isLastXTile = x == xTileCount - 1
                 val isLastYTile = y == yTileCount - 1
                 val tile = ImageRegionTile(
+                    scale = scale,
+                    index = 0,
                     sampleSize = sampleSize,
                     bounds = IntRect(
                         left = x * tileSize.width,

@@ -5,11 +5,14 @@ package com.archko.reader.pdf.subsampling.internal.tile
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.unit.IntRect
 
 /** A region in the source image that will be drawn in a [ViewportTile]. */
 @Immutable
 public data class ImageRegionTile(
+    val scale: ScaleFactor,
+    val index: Int,
     val sampleSize: ImageSampleSize,
     val bounds: IntRect,
 )
@@ -28,14 +31,6 @@ internal data class ViewportTile private constructor(
         isBase: Boolean,
     ) : this(
         region = region,
-        // Because the Canvas APIs only accept integer values, any fractional values
-        // that arise during tiling must be discarded. However this isn't a problem,
-        // since discarding a fractional value will cause the next tile to be shifted
-        // back by a pixel and so on, which will eventually eliminate any fractional
-        // error. However, this means that the last tiles along the X and Y axes may
-        // be one pixel shorter than the image. In practice, this is usually not
-        // noticeable to the naked eye, and the benefits of tiling large images outweigh
-        // this minor loss of precision.
         bounds = bounds.discardFractionalValues(),
         isVisible = isVisible,
         isBase = isBase,

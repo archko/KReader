@@ -92,7 +92,9 @@ internal class RealSubSamplingImageState(
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
         if (isReadyToBeDisplayed) {
+            val transformation = contentTransformation()
             ImageRegionTileGrid.generate(
+                transformation.scale,
                 viewportSize = viewportSize!!,
                 unscaledImageSize = imageOrPreviewSize!!,
             )

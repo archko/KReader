@@ -195,14 +195,15 @@ fun App(
                 return@Theme
             }
 
-            PdfScreen(
+            /*PdfScreen(
                 screenWidth = screenWidthInPixels,
                 screenHeight = screenHeightInPixels,
                 pdf = pdf!!,
                 scope = scope,
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
-            )
+            )*/
+            TestSubSampling(viewModel.path.toString())
         }
     }
 }

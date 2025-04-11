@@ -32,7 +32,7 @@ internal class AndroidImageRegionDecoder private constructor(
         )
 
         val bitmap: ImageBitmap? = withContext(dispatcher) {
-            decoder.decodeRegion(bounds, 1)
+            decoder.decodeRegion(bounds, tile)
         }
         if (bitmap != null) {
             return ImageRegionDecoder.DecodeResult(
