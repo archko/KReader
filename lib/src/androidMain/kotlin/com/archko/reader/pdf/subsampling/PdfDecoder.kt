@@ -46,13 +46,6 @@ public class PdfDecoder(file: File) : ImageDecoder {
         pageCount = document.countPages()
         pageSizes = prepareSizes()
         outlineItems = prepareOutlines()
-
-        var width = 0
-        var height = 0
-        val size = pageSizes[0]
-        width = size.width
-        height = size.height
-        imageSize = IntSize(width, height)
     }
 
     override fun decodeRegion(
@@ -63,8 +56,29 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return bitmap
     }
 
-    override fun size(): IntSize {
+    override fun size(viewportSize: IntSize): IntSize {
+        if (imageSize == IntSize.Zero && viewportSize.width > 0 && viewportSize.height > 0) {
+            caculateSize(viewportSize)
+        }
         return imageSize
+    }
+
+    private fun caculateSize(viewportSize: IntSize) {
+        if (pageSizes.isNotEmpty()) {
+            var width = viewportSize.width
+            var height = 0
+            for (page in pageSizes) {
+                val zoom = 1f * viewportSize.width / page.width
+                page.zoom = zoom
+                val h = (page.height * zoom).toInt()
+                height += h
+                break
+            }
+            val size = pageSizes[0]
+            width = size.width
+            height = size.height
+            imageSize = IntSize(width, height)
+        }
     }
 
     override fun close() {

@@ -45,13 +45,13 @@ import java.io.IOException
 public fun rememberSubSamplingImageState(
     imageSource: SubSamplingImageSource,
     zoomableState: ZoomableState,
-    imageOptions: ImageBitmapOptions = ImageBitmapOptions.Default,
+    viewportSize: IntSize = IntSize.Zero,
     errorReporter: SubSamplingImageErrorReporter = SubSamplingImageErrorReporter.NoOpInRelease
 ): SubSamplingImageState {
     val state = rememberSubSamplingImageState(
         imageSource = imageSource,
         transformation = { zoomableState.contentTransformation },
-        imageOptions = imageOptions,
+        viewportSize = viewportSize,
         errorReporter = errorReporter,
     )
 
@@ -75,14 +75,14 @@ public fun rememberSubSamplingImageState(
 internal fun rememberSubSamplingImageState(
     imageSource: SubSamplingImageSource,
     transformation: () -> ZoomableContentTransformation,
-    imageOptions: ImageBitmapOptions = ImageBitmapOptions.Default,
+    viewportSize: IntSize = IntSize.Zero,
     errorReporter: SubSamplingImageErrorReporter = SubSamplingImageErrorReporter.NoOpInRelease,
 ): SubSamplingImageState {
     val transformation by rememberUpdatedState(transformation)
     val state = remember(imageSource) {
         RealSubSamplingImageState(imageSource, transformation)
     }.also {
-        it.imageRegionDecoder = createImageRegionDecoder(imageSource, imageOptions, errorReporter)
+        it.imageRegionDecoder = createImageRegionDecoder(imageSource, viewportSize, errorReporter)
     }
 
     state.LoadImageTilesEffect()
@@ -97,18 +97,18 @@ internal fun rememberSubSamplingImageState(
 @Composable
 private fun createImageRegionDecoder(
     imageSource: SubSamplingImageSource,
-    imageOptions: ImageBitmapOptions,
+    viewportSize: IntSize,
     errorReporter: SubSamplingImageErrorReporter
 ): ImageRegionDecoder? {
     val errorReporter by rememberUpdatedState(errorReporter)
     var decoder by remember(imageSource) { mutableStateOf<ImageRegionDecoder?>(null) }
 
-    if (!LocalInspectionMode.current) {
-        LaunchedEffect(imageSource) {
+    if (!LocalInspectionMode.current && viewportSize != IntSize.Zero) {
+        LaunchedEffect(imageSource, viewportSize) {
             try {
                 decoder = imageSource.decoder().create(
                     AndroidImageDecoderFactoryParams(
-                        imageOptions = imageOptions,
+                        viewportSize = viewportSize,
                     )
                 )
             } catch (e: IOException) {

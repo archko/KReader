@@ -1,9 +1,8 @@
 package com.archko.reader.pdf.subsampling.internal
 
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.subsampling.ImageBitmapOptions
+import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTile
 
 /**
  * An image decoder, responsible for loading partial regions for
@@ -13,7 +12,7 @@ public interface ImageRegionDecoder {
     /** Size of the full image, without any scaling applied. */
     public var imageSize: IntSize
 
-    public suspend fun decodeRegion(region: IntRect, sampleSize: Int): DecodeResult
+    public suspend fun decodeRegion(tile: ImageRegionTile): DecodeResult
 
     /** Called when the image is no longer visible. */
     public fun close(): Unit = Unit
@@ -27,10 +26,10 @@ public interface ImageRegionDecoder {
     )
 
     public interface FactoryParams {
-        public val imageOptions: ImageBitmapOptions
+        public val viewportSize: IntSize
     }
 }
 
 internal data class AndroidImageDecoderFactoryParams(
-    override val imageOptions: ImageBitmapOptions,
+    override val viewportSize: IntSize,
 ) : ImageRegionDecoder.FactoryParams

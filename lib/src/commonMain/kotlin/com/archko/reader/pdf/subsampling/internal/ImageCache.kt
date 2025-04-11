@@ -55,7 +55,7 @@ internal class ImageCache(
                                 check(tile !in it)
                                 it + (tile to InFlight(currentCoroutineContext().job))
                             }
-                            val painter = decoder.decodeRegion(tile.bounds, tile.sampleSize.size)
+                            val painter = decoder.decodeRegion(tile)
                             cachedImages.update {
                                 it + (tile to Loaded(painter))
                             }

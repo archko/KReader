@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.IntRect
 
 /** A region in the source image that will be drawn in a [ViewportTile]. */
 @Immutable
-internal data class ImageRegionTile(
+public data class ImageRegionTile(
     val sampleSize: ImageSampleSize,
     val bounds: IntRect,
 )
@@ -56,19 +56,9 @@ internal data class ViewportImageTile(
     val isBase get() = tile.isBase
 }
 
-/**
- * Documentation copied from `android.graphics.BitmapFactory.Options.inSampleSize`:
- *
- * If set to a value > 1, requests the decoder to sub-sample the original image, returning
- * a smaller image to save memory. The sample size is the number of pixels in either dimension
- * that correspond to a single pixel in the decoded bitmap. For example, inSampleSize == 4
- * returns an image that is 1/4 the width/height of the original, and 1/16 the number of
- * pixels. Any value <= 1 is treated the same as 1. Note: the decoder uses a final value
- * based on powers of 2, any other value will be rounded down to the nearest power of 2.
- */
 @JvmInline
-internal value class ImageSampleSize(val size: Int) {
-    companion object; // For extensions.
+public value class ImageSampleSize(public val size: Int) {
+    public companion object; // For extensions.
 
     init {
         check(size == 1 || size.rem(2) == 0) {
@@ -76,7 +66,7 @@ internal value class ImageSampleSize(val size: Int) {
         }
     }
 
-    fun coerceAtMost(other: ImageSampleSize): ImageSampleSize {
+    public fun coerceAtMost(other: ImageSampleSize): ImageSampleSize {
         return if (size > other.size) other else this
     }
 }

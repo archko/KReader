@@ -4,9 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.subsampling.SamplingImageSource
 import com.archko.reader.pdf.subsampling.SubSamplingImage
 import com.archko.reader.pdf.subsampling.rememberSubSamplingImageState
@@ -20,6 +25,7 @@ import okio.Path.Companion.toPath
  */
 @Composable
 fun TestSubSampling(path: String) {
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val imageSource = remember { SamplingImageSource(path.toPath(true), null) }
     val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 5f))
     Box(
@@ -30,8 +36,12 @@ fun TestSubSampling(path: String) {
         SubSamplingImage(
             modifier = Modifier
                 .fillMaxSize()
+                .onSizeChanged {
+                    viewportSize = IntSize(it.width, it.height)
+                    println("viewportSize:$viewportSize")
+                }
                 .zoomable(zoomableState),
-            state = rememberSubSamplingImageState(imageSource, zoomableState),
+            state = rememberSubSamplingImageState(imageSource, zoomableState, viewportSize),
             contentDescription = "",
         )
     }

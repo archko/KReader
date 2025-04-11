@@ -84,18 +84,6 @@ public fun SubSamplingImage(
                 )
             }
     )
-
-    /*if (state.hasUltraHdrContent && SDK_INT >= 26) {
-        val context = LocalContext.current
-        DisposableEffect(Unit) {
-            val activity = context.findActivity()
-            val previousColorMode = activity.window.colorMode
-            activity.window.colorMode = ActivityInfo.COLOR_MODE_HDR
-            onDispose {
-                activity.window.colorMode = previousColorMode
-            }
-        }
-    }*/
 }
 
 private fun DrawScope.drawImageTile(
