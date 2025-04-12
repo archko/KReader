@@ -82,7 +82,7 @@ internal fun rememberSubSamplingImageState(
     val state = remember(imageSource) {
         RealSubSamplingImageState(imageSource, transformation)
     }.also {
-        it.imageRegionDecoder = createImageRegionDecoder(imageSource, viewportSize, errorReporter)
+        it.decoder = createImageRegionDecoder(imageSource, viewportSize, errorReporter)
     }
 
     state.LoadImageTilesEffect()

@@ -47,7 +47,7 @@ internal class RealSubSamplingImageState(
 ) : SubSamplingImageState {
 
     override val imageSize: IntSize?
-        get() = imageRegionDecoder?.imageSize
+        get() = decoder?.imageSize
 
     // todo: it isn't great that the preview image remains in memory even after the full image is loaded.
     private val imagePreview: Painter? =
@@ -65,7 +65,7 @@ internal class RealSubSamplingImageState(
         isImageDisplayed && viewportImageTiles.fastAll { it.painter != null }
     }
 
-    internal var imageRegionDecoder: ImageRegionDecoder? by mutableStateOf(null)
+    internal var decoder: ImageRegionDecoder? by mutableStateOf(null)
     internal var viewportSize: IntSize? by mutableStateOf(null)
     internal var showTileBounds = true  // Only used by tests.
 
@@ -91,7 +91,7 @@ internal class RealSubSamplingImageState(
     // Note to self: This is not inlined in viewportTiles to
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
-        if (isReadyToBeDisplayed) {
+        if (isReadyToBeDisplayed && decoder != null) {
             val transformation = contentTransformation()
             ImageRegionTileGrid.generate(
                 transformation.scale,
@@ -157,7 +157,7 @@ internal class RealSubSamplingImageState(
 
     @Composable
     fun LoadImageTilesEffect() {
-        val imageRegionDecoder = imageRegionDecoder ?: return
+        val imageRegionDecoder = decoder ?: return
         val scope = rememberCoroutineScope()
         val imageCache = remember(this, imageRegionDecoder) {
             ImageCache(scope, imageRegionDecoder)

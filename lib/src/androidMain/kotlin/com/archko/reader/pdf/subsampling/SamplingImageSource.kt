@@ -18,7 +18,7 @@ public class SamplingImageSource(
     override val preview: ImageBitmap? = null
 
     override suspend fun decoder(): ImageRegionDecoder.Factory {
-        return AndroidImageRegionDecoder.Factory(this) {
+        return AndroidDecoderDelegate.Factory(this) {
             PdfDecoder(path.toFile())
         }
     }

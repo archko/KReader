@@ -63,7 +63,7 @@ public fun SubSamplingImage(
                         color = Color.Red,
                         topLeft = tile.bounds.topLeft.toOffset(),
                         size = tile.bounds.size.toSize(),
-                        style = Stroke(width = 6.dp.toPx()),
+                        style = Stroke(width = 2.dp.toPx()),
                     )
                 }
             }

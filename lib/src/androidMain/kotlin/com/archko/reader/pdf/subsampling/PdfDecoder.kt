@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.subsampling.internal.ImageDecoder
 import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTile
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
@@ -24,25 +25,26 @@ import java.io.File
 public class PdfDecoder(file: File) : ImageDecoder {
 
     private val document: Document = Document.openDocument(file.absolutePath)
-    public var pageCount: Int = document.countPages()
-    public var pageSizes: List<Size> = listOf()
+    public override var pageCount: Int = document.countPages()
+    public override var pageSizes: List<Size> = listOf()
         get() = field
         set(value) {
             field = value
         }
 
-    public var outlineItems: List<Item>? = listOf()
+    public override var outlineItems: List<Item>? = listOf()
+        get() = field
+        set(value) {
+            field = value
+        }
+
+    public override var imageSize: IntSize = IntSize.Zero
         get() = field
         set(value) {
             field = value
         }
 
     public var viewSize: IntSize = IntSize.Zero
-    public var imageSize: IntSize = IntSize.Zero
-        get() = field
-        set(value) {
-            field = value
-        }
 
     init {
         val fontSize = 54f

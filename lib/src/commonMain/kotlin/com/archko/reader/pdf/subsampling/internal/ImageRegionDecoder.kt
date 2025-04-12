@@ -8,14 +8,9 @@ import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTile
  * An image decoder, responsible for loading partial regions for
  * [SubSamplingImage][me.saket.telephoto.subsamplingimage.SubSamplingImage]'s tiles.
  */
-public interface ImageRegionDecoder {
-    /** Size of the full image, without any scaling applied. */
-    public var imageSize: IntSize
+public interface ImageRegionDecoder : ImageDecoder{
 
     public suspend fun decodeRegion(tile: ImageRegionTile): DecodeResult
-
-    /** Called when the image is no longer visible. */
-    public fun close(): Unit = Unit
 
     public fun interface Factory {
         public suspend fun create(params: FactoryParams): ImageRegionDecoder
