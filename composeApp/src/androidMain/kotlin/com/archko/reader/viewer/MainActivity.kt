@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -30,6 +31,11 @@ import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.DatabaseDriverFactory
 import com.archko.reader.pdf.cache.DriverFactory
+import ovh.plrapps.mapcompose.api.addLayer
+import ovh.plrapps.mapcompose.api.shouldLoopScale
+import ovh.plrapps.mapcompose.core.TileStreamProvider
+import ovh.plrapps.mapcompose.ui.TestUI
+import ovh.plrapps.mapcompose.ui.state.MapState
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
@@ -65,7 +71,24 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
-                App(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
+                //App(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
+
+                val tileStreamProvider=TileStreamProvider { row, col, zoomLvl ->
+                    try {
+                        println("getBitmap.provider:$row, $col, $zoomLvl")
+                        this.assets?.open("tiles/mont_blanc/$zoomLvl/$row/$col.jpg")
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                val state = MapState(4, 4096, 4096) {
+                    scale(1.0f)
+                }.apply {
+                    addLayer(tileStreamProvider)
+                    shouldLoopScale = true
+                    //enableRotation()
+                }
+                TestUI(modifier = Modifier, state)
             }
         }
     }
