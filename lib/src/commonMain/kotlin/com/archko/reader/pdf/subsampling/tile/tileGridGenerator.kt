@@ -1,22 +1,21 @@
-package com.archko.reader.pdf.subsampling.internal.tile
+package com.archko.reader.pdf.subsampling.tile
 
 import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.component.Size
 
-internal fun ImageRegionTileGrid.Companion.generate(
+internal fun ImageTileGrid.Companion.generate(
     scaleFactor: ScaleFactor,
     viewportSize: IntSize,
     unscaledImageSize: IntSize,
-): ImageRegionTileGrid {
+): ImageTileGrid {
     val baseSampleSize = ImageSampleSize.calculateFor(
         viewportSize = viewportSize,
         scaledImageSize = unscaledImageSize
     )
 
-    val baseTile = ImageRegionTile(
+    val baseTile = ImageTile(
         scale = scaleFactor,
         index = 0,
         sampleSize = baseSampleSize,
@@ -37,10 +36,10 @@ internal fun ImageRegionTileGrid.Companion.generate(
         val partHeight = pageHeight / rows
         println("getPageColsRows:$scaleFactor, Page.w-h:$pageWidth-$pageHeight, Part:w-h:$partWidth-$partHeight, rows-cols:$rows-$cols")
 
-        val tileGrid = ArrayList<ImageRegionTile>(rows * cols)
+        val tileGrid = ArrayList<ImageTile>(rows * cols)
         for (x in 0 until cols) {
             for (y in 0 until rows) {
-                val tile = ImageRegionTile(
+                val tile = ImageTile(
                     scale = scaleFactor,
                     index = 0,
                     sampleSize = sampleSize,
@@ -57,7 +56,7 @@ internal fun ImageRegionTileGrid.Companion.generate(
         return@associateWith tileGrid
     }
 
-    return ImageRegionTileGrid(
+    return ImageTileGrid(
         base = baseTile,
         foreground = foregroundTiles,
     )

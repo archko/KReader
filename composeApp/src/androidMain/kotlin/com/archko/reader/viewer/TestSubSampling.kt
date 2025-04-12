@@ -26,12 +26,12 @@ import okio.Path.Companion.toPath
 @Composable
 fun TestSubSampling(path: String) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
-    val imageSource = remember { SamplingImageSource(path.toPath(true), null) }
+    val imageSource = remember { SamplingImageSource(path) }
     val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 2f))
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(Color.White)
     ) {
         SubSamplingImage(
             modifier = Modifier

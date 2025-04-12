@@ -1,6 +1,6 @@
 @file:Suppress("DataClassPrivateConstructor")
 
-package com.archko.reader.pdf.subsampling.internal.tile
+package com.archko.reader.pdf.subsampling.tile
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Rect
@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.IntRect
 
 /** A region in the source image that will be drawn in a [ViewportTile]. */
 @Immutable
-public data class ImageRegionTile(
+public data class ImageTile(
     val scale: ScaleFactor,
     val index: Int,
     val sampleSize: ImageSampleSize,
@@ -21,15 +21,15 @@ public data class ImageRegionTile(
     }
 }
 
-/** A region in the viewport/canvas where a [ImageRegionTile] image will be drawn. */
+/** A region in the viewport/canvas where a [ImageTile] image will be drawn. */
 internal data class ViewportTile private constructor(
-    val region: ImageRegionTile,
+    val region: ImageTile,
     val bounds: IntRect,
     val isVisible: Boolean,
     val isBase: Boolean,
 ) {
     constructor(
-        region: ImageRegionTile,
+        region: ImageTile,
         bounds: Rect,
         isVisible: Boolean,
         isBase: Boolean,
@@ -70,10 +70,10 @@ public value class ImageSampleSize(public val size: Int) {
     }
 }
 
-/** Collection of [ImageRegionTile] needed for drawing an image at a certain zoom level. */
-internal data class ImageRegionTileGrid(
-    val base: ImageRegionTile,
-    val foreground: Map<ImageSampleSize, List<ImageRegionTile>>
+/** Collection of [ImageTile] needed for drawing an image at a certain zoom level. */
+internal data class ImageTileGrid(
+    val base: ImageTile,
+    val foreground: Map<ImageSampleSize, List<ImageTile>>
 ) {
     companion object; // For extensions.
 }

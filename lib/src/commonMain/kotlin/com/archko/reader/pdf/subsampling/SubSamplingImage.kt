@@ -27,10 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.util.fastForEach
-import com.archko.reader.pdf.subsampling.internal.tile.SubSamplingImageSemanticState
-import com.archko.reader.pdf.subsampling.internal.tile.ViewportImageTile
-import com.archko.reader.pdf.subsampling.internal.tile.imageSemanticState
-import com.archko.reader.pdf.subsampling.internal.tile.toCeilInt
+import com.archko.reader.pdf.subsampling.tile.SubSamplingImageSemanticState
+import com.archko.reader.pdf.subsampling.tile.ViewportImageTile
+import com.archko.reader.pdf.subsampling.tile.imageSemanticState
+import com.archko.reader.pdf.subsampling.tile.toCeilInt
 
 /**
  * An Image composable that can render large bitmaps by diving them into tiles so that they

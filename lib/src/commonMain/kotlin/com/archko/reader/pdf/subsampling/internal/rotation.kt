@@ -2,13 +2,11 @@
 
 package com.archko.reader.pdf.subsampling.internal
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.subsampling.internal.ExifMetadata.ImageOrientation
 import kotlin.LazyThreadSafetyMode.NONE
 
 /**

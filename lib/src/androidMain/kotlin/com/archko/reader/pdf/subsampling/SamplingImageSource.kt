@@ -1,25 +1,24 @@
 package com.archko.reader.pdf.subsampling
 
+import android.text.TextUtils
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import okio.Closeable
-import okio.Path
+import java.io.File
 
 @Immutable
 public class SamplingImageSource(
-    public val path: Path,
-    public val onClose: Closeable?
+    public val path: String,
+    public val onClose: Closeable? = null
 ) : SubSamplingImageSource {
-    init {
-        check(path.isAbsolute)
-    }
 
-    override val preview: ImageBitmap? = null
+    init {
+        check(!TextUtils.isEmpty(path))
+    }
 
     override suspend fun decoder(): ImageRegionDecoder.Factory {
         return AndroidDecoderDelegate.Factory(this) {
-            PdfDecoder(path.toFile())
+            PdfDecoder(File(path))
         }
     }
 

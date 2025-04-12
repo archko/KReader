@@ -10,37 +10,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
 import com.archko.reader.pdf.subsampling.internal.ImageCache
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import com.archko.reader.pdf.subsampling.internal.fastMapNotNull
-import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTile
-import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTileGrid
-import com.archko.reader.pdf.subsampling.internal.tile.ImageSampleSize
-import com.archko.reader.pdf.subsampling.internal.tile.ViewportImageTile
-import com.archko.reader.pdf.subsampling.internal.tile.ViewportTile
-import com.archko.reader.pdf.subsampling.internal.tile.calculateFor
-import com.archko.reader.pdf.subsampling.internal.tile.contains2
-import com.archko.reader.pdf.subsampling.internal.tile.generate
-import com.archko.reader.pdf.subsampling.internal.tile.isNotEmpty
-import com.archko.reader.pdf.subsampling.internal.tile.maxScale
-import com.archko.reader.pdf.subsampling.internal.tile.overlaps2
-import com.archko.reader.pdf.subsampling.internal.tile.scaledAndOffsetBy
+import com.archko.reader.pdf.subsampling.tile.ImageSampleSize
+import com.archko.reader.pdf.subsampling.tile.ImageTile
+import com.archko.reader.pdf.subsampling.tile.ImageTileGrid
+import com.archko.reader.pdf.subsampling.tile.ViewportImageTile
+import com.archko.reader.pdf.subsampling.tile.ViewportTile
+import com.archko.reader.pdf.subsampling.tile.calculateFor
+import com.archko.reader.pdf.subsampling.tile.contains2
+import com.archko.reader.pdf.subsampling.tile.generate
+import com.archko.reader.pdf.subsampling.tile.isNotEmpty
+import com.archko.reader.pdf.subsampling.tile.maxScale
+import com.archko.reader.pdf.subsampling.tile.overlaps2
+import com.archko.reader.pdf.subsampling.tile.scaledAndOffsetBy
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableList
 import me.saket.telephoto.zoomable.ZoomableContentTransformation
-import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder.DecodeResult as ImageDecodeResult
+import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder.DecodeResult as ImageResult
 
-/** State for [SubSamplingImage]. Created using [rememberSubSamplingImageState]. */
 @Stable
 internal class RealSubSamplingImageState(
     private val imageSource: SubSamplingImageSource,
@@ -50,12 +46,10 @@ internal class RealSubSamplingImageState(
     override val imageSize: IntSize?
         get() = decoder?.imageSize
 
-    // todo: it isn't great that the preview image remains in memory even after the full image is loaded.
-    private val imagePreview: Painter? =
-        imageSource.preview?.let(::BitmapPainter)
+    private var imagePreview: Painter? = null
 
     internal val imageOrPreviewSize: IntSize?
-        get() = imageSize ?: imageSource.preview?.size()
+        get() = imageSize
 
     override val isImageDisplayed: Boolean by derivedStateOf {
         isReadyToBeDisplayed && viewportImageTiles.isNotEmpty() &&
@@ -81,7 +75,7 @@ internal class RealSubSamplingImageState(
      * versions, layout changes caused image flickering because tile updates were asynchronous
      * and lagged by one frame.
      */
-    private var loadedImages: ImmutableMap<ImageRegionTile, ImageDecodeResult> by mutableStateOf(
+    private var loadedImages: ImmutableMap<ImageTile, ImageResult> by mutableStateOf(
         persistentMapOf()
     )
 
@@ -94,7 +88,7 @@ internal class RealSubSamplingImageState(
     private val tileGrid by derivedStateOf {
         val transformation = contentTransformation()
         if (isReadyToBeDisplayed && decoder != null) {
-            ImageRegionTileGrid.generate(
+            ImageTileGrid.generate(
                 transformation.scale,
                 viewportSize = viewportSize!!,
                 unscaledImageSize = imageOrPreviewSize!!,
@@ -178,5 +172,3 @@ internal class RealSubSamplingImageState(
         }
     }
 }
-
-private fun ImageBitmap.size(): IntSize = IntSize(width, height)

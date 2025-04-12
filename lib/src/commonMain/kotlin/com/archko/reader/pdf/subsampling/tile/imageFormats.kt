@@ -1,4 +1,4 @@
-package com.archko.reader.pdf.subsampling.internal.tile
+package com.archko.reader.pdf.subsampling.tile
 
 import okio.BufferedSource
 import okio.ByteString

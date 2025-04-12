@@ -3,7 +3,7 @@ package com.archko.reader.pdf.subsampling.internal
 import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.subsampling.internal.ImageCache.LoadingState.InFlight
 import com.archko.reader.pdf.subsampling.internal.ImageCache.LoadingState.Loaded
-import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTile
+import com.archko.reader.pdf.subsampling.tile.ImageTile
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CoroutineScope
@@ -30,8 +30,8 @@ internal class ImageCache(
     private val decoder: ImageRegionDecoder,
     private val throttleEvery: Duration = 100.milliseconds,
 ) {
-    private val visibleRegions = Channel<List<ImageRegionTile>>(capacity = 10)
-    private val cachedImages = MutableStateFlow(emptyMap<ImageRegionTile, LoadingState>())
+    private val visibleRegions = Channel<List<ImageTile>>(capacity = 10)
+    private val cachedImages = MutableStateFlow(emptyMap<ImageTile, LoadingState>())
 
     private sealed interface LoadingState {
         data class Loaded(val painter: ImageRegionDecoder.DecodeResult) : LoadingState
@@ -72,7 +72,7 @@ internal class ImageCache(
         }
     }
 
-    fun observeCachedImages(): Flow<ImmutableMap<ImageRegionTile, ImageRegionDecoder.DecodeResult>> {
+    fun observeCachedImages(): Flow<ImmutableMap<ImageTile, ImageRegionDecoder.DecodeResult>> {
         return cachedImages.map { map ->
             buildMap(capacity = map.size) {
                 map.forEach { (region, state) ->
@@ -84,7 +84,7 @@ internal class ImageCache(
         }.distinctUntilChanged()
     }
 
-    fun loadOrUnloadForTiles(regions: List<ImageRegionTile>) {
+    fun loadOrUnloadForTiles(regions: List<ImageTile>) {
         visibleRegions.trySend(regions)
     }
 

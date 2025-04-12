@@ -27,10 +27,10 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.DatabaseDriverFactory
 import com.archko.reader.pdf.cache.DriverFactory
+import com.archko.reader.pdf.viewmodel.PdfViewModel
 import ovh.plrapps.mapcompose.api.addLayer
 import ovh.plrapps.mapcompose.api.shouldLoopScale
 import ovh.plrapps.mapcompose.core.TileStreamProvider
@@ -71,9 +71,9 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
-                //App(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
+                App(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
 
-                val tileStreamProvider=TileStreamProvider { row, col, zoomLvl ->
+                /*val tileStreamProvider = TileStreamProvider { row, col, zoomLvl ->
                     try {
                         println("getBitmap.provider:$row, $col, $zoomLvl")
                         this.assets?.open("tiles/mont_blanc/$zoomLvl/$row/$col.jpg")
@@ -88,7 +88,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                     shouldLoopScale = true
                     //enableRotation()
                 }
-                TestUI(modifier = Modifier, state)
+                TestUI(modifier = Modifier, state)*/
             }
         }
     }

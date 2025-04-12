@@ -21,26 +21,6 @@ import me.saket.telephoto.zoomable.ZoomableContentTransformation
 import me.saket.telephoto.zoomable.ZoomableState
 import java.io.IOException
 
-/**
- * Create a [SubSamplingImageState] that can be used with [SubSamplingImage] which uses
- * [Modifier.zoomable][me.saket.telephoto.zoomable.zoomable] as its gesture detector.
- *
- * ```kotlin
- * val zoomableState = rememberZoomableState()
- * val imageState = rememberSubSamplingImageState(
- *   zoomableState = zoomableState,
- *   imageSource = SubSamplingImageSource.asset("fox.jpg")
- * )
- *
- * SubSamplingImage(
- *   modifier = Modifier
- *     .fillMaxSize()
- *     .zoomable(zoomableState),
- *   state = imageState,
- *   contentDescription = …,
- * )
- * ```
- */
 @Composable
 public fun rememberSubSamplingImageState(
     imageSource: SubSamplingImageSource,
@@ -144,10 +124,4 @@ public sealed interface SubSamplingImageState {
 
     @Deprecated("Use isImageDisplayed instead", ReplaceWith("isImageDisplayed"))
     public val isImageLoaded: Boolean get() = isImageDisplayed
-
-    @Deprecated(
-        "Renamed to isImageDisplayedInFullQuality",
-        ReplaceWith("isImageDisplayedInFullQuality")
-    )
-    public val isImageLoadedInFullQuality: Boolean get() = isImageDisplayedInFullQuality
 }

@@ -11,7 +11,7 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.subsampling.internal.ImageDecoder
-import com.archko.reader.pdf.subsampling.internal.tile.ImageRegionTile
+import com.archko.reader.pdf.subsampling.tile.ImageTile
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -56,7 +56,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     override fun decodeRegion(
         region: IntRect,
-        tile: ImageRegionTile
+        tile: ImageTile
     ): ImageBitmap? {
         val bitmap = renderPageRegion(region, tile)
         return bitmap
@@ -143,7 +143,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     public fun renderPageRegion(
         region: IntRect,
-        tile: ImageRegionTile
+        tile: ImageTile
     ): ImageBitmap {
         val cropBound = Rect()
         val scale = tile.scale.scaleX

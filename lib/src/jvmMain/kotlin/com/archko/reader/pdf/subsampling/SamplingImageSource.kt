@@ -1,27 +1,23 @@
 package com.archko.reader.pdf.subsampling
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import okio.Closeable
-import okio.Path
 
 @Immutable
-public actual class SamplingImageSource(
-    public val path: Path,
+public class SamplingImageSource(
+    public val path: String,
     public val onClose: Closeable?
 ) : SubSamplingImageSource {
     init {
-        check(path.isAbsolute)
+        //check(path)
     }
 
-    actual override val preview: ImageBitmap? = null
-
-    actual override suspend fun decoder(): ImageRegionDecoder.Factory {
+    override suspend fun decoder(): ImageRegionDecoder.Factory {
         return null
     }
 
-    actual override fun close() {
+    override fun close() {
         onClose?.close()
     }
 }
