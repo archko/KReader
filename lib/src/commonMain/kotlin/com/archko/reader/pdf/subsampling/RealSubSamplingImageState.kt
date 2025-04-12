@@ -13,6 +13,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
@@ -91,8 +92,8 @@ internal class RealSubSamplingImageState(
     // Note to self: This is not inlined in viewportTiles to
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
+        val transformation = contentTransformation()
         if (isReadyToBeDisplayed && decoder != null) {
-            val transformation = contentTransformation()
             ImageRegionTileGrid.generate(
                 transformation.scale,
                 viewportSize = viewportSize!!,
@@ -114,7 +115,7 @@ internal class RealSubSamplingImageState(
         val foregroundRegions =
             if (isBaseSampleSize) emptyList() else tileGrid.foreground[currentSampleSize]!!
 
-        (listOf(tileGrid.base) + foregroundRegions)
+        (/*listOf(tileGrid.base) +*/ foregroundRegions)
             .sortedByDescending {
                 it.bounds.contains2(transformation.centroid)
             }

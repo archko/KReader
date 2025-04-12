@@ -153,12 +153,12 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val patchY: Int
 
         //如果页面的缩放为1,那么这时的pageW就是view的宽.
-        pageW = (region.width * scale).toInt()
-        pageH = (region.height * scale).toInt()
+        pageW = (region.width).toInt()
+        pageH = (region.height).toInt()
 
-        patchX = ((region.left) + cropBound.left * scale).toInt()
-        patchY = ((region.top) + cropBound.top * scale).toInt()
-        println("renderPageRegion:index:${tile.index}, scale:${tile.scale}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
+        patchX = ((region.left) + cropBound.left).toInt()
+        patchY = ((region.top) + cropBound.top).toInt()
+        println("renderPageRegion:index:${tile}, scale:${tile.scale}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
 
         val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
         val ctm = Matrix(scale)

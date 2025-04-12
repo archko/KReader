@@ -15,7 +15,11 @@ public data class ImageRegionTile(
     val index: Int,
     val sampleSize: ImageSampleSize,
     val bounds: IntRect,
-)
+){
+    override fun toString(): String {
+        return "Tile(scale=$scale, index=$index, bounds=$bounds)"
+    }
+}
 
 /** A region in the viewport/canvas where a [ImageRegionTile] image will be drawn. */
 internal data class ViewportTile private constructor(
