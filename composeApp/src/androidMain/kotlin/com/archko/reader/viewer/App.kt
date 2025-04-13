@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -87,6 +88,7 @@ import com.archko.reader.pdf.scrollbar.DraggableScrollbar
 import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
 import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.util.Dispatcher
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -95,6 +97,9 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -301,7 +306,7 @@ private fun PdfScreen(
         itemsAvailable = pdf.pageCount,
     )
 
-    var aPageList by remember { mutableStateOf(listOf<APage>()) }
+    var aPageList by remember { mutableStateOf(mutableListOf<APage>()) }
 
     // 处理系统后退手势
     BackHandler(enabled = true) {
@@ -315,7 +320,7 @@ private fun PdfScreen(
     // 在组合完成后请求焦点
     LaunchedEffect(Unit) {
         println("开始计算页面列表，总页数: ${pdf.pageCount}")
-        /*scope.launch {
+        scope.launch {
             snapshotFlow {
                 if (isActive) {
                     val list = mutableListOf<APage>()
@@ -335,7 +340,7 @@ private fun PdfScreen(
                         aPageList = it
                     }
                 }
-        }*/
+        }
 
         println("launch.progress:${viewModel.progress}")
         viewModel.progress?.page?.let { lazyListState.scrollToItem(it.toInt()) }
@@ -401,7 +406,7 @@ private fun PdfScreen(
                         )
                     }
             ) {
-                PdfColumn(
+                /*PdfColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .onSizeChanged {
@@ -424,13 +429,13 @@ private fun PdfScreen(
                     onThumbMoved = lazyListState.rememberDraggableScroller(
                         itemsAvailable = pdf.pageCount,
                     ),
-                )
+                )*/
                 //DocumentView(pdf, aPageList, width, height)
-                /*val list= mutableListOf<APage>()
+                val list= mutableListOf<APage>()
                 for(i in 0..6){
                     list.add(APage(i,1024,1280))
                 }
-                CustomView(list)*/
+                CustomView(aPageList, pdf)
             }
         }
 
