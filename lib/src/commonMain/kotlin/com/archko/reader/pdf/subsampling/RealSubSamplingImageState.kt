@@ -17,16 +17,13 @@ import androidx.compose.ui.util.fastAny
 import com.archko.reader.pdf.subsampling.internal.ImageCache
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import com.archko.reader.pdf.subsampling.internal.fastMapNotNull
-import com.archko.reader.pdf.subsampling.tile.ImageSampleSize
 import com.archko.reader.pdf.subsampling.tile.ImageTile
 import com.archko.reader.pdf.subsampling.tile.ImageTileGrid
 import com.archko.reader.pdf.subsampling.tile.ViewportImageTile
 import com.archko.reader.pdf.subsampling.tile.ViewportTile
-import com.archko.reader.pdf.subsampling.tile.calculateFor
 import com.archko.reader.pdf.subsampling.tile.contains2
 import com.archko.reader.pdf.subsampling.tile.generate
 import com.archko.reader.pdf.subsampling.tile.isNotEmpty
-import com.archko.reader.pdf.subsampling.tile.maxScale
 import com.archko.reader.pdf.subsampling.tile.overlaps2
 import com.archko.reader.pdf.subsampling.tile.scaledAndOffsetBy
 import kotlinx.collections.immutable.ImmutableList
@@ -83,16 +80,27 @@ internal class RealSubSamplingImageState(
         viewportSize?.isNotEmpty() == true && imageOrPreviewSize?.isNotEmpty() == true
     }
 
+    private val tileMap = mutableMapOf<Float, ImageTileGrid>()
+
     // Note to self: This is not inlined in viewportTiles to
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
-        println("DEBUG: tileGrid recalculated:$isReadyToBeDisplayed, $decoder")
+        //println("DEBUG: tileGrid recalculated:$isReadyToBeDisplayed")
         if (isReadyToBeDisplayed && decoder != null) {
-            ImageTileGrid.generate(
-                //transformation.scale,
-                viewportSize = viewportSize!!,
-                unscaledImageSize = imageOrPreviewSize!!,
-            )
+            val scale = contentTransformation().scale.scaleX
+            var grid = tileMap[scale]
+            //println("DEBUG: tileGrid:$grid")
+            if (null != grid) {
+                grid
+            } else {
+                grid = ImageTileGrid.generate(
+                    scale,
+                    viewportSize = viewportSize!!,
+                    unscaledImageSize = imageOrPreviewSize!!,
+                )
+                tileMap[scale] = grid
+                grid
+            }
         } else null
     }
 
