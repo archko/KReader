@@ -86,10 +86,10 @@ internal class RealSubSamplingImageState(
     // Note to self: This is not inlined in viewportTiles to
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
-        val transformation = contentTransformation()
+        println("DEBUG: tileGrid recalculated:$isReadyToBeDisplayed, $decoder")
         if (isReadyToBeDisplayed && decoder != null) {
             ImageTileGrid.generate(
-                transformation.scale,
+                //transformation.scale,
                 viewportSize = viewportSize!!,
                 unscaledImageSize = imageOrPreviewSize!!,
             )
@@ -97,19 +97,15 @@ internal class RealSubSamplingImageState(
     }
 
     private val viewportTiles: ImmutableList<ViewportTile> by derivedStateOf {
+        //println("DEBUG: viewportTiles:$tileGrid")
         val tileGrid = tileGrid ?: return@derivedStateOf persistentListOf()
         val transformation = contentTransformation()
-        val baseSampleSize = tileGrid.base.sampleSize
 
-        val currentSampleSize = ImageSampleSize
-            .calculateFor(zoom = transformation.scale.maxScale)
-            .coerceAtMost(baseSampleSize)
+        val foregroundRegions = tileGrid.foreground.values
+            .filter { it.isNotEmpty() }
+            .flatten()
 
-        val isBaseSampleSize = currentSampleSize == baseSampleSize
-        val foregroundRegions =
-            if (isBaseSampleSize) emptyList() else tileGrid.foreground[currentSampleSize]!!
-
-        (/*listOf(tileGrid.base) +*/ foregroundRegions)
+        (foregroundRegions)
             .sortedByDescending {
                 it.bounds.contains2(transformation.centroid)
             }

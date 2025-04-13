@@ -27,7 +27,7 @@ import okio.Path.Companion.toPath
 fun TestSubSampling(path: String) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val imageSource = remember { SamplingImageSource(path) }
-    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 2f))
+    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 3f))
     Box(
         modifier = Modifier
             .fillMaxSize()

@@ -6,7 +6,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 
 internal fun ImageTileGrid.Companion.generate(
-    scaleFactor: ScaleFactor,
+    scaleFactor: ScaleFactor = ScaleFactor(1f, 1f),
     viewportSize: IntSize,
     unscaledImageSize: IntSize,
 ): ImageTileGrid {
@@ -22,39 +22,35 @@ internal fun ImageTileGrid.Companion.generate(
         bounds = IntRect(IntOffset.Zero, unscaledImageSize)
     )
 
-    val possibleSampleSizes = generateSequence(seed = baseSampleSize) { current ->
-        if (current.size < 2) null else current / 2
-    }.drop(1) // Skip base size.
+    val scale = scaleFactor.scaleX
+    val pageWidth = scale * unscaledImageSize.width
+    val pageHeight = scale * unscaledImageSize.height
+    val cols: Int = (pageWidth / PART_SIZE).toInt()
+    val rows: Int = (pageHeight / PART_SIZE).toInt()
+    val partWidth = pageWidth / cols
+    val partHeight = pageHeight / rows
+    println("getPageColsRows:$scaleFactor, Page.w-h:$pageWidth-$pageHeight, Part:w-h:$partWidth-$partHeight, rows-cols:$rows-$cols")
 
-    val foregroundTiles = possibleSampleSizes.associateWith { sampleSize ->
-        val scale = scaleFactor.scaleX
-        val pageWidth = scale * unscaledImageSize.width
-        val pageHeight = scale * unscaledImageSize.height
-        val cols: Int = (pageWidth / PART_SIZE).toInt()
-        val rows: Int = (pageHeight / PART_SIZE).toInt()
-        val partWidth = pageWidth / cols
-        val partHeight = pageHeight / rows
-        println("getPageColsRows:$scaleFactor, Page.w-h:$pageWidth-$pageHeight, Part:w-h:$partWidth-$partHeight, rows-cols:$rows-$cols")
-
-        val tileGrid = ArrayList<ImageTile>(rows * cols)
-        for (x in 0 until cols) {
-            for (y in 0 until rows) {
-                val tile = ImageTile(
-                    scale = scaleFactor,
-                    index = 0,
-                    sampleSize = sampleSize,
-                    bounds = IntRect(
-                        left = (x * partWidth).toInt(),
-                        top = (y * partHeight).toInt(),
-                        right = ((x + 1) * partWidth).toInt(),
-                        bottom = ((y + 1) * partHeight).toInt(),
-                    )
+    val tileGrid = ArrayList<ImageTile>(rows * cols)
+    for (x in 0 until cols) {
+        for (y in 0 until rows) {
+            val tile = ImageTile(
+                scale = scaleFactor,
+                index = 0,
+                sampleSize = ImageSampleSize(1),
+                bounds = IntRect(
+                    left = (x * partWidth).toInt(),
+                    top = (y * partHeight).toInt(),
+                    right = ((x + 1) * partWidth).toInt(),
+                    bottom = ((y + 1) * partHeight).toInt(),
                 )
-                tileGrid.add(tile)
-            }
+            )
+            tileGrid.add(tile)
         }
-        return@associateWith tileGrid
     }
+
+    val foregroundTiles = mutableMapOf<ImageSampleSize, List<ImageTile>>()
+    foregroundTiles[ImageSampleSize(1)] = tileGrid
 
     return ImageTileGrid(
         base = baseTile,
