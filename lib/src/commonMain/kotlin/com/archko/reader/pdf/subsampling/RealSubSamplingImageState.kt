@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
@@ -120,7 +121,7 @@ internal class RealSubSamplingImageState(
             .fastMapNotNull { region ->
                 val isBaseTile = region == tileGrid.base
                 val drawBounds =
-                    region.bounds.scaledAndOffsetBy(transformation.scale, transformation.offset)
+                    region.bounds.scaledAndOffsetBy(ScaleFactor(1f, 1f), transformation.offset)
                 ViewportTile(
                     region = region,
                     bounds = drawBounds,
