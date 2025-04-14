@@ -74,6 +74,7 @@ public class ImageBitmapCache private constructor() {
             }
             while (putCount > MAX_PAGE_SIZE) {
                 removeLast()
+                putCount--
             }
 
             val previous: Painter?
@@ -181,6 +182,6 @@ public class ImageBitmapCache private constructor() {
             return ImageFactory.instance
         }
 
-        private var MAX_PAGE_SIZE = 16
+        private var MAX_PAGE_SIZE = 48
     }
 }

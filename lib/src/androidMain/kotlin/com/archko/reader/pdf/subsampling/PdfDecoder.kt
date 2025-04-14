@@ -158,7 +158,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         patchX = ((region.left) + cropBound.left).toInt()
         patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegion:index:${tile}, scale:${tile.scale}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
+        println("renderPageRegion:index:${tile.index}, scale:${tile.scale}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
 
         val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
         val ctm = Matrix(scale)

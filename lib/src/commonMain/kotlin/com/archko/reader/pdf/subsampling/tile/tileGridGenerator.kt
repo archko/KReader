@@ -10,15 +10,9 @@ internal fun ImageTileGrid.Companion.generate(
     viewportSize: IntSize,
     unscaledImageSize: IntSize,
 ): ImageTileGrid {
-    val baseSampleSize = ImageSampleSize.calculateFor(
-        viewportSize = viewportSize,
-        scaledImageSize = unscaledImageSize
-    )
-
     val baseTile = ImageTile(
         scale = ScaleFactor(scale, scale),
         index = 0,
-        sampleSize = baseSampleSize,
         bounds = IntRect(IntOffset.Zero, unscaledImageSize)
     )
 
@@ -37,7 +31,6 @@ internal fun ImageTileGrid.Companion.generate(
             val tile = ImageTile(
                 scale = ScaleFactor(scale, scale),
                 index = 0,
-                sampleSize = ImageSampleSize(1),
                 bounds = IntRect(
                     left = (x * partWidth).toInt(),
                     top = (y * partHeight).toInt(),
@@ -58,7 +51,7 @@ internal fun ImageTileGrid.Companion.generate(
     )
 }
 
-public const val PART_SIZE: Int = 512
+public const val PART_SIZE: Int = 256 * 3
 
 /** Calculates a [ImageSampleSize] for fitting a source image in its layout bounds. */
 internal fun ImageSampleSize.Companion.calculateFor(

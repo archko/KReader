@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.IntRect
 public data class ImageTile(
     val scale: ScaleFactor,
     val index: Int,
-    val sampleSize: ImageSampleSize,
     val bounds: IntRect,
 ){
     override fun toString(): String {

@@ -86,11 +86,9 @@ internal class RealSubSamplingImageState(
     // Note to self: This is not inlined in viewportTiles to
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
-        //println("DEBUG: tileGrid recalculated:$isReadyToBeDisplayed")
         if (isReadyToBeDisplayed && decoder != null) {
             val scale = contentTransformation().scale.scaleX
             var grid = tileMap[scale]
-            //println("DEBUG: tileGrid:$grid")
             if (null != grid) {
                 grid
             } else {
