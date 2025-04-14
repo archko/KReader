@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.subsampling.internal
 
 import androidx.compose.ui.util.fastForEach
+import com.archko.reader.pdf.cache.ImageBitmapCache
 import com.archko.reader.pdf.subsampling.internal.ImageCache.LoadingState.InFlight
 import com.archko.reader.pdf.subsampling.internal.ImageCache.LoadingState.Loaded
 import com.archko.reader.pdf.subsampling.tile.ImageTile
@@ -55,9 +56,20 @@ internal class ImageCache(
                                 check(tile !in it)
                                 it + (tile to InFlight(currentCoroutineContext().job))
                             }
-                            val painter = decoder.decodeRegion(tile)
-                            cachedImages.update {
-                                it + (tile to Loaded(painter))
+                            val key = "${tile.index}-${tile.bounds}"
+                            val painter = ImageBitmapCache.getInstance().getBitmap(key)
+                            if (null != painter) {
+                                cachedImages.update {
+                                    it + (tile to Loaded(
+                                        ImageRegionDecoder.DecodeResult(painter)
+                                    ))
+                                }
+                            } else {
+                                val painter = decoder.decodeRegion(tile)
+                                ImageBitmapCache.getInstance().addBitmap(key, painter.painter)
+                                cachedImages.update {
+                                    it + (tile to Loaded(painter))
+                                }
                             }
                         }
                     }
