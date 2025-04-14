@@ -1,7 +1,7 @@
 [versions]
 androidDriver = "2.0.2"
 compose = "1.7.8"
-compose-multiplatform = "1.8.0-alpha03"
+compose-multiplatform = "1.8.0-beta02"
 
 kotlin = "2.1.0"
 agp = "8.6.0"
@@ -19,7 +19,7 @@ androidx-material = "1.12.0"
 androidx-test-junit = "1.2.1"
 junit = "4.13.2"
 
-coil = "3.0.4"
+coil = "3.1.0"
 ktor = "3.0.3"
 kotlinx-coroutines = "1.10.1"
 kotlinx-immutableCollections = "0.3.8" # https://github.com/Kotlin/kotlinx.collections.immutable/releases
@@ -33,7 +33,7 @@ sqlDelight = "2.0.2"
 core = "1.15.0"
 lifecycleViewmodelComposeAndroid = "2.8.7"
 zoomable = "0.15.1"
-okio = "3.9.1"
+okio = "3.10.2"
 
 [libraries]
 android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "androidDriver" }

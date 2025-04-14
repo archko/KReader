@@ -6,17 +6,17 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 
 internal fun ImageTileGrid.Companion.generate(
-    scale: Float,
+    scaleFactor: ScaleFactor,
     viewportSize: IntSize,
     unscaledImageSize: IntSize,
 ): ImageTileGrid {
     val baseTile = ImageTile(
-        scale = ScaleFactor(scale, scale),
+        scale = scaleFactor,
         index = 0,
         bounds = IntRect(IntOffset.Zero, unscaledImageSize)
     )
 
-    //val scale = scaleFactor.scaleX
+    val scale = scaleFactor.scaleX
     val pageWidth = scale * unscaledImageSize.width
     val pageHeight = scale * unscaledImageSize.height
     val cols: Int = (pageWidth / PART_SIZE).toInt()
@@ -29,7 +29,7 @@ internal fun ImageTileGrid.Companion.generate(
     for (x in 0 until cols) {
         for (y in 0 until rows) {
             val tile = ImageTile(
-                scale = ScaleFactor(scale, scale),
+                scale = scaleFactor,
                 index = 0,
                 bounds = IntRect(
                     left = (x * partWidth).toInt(),
@@ -42,8 +42,8 @@ internal fun ImageTileGrid.Companion.generate(
         }
     }
 
-    val foregroundTiles = mutableMapOf<ImageSampleSize, List<ImageTile>>()
-    foregroundTiles[ImageSampleSize(1)] = tileGrid
+    val foregroundTiles = mutableMapOf<ScaleFactor, List<ImageTile>>()
+    foregroundTiles[scaleFactor] = tileGrid
 
     return ImageTileGrid(
         base = baseTile,
@@ -52,36 +52,3 @@ internal fun ImageTileGrid.Companion.generate(
 }
 
 public const val PART_SIZE: Int = 256 * 3
-
-/** Calculates a [ImageSampleSize] for fitting a source image in its layout bounds. */
-internal fun ImageSampleSize.Companion.calculateFor(
-    viewportSize: IntSize,
-    scaledImageSize: IntSize
-): ImageSampleSize {
-    check(viewportSize.minDimension > 0f) { "Can't calculate a sample size for $viewportSize" }
-
-    val zoom = minOf(
-        viewportSize.width / scaledImageSize.width.toFloat(),
-        viewportSize.height / scaledImageSize.height.toFloat()
-    )
-    return calculateFor(zoom)
-}
-
-/** Calculates a [ImageSampleSize] for fitting a source image in its layout bounds. */
-internal fun ImageSampleSize.Companion.calculateFor(zoom: Float): ImageSampleSize {
-    if (zoom == 0f) {
-        return ImageSampleSize(1)
-    }
-
-    var sampleSize = 1
-    while (sampleSize * 2 <= (1 / zoom)) {
-        // BitmapRegionDecoder requires values based on powers of 2.
-        sampleSize *= 2
-    }
-    return ImageSampleSize(sampleSize)
-}
-
-private operator fun ImageSampleSize.div(other: ImageSampleSize) =
-    ImageSampleSize(size / other.size)
-
-private operator fun ImageSampleSize.div(other: Int) = ImageSampleSize(size / other)

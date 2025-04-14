@@ -81,13 +81,13 @@ internal class RealSubSamplingImageState(
         viewportSize?.isNotEmpty() == true && imageOrPreviewSize?.isNotEmpty() == true
     }
 
-    private val tileMap = mutableMapOf<Float, ImageTileGrid>()
+    private val tileMap = mutableMapOf<ScaleFactor, ImageTileGrid>()
 
     // Note to self: This is not inlined in viewportTiles to
     // avoid creating a new grid on every transformation change.
     private val tileGrid by derivedStateOf {
         if (isReadyToBeDisplayed && decoder != null) {
-            val scale = contentTransformation().scale.scaleX
+            val scale = contentTransformation().scale
             var grid = tileMap[scale]
             if (null != grid) {
                 grid

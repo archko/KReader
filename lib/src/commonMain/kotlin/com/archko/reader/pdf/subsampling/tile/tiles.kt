@@ -54,25 +54,10 @@ internal data class ViewportImageTile(
     val isBase get() = tile.isBase
 }
 
-@JvmInline
-public value class ImageSampleSize(public val size: Int) {
-    public companion object; // For extensions.
-
-    init {
-        check(size == 1 || size.rem(2) == 0) {
-            "Incorrect size = $size. BitmapRegionDecoder requires values based on powers of 2."
-        }
-    }
-
-    public fun coerceAtMost(other: ImageSampleSize): ImageSampleSize {
-        return if (size > other.size) other else this
-    }
-}
-
 /** Collection of [ImageTile] needed for drawing an image at a certain zoom level. */
 internal data class ImageTileGrid(
     val base: ImageTile,
-    val foreground: Map<ImageSampleSize, List<ImageTile>>
+    val foreground: Map<ScaleFactor, List<ImageTile>>
 ) {
     companion object; // For extensions.
 }
