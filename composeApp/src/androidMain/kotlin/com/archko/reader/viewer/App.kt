@@ -203,6 +203,13 @@ fun App(
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
             )*/
+            //FullscreenImageScreen(viewModel.path)
+            //val list = mutableListOf<APage>()
+            //for (i in 0..5) {
+            //    list.add(APage(i, 1024, 1280, 1f))
+            //}
+            //CustomView(list, pdf!!)
+
             TestSubSampling(viewModel.path.toString())
         }
     }
