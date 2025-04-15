@@ -38,7 +38,7 @@ class MapState(
     fullWidth: Int,
     fullHeight: Int,
     tileSize: Int = 512,
-    workerCount: Int = Runtime.getRuntime().availableProcessors() - 1,
+    workerCount: Int = 1,
     initialValuesBuilder: InitialValues.() -> Unit = {}
 ) : ZoomPanRotateStateListener {
     private val initialValues = InitialValues().apply(initialValuesBuilder)

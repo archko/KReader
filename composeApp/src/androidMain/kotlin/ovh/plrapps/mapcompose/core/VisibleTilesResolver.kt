@@ -91,6 +91,7 @@ internal class VisibleTilesResolver(
                 colLeft..colRight
             }
             val count = (rowBottom - rowTop + 1) * (colRight - colLeft + 1)
+            println("VisibleTiles:$colLeft, $rowTop, $colRight, $rowBottom, $count, left:$left-$top-$right-$bottom $scale, $scaledTileSize, $tileMatrix")
             return VisibleTiles(level, tileMatrix, count, getSubSample(scale))
         }
 

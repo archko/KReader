@@ -5,24 +5,27 @@ import android.graphics.Bitmap.Config
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ColorFilter
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Build
-import kotlinx.coroutines.*
+import androidx.core.graphics.createBitmap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import java.io.InputStream
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import kotlin.math.pow
-import androidx.core.graphics.createBitmap
-
 
 /**
  * The engine of MapCompose. The view-model uses two channels to communicate with the [TileCollector]:
@@ -97,7 +100,6 @@ internal class TileCollector(
         layers: List<Layer>,
         bitmapPool: BitmapPool
     ) = launch(dispatcher) {
-
         val layerIds = layers.map { it.id }
         val bitmapLoadingOptionsForLayer = layerIds.associateWith {
             BitmapFactory.Options().apply {
@@ -107,14 +109,17 @@ internal class TileCollector(
         val bitmapForLayer = layerIds.associateWith {
             Bitmap.createBitmap(tileSize, tileSize, bitmapConfiguration.bitmapConfig)
         }
-        val canvas = Canvas()
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
         suspend fun getBitmapFromPoolOrCreate(subSamplingRatio: Int): Bitmap {
             val subSampledSize = (tileSize / subSamplingRatio).coerceAtLeast(1)
-            val allocationByteCount = subSampledSize * subSampledSize * bitmapConfiguration.bytesPerPixel
+            val allocationByteCount =
+                subSampledSize * subSampledSize * bitmapConfiguration.bytesPerPixel
             println("getBitmapFromPoolOrCreate:$subSampledSize")
-            return bitmapPool.get(allocationByteCount) ?: Bitmap.createBitmap(subSampledSize, subSampledSize, bitmapConfiguration.bitmapConfig)
+            return bitmapPool.get(allocationByteCount) ?: Bitmap.createBitmap(
+                subSampledSize,
+                subSampledSize,
+                bitmapConfiguration.bitmapConfig
+            )
         }
 
         suspend fun getBitmap(
@@ -157,19 +162,18 @@ internal class TileCollector(
             val bitmapForLayers = layers.mapIndexed { index, layer ->
                 async {
                     val bitmap = createBitmap(512, 512, Config.ARGB_8888)
-                    val canvas = Canvas(bitmap)
                     val paint = Paint()
+                    val canvas = Canvas(bitmap)
                     paint.textSize = 60f
                     paint.strokeWidth = 4f
                     paint.isAntiAlias = true
                     paint.style = Paint.Style.STROKE
                     canvas.drawARGB(255, 0, 255, 0)
-                    paint.setColor(Color.WHITE)
                     val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
                     paint.setColor(Color.YELLOW)
                     canvas.drawRect(rect, paint)
                     paint.setColor(Color.RED)
-                    canvas.drawText(index.toString(), 130f, 130f, paint)
+                    canvas.drawText("${spec.row}-${spec.col},${spec.zoom}", 130f, 130f, paint)
                     BitmapForLayer(bitmap, layer)
                     /*val i = layer.tileStreamProvider.getTileStream(spec.row, spec.col, spec.zoom)
                     if (i != null) {
@@ -202,17 +206,7 @@ internal class TileCollector(
                 null
             } ?: continue // If the decoding of the first layer failed, skip the rest
 
-            if (layers.size > 1) {
-                canvas.setBitmap(resultBitmap)
-
-                for (result in bitmapForLayers.drop(1)) {
-                    paint.alpha = (255f * result.layer.alpha).toInt()
-                    if (result.bitmap == null) continue
-                    canvas.drawBitmap(result.bitmap, 0f, 0f, paint)
-                }
-            }
-
-            println("getBitmap.Tile:zoom:${spec.zoom}, row-col:${spec.row}-${spec.col}, ${spec.subSample}")
+            println("getBitmap.Tile:zoom:${spec}, row-col:${spec.row}-${spec.col}, ${spec.subSample}")
             val tile = Tile(
                 spec.zoom,
                 spec.row,

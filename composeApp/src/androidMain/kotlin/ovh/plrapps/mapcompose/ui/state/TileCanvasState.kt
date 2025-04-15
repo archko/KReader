@@ -172,7 +172,7 @@ internal class TileCanvasState(
         val visibleTilesForLayers = VisibleState(visibleTiles, layerIds, opacities)
         visibleStateFlow.value = visibleTilesForLayers
         visibleTiles.tileMatrix.entries.forEach {
-            println("tiles:${it.key}, ${it.value}")
+            //println("tiles:${it.key}, ${it.value}")
         }
 
         renderThrottled()
