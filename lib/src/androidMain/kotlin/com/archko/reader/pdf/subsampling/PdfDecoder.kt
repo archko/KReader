@@ -90,6 +90,26 @@ public class PdfDecoder(file: File) : ImageDecoder {
         }
     }
 
+    public fun getSize(viewportSize: IntSize): IntSize {
+        if ((imageSize == IntSize.Zero || viewSize != viewportSize)
+            && viewportSize.width > 0 && viewportSize.height > 0
+        ) {
+            viewSize = viewportSize
+            if (pageSizes.isNotEmpty()) {
+                var width = pageSizes[0].width
+                var height = 0
+                for (page in pageSizes) {
+                    val zoom = 1f * width / page.width
+                    page.zoom = zoom
+                    val h = (page.height * zoom).toInt()
+                    height += h
+                }
+                imageSize = IntSize(width, height)
+            }
+        }
+        return imageSize
+    }
+
     override fun close() {
         document.destroy()
     }

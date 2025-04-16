@@ -153,6 +153,8 @@ internal class TileCollector(
             }
         }
 
+        val colors = arrayOf(Color.YELLOW, Color.BLUE, Color.BLACK, Color.CYAN, Color.MAGENTA)
+
         for (spec in tilesToDownload) {
             if (layers.isEmpty()) {
                 tilesDownloaded.send(spec)
@@ -168,7 +170,7 @@ internal class TileCollector(
                     paint.strokeWidth = 4f
                     paint.isAntiAlias = true
                     paint.style = Paint.Style.STROKE
-                    canvas.drawARGB(255, 0, 255, 0)
+                    canvas.drawARGB(255, 255 * (spec.row % 2), 255 * (spec.col % 2), 0)
                     val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
                     paint.setColor(Color.YELLOW)
                     canvas.drawRect(rect, paint)

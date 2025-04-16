@@ -101,6 +101,7 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import ovh.plrapps.mapcompose.ui.TestUI
 
 @Composable
 fun App(
@@ -210,7 +211,8 @@ fun App(
             //}
             //CustomView(list, pdf!!)
 
-            TestSubSampling(viewModel.path.toString())
+            //TestSubSampling(viewModel.path.toString())
+            TestUI(viewModel.path.toString())
         }
     }
 }

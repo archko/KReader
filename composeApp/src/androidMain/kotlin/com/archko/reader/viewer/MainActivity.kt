@@ -81,7 +81,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                         null
                     }
                 }
-                val state = MapState(4, 4096, 4096) {
+                val state = MapState(4, 1024, 4096) {
                     scale(1.0f)
                 }.apply {
                     addLayer(tileStreamProvider)
