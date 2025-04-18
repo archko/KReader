@@ -150,7 +150,9 @@ internal class TileCanvasState(
         }
 
         withContext(scope.coroutineContext) {
-            setVisibleTiles(visibleTiles)
+            if (visibleTilesResolver.getScale() == visibleTiles.scale) {
+                setVisibleTiles(visibleTiles)
+            }
         }
     }
 

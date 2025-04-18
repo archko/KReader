@@ -34,7 +34,7 @@ internal fun TileCanvas(
             translate(left = -zoomPRState.scrollX, top = -zoomPRState.scrollY)
             scale(scale = zoomPRState.scale, Offset.Zero)
         }) {
-            println("state:Canvas:${tilesToRender.size}")
+            //println("state:Canvas:${tilesToRender.size}")
             for (tile in tilesToRender) {
                 val bitmap = tile.bitmap ?: continue
                 val scaleForLevel = 1f
