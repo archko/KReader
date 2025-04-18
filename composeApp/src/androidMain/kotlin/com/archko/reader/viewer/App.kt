@@ -101,6 +101,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import ovh.plrapps.mapcompose.ui.TestUI
 
 @Composable
 fun App(
@@ -192,14 +193,15 @@ fun App(
                 return@Theme
             }
 
-            PdfScreen(
+            /*PdfScreen(
                 screenWidth = screenWidthInPixels,
                 screenHeight = screenHeightInPixels,
                 pdf = pdf!!,
                 scope = scope,
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
-            )
+            )*/
+            TestUI(viewModel.path.toString())
         }
     }
 }
