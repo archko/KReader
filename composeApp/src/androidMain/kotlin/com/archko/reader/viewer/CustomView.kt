@@ -64,6 +64,26 @@ private class PageNode(
             size = rect.size,
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8f)
         )
+        drawScope.drawContext.canvas.nativeCanvas.drawText(
+            "${aPage.index},w-h:${rect.width}-${rect.height}",
+            rect.topLeft.x + rect.width / 2,
+            rect.topLeft.y + rect.height / 2,
+            android.graphics.Paint().apply {
+                color = android.graphics.Color.BLUE
+                textSize = 36f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        )
+        drawScope.drawContext.canvas.nativeCanvas.drawText(
+            "topLeft:${rect.topLeft}",
+            rect.topLeft.x + rect.width / 2,
+            rect.topLeft.y + rect.height / 2 + 80,
+            android.graphics.Paint().apply {
+                color = android.graphics.Color.BLUE
+                textSize = 36f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        )
 
         // 绘制 ID
         /*drawScope.drawContext.canvas.nativeCanvas.drawText(
@@ -126,7 +146,7 @@ private class Page(
     public fun draw(drawScope: DrawScope, offset: Offset) {
         nodes.forEach { node ->
             node.draw(drawScope, offset)
-            val contentOffset = calculateContentOffset()
+            /*val contentOffset = calculateContentOffset()
             drawScope.drawContext.canvas.nativeCanvas.drawText(
                 aPage.index.toString(),
                 contentOffset.x + drawScope.size.width / 2,
@@ -136,7 +156,7 @@ private class Page(
                     textSize = 160f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
-            )
+            )*/
         }
     }
 
