@@ -2,6 +2,7 @@ package com.archko.reader.viewer
 
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -10,6 +11,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -24,6 +26,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
@@ -35,54 +38,104 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
+import com.archko.reader.pdf.component.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import com.archko.reader.pdf.state.PdfState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable.isActive
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
+import ovh.plrapps.mapcompose.core.throttle
+import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 
 // 将 Page 类重命名为 PageNode
 private class PageNode(
+    private val pdfViewState: PdfViewState,
     public var rect: Rect,
     public val aPage: APage  // 添加 APage 属性
 ) {
+    private var isDecoding = false
+    val cacheKey = "${aPage.index}-${rect}-${aPage.scale}"
     public fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
         if (!isVisible(drawScope, offset, rect, aPage.index)) {
             //println("is not Visible:${aPage.index}, $offset, $rect")
+            pdfViewState.remove(rect, aPage, cacheKey)
             return
         }
-
-        //println("pageNode.draw.offset:$offset, $rect, $aPage")
-        // 绘制边框
-        drawScope.drawRect(
-            color = Color.Magenta,
-            topLeft = Offset(0f, rect.top),
-            size = rect.size,
-            style = Stroke(width = 6f)
-        )
-
-        // 绘制 ID
-        /*drawScope.drawContext.canvas.nativeCanvas.drawText(
-            aPage.index.toString(),
-            rect.topLeft.x + rect.size.width / 2,
-            rect.topLeft.y + rect.size.height / 2,
-            android.graphics.Paint().apply {
-                color = android.graphics.Color.WHITE
-                textSize = 60f
-                textAlign = android.graphics.Paint.Align.CENTER
+        var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
+        if (loadedBitmap != null) {
+            //println("pageNode.draw.loadedBitmap:$rect, $aPage")
+            isDecoding = false
+            drawScope.drawImage(
+                loadedBitmap,
+                dstOffset = IntOffset(rect.left.toInt(), rect.top.toInt())
+            )
+        } else {
+            if (!isDecoding) {
+                isDecoding = true
+                pdfViewState.decode(rect, aPage, cacheKey)
             }
-        )*/
+            //println("pageNode.draw.offset:$offset, $rect, $aPage")
+            // 绘制边框
+            drawScope.drawRect(
+                color = Color.Magenta,
+                topLeft = Offset(rect.left, rect.top),
+                size = rect.size,
+                style = Stroke(width = 6f)
+            )
+
+            drawScope.drawContext.canvas.nativeCanvas.drawText(
+                "page:${aPage.index}, scale:${aPage.scale},",
+                rect.topLeft.x + rect.size.width / 2,
+                rect.topLeft.y + rect.size.height / 2,
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.MAGENTA
+                    textSize = 40f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            drawScope.drawContext.canvas.nativeCanvas.drawText(
+                "${rect.width}-${rect.height}",
+                rect.topLeft.x + rect.size.width / 2,
+                rect.topLeft.y + rect.size.height / 2 + 60,
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.MAGENTA
+                    textSize = 36f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            drawScope.drawContext.canvas.nativeCanvas.drawText(
+                rect.toString2(),
+                rect.topLeft.x + rect.size.width / 2,
+                rect.topLeft.y + rect.size.height / 2 + 120,
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.MAGENTA
+                    textSize = 32f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+        }
+    }
+
+    private fun Rect.toString2(): String {
+        return "($left, $top, $right, $bottom)"
     }
 }
 
-private fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page:Int): Boolean {
+private fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: Int): Boolean {
     // 获取画布的可视区域
     val visibleRect = Rect(
         left = -offset.x,
@@ -98,6 +151,7 @@ private fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page:I
 }
 
 private class Page(
+    private val pdfViewState: PdfViewState,
     private var viewSize: IntSize,
     private var zoom: Float,
     private var viewOffset: Offset,
@@ -105,6 +159,7 @@ private class Page(
     private var yOffset: Float = 0f
 ) {
     private var nodes: List<PageNode> = emptyList()
+
     //page bound, should be caculate after view measured
     private var bounds = Rect(0f, 0f, 0f, 0f)
 
@@ -169,6 +224,7 @@ private class Page(
         bounds = Rect(0f, contentOffset.y, scaledWidth, contentOffset.y + scaledHeight)
 
         val rootNode = PageNode(
+            pdfViewState,
             Rect(
                 left = contentOffset.x,
                 top = contentOffset.y,
@@ -189,18 +245,22 @@ private class Page(
             val halfHeight = rect.height / 2
             val list = listOf(
                 PageNode(
+                    pdfViewState,
                     Rect(rect.left, rect.top, rect.left + halfWidth, rect.top + halfHeight),
                     page.aPage
                 ),
                 PageNode(
+                    pdfViewState,
                     Rect(rect.left + halfWidth, rect.top, rect.right, rect.top + halfHeight),
                     page.aPage
                 ),
                 PageNode(
+                    pdfViewState,
                     Rect(rect.left, rect.top + halfHeight, rect.left + halfWidth, rect.bottom),
                     page.aPage
                 ),
                 PageNode(
+                    pdfViewState,
                     Rect(rect.left + halfWidth, rect.top + halfHeight, rect.right, rect.bottom),
                     page.aPage
                 )
@@ -224,6 +284,7 @@ private class PdfViewState(
     public val list: List<APage>,
     public val state: PdfState,
 ) {
+    private var viewOffset: Offset = Offset.Zero
     public var init: Boolean by mutableStateOf(false)
     public var totalHeight: Float by mutableFloatStateOf(0f)
 
@@ -231,6 +292,95 @@ private class PdfViewState(
     public var viewSize: IntSize by mutableStateOf(IntSize.Zero)
     public var vZoom: Float by mutableFloatStateOf(1f)
     var pagePositions: List<Float> by mutableStateOf(createPositions())
+
+    private val parentScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    private val scope = CoroutineScope(
+        parentScope.coroutineContext + singleThreadDispatcher
+    )
+    private val visibleTilesChannel = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
+    private val tilesOutput = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
+    internal val decoderService: DecoderService
+    internal val tilesCollected = mutableListOf<TileSpec>()
+    internal var tilesToRender: List<TileSpec> by mutableStateOf(listOf())
+
+    init {
+        //scope.launch {
+        //collectNewTiles()
+        //}
+
+        decoderService = DecoderService(1)
+        scope.launch {
+            decoderService.collectTiles(
+                visibleTilesChannel,
+                tilesOutput
+            )
+        }
+
+        scope.launch {
+            consumeTiles(tilesOutput)
+        }
+    }
+
+    private val renderTask = scope.throttle(wait = 34) {
+        //evictTiles(lastVisible)
+        val tilesToRenderCopy = tilesCollected.sortedBy {
+            val priority = it.page
+            priority
+        }
+        println("PdfViewState:renderTask:${tilesToRenderCopy.size}")
+        tilesToRender = tilesToRenderCopy
+    }
+
+    private suspend fun consumeTiles(tileChannel: ReceiveChannel<TileSpec>) {
+        for (tile in tileChannel) {
+            //println("PdfViewState:consumeTiles:$tile")
+            if (tile.imageBitmap == null) {
+                continue
+            }
+            ImageCache.put(tile.cacheKey, tile.imageBitmap!!)
+            /*if (isTileVisible(tile)) {
+                if (!tilesCollected.contains(tile)) {
+                    tilesCollected.add(tile)
+                } else {
+
+                }
+            } else {
+                //tile.recycle()
+                tilesCollected.remove(tile)
+                ImageCache.remove(tile.cacheKey)
+            }*/
+            renderThrottled()
+        }
+    }
+
+    private fun renderThrottled() {
+        renderTask.trySend(Unit)
+    }
+
+    private fun isTileVisible(spec: TileSpec): Boolean {
+        return isVisible(IntSize(0, 0), viewOffset, spec.rect, spec.page)
+    }
+
+    private fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
+        // 获取画布的可视区域
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = viewSize.width - offset.x,
+            bottom = viewSize.height - offset.y
+        )
+
+        // 检查页面是否与可视区域相交
+        val visible = bounds.overlaps(visibleRect)
+        //println("page.draw.isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
+        return visible
+    }
+
+    fun shutdown() {
+        singleThreadDispatcher.close()
+        decoderService.shutdownNow()
+    }
 
     private fun createPositions(): List<Float> {
         return emptyList<Float>()
@@ -313,6 +463,44 @@ private class PdfViewState(
             println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         }
     }
+
+    fun remove(rect: Rect, page: APage, cacheKey: String) {
+        val tileSpec = TileSpec(
+            page.index,
+            page.scale,
+            rect,
+            rect.width.toInt(),
+            rect.height.toInt(),
+            cacheKey,
+            null
+        )
+        if (tilesCollected.contains(tileSpec)) {
+            println("PdfViewState:remove:$tileSpec")
+            tilesCollected.remove(tileSpec)
+        }
+    }
+
+    fun decode(rect: Rect, page: APage, cacheKey: String) {
+        val tileSpec = TileSpec(
+            page.index,
+            page.scale,
+            rect,
+            rect.width.toInt(),
+            rect.height.toInt(),
+            cacheKey,
+            null
+        )
+        if (!tilesCollected.contains(tileSpec)) {
+            tilesCollected.add(tileSpec)
+            scope.launch {
+                visibleTilesChannel.send(tileSpec)
+            }
+        }
+    }
+
+    public fun updateOffset(newOffset: Offset) {
+        this.viewOffset = newOffset
+    }
 }
 
 @Composable
@@ -341,11 +529,18 @@ fun CustomView(
         }
     }
 
+    DisposableEffect(list) {
+        onDispose {
+            println("DocumentView: shutdown:$viewSize, vZoom:$vZoom, list: ${list.size}")
+            pdfState.shutdown()
+        }
+    }
+
     // 创建并记住每个页面的Page对象
     var pages by remember(list, pdfState.pagePositions) {
         mutableStateOf(list.zip(pdfState.pagePositions).map { (aPage, yPos) ->
             println("DocumentView.createPage.viewSize:$viewSize, vZoom:$vZoom, y: $yPos, $aPage")
-            Page(IntSize.Zero, vZoom, Offset.Zero, aPage, yPos)
+            Page(pdfState, IntSize.Zero, vZoom, Offset.Zero, aPage, yPos)
         })
     }
 
@@ -368,6 +563,7 @@ fun CustomView(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         var wasCancelled = false
@@ -417,6 +613,7 @@ fun CustomView(
                                         /*pages.forEach { page ->
                                             page.updateOffset(offset)
                                         }*/
+                                        pdfState.updateOffset(offset)
 
                                         if (event.changes.size > 1) {
                                             pastTouchSlop = true
@@ -503,6 +700,8 @@ fun CustomView(
                                         ) { value, _ ->
                                             offset = offset.copy(x = value.coerceIn(-maxX, maxX))
                                             pages.forEach { page -> page.updateOffset(offset) }
+
+                                            pdfState.updateOffset(offset)
                                         }
                                     }
                                 }
@@ -516,6 +715,8 @@ fun CustomView(
                                         ) { value, _ ->
                                             offset = offset.copy(y = value.coerceIn(-maxY, 0f))
                                             pages.forEach { page -> page.updateOffset(offset) }
+
+                                            pdfState.updateOffset(offset)
                                         }
                                     }
                                 }
@@ -524,9 +725,10 @@ fun CustomView(
                     }
                 }
         ) {
+            //println("state:Canvas:${pdfState.tilesToRender.size}")
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.
-                val visibleRect = Rect(
+                /*val visibleRect = Rect(
                     left = -offset.x,
                     top = -offset.y,
                     right = size.width - offset.x,
@@ -536,7 +738,7 @@ fun CustomView(
                     brush = gradientBrush,
                     topLeft = visibleRect.topLeft,
                     size = visibleRect.size
-                )
+                )*/
                 pages.forEach { page -> page.draw(this, offset) }
             }
         }
