@@ -21,9 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -52,17 +54,18 @@ private class PageNode(
 ) {
     public fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
-        if (!isVisible(drawScope)) {
+        if (!isVisible(drawScope, offset, rect, aPage.index)) {
             //println("is not Visible:${aPage.index}, $offset, $rect")
             return
         }
 
+        //println("pageNode.draw.offset:$offset, $rect, $aPage")
         // 绘制边框
         drawScope.drawRect(
-            color = Color.Green,
-            topLeft = rect.topLeft,
+            color = Color.Magenta,
+            topLeft = Offset(0f, rect.top),
             size = rect.size,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8f)
+            style = Stroke(width = 6f)
         )
 
         // 绘制 ID
@@ -77,46 +80,47 @@ private class PageNode(
             }
         )*/
     }
-
-    private fun isVisible(drawScope: DrawScope): Boolean {
-        // 获取画布的可视区域
-        val visibleRect = Rect(
-            left = 0f,
-            top = 0f,
-            right = drawScope.size.width,
-            bottom = drawScope.size.height
-        )
-
-        // 检查页面是否与可视区域相交
-        return rect.intersectsWith(visibleRect)
-    }
 }
 
-private fun Rect.intersectsWith(other: Rect): Boolean {
-    return !(left > other.right ||
-            right < other.left ||
-            top > other.bottom ||
-            bottom < other.top)
+private fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page:Int): Boolean {
+    // 获取画布的可视区域
+    val visibleRect = Rect(
+        left = -offset.x,
+        top = -offset.y,
+        right = drawScope.size.width - offset.x,
+        bottom = drawScope.size.height - offset.y
+    )
+
+    // 检查页面是否与可视区域相交
+    val visible = bounds.overlaps(visibleRect)
+    //println("page.draw.isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
+    return visible
 }
 
 private class Page(
     private var viewSize: IntSize,
     private var zoom: Float,
-    private var offset: Offset,
+    private var viewOffset: Offset,
     private var aPage: APage,
-    private var pageOffset: Float = 0f
+    private var yOffset: Float = 0f
 ) {
     private var nodes: List<PageNode> = emptyList()
-    private var lastContentOffset: Offset = Offset.Zero
+    //page bound, should be caculate after view measured
+    private var bounds = Rect(0f, 0f, 0f, 0f)
 
-    public fun update(viewSize: IntSize, zoom: Float, offset: Offset, pageOffset: Float) {
+    /**
+     * @param viewSize view size
+     * @param zoom view zoom,not the page zoom,default=1f
+     * @param yOffset page.top
+     */
+    public fun update(viewSize: IntSize, zoom: Float, offset: Offset, yOffset: Float) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.zoom != zoom
 
         this.viewSize = viewSize
         this.zoom = zoom
-        this.offset = offset
-        this.pageOffset = pageOffset
+        this.viewOffset = offset
+        this.yOffset = yOffset
 
         if (isViewSizeChanged || isZoomChanged) {
             recalculateNodes()
@@ -124,60 +128,45 @@ private class Page(
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset) {
+        if (!isVisible(drawScope, offset, bounds, aPage.index)) {
+            return
+        }
+        //println("page.draw.offset:$offset, $bounds, $aPage")
         nodes.forEach { node ->
-            node.draw(drawScope, offset)
-            val contentOffset = calculateContentOffset()
+            drawScope.drawRect(
+                color = Color.Yellow,
+                topLeft = Offset(0f, bounds.top),
+                size = Size(bounds.width, bounds.height),
+                style = Stroke(width = 8f)
+            )
             drawScope.drawContext.canvas.nativeCanvas.drawText(
                 aPage.index.toString(),
-                contentOffset.x + drawScope.size.width / 2,
-                contentOffset.y + drawScope.size.height / 2,
+                0 + drawScope.size.width / 2,
+                yOffset + drawScope.size.height / 2,
                 android.graphics.Paint().apply {
                     color = android.graphics.Color.YELLOW
                     textSize = 160f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
             )
+            node.draw(drawScope, offset)
         }
     }
 
     public fun updateOffset(newOffset: Offset) {
-        this.offset = newOffset
-        updateNodesPosition()
-    }
-
-    private fun updateNodesPosition() {
-        val contentOffset = calculateContentOffset()
-        if (contentOffset != lastContentOffset) {
-            nodes.forEach { node ->
-                node.rect = node.rect.translate(contentOffset - lastContentOffset)
-            }
-            lastContentOffset = contentOffset
-        }
-    }
-
-    private fun calculateContentOffset(): Offset {
-        val viewWidth = viewSize.width.toFloat()
-        val pageScale = viewWidth / aPage.width
-        val pageHeight = aPage.height * pageScale
-        val scaledWidth = viewWidth * zoom
-        val scaledHeight = pageHeight * zoom
-
-        return Offset(
-            (viewSize.width - scaledWidth) / 2 + offset.x,
-            pageOffset * zoom + offset.y
-        )
+        this.viewOffset = newOffset
     }
 
     private fun recalculateNodes() {
         if (viewSize == IntSize.Zero) return
 
-        val contentOffset = calculateContentOffset()
-        lastContentOffset = contentOffset
+        val contentOffset = Offset(0f, yOffset)
 
         val viewWidth = viewSize.width.toFloat()
         val pageScale = viewWidth / aPage.width
         val scaledWidth = viewWidth * zoom
         val scaledHeight = aPage.height * pageScale * zoom
+        bounds = Rect(0f, contentOffset.y, scaledWidth, contentOffset.y + scaledHeight)
 
         val rootNode = PageNode(
             Rect(
@@ -189,6 +178,7 @@ private class Page(
             aPage
         )
 
+        println("page.recalculateNodes.viewSize:$viewSize, offset:$contentOffset, $bounds, w-h:$scaledWidth-$scaledHeight, $aPage")
         nodes = calculatePages(rootNode)
     }
 
@@ -197,7 +187,7 @@ private class Page(
         if (rect.width * rect.height > maxSize) {
             val halfWidth = rect.width / 2
             val halfHeight = rect.height / 2
-            return listOf(
+            val list = listOf(
                 PageNode(
                     Rect(rect.left, rect.top, rect.left + halfWidth, rect.top + halfHeight),
                     page.aPage
@@ -217,6 +207,10 @@ private class Page(
             ).flatMap {
                 calculatePages(it)
             }
+            //list.forEach {
+            //    println("page.calculatePages.rect:${it.rect}, $aPage")
+            //}
+            return list
         }
         return listOf(page)
     }
@@ -252,6 +246,7 @@ private class PdfViewState(
                 currentY += pageHeight
                 position
             }
+            totalHeight = currentY
         }
     }
 
@@ -268,8 +263,8 @@ private class PdfViewState(
 
     public fun invalidatePageSizes() {
         updatePositions()
-        updateHeight()
-        var currentY = 0f
+        //updateHeight()
+        //var currentY = 0f
         /*if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
             println("PdfViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, list:$list, totalHeight:$totalHeight")
             totalHeight = viewSize.height.toFloat()
@@ -291,7 +286,7 @@ private class PdfViewState(
             init = true
         }
         totalHeight = currentY*/
-        println("invalidatePageSizes.totalHeight:$totalHeight, zoom:$vZoom, viewSize:$viewSize")
+        println("PdfViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, zoom:$vZoom")
     }
 
     /*private fun createPages(): List<Page> {
@@ -314,7 +309,6 @@ private class PdfViewState(
         this.vZoom = vZoom
         if (isViewSizeChanged || isZoomChanged) {
             invalidatePageSizes()
-            println("PdfViewState.viewSize变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         } else {
             println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         }
@@ -350,7 +344,8 @@ fun CustomView(
     // 创建并记住每个页面的Page对象
     var pages by remember(list, pdfState.pagePositions) {
         mutableStateOf(list.zip(pdfState.pagePositions).map { (aPage, yPos) ->
-            Page(IntSize.Zero, 1f, Offset.Zero, aPage, yPos)
+            println("DocumentView.createPage.viewSize:$viewSize, vZoom:$vZoom, y: $yPos, $aPage")
+            Page(IntSize.Zero, vZoom, Offset.Zero, aPage, yPos)
         })
     }
 
@@ -419,9 +414,9 @@ fun CustomView(
                                         )
 
                                         // 更新页面位置
-                                        pages.forEach { page ->
+                                        /*pages.forEach { page ->
                                             page.updateOffset(offset)
-                                        }
+                                        }*/
 
                                         if (event.changes.size > 1) {
                                             pastTouchSlop = true
@@ -542,9 +537,8 @@ fun CustomView(
                     topLeft = visibleRect.topLeft,
                     size = visibleRect.size
                 )
+                pages.forEach { page -> page.draw(this, offset) }
             }
-
-            pages.forEach { page -> page.draw(this, offset) }
         }
     }
 }

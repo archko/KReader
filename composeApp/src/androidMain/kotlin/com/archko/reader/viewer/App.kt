@@ -193,15 +193,15 @@ fun App(
                 return@Theme
             }
 
-            /*PdfScreen(
+            PdfScreen(
                 screenWidth = screenWidthInPixels,
                 screenHeight = screenHeightInPixels,
                 pdf = pdf!!,
                 scope = scope,
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
-            )*/
-            TestUI(viewModel.path.toString())
+            )
+            //TestUI(viewModel.path.toString())
         }
     }
 }
