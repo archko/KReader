@@ -15,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,13 +61,12 @@ import ovh.plrapps.mapcompose.core.throttle
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 
-// 将 Page 类重命名为 PageNode
 private class PageNode(
     private val pdfViewState: PdfViewState,
     public var rect: Rect,
     public val aPage: APage  // 添加 APage 属性
 ) {
-    private var isDecoding = false
+
     val cacheKey = "${aPage.index}-${rect}-${aPage.scale}"
     public fun draw(drawScope: DrawScope, offset: Offset) {
         // 检查页面是否在可视区域内
@@ -76,18 +76,15 @@ private class PageNode(
             return
         }
         var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
+        println("pageNode.draw.loadedBitmap:${loadedBitmap == null}, $rect, $aPage")
         if (loadedBitmap != null) {
             //println("pageNode.draw.loadedBitmap:$rect, $aPage")
-            isDecoding = false
             drawScope.drawImage(
                 loadedBitmap,
                 dstOffset = IntOffset(rect.left.toInt(), rect.top.toInt())
             )
         } else {
-            if (!isDecoding) {
-                isDecoding = true
-                pdfViewState.decode(rect, aPage, cacheKey)
-            }
+            pdfViewState.decode(rect, aPage, cacheKey)
             //println("pageNode.draw.offset:$offset, $rect, $aPage")
             // 绘制边框
             drawScope.drawRect(
@@ -155,13 +152,13 @@ private class Page(
     private var viewSize: IntSize,
     private var zoom: Float,
     private var viewOffset: Offset,
-    private var aPage: APage,
+    internal var aPage: APage,
     private var yOffset: Float = 0f
 ) {
     private var nodes: List<PageNode> = emptyList()
 
     //page bound, should be caculate after view measured
-    private var bounds = Rect(0f, 0f, 0f, 0f)
+    internal var bounds = Rect(0f, 0f, 0f, 0f)
 
     /**
      * @param viewSize view size
@@ -275,6 +272,34 @@ private class Page(
         return listOf(page)
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+
+        other as Page
+
+        if (viewSize != other.viewSize) return false
+        if (zoom != other.zoom) return false
+        if (viewOffset != other.viewOffset) return false
+        if (aPage != other.aPage) return false
+        if (yOffset != other.yOffset) return false
+        if (nodes != other.nodes) return false
+        if (bounds != other.bounds) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = viewSize.hashCode()
+        result = 31 * result + zoom.hashCode()
+        result = 31 * result + viewOffset.hashCode()
+        result = 31 * result + aPage.hashCode()
+        result = 31 * result + yOffset.hashCode()
+        result = 31 * result + nodes.hashCode()
+        result = 31 * result + bounds.hashCode()
+        return result
+    }
+
     public companion object {
         private const val maxSize = 256 * 384 * 4f * 2
     }
@@ -289,8 +314,10 @@ private class PdfViewState(
     public var totalHeight: Float by mutableFloatStateOf(0f)
 
     public var viewSize: IntSize by mutableStateOf(IntSize.Zero)
+    internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
+    public var update: Int by mutableIntStateOf(1)
 
     private val parentScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -301,7 +328,6 @@ private class PdfViewState(
     private val tilesOutput = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
     internal val decoderService: DecoderService
     internal val tilesCollected = mutableListOf<TileSpec>()
-    internal var tilesToRender: List<TileSpec> by mutableStateOf(listOf())
 
     init {
         //scope.launch {
@@ -323,12 +349,23 @@ private class PdfViewState(
 
     private val renderTask = scope.throttle(wait = 34) {
         //evictTiles(lastVisible)
-        val tilesToRenderCopy = tilesCollected.sortedBy {
-            val priority = it.page
-            priority
+        /*val sortedPages = pages.sortedBy { it.aPage.index }
+        val pagesIndices = sortedPages.map { it.aPage.index }.toIntArray()
+
+        val tilesToRenderCopy = mutableListOf<Page>()
+        val addedIndices = mutableSetOf<Int>()
+
+        for (tile in tilesCollected) {
+            val pageIndex = tile.page
+            val index = pagesIndices.binarySearch(pageIndex)
+            if (index >= 0 && !addedIndices.contains(pageIndex)) {
+                tilesToRenderCopy.add(sortedPages[index])
+                addedIndices.add(pageIndex)
+            }
         }
-        println("PdfViewState:renderTask:${tilesToRenderCopy.size}")
-        tilesToRender = tilesToRenderCopy
+        println("PdfViewState:renderTask:${tilesCollected.size}, ${tilesToRenderCopy.size}")
+        pageToRender = tilesToRenderCopy*/
+        setVisibilePage()
     }
 
     private suspend fun consumeTiles(tileChannel: ReceiveChannel<TileSpec>) {
@@ -338,17 +375,15 @@ private class PdfViewState(
                 continue
             }
             ImageCache.put(tile.cacheKey, tile.imageBitmap!!)
-            /*if (isTileVisible(tile)) {
+            if (isTileVisible(tile)) {
                 if (!tilesCollected.contains(tile)) {
                     tilesCollected.add(tile)
-                } else {
-
                 }
             } else {
                 //tile.recycle()
-                tilesCollected.remove(tile)
-                ImageCache.remove(tile.cacheKey)
-            }*/
+                //tilesCollected.remove(tile)
+                //ImageCache.remove(tile.cacheKey)
+            }
             renderThrottled()
         }
     }
@@ -358,7 +393,7 @@ private class PdfViewState(
     }
 
     private fun isTileVisible(spec: TileSpec): Boolean {
-        return isVisible(IntSize(0, 0), viewOffset, spec.rect, spec.page)
+        return isVisible(viewSize, viewOffset, spec.rect, spec.page)
     }
 
     private fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
@@ -379,10 +414,6 @@ private class PdfViewState(
     fun shutdown() {
         singleThreadDispatcher.close()
         decoderService.shutdownNow()
-    }
-
-    private fun createPositions(): List<Float> {
-        return emptyList<Float>()
     }
 
     public fun invalidatePageSizes() {
@@ -413,7 +444,7 @@ private class PdfViewState(
     }
 
     private fun createPages(): List<Page> {
-        return list.map { aPage ->
+        val list = list.map { aPage ->
             Page(
                 this,
                 viewSize,
@@ -423,6 +454,8 @@ private class PdfViewState(
                 0f,
             )
         }
+        pageToRender = list
+        return list
     }
 
     public fun updateViewSize(viewSize: IntSize, vZoom: Float) {
@@ -464,16 +497,39 @@ private class PdfViewState(
             cacheKey,
             null
         )
-        if (!tilesCollected.contains(tileSpec)) {
-            tilesCollected.add(tileSpec)
-            scope.launch {
-                visibleTilesChannel.send(tileSpec)
+        if (tilesCollected.contains(tileSpec)) {
+            val index = tilesCollected.indexOf(tileSpec)
+            val bitmap = tilesCollected[index].imageBitmap
+            if (null != bitmap) {
+                println("PdfViewState:decode:$tileSpec")
+                return
             }
+        }
+        tilesCollected.add(tileSpec)
+        scope.launch {
+            visibleTilesChannel.send(tileSpec)
         }
     }
 
     public fun updateOffset(newOffset: Offset) {
         this.viewOffset = newOffset
+        setVisibilePage()
+    }
+
+    private fun setVisibilePage() {
+        val tilesToRenderCopy = mutableListOf<Page>()
+        pages.forEach {
+            if (isVisible(viewSize, viewOffset, it.bounds, it.aPage.index)) {
+                tilesToRenderCopy.add(it)
+                //println("PdfViewState:updateOffset:${it.bounds}, ${it.aPage}")
+            }
+        }
+        if (tilesToRenderCopy == pageToRender) {
+            println("PdfViewState:updateOffset:${tilesToRenderCopy == pageToRender}, $update")
+            update++
+        } else {
+            pageToRender = tilesToRenderCopy
+        }
     }
 }
 
@@ -611,7 +667,11 @@ fun CustomView(
                                             // 更新状态
                                             vZoom = newZoom
                                             println("zoom:$vZoom, $centroid, $offset")
-                                            pdfViewState.pages.forEach { page -> page.updateOffset(offset) }
+                                            pdfViewState.pages.forEach { page ->
+                                                page.updateOffset(
+                                                    offset
+                                                )
+                                            }
                                             pdfViewState.updateOffset(offset)
                                         }
                                         event.changes.fastForEach {
@@ -661,7 +721,11 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(x = value.coerceIn(-maxX, maxX))
-                                            pdfViewState.pages.forEach { page -> page.updateOffset(offset) }
+                                            pdfViewState.pages.forEach { page ->
+                                                page.updateOffset(
+                                                    offset
+                                                )
+                                            }
                                             pdfViewState.updateOffset(offset)
                                         }
                                     }
@@ -675,7 +739,11 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(y = value.coerceIn(-maxY, 0f))
-                                            pdfViewState.pages.forEach { page -> page.updateOffset(offset) }
+                                            pdfViewState.pages.forEach { page ->
+                                                page.updateOffset(
+                                                    offset
+                                                )
+                                            }
                                             pdfViewState.updateOffset(offset)
                                         }
                                     }
