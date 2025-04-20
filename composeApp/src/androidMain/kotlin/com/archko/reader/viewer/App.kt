@@ -173,15 +173,16 @@ fun App(
                 return@Theme
             }
 
-            PdfScreen(
+            /*PdfScreen(
                 screenWidth = screenWidthInPixels,
                 screenHeight = screenHeightInPixels,
                 pdf = pdf!!,
                 scope = scope,
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
-            )
+            )*/
             //TestUI(viewModel.path.toString())
+            CustomView(viewModel.path.toString())
         }
     }
 }
@@ -417,7 +418,7 @@ private fun PdfScreen(
                 for (i in 0..6) {
                     list.add(APage(i, 1024, 1280))
                 }
-                CustomView(aPageList, pdf)
+                //CustomView(aPageList, pdf)
             }
         }
 

@@ -5,7 +5,6 @@ import android.graphics.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
@@ -160,12 +159,16 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return (bitmap.asImageBitmap())
     }
 
-    /*public fun renderPageRegion(
-        region: IntRect,
-        tile: ImageTile
+    public fun renderPageRegion(
+        region: androidx.compose.ui.geometry.Rect,
+        index: Int,
+        scale: Float,
+        viewSize: IntSize,
+        pageWidth: Int,
+        pageHeight: Int
     ): ImageBitmap {
         val cropBound = Rect()
-        val scale = tile.scale.scaleX
+        val scale = scale * viewSize.width / pageWidth
         val pageW: Int
         val pageH: Int
         val patchX: Int
@@ -177,18 +180,18 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         patchX = ((region.left) + cropBound.left).toInt()
         patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegion:index:${tile.index}, scale:${tile.scale}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
+        println("renderPageRegion:index:${index}, scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
 
         val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
 
-        val page = document.loadPage(tile.index)
+        val page = document.loadPage(index)
         page.run(dev, ctm, null)
 
         dev.close()
         dev.destroy()
 
         return (bitmap.asImageBitmap())
-    }*/
+    }
 }

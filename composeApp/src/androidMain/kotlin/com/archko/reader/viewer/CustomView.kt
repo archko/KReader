@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,7 +48,7 @@ import com.archko.reader.pdf.component.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.subsampling.PdfDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -57,13 +58,16 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import ovh.plrapps.mapcompose.core.throttle
+import java.io.File
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 
 private class PageNode(
     private val pdfViewState: PdfViewState,
     public var rect: Rect,
+    public var bounds: Rect,
     public val aPage: APage  // 添加 APage 属性
 ) {
 
@@ -72,7 +76,7 @@ private class PageNode(
         // 检查页面是否在可视区域内
         if (!isVisible(drawScope, offset, rect, aPage.index)) {
             //println("is not Visible:${aPage.index}, $offset, $rect")
-            pdfViewState.remove(rect, aPage, cacheKey)
+            pdfViewState.remove(bounds, aPage, cacheKey)
             return
         }
         var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
@@ -84,7 +88,7 @@ private class PageNode(
                 dstOffset = IntOffset(rect.left.toInt(), rect.top.toInt())
             )
         } else {
-            pdfViewState.decode(rect, aPage, cacheKey)
+            pdfViewState.decode(bounds, aPage, cacheKey)
             //println("pageNode.draw.offset:$offset, $rect, $aPage")
             // 绘制边框
             drawScope.drawRect(
@@ -228,6 +232,7 @@ private class Page(
                 right = contentOffset.x + scaledWidth,
                 bottom = contentOffset.y + scaledHeight
             ),
+            Rect(0f, 0f, scaledWidth, scaledHeight),
             aPage
         )
 
@@ -244,21 +249,25 @@ private class Page(
                 PageNode(
                     pdfViewState,
                     Rect(rect.left, rect.top, rect.left + halfWidth, rect.top + halfHeight),
+                    Rect(0f, 0f, halfWidth, halfHeight),
                     page.aPage
                 ),
                 PageNode(
                     pdfViewState,
                     Rect(rect.left + halfWidth, rect.top, rect.right, rect.top + halfHeight),
+                    Rect(halfWidth, 0f, rect.width, halfHeight),
                     page.aPage
                 ),
                 PageNode(
                     pdfViewState,
                     Rect(rect.left, rect.top + halfHeight, rect.left + halfWidth, rect.bottom),
+                    Rect(0f, halfHeight, halfWidth, rect.height),
                     page.aPage
                 ),
                 PageNode(
                     pdfViewState,
                     Rect(rect.left + halfWidth, rect.top + halfHeight, rect.right, rect.bottom),
+                    Rect(halfWidth, halfHeight, rect.width, rect.height),
                     page.aPage
                 )
             ).flatMap {
@@ -307,7 +316,7 @@ private class Page(
 
 private class PdfViewState(
     public val list: List<APage>,
-    public val state: PdfState,
+    public val state: PdfDecoder,
 ) {
     private var viewOffset: Offset = Offset.Zero
     public var init: Boolean by mutableStateOf(false)
@@ -334,7 +343,7 @@ private class PdfViewState(
         //collectNewTiles()
         //}
 
-        decoderService = DecoderService(1)
+        decoderService = DecoderService(1, state)
         scope.launch {
             decoderService.collectTiles(
                 visibleTilesChannel,
@@ -477,6 +486,7 @@ private class PdfViewState(
             rect,
             rect.width.toInt(),
             rect.height.toInt(),
+            viewSize,
             cacheKey,
             null
         )
@@ -490,9 +500,10 @@ private class PdfViewState(
         val tileSpec = TileSpec(
             page.index,
             page.scale,
-            rect,
-            rect.width.toInt(),
-            rect.height.toInt(),
+            Rect(rect.left, rect.top, rect.right, rect.bottom),
+            page.width,
+            page.height,
+            viewSize,
             cacheKey,
             null
         )
@@ -530,9 +541,71 @@ private class PdfViewState(
 }
 
 @Composable
+fun CustomView(path: String) {
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    var decoder: PdfDecoder? by remember { mutableStateOf(null) }
+    LaunchedEffect(path) {
+        withContext(Dispatchers.IO) {
+            println("init:$viewportSize, $path")
+            val pdfDecoder = if (viewportSize == IntSize.Zero) {
+                null
+            } else {
+                PdfDecoder(File(path))
+            }
+            if (pdfDecoder != null) {
+                pdfDecoder.getSize(viewportSize)
+                println("init.size:${pdfDecoder.imageSize.width}-${pdfDecoder.imageSize.height}")
+                decoder = pdfDecoder
+            }
+        }
+    }
+    DisposableEffect(decoder) {
+        onDispose {
+            println("onDispose:$path, $decoder")
+            //decoder?.close()
+        }
+    }
+
+    if (null == decoder) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { viewportSize = it }) {
+            Text(
+                "Loading",
+                modifier = Modifier
+            )
+        }
+    } else {
+        fun createList(decoder: PdfDecoder): MutableList<APage> {
+            var list = mutableListOf<APage>()
+            for (i in 0 until decoder.pageSizes.size) {
+                val page = decoder.pageSizes[i]
+                val aPage = APage(i, page.width, page.height, 1f)
+                list.add(aPage)
+            }
+            return list
+        }
+
+        var list: MutableList<APage> = remember {
+            createList(decoder!!)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { viewportSize = it }) {
+            CustomView(
+                list,
+                decoder!!
+            )
+        }
+    }
+}
+
+@Composable
 fun CustomView(
     list: MutableList<APage>,
-    state: PdfState
+    state: PdfDecoder
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -749,23 +822,23 @@ fun CustomView(
                     }
                 }
         ) {
-            if (pdfViewState.update>0)
+            if (pdfViewState.update > 0)
             //println("state:Canvas:${pdfState.tilesToRender.size}")
-            translate(left = offset.x, top = offset.y) {
-                //只绘制可见区域.
-                /*val visibleRect = Rect(
-                    left = -offset.x,
-                    top = -offset.y,
-                    right = size.width - offset.x,
-                    bottom = size.height - offset.y
-                )
-                drawRect(
-                    brush = gradientBrush,
-                    topLeft = visibleRect.topLeft,
-                    size = visibleRect.size
-                )*/
-                pdfViewState.pages.forEach { page -> page.draw(this, offset) }
-            }
+                translate(left = offset.x, top = offset.y) {
+                    //只绘制可见区域.
+                    /*val visibleRect = Rect(
+                        left = -offset.x,
+                        top = -offset.y,
+                        right = size.width - offset.x,
+                        bottom = size.height - offset.y
+                    )
+                    drawRect(
+                        brush = gradientBrush,
+                        topLeft = visibleRect.topLeft,
+                        size = visibleRect.size
+                    )*/
+                    pdfViewState.pages.forEach { page -> page.draw(this, offset) }
+                }
         }
     }
 }

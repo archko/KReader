@@ -7,7 +7,9 @@ import android.graphics.Paint
 import android.graphics.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.IntSize
 import androidx.core.graphics.createBitmap
+import com.archko.reader.pdf.subsampling.PdfDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -23,7 +25,8 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 internal class DecoderService(
-    private val workerCount: Int
+    private val workerCount: Int,
+    private val decoder: PdfDecoder,
 ) {
     @Volatile
     var isIdle: Boolean = true
@@ -51,36 +54,8 @@ internal class DecoderService(
     ) = launch(dispatcher) {
         for (spec in tilesToDownload) {
             val imageBitmap = async {
-                val bitmap = createBitmap(spec.width, spec.height, Bitmap.Config.ARGB_8888)
-                val paint = Paint()
-                val canvas = Canvas(bitmap)
-                paint.textSize = 32f
-                paint.strokeWidth = 4f
-                paint.isAntiAlias = true
-                paint.style = Paint.Style.STROKE
-                canvas.drawARGB(
-                    255,
-                    255 * (spec.rect.left.toInt() % 150),
-                    255 * (spec.rect.top.toInt() % 150),
-                    0
-                )
-                val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
-                paint.setColor(Color.GREEN)
-                canvas.drawRect(rect, paint)
-                paint.setColor(Color.RED)
-                canvas.drawText(
-                    "page:${spec.page}, ${spec.width}-${spec.height}, scale:${spec.zoom}",
-                    20f,
-                    140f,
-                    paint
-                )
-                canvas.drawText(
-                    "(${spec.rect.left}, ${spec.rect.top}, ${spec.rect.right}, ${spec.rect.bottom})",
-                    20f,
-                    220f,
-                    paint
-                )
-                bitmap.asImageBitmap()
+                //testBitmap(spec)
+                decodeBitmap(spec)
             }.await()
             spec.imageBitmap = imageBitmap
 
@@ -88,6 +63,50 @@ internal class DecoderService(
             tilesOutput.send(spec)
             tilesDownloaded.send(spec)
         }
+    }
+
+    private fun decodeBitmap(spec: TileSpec): ImageBitmap {
+        return decoder.renderPageRegion(
+            spec.rect,
+            spec.page,
+            spec.zoom,
+            spec.viewSize,
+            spec.width,
+            spec.height
+        )
+    }
+
+    private fun testBitmap(spec: TileSpec): ImageBitmap {
+        val bitmap = createBitmap(spec.width, spec.height, Bitmap.Config.ARGB_8888)
+        val paint = Paint()
+        val canvas = Canvas(bitmap)
+        paint.textSize = 32f
+        paint.strokeWidth = 4f
+        paint.isAntiAlias = true
+        paint.style = Paint.Style.STROKE
+        canvas.drawARGB(
+            255,
+            255 * (spec.rect.left.toInt() % 150),
+            255 * (spec.rect.top.toInt() % 150),
+            0
+        )
+        val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
+        paint.setColor(Color.GREEN)
+        canvas.drawRect(rect, paint)
+        paint.setColor(Color.RED)
+        canvas.drawText(
+            "page:${spec.page}, ${spec.width}-${spec.height}, scale:${spec.zoom}",
+            20f,
+            140f,
+            paint
+        )
+        canvas.drawText(
+            "(${spec.rect.left}, ${spec.rect.top}, ${spec.rect.right}, ${spec.rect.bottom})",
+            20f,
+            220f,
+            paint
+        )
+        return bitmap.asImageBitmap()
     }
 
     private fun CoroutineScope.tileCollectorKernel(
@@ -118,6 +137,7 @@ internal class DecoderService(
 
     fun shutdownNow() {
         executor.shutdownNow()
+        decoder.close()
     }
 
     private val executor = ThreadPoolExecutor(
@@ -135,6 +155,7 @@ internal data class TileSpec(
     val rect: androidx.compose.ui.geometry.Rect,
     val width: Int = 512,
     val height: Int = 512,
+    val viewSize: IntSize,
     val cacheKey: String,
     var imageBitmap: ImageBitmap?,
 ) {
