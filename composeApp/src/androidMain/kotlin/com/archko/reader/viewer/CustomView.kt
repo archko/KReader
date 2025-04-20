@@ -76,7 +76,7 @@ private class PageNode(
             return
         }
         var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
-        println("pageNode.draw.loadedBitmap:${loadedBitmap == null}, $rect, $aPage")
+        //println("pageNode.draw.loadedBitmap:${loadedBitmap == null}, $rect, $aPage")
         if (loadedBitmap != null) {
             //println("pageNode.draw.loadedBitmap:$rect, $aPage")
             drawScope.drawImage(
@@ -185,24 +185,24 @@ private class Page(
         }
         //println("page.draw.offset:$offset, $bounds, $aPage")
         nodes.forEach { node ->
-            drawScope.drawRect(
-                color = Color.Yellow,
-                topLeft = Offset(0f, bounds.top),
-                size = Size(bounds.width, bounds.height),
-                style = Stroke(width = 8f)
-            )
-            drawScope.drawContext.canvas.nativeCanvas.drawText(
-                aPage.index.toString(),
-                0 + drawScope.size.width / 2,
-                yOffset + drawScope.size.height / 2,
-                android.graphics.Paint().apply {
-                    color = android.graphics.Color.YELLOW
-                    textSize = 160f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-            )
             node.draw(drawScope, offset)
         }
+        drawScope.drawRect(
+            color = Color.Yellow,
+            topLeft = Offset(0f, bounds.top),
+            size = Size(bounds.width, bounds.height),
+            style = Stroke(width = 8f)
+        )
+        drawScope.drawContext.canvas.nativeCanvas.drawText(
+            aPage.index.toString(),
+            0 + drawScope.size.width / 2,
+            yOffset + drawScope.size.height / 2,
+            android.graphics.Paint().apply {
+                color = android.graphics.Color.YELLOW
+                textSize = 160f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        )
     }
 
     public fun updateOffset(newOffset: Offset) {
@@ -370,7 +370,7 @@ private class PdfViewState(
 
     private suspend fun consumeTiles(tileChannel: ReceiveChannel<TileSpec>) {
         for (tile in tileChannel) {
-            //println("PdfViewState:consumeTiles:$tile")
+            println("PdfViewState:consumeTiles:$tile")
             if (tile.imageBitmap == null) {
                 continue
             }
@@ -380,8 +380,7 @@ private class PdfViewState(
                     tilesCollected.add(tile)
                 }
             } else {
-                //tile.recycle()
-                //tilesCollected.remove(tile)
+                tilesCollected.remove(tile)
                 //ImageCache.remove(tile.cacheKey)
             }
             renderThrottled()
@@ -501,6 +500,7 @@ private class PdfViewState(
             val index = tilesCollected.indexOf(tileSpec)
             val bitmap = tilesCollected[index].imageBitmap
             if (null != bitmap) {
+                ImageCache.put(cacheKey, bitmap)
                 println("PdfViewState:decode:$tileSpec")
                 return
             }
@@ -521,15 +521,11 @@ private class PdfViewState(
         pages.forEach {
             if (isVisible(viewSize, viewOffset, it.bounds, it.aPage.index)) {
                 tilesToRenderCopy.add(it)
-                //println("PdfViewState:updateOffset:${it.bounds}, ${it.aPage}")
             }
         }
-        if (tilesToRenderCopy == pageToRender) {
-            println("PdfViewState:updateOffset:${tilesToRenderCopy == pageToRender}, $update")
-            update++
-        } else {
-            pageToRender = tilesToRenderCopy
-        }
+        //println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
+        update++
+        pageToRender = tilesToRenderCopy
     }
 }
 
@@ -753,6 +749,7 @@ fun CustomView(
                     }
                 }
         ) {
+            if (pdfViewState.update>0)
             //println("state:Canvas:${pdfState.tilesToRender.size}")
             translate(left = offset.x, top = offset.y) {
                 //只绘制可见区域.

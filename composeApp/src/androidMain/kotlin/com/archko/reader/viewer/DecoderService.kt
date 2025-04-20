@@ -55,29 +55,29 @@ internal class DecoderService(
                 val paint = Paint()
                 val canvas = Canvas(bitmap)
                 paint.textSize = 32f
-                paint.strokeWidth = 2f
+                paint.strokeWidth = 4f
                 paint.isAntiAlias = true
                 paint.style = Paint.Style.STROKE
                 canvas.drawARGB(
                     255,
-                    255 * (spec.zoom.toInt() % 2),
-                    255 * (spec.zoom.toInt() % 2),
+                    255 * (spec.rect.left.toInt() % 150),
+                    255 * (spec.rect.top.toInt() % 150),
                     0
                 )
                 val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
-                paint.setColor(Color.YELLOW)
+                paint.setColor(Color.GREEN)
                 canvas.drawRect(rect, paint)
                 paint.setColor(Color.RED)
                 canvas.drawText(
                     "page:${spec.page}, ${spec.width}-${spec.height}, scale:${spec.zoom}",
                     20f,
-                    120f,
+                    140f,
                     paint
                 )
                 canvas.drawText(
                     "(${spec.rect.left}, ${spec.rect.top}, ${spec.rect.right}, ${spec.rect.bottom})",
                     20f,
-                    200f,
+                    220f,
                     paint
                 )
                 bitmap.asImageBitmap()
