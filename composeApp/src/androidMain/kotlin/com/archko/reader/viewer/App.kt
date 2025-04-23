@@ -211,8 +211,7 @@ fun App(
             //}
             //CustomView(list, pdf!!)
 
-            //TestSubSampling(viewModel.path.toString())
-            TestUI(viewModel.path.toString())
+            TestSubSampling(viewModel.path.toString())
         }
     }
 }
