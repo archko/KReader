@@ -94,11 +94,6 @@ public fun DocumentView(
     val density = LocalDensity.current
     var flingJob by remember { mutableStateOf<Job?>(null) }
 
-    // 定义背景渐变
-    val gradientBrush = Brush.verticalGradient(
-        colors = listOf(Color.Green, Color.Red)
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()//画布是屏幕大就行了,否则页数多的情况,canvas无法创建

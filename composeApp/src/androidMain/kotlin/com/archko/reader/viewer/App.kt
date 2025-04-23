@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -43,22 +42,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.referentialEqualityPolicy
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -67,7 +52,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -80,12 +64,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.component.ImageCache
-import com.archko.reader.pdf.component.PdfColumn
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.scrollbar.DraggableScrollbar
-import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
 import com.archko.reader.pdf.state.PdfState
 import com.archko.reader.pdf.util.Dispatcher
@@ -101,7 +82,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import ovh.plrapps.mapcompose.ui.TestUI
 
 @Composable
 fun App(
@@ -201,7 +181,8 @@ fun App(
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
             )*/
-            TestUI(viewModel.path.toString())
+            //TestUI(viewModel.path.toString())
+            CustomView(viewModel.path.toString())
         }
     }
 }
@@ -433,11 +414,11 @@ private fun PdfScreen(
                     ),
                 )*/
                 //DocumentView(pdf, aPageList, width, height)
-                val list= mutableListOf<APage>()
-                for(i in 0..6){
-                    list.add(APage(i,1024,1280))
+                val list = mutableListOf<APage>()
+                for (i in 0..6) {
+                    list.add(APage(i, 1024, 1280))
                 }
-                CustomView(aPageList, pdf)
+                //CustomView(aPageList, pdf)
             }
         }
 
