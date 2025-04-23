@@ -2,7 +2,7 @@ package com.archko.reader.pdf.subsampling.internal
 
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.subsampling.tile.ImageTile
+import com.archko.reader.pdf.subsampling.tile.ImageRegionTile
 
 /**
  * An image decoder, responsible for loading partial regions for
@@ -10,7 +10,7 @@ import com.archko.reader.pdf.subsampling.tile.ImageTile
  */
 public interface ImageRegionDecoder : ImageDecoder{
 
-    public suspend fun decodeRegion(tile: ImageTile): DecodeResult
+    public suspend fun decodeRegion(tile: ImageRegionTile): DecodeResult
 
     public fun interface Factory {
         public suspend fun create(params: FactoryParams): ImageRegionDecoder

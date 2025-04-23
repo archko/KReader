@@ -62,7 +62,7 @@ internal fun rememberSubSamplingImageState(
     val state = remember(imageSource) {
         RealSubSamplingImageState(imageSource, transformation)
     }.also {
-        it.decoder = createImageRegionDecoder(imageSource, viewportSize, errorReporter)
+        it.imageRegionDecoder = createImageRegionDecoder(imageSource, viewportSize, errorReporter)
     }
 
     state.LoadImageTilesEffect()
@@ -124,4 +124,6 @@ public sealed interface SubSamplingImageState {
 
     @Deprecated("Use isImageDisplayed instead", ReplaceWith("isImageDisplayed"))
     public val isImageLoaded: Boolean get() = isImageDisplayed
+
+    public val isImageLoadedInFullQuality: Boolean get() = isImageDisplayedInFullQuality
 }

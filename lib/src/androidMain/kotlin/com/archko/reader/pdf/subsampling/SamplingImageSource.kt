@@ -2,6 +2,7 @@ package com.archko.reader.pdf.subsampling
 
 import android.text.TextUtils
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import okio.Closeable
 import java.io.File
@@ -9,7 +10,8 @@ import java.io.File
 @Immutable
 public class SamplingImageSource(
     public val path: String,
-    public val onClose: Closeable? = null
+    public val onClose: Closeable? = null,
+    override val preview: ImageBitmap? = null
 ) : SubSamplingImageSource {
 
     init {

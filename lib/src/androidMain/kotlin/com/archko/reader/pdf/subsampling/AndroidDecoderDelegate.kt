@@ -11,7 +11,7 @@ import com.archko.reader.pdf.subsampling.internal.ExifMetadata
 import com.archko.reader.pdf.subsampling.internal.ImageDecoder
 import com.archko.reader.pdf.subsampling.internal.ImageRegionDecoder
 import com.archko.reader.pdf.subsampling.internal.rotateBy
-import com.archko.reader.pdf.subsampling.tile.ImageTile
+import com.archko.reader.pdf.subsampling.tile.ImageRegionTile
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 internal class AndroidDecoderDelegate private constructor(
     private val imageSource: SubSamplingImageSource,
     private val viewportSize: IntSize,
-    private val decoder: ImageDecoder,
+    internal val decoder: ImageDecoder,
     private val exif: ExifMetadata,
     private val dispatcher: CoroutineDispatcher,
 ) : ImageRegionDecoder {
@@ -33,7 +33,7 @@ internal class AndroidDecoderDelegate private constructor(
 
     override fun decodeRegion(
         rect: IntRect,
-        tile: ImageTile
+        tile: ImageRegionTile
     ): ImageBitmap? {
         return decoder.decodeRegion(rect, tile)
     }
@@ -42,7 +42,7 @@ internal class AndroidDecoderDelegate private constructor(
         return decoder.size(viewportSize)
     }
 
-    override suspend fun decodeRegion(tile: ImageTile): ImageRegionDecoder.DecodeResult {
+    override suspend fun decodeRegion(tile: ImageRegionTile): ImageRegionDecoder.DecodeResult {
         val bounds = tile.bounds.rotateBy(
             degrees = -exif.orientation.degrees,
             unRotatedParent = IntRect(offset = IntOffset.Zero, size = imageSize)

@@ -10,30 +10,35 @@ import androidx.compose.ui.unit.IntRect
 
 /** A region in the source image that will be drawn in a [ViewportTile]. */
 @Immutable
-public data class ImageTile(
+public data class ImageRegionTile(
     val scale: ScaleFactor,
     val index: Int,
+    val sampleSize: ImageSampleSize,
     val bounds: IntRect,
-){
-    override fun toString(): String {
-        return "Tile(scale=$scale, index=$index, bounds=$bounds)"
-    }
-}
+)
 
-/** A region in the viewport/canvas where a [ImageTile] image will be drawn. */
+/** A region in the viewport/canvas where a [ImageRegionTile] image will be drawn. */
 internal data class ViewportTile private constructor(
-    val region: ImageTile,
+    val region: ImageRegionTile,
     val bounds: IntRect,
     val isVisible: Boolean,
     val isBase: Boolean,
 ) {
     constructor(
-        region: ImageTile,
+        region: ImageRegionTile,
         bounds: Rect,
         isVisible: Boolean,
         isBase: Boolean,
     ) : this(
         region = region,
+        // Because the Canvas APIs only accept integer values, any fractional values
+        // that arise during tiling must be discarded. However this isn't a problem,
+        // since discarding a fractional value will cause the next tile to be shifted
+        // back by a pixel and so on, which will eventually eliminate any fractional
+        // error. However, this means that the last tiles along the X and Y axes may
+        // be one pixel shorter than the image. In practice, this is usually not
+        // noticeable to the naked eye, and the benefits of tiling large images outweigh
+        // this minor loss of precision.
         bounds = bounds.discardFractionalValues(),
         isVisible = isVisible,
         isBase = isBase,
@@ -54,10 +59,35 @@ internal data class ViewportImageTile(
     val isBase get() = tile.isBase
 }
 
-/** Collection of [ImageTile] needed for drawing an image at a certain zoom level. */
-internal data class ImageTileGrid(
-    val base: ImageTile,
-    val foreground: Map<ScaleFactor, List<ImageTile>>
+/**
+ * Documentation copied from `android.graphics.BitmapFactory.Options.inSampleSize`:
+ *
+ * If set to a value > 1, requests the decoder to sub-sample the original image, returning
+ * a smaller image to save memory. The sample size is the number of pixels in either dimension
+ * that correspond to a single pixel in the decoded bitmap. For example, inSampleSize == 4
+ * returns an image that is 1/4 the width/height of the original, and 1/16 the number of
+ * pixels. Any value <= 1 is treated the same as 1. Note: the decoder uses a final value
+ * based on powers of 2, any other value will be rounded down to the nearest power of 2.
+ */
+@JvmInline
+public value class ImageSampleSize(public val size: Int) {
+    public companion object; // For extensions.
+
+    init {
+        check(size == 1 || size.rem(2) == 0) {
+            "Incorrect size = $size. BitmapRegionDecoder requires values based on powers of 2."
+        }
+    }
+
+    public fun coerceAtMost(other: ImageSampleSize): ImageSampleSize {
+        return if (size > other.size) other else this
+    }
+}
+
+/** Collection of [ImageRegionTile] needed for drawing an image at a certain zoom level. */
+internal data class ImageRegionTileGrid(
+    val base: ImageRegionTile,
+    val foreground: Map<ImageSampleSize, List<ImageRegionTile>>
 ) {
     companion object; // For extensions.
 }

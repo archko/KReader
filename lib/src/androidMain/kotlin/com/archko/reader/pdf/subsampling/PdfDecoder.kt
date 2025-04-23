@@ -11,7 +11,7 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.subsampling.internal.ImageDecoder
-import com.archko.reader.pdf.subsampling.tile.ImageTile
+import com.archko.reader.pdf.subsampling.tile.ImageRegionTile
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -56,7 +56,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     override fun decodeRegion(
         region: IntRect,
-        tile: ImageTile
+        tile: ImageRegionTile
     ): ImageBitmap? {
         val bitmap = renderPageRegion(region, tile)
         return bitmap
@@ -76,6 +76,8 @@ public class PdfDecoder(file: File) : ImageDecoder {
         if (pageSizes.isNotEmpty()) {
             var width = viewportSize.width
             var height = 0
+
+            // 计算所有页面的高度之和
             for (page in pageSizes) {
                 val zoom = 1f * viewportSize.width / page.width
                 page.zoom = zoom
@@ -163,9 +165,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     public fun renderPageRegion(
         region: IntRect,
-        tile: ImageTile
+        tile: ImageRegionTile
     ): ImageBitmap {
         val cropBound = Rect()
+        // 使用原始的 scale 值，不需要额外的 sampleSize 调整
         val scale = tile.scale.scaleX
         val pageW: Int
         val pageH: Int
@@ -178,9 +181,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         patchX = ((region.left) + cropBound.left).toInt()
         patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegion:index:${tile.index}, scale:${tile.scale}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
+        println("renderPageRegion:index:${tile.index}, scale:${tile.scale}, sampleSize:${tile.sampleSize.size}, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
 
         val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
+        // 直接使用 scale 创建 Matrix
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
 

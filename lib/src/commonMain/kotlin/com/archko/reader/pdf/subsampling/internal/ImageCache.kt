@@ -4,7 +4,7 @@ import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.cache.ImageBitmapCache
 import com.archko.reader.pdf.subsampling.internal.ImageCache.LoadingState.InFlight
 import com.archko.reader.pdf.subsampling.internal.ImageCache.LoadingState.Loaded
-import com.archko.reader.pdf.subsampling.tile.ImageTile
+import com.archko.reader.pdf.subsampling.tile.ImageRegionTile
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CoroutineScope
@@ -31,8 +31,8 @@ internal class ImageCache(
     private val decoder: ImageRegionDecoder,
     private val throttleEvery: Duration = 100.milliseconds,
 ) {
-    private val visibleRegions = Channel<List<ImageTile>>(capacity = 10)
-    private val cachedImages = MutableStateFlow(emptyMap<ImageTile, LoadingState>())
+    private val visibleRegions = Channel<List<ImageRegionTile>>(capacity = 10)
+    private val cachedImages = MutableStateFlow(emptyMap<ImageRegionTile, LoadingState>())
 
     private sealed interface LoadingState {
         data class Loaded(val painter: ImageRegionDecoder.DecodeResult) : LoadingState
@@ -56,7 +56,7 @@ internal class ImageCache(
                                 check(tile !in it)
                                 it + (tile to InFlight(currentCoroutineContext().job))
                             }
-                            val key = "${tile.index}-${tile.bounds}"
+                            val key = "${tile}-${tile.bounds}"
                             val painter = ImageBitmapCache.getInstance().getBitmap(key)
                             if (null != painter) {
                                 cachedImages.update {
@@ -84,7 +84,7 @@ internal class ImageCache(
         }
     }
 
-    fun observeCachedImages(): Flow<ImmutableMap<ImageTile, ImageRegionDecoder.DecodeResult>> {
+    fun observeCachedImages(): Flow<ImmutableMap<ImageRegionTile, ImageRegionDecoder.DecodeResult>> {
         return cachedImages.map { map ->
             buildMap(capacity = map.size) {
                 map.forEach { (region, state) ->
@@ -96,7 +96,7 @@ internal class ImageCache(
         }.distinctUntilChanged()
     }
 
-    fun loadOrUnloadForTiles(regions: List<ImageTile>) {
+    fun loadOrUnloadForTiles(regions: List<ImageRegionTile>) {
         visibleRegions.trySend(regions)
     }
 
