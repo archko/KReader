@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
@@ -27,12 +27,13 @@ import kotlinx.coroutines.flow.flowOn
 
 @Composable
 private fun PdfSubPage(
-    state: PdfState,
+    state: LocalPdfState,
     index: Int,
     width: Int,
     height: Int,
     xOffset: Int,
     yOffset: Int,
+    scale: Float = 1f, // 添加 scale 参数
     modifier: Modifier = Modifier,
     loadingIconTint: Color = Color.White,
     errorIconTint: Color = Color.Red,
@@ -46,17 +47,17 @@ private fun PdfSubPage(
         }
     },
 ) {
-    val cacheKey = "$index-$width-$height-$xOffset-$yOffset"
+    val cacheKey = "$index-$width-$height-$xOffset-$yOffset-$scale" // 更新缓存键
     val imageState: MutableState<ImageBitmap?> = remember { mutableStateOf(ImageCache.get(cacheKey)) }
 
     if (imageState.value == null) {
         loadingIndicator()
-        DisposableEffect(index, width, height, xOffset, yOffset) {
+        DisposableEffect(index, width, height, xOffset, yOffset, scale) {
             val scope = CoroutineScope(SupervisorJob())
             scope.launch {
                 snapshotFlow {
                     if (isActive) {
-                        return@snapshotFlow state.renderPageRegion(index, width, height, xOffset, yOffset)
+                        return@snapshotFlow state.renderPageRegion(index, width, height, xOffset, yOffset, scale) // 传递 scale 参数
                     } else {
                         return@snapshotFlow null
                     }
@@ -86,7 +87,7 @@ private fun PdfSubPage(
 
 @Composable
 public fun PdfPage(
-    state: PdfState,
+    state: LocalPdfState,
     index: Int,
     width: Int,
     height: Int,
@@ -132,6 +133,7 @@ public fun PdfPage(
     if (width > 2048 || h > 2048) {
         val subWidth = width / 2
         val subHeight = h / 2
+        val scale = 2f
 
         Column(
             modifier = modifier
@@ -151,6 +153,7 @@ public fun PdfPage(
                     height = subHeight,
                     xOffset = 0,
                     yOffset = 0,
+                    scale = scale // 传递 scale 参数
                 )
                 // 右上角子页面
                 PdfSubPage(
@@ -160,6 +163,7 @@ public fun PdfPage(
                     height = subHeight,
                     xOffset = subWidth,
                     yOffset = 0,
+                    scale = scale // 传递 scale 参数
                 )
             }
             Row(
@@ -175,6 +179,7 @@ public fun PdfPage(
                     height = subHeight,
                     xOffset = 0,
                     yOffset = subHeight,
+                    scale = scale // 传递 scale 参数
                 )
                 // 右下角子页面
                 PdfSubPage(
@@ -184,6 +189,7 @@ public fun PdfPage(
                     height = subHeight,
                     xOffset = subWidth,
                     yOffset = subHeight,
+                    scale = scale // 传递 scale 参数
                 )
             }
         }
@@ -200,6 +206,7 @@ public fun PdfPage(
                 height = h,
                 xOffset = 0,
                 yOffset = 0,
+                scale = 1f
             )
         }
     }

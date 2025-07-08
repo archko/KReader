@@ -95,7 +95,7 @@ import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.scrollbar.DraggableScrollbar
 import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
@@ -115,7 +115,7 @@ fun App(
 ) {
     Theme {
         val errorIcon = rememberVectorPainter(Icons.Default.Error)
-        var pdf: PdfState? by remember {
+        var pdf: LocalPdfState? by remember {
             mutableStateOf(null, referentialEqualityPolicy())
         }
 
@@ -212,7 +212,7 @@ fun App(
 private fun loadProgress(
     viewModel: PdfViewModel,
     file: KmpFile,
-    pdf: PdfState?
+    pdf: LocalPdfState?
 ) {
     if (pdf != null) {
         viewModel.insertOrUpdate(file.file.absolutePath, pdf.pageCount.toLong())
@@ -319,7 +319,7 @@ fun SearchTextField(scope: CoroutineScope) {
 private fun PdfScreen(
     screenWidth: Int,
     screenHeight: Int,
-    pdf: PdfState,
+    pdf: LocalPdfState,
     onClickBack: () -> Unit,
     scope: CoroutineScope,
     viewModel: PdfViewModel,

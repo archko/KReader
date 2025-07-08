@@ -3,17 +3,25 @@ package com.archko.reader.pdf.state
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.Painter
+import com.archko.reader.pdf.component.Size
+import com.archko.reader.pdf.entity.Item
 import java.io.File
 import java.net.URL
 
 @Stable
-public expect class LocalPdfState public constructor(file: File) : PdfState {
-    public override var pageCount: Int
+public expect class LocalPdfState public constructor(file: File){
 
-    public override fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): ImageBitmap
+    public var pageCount: Int
 
-    public override fun renderPageRegion(index: Int, viewWidth: Int, viewHeight: Int, xOffset: Int, yOffset: Int): ImageBitmap
+    public var pageSizes: List<Size>
+
+    public var outlineItems: List<Item>?
+
+    public fun close()
+
+    public fun renderPage(index: Int, viewWidth: Int, viewHeight: Int): ImageBitmap
+
+    public fun renderPageRegion(index: Int, viewWidth: Int, viewHeight: Int, xOffset: Int, yOffset: Int, zoom: Float): ImageBitmap
 }
 
 /**

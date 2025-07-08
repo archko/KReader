@@ -8,12 +8,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.toIntSize
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.state.PdfViewState
 
 public class Page(
     private var pdfViewState: PdfViewState,
-    private var pdfState: PdfState,
+    private var pdfState: LocalPdfState,
     private var viewSize: IntSize,
     private var zoom: Float,
     public var aPage: APage,

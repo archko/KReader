@@ -68,7 +68,7 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.scrollbar.scrollbarState
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.Dispatcher
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
@@ -91,7 +91,7 @@ fun App(
 ) {
     Theme {
         val errorIcon = rememberVectorPainter(Icons.Default.Error)
-        var pdf: PdfState? by remember {
+        var pdf: LocalPdfState? by remember {
             mutableStateOf(null, referentialEqualityPolicy())
         }
 
@@ -190,7 +190,7 @@ fun App(
 private fun loadProgress(
     viewModel: PdfViewModel,
     file: KmpFile,
-    pdf: PdfState?
+    pdf: LocalPdfState?
 ) {
     if (pdf != null && file.uri.lastPathSegment != null) {
         var path = IntentFile.getPath(PdfApp.app!!, file.uri)
@@ -267,7 +267,7 @@ private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
 private fun PdfScreen(
     screenWidth: Int,
     screenHeight: Int,
-    pdf: PdfState,
+    pdf: LocalPdfState,
     onClickBack: () -> Unit,
     scope: CoroutineScope,
     viewModel: PdfViewModel,

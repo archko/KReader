@@ -48,7 +48,7 @@ import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.state.PdfViewState
 import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -66,7 +66,7 @@ import kotlin.math.abs
  */
 @Composable
 public fun DocumentView(
-    state: PdfState,
+    state: LocalPdfState,
     list: List<APage>,
     width: Int,
     height: Int
@@ -307,7 +307,7 @@ private fun isPageVisible(index: Int, bounds: Rect, offset: Offset, size: IntSiz
 
 @Composable
 public fun PdfPage(
-    state: PdfState,
+    state: LocalPdfState,
     pdfState: PdfViewState,
     page: Page,
     offset: Offset,

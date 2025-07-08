@@ -14,7 +14,7 @@ import com.archko.reader.pdf.entity.APage
  */
 public class PdfViewState(
     public val list: List<APage>,
-    public val state: PdfState,
+    public val state: LocalPdfState,
 ) {
     public var init: Boolean by mutableStateOf(false)
     public var totalHeight: Float by mutableFloatStateOf(0f)

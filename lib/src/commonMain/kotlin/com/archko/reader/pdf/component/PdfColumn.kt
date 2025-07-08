@@ -16,13 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.flinger.StockFlingBehaviours
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 
 @Composable
 public fun PdfColumn(
     viewWidth: Int,
     viewHeight: Int,
-    state: PdfState,
+    state: LocalPdfState,
     modifier: Modifier = Modifier,
     page: @Composable (index: Int, width: Int, height: Int) -> Unit =
         { i: Int, w: Int, h: Int ->
