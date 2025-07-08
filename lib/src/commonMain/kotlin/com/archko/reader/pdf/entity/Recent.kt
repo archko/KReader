@@ -53,7 +53,7 @@ public class Recent {
     }
 
     public constructor(
-        id: Long,
+        //id: Long,
         path: String,
         page: Long?,
         pageCount: Long?,
@@ -66,7 +66,7 @@ public class Recent {
         scrollX: Long?,
         scrollY: Long?
     ) {
-        this.id = id
+        //this.id = id
         this.updateAt = updateAt
         this.page = page
         this.pageCount = pageCount

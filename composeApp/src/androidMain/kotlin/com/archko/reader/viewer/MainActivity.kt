@@ -30,8 +30,6 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.archko.reader.pdf.cache.AppDatabase
-import com.archko.reader.pdf.cache.DatabaseDriverFactory
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 
@@ -74,8 +72,8 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             val screenHeightInPixels = with(density) { configuration.screenHeightDp.dp.toPx() }
             println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
 
-            val driverFactory: DatabaseDriverFactory = DriverFactory(LocalContext.current)
-            val database = AppDatabase(driverFactory.createDriver())
+            val driverFactory = DriverFactory(LocalContext.current)
+            val database = driverFactory.createRoomDatabase()
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()

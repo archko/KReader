@@ -2,8 +2,9 @@ package com.archko.reader.pdf.cache
 
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import kotlinx.coroutines.Dispatchers
 import java.io.File
-import java.sql.DriverManager
 
 /**
  * @author: archko 2025/2/14 :16:54
@@ -11,7 +12,10 @@ import java.sql.DriverManager
 public actual class DriverFactory {
 
     public actual fun createRoomDatabase(): AppDatabase {
-        return getDatabaseBuilder().build()
+        return getDatabaseBuilder()
+            .setDriver(BundledSQLiteDriver())
+            .setQueryCoroutineContext(Dispatchers.IO)
+            .build()
     }
 
     public fun getDatabaseBuilder(): RoomDatabase.Builder<AppDatabase> {

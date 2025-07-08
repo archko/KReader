@@ -23,11 +23,14 @@ public interface RecentDao {
     @Query("SELECT * FROM recent WHERE id = :id")
     public suspend fun getRecent(id: Long): Recent?
 
+    @Query("SELECT * FROM recent WHERE path = :path")
+    public suspend fun getRecent(path: String): Recent?
+
     @Query("SELECT * FROM recent order by createAt desc limit :start, :count")
     public suspend fun getRecents(start: Int, count: Int): List<Recent>?
 
     @Query("SELECT count(id) FROM recent")
-    public suspend fun assistantCount(): Int
+    public suspend fun recentCount(): Int
 
     //@Delete
     @Query("Delete FROM recent where id = :id")
