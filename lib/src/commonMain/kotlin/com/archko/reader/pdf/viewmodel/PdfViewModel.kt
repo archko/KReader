@@ -3,7 +3,6 @@ package com.archko.reader.pdf.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
-import com.archko.reader.pdf.cache.Progress
 import com.archko.reader.pdf.entity.Recent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +15,7 @@ public class PdfViewModel : ViewModel() {
     public var database: AppDatabase? = null
     private val _recentList = MutableStateFlow<List<Recent>>(mutableListOf())
     public val recentList: StateFlow<List<Recent>> = _recentList
-    public var progress: Progress? = null
+    public var progress: Recent? = null
     public var path:String?=null
 
     public fun insertOrUpdate(path: String, pageCount: Long) {

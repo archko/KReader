@@ -5,40 +5,32 @@ compose-multiplatform = "1.9.0-alpha02"
 kotlin = "2.1.20"
 agp = "8.10.1"
 
-android-compileSdk = "36"
-android-minSdk = "24"
-android-targetSdk = "36"
 androidx-activityCompose = "1.10.1"
 androidx-appcompat = "1.7.1"
-androidx-constraintlayout = "2.2.0"
-#androidx-espresso-core = "3.6.1"
 jetbrains-lifecycle = "2.9.1"
-androidx-material = "1.12.0"
-#androidx-test-junit = "1.2.1"
-#junit = "4.13.2"
-
+androidx-room = "2.7.2"
+sqlite = "2.5.1"
 coil = "3.2.0"
 ktor = "3.2.0"
 kotlinx-coroutines = "1.10.1"
 kotlinx-immutableCollections = "0.4.0" # https://github.com/Kotlin/kotlinx.collections.immutable/releases
+ksp = "2.1.20-2.0.0"
 
 calf = "0.8.0"
 mupdfFitz = "1.25.1"
 mupdfFitzAar = "1.25.0"
 mmkv = "2.2.2"
 gson = "2.13.1"
-sqlDelight = "2.1.0"
 core = "1.16.0"
 lifecycleViewmodelComposeAndroid = "2.9.1"
 zoomable = "1.0.0-alpha02"
-okio = "3.13.0"
+okio = "3.12.0"
+
+android-compileSdk = "36"
+android-minSdk = "24"
+android-targetSdk = "36"
 
 [libraries]
-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqlDelight" }
-jvm-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqlDelight" }
-#kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-
-# Sample dependencies
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
@@ -47,6 +39,10 @@ mupdf-fitz = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitz
 mupdf-fitz-aar = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitzAar" }
 zoomable = { module = "me.saket.telephoto:zoomable", version.ref = "zoomable" }
 zoomable-coil = { module = "me.saket.telephoto:zoomable-image-coil3", version.ref = "zoomable" }
+
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidx-room" }
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "androidx-room" }
+sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 
 jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "jetbrains-lifecycle" }
 jetbrains-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "jetbrains-lifecycle" }
@@ -70,7 +66,6 @@ androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
 [plugins]
 #kotlin-native-cocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-sqldelight = { id = "app.cash.sqldelight", version.ref = "sqlDelight" }
 
 # Android
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -78,3 +73,5 @@ androidLibrary = { id = "com.android.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+room = { id = "androidx.room", version.ref = "androidx-room" }

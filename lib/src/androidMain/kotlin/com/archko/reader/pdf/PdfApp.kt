@@ -17,6 +17,7 @@ import com.tencent.mmkv.MMKV
  * @author: archko 2025/1/4 :21:21
  */
 public class PdfApp : Application(), SingletonImageLoader.Factory {
+
     override fun onCreate() {
         super.onCreate()
         MMKV.initialize(this)
