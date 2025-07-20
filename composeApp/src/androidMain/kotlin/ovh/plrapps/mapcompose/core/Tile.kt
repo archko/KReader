@@ -13,10 +13,12 @@ import androidx.compose.runtime.setValue
  * the original bitmap (the one at the lowest level), and so on.
  */
 internal data class Tile(
-    val zoom: Int,
-    val row: Int,
-    val col: Int,
+    val zoom: Float,
+    val level: Int,
     val subSample: Int,
+    val pageIndex: Int, // 页码
+    val pageOffsetX: Int, // 页面在文档中的X偏移
+    val pageOffsetY: Int, // 页面在文档中的Y偏移
     val layerIds: List<String>,
     val opacities: List<Float>
 ) {
@@ -24,16 +26,26 @@ internal data class Tile(
     var alpha: Float by mutableStateOf(0f)
 }
 
-internal data class TileSpec(val zoom: Int, val row: Int, val col: Int, val subSample: Int = 0)
+internal data class TileSpec(
+    val zoom: Float, 
+    val level: Int,
+    val subSample: Int = 0,
+    val pageIndex: Int = 0, // 页码
+    val pageOffsetX: Int = 0, // 页面在文档中的X偏移
+    val pageOffsetY: Int = 0  // 页面在文档中的Y偏移
+)
 
 internal fun Tile.sameSpecAs(
-    zoom: Int,
-    row: Int,
-    col: Int,
+    zoom: Float,
+    level: Int,
     subSample: Int,
+    pageIndex: Int,
+    pageOffsetX: Int,
+    pageOffsetY: Int,
     layerIds: List<String>,
     opacities: List<Float>
 ): Boolean {
-    return this.zoom == zoom && this.row == row && this.col == col && this.subSample == subSample
+    return this.zoom == zoom && this.level == level && this.subSample == subSample
+            && this.pageIndex == pageIndex && this.pageOffsetX == pageOffsetX && this.pageOffsetY == pageOffsetY
             && this.layerIds == layerIds && this.opacities == opacities
 }

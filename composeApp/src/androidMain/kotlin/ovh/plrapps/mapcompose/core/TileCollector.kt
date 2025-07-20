@@ -2,28 +2,34 @@ package ovh.plrapps.mapcompose.core
 
 import android.graphics.Bitmap
 import android.graphics.Bitmap.Config
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Build
 import androidx.core.graphics.createBitmap
-import kotlinx.coroutines.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
-import java.io.InputStream
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import kotlin.math.min
+import kotlin.math.ceil
 import kotlin.math.pow
 
-
 /**
- * The engine of MapCompose. The view-model uses two channels to communicate with the [TileCollector]:
+ * The engine.The view-model uses two channels to communicate with the [TileCollector]:
  * * one to send [TileSpec]s (a [SendChannel])
  * * one to receive [TileSpec]s (a [ReceiveChannel])
  *
@@ -51,8 +57,9 @@ import kotlin.math.pow
  */
 internal class TileCollector(
     private val workerCount: Int,
-    private val bitmapConfiguration: BitmapConfiguration,
-    private val tileSize: Int
+    private val tileSize: Int,
+    private val decoder: com.archko.reader.pdf.subsampling.PdfDecoder,
+    private val visibleTilesResolver: ovh.plrapps.mapcompose.core.VisibleTilesResolver
 ) {
     @Volatile
     var isIdle: Boolean = true
@@ -70,8 +77,6 @@ internal class TileCollector(
     suspend fun collectTiles(
         tileSpecs: ReceiveChannel<TileSpec>,
         tilesOutput: SendChannel<Tile>,
-        layers: List<Layer>,
-        bitmapPool: BitmapPool
     ) = coroutineScope {
         val tilesToDownload = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
         val tilesDownloadedFromWorker = Channel<TileSpec>(capacity = 1)
@@ -81,8 +86,6 @@ internal class TileCollector(
                 tilesToDownload,
                 tilesDownloadedFromWorker,
                 tilesOutput,
-                layers,
-                bitmapPool
             )
         }
         tileCollectorKernel(tileSpecs, tilesToDownload, tilesDownloadedFromWorker)
@@ -92,99 +95,66 @@ internal class TileCollector(
         tilesToDownload: ReceiveChannel<TileSpec>,
         tilesDownloaded: SendChannel<TileSpec>,
         tilesOutput: SendChannel<Tile>,
-        layers: List<Layer>,
-        bitmapPool: BitmapPool
     ) = launch(dispatcher) {
-
-        val layerIds = layers.map { it.id }
-        val bitmapLoadingOptionsForLayer = layerIds.associateWith {
-            BitmapFactory.Options().apply {
-                inPreferredConfig = bitmapConfiguration.bitmapConfig
-            }
-        }
-        val bitmapForLayer = layerIds.associateWith {
-            Bitmap.createBitmap(tileSize, tileSize, bitmapConfiguration.bitmapConfig)
-        }
-        val canvas = Canvas()
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-
-        suspend fun getBitmapFromPoolOrCreate(subSamplingRatio: Int): Bitmap {
-            val subSampledSize = (tileSize / subSamplingRatio).coerceAtLeast(1)
-            val allocationByteCount = subSampledSize * subSampledSize * bitmapConfiguration.bytesPerPixel
-            println("getBitmapFromPoolOrCreate:$subSampledSize")
-            return bitmapPool.get(allocationByteCount) ?: Bitmap.createBitmap(subSampledSize, subSampledSize, bitmapConfiguration.bitmapConfig)
-        }
-
-        suspend fun getBitmap(
-            spec: TileSpec,
-            subSamplingRatio: Int,
-            layer: Layer,
-            inputStream: InputStream?,
-            isPrimaryLayer: Boolean,
-        ): BitmapForLayer {
-            /*val bitmapLoadingOptions =
-                bitmapLoadingOptionsForLayer[layer.id] ?: return BitmapForLayer(null, layer)
-
-            bitmapLoadingOptions.inSampleSize = subSamplingRatio
-            if (shouldUseHardwareBitmaps(layers)) {
-                bitmapLoadingOptions.inPreferredConfig = Config.HARDWARE
-            } else {
-                bitmapLoadingOptions.inMutable = true
-                *//* Attempt to reuse an existing bitmap for the first layer *//*
-                bitmapLoadingOptions.inBitmap = if (isPrimaryLayer) {
-                    getBitmapFromPoolOrCreate(
-                        subSamplingRatio
-                    )
-                } else bitmapForLayer[layer.id]
-            }
-
-            println("getBitmap.ratio:$subSamplingRatio, layer:${layers.size}")
-            return inputStream.use {
-                val bitmap = runCatching {
-                    BitmapFactory.decodeStream(inputStream, null, bitmapLoadingOptions)
-                }.getOrNull()
-                BitmapForLayer(bitmap, layer)
-            }*/
-
-            val bitmap = createBitmap(512, 512, Config.ARGB_8888)
-            val paint = Paint()
-            val canvas = Canvas(bitmap)
-            paint.textSize = 60f
-            paint.strokeWidth = 4f
-            paint.isAntiAlias = true
-            paint.style = Paint.Style.STROKE
-            canvas.drawARGB(255, 255 * (spec.row % 2), 255 * (spec.col % 2), 0)
-            val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
-            paint.setColor(Color.YELLOW)
-            canvas.drawRect(rect, paint)
-            paint.setColor(Color.RED)
-            canvas.drawText("${spec.row}-${spec.col},${spec.zoom}", 130f, 130f, paint)
-            return BitmapForLayer(bitmap, layer)
-        }
-
         for (spec in tilesToDownload) {
-            if (layers.isEmpty()) {
-                tilesDownloaded.send(spec)
-                continue
-            }
+            val bitmapForLayers = async {
+                // 直接使用TileSpec中的页码和偏移量信息
+                val pageIndex = spec.pageIndex
+                val tileInPageX = spec.pageOffsetX
+                val tileInPageY = spec.pageOffsetY
+                
+                // 确保tile在页面范围内
+                val pageWidth = decoder.pageSizes[pageIndex].width
+                val pageHeight = decoder.pageSizes[pageIndex].height
+                
+                if (tileInPageX >= pageWidth || tileInPageY >= pageHeight) {
+                    println("TileCollector: tile out of page bounds: spec=$spec, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY, pageWidth=$pageWidth, pageHeight=$pageHeight")
+                    return@async BitmapForLayer(null)
+                }
+                
+                // 计算tile的实际大小
+                // 对于页面宽度595，tileSize=512的情况：
+                // colsNeeded = ceil(595/512) = 2
+                // actualTileWidth = 595/2 = 297.5
+                val colsNeeded = ceil(pageWidth / tileSize.toDouble()).toInt()
+                val rowsNeeded = ceil(pageHeight / tileSize.toDouble()).toInt()
+                val actualTileWidth = pageWidth / colsNeeded
+                val actualTileHeight = pageHeight / rowsNeeded
+                
+                // 计算当前tile的实际大小（可能被页面边界裁剪）
+                val currentTileWidth = min(actualTileWidth, pageWidth - tileInPageX)
+                val currentTileHeight = min(actualTileHeight, pageHeight - tileInPageY)
+                
+                // 解码时使用1.0的scale，因为Canvas已经处理了缩放变换
+                val decodeScale = 1.0f
+                
+                // 使用PdfDecoder解码指定区域
+                val region = androidx.compose.ui.geometry.Rect(
+                    left = tileInPageX.toFloat(),
+                    top = tileInPageY.toFloat(),
+                    right = (tileInPageX + currentTileWidth).toFloat(),
+                    bottom = (tileInPageY + currentTileHeight).toFloat()
+                )
+                
+                try {
+                    println("TileCollector: decoding tile spec=$spec, region=$region, pageIndex=$pageIndex, decodeScale=$decodeScale, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY")
+                    val bitmap = decoder.renderPageRegion(
+                        region = region,
+                        index = pageIndex,
+                        scale = decodeScale,
+                        viewSize = androidx.compose.ui.unit.IntSize(currentTileWidth.toInt(), currentTileHeight.toInt()),
+                        pageWidth = pageWidth,
+                        pageHeight = pageHeight
+                    )
+                    BitmapForLayer(bitmap.asAndroidBitmap())
+                } catch (e: Exception) {
+                    println("TileCollector: decode error for tile $spec: ${e.message}")
+                    e.printStackTrace()
+                    BitmapForLayer(null)
+                }
+            }.await()
 
-            val subSamplingRatio = 2.0.pow(spec.subSample).toInt()
-            val bitmapForLayers = layers.mapIndexed { index, layer ->
-                //async {
-                    //val i = layer.tileStreamProvider.getTileStream(spec.row, spec.col, spec.zoom)
-                    //if (i != null) {
-                        getBitmap(
-                            spec,
-                            subSamplingRatio = subSamplingRatio,
-                            layer = layer,
-                            inputStream = null,
-                            isPrimaryLayer = index == 0
-                        )
-                    //} else BitmapForLayer(null, layer)
-                //}
-            }//.awaitAll()
-
-            val resultBitmap = bitmapForLayers.firstOrNull()?.bitmap ?: run {
+            val resultBitmap = bitmapForLayers.bitmap ?: run {
                 tilesDownloaded.send(spec)
                 /* When the decoding failed or if there's nothing to decode, then send back the Tile
                  * just as in normal processing, so that the actor which submits tiles specs to the
@@ -193,34 +163,28 @@ internal class TileCollector(
                 tilesOutput.send(
                     Tile(
                         spec.zoom,
-                        spec.row,
-                        spec.col,
+                        spec.level,
                         spec.subSample,
-                        layerIds,
-                        layers.map { it.alpha }
+                        spec.pageIndex,
+                        spec.pageOffsetX,
+                        spec.pageOffsetY,
+                        emptyList(),
+                        emptyList()
                     )
                 )
                 null
-            } ?: continue // If the decoding of the first layer failed, skip the rest
+            } ?: continue // If the decoding failed, skip the rest
 
-            if (layers.size > 1) {
-                canvas.setBitmap(resultBitmap)
-
-                for (result in bitmapForLayers.drop(1)) {
-                    paint.alpha = (255f * result.layer.alpha).toInt()
-                    if (result.bitmap == null) continue
-                    canvas.drawBitmap(result.bitmap, 0f, 0f, paint)
-                }
-            }
-
-            println("getBitmap.Tile:zoom:${spec.zoom}, row-col:${spec.row}-${spec.col}, ${spec.subSample}")
+            println("TileCollector: successfully decoded tile zoom:${spec.zoom}, level:${spec.level}, page:${spec.pageIndex}, subSample:${spec.subSample}")
             val tile = Tile(
                 spec.zoom,
-                spec.row,
-                spec.col,
+                spec.level,
                 spec.subSample,
-                layerIds,
-                layers.map { it.alpha }
+                spec.pageIndex,
+                spec.pageOffsetX,
+                spec.pageOffsetY,
+                emptyList(),
+                emptyList()
             ).apply {
                 this.bitmap = resultBitmap
             }
@@ -265,25 +229,6 @@ internal class TileCollector(
     }
 
     /**
-     * On Android O+, ART has a more efficient GC and HARDWARE Bitmaps are supported, making
-     * Bitmap re-use much less important.
-     * However:
-     * - a framework issue pre Q requires to wait until GL context is initialized. Otherwise,
-     * allocating a hardware Bitmap can cause a native crash.
-     * - Allocating a hardware Bitmap involves the creation of a file descriptor. Android O, as well
-     * as some P devices, have a maximum of 1024 file descriptors. Android Q+ devices have a much
-     * higher limit of fd.
-     *
-     * To avoid all those issues entirely, we enable HARDWARE Bitmaps on Android Q and above.
-     * We don't monitor the file descriptor count because in practice, MapCompose creates a few
-     * hundreds of them and they seem to be efficiently recycled.
-     * When we have more than one layer, we still need a mutable Bitmap (software rendering).
-     */
-    private fun shouldUseHardwareBitmaps(layers: List<Layer>): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && layers.size == 1
-    }
-
-    /**
      * When using a [LinkedBlockingQueue], the core pool size mustn't be 0, or the active thread
      * count won't be greater than 1. Previous versions used a [SynchronousQueue], which could have
      * a core pool size of 0 and a growing count of active threads. However, a [Runnable] could be
@@ -299,6 +244,4 @@ internal class TileCollector(
     private val dispatcher = executor.asCoroutineDispatcher()
 }
 
-internal data class BitmapConfiguration(val bitmapConfig: Config, val bytesPerPixel: Int)
-
-private data class BitmapForLayer(val bitmap: Bitmap?, val layer: Layer)
+private data class BitmapForLayer(val bitmap: Bitmap?)

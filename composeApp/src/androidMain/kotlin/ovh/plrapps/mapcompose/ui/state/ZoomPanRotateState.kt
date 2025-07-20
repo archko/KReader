@@ -149,9 +149,12 @@ internal class ZoomPanRotateState(
 
     @Suppress("unused")
     fun setScroll(scrollX: Float, scrollY: Float, notify: Boolean = true) {
+        val oldScrollX = this.scrollX
+        val oldScrollY = this.scrollY
         this.scrollX = constrainScrollX(scrollX)
         this.scrollY = constrainScrollY(scrollY)
         updateCentroid()
+        println("ZoomPanRotateState: setScroll: old=($oldScrollX, $oldScrollY), new=(${this.scrollX}, ${this.scrollY}), notify=$notify")
         notifyStateChanged()
     }
 
@@ -386,6 +389,7 @@ internal class ZoomPanRotateState(
         scrollY -= if (rotRad == 0f) scrollDelta.y else {
             scrollDelta.x * sin(rotRad) + scrollDelta.y * cos(rotRad)
         }
+        println("ZoomPanRotateState: onScrollDelta: scrollDelta=$scrollDelta, oldScroll=(${this.scrollX}, ${this.scrollY}), newScroll=($scrollX, $scrollY)")
         setScroll(scrollX, scrollY)
     }
 
@@ -599,16 +603,13 @@ internal class ZoomPanRotateState(
             polarRadius(layoutSize.height.toFloat(), layoutSize.width.toFloat(), angle)
         val bias = (layoutDimension - layoutSize.height) / 2
 
-        return if (fullHeight * scale < layoutDimension) {
-            val offset = scrollOffsetRatio.y * fullHeight * scale
-            scrollY.coerceIn(fullHeight * scale - layoutDimension - offset + bias, offset + bias)
-        } else {
-            val offset = scrollOffsetRatio.y * layoutDimension
-            scrollY.coerceIn(
-                -offset + bias,
-                offset + bias + fullHeight * scale - layoutDimension
-            )
-        }
+        // 对于多页面PDF，允许滚动到文档的底部
+        val maxScrollY = fullHeight * scale - layoutDimension + bias
+        val minScrollY = -bias
+
+        println("ZoomPanRotateState: constrainScrollY: scrollY=$scrollY, fullHeight=$fullHeight, scale=$scale, layoutDimension=$layoutDimension, maxScrollY=$maxScrollY, minScrollY=$minScrollY")
+        
+        return scrollY.coerceIn(minScrollY, maxScrollY)
     }
 
     internal fun constrainScale(scale: Float): Float {
@@ -628,7 +629,7 @@ internal class ZoomPanRotateState(
         val minScaleY = layoutSize.height.toFloat() / fullHeight
         val mode = minimumScaleMode
         minScale = when (mode) {
-            Fit -> min(minScaleX, minScaleY)
+            Fit -> minScaleX  // 让文档宽度正好填满视图宽度
             Fill -> max(minScaleX, minScaleY)
             is Forced -> mode.scale
         }

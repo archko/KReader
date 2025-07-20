@@ -16,6 +16,7 @@ import ovh.plrapps.mapcompose.core.Viewport
 import ovh.plrapps.mapcompose.core.VisibleTilesResolver
 import ovh.plrapps.mapcompose.core.throttle
 import ovh.plrapps.mapcompose.ui.layout.Fit
+import ovh.plrapps.mapcompose.ui.layout.Forced
 import ovh.plrapps.mapcompose.ui.layout.MinimumScaleMode
 import ovh.plrapps.mapcompose.utils.AngleDegree
 
@@ -23,9 +24,8 @@ import ovh.plrapps.mapcompose.utils.AngleDegree
  * The state of the map. All public APIs are extensions functions or extension properties of this
  * class.
  *
- * @param levelCount The number of levels in the pyramid.
- * @param fullWidth The width in pixels of the map at scale 1f.
- * @param fullHeight The height in pixels of the map at scale 1f.
+ * @param decoder PdfDecoder instance for PDF processing
+ * @param levelCount The number of levels in the pyramid. Defaults to 4. Each level represents a different zoom level.
  * @param tileSize The size in pixels of tiles, which are expected to be squared. Defaults to 256.
  * @param workerCount The thread count used to fetch tiles. Defaults to the number of cores minus
  * one, which works well for tiles in the file system or in a local database. However, that number
@@ -34,7 +34,8 @@ import ovh.plrapps.mapcompose.utils.AngleDegree
  * initialization. Note that the provided lambda should not start any coroutines.
  */
 class ViewState(
-    levelCount: Int,
+    decoder: PdfDecoder,
+    levelCount: Int = 6,
     fullWidth: Int,
     fullHeight: Int,
     tileSize: Int = 512,
@@ -43,19 +44,41 @@ class ViewState(
 ) : ZoomPanRotateStateListener {
     private val initialValues = InitialValues().apply(initialValuesBuilder)
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    
+    // 计算初始缩放比例 - 根据文档尺寸和视图尺寸
+    private val initialScale = if (initialValues.scale == 1f) {
+        // 如果用户没有指定scale，则根据minimumScaleMode计算
+        when (initialValues.minimumScaleMode) {
+            is ovh.plrapps.mapcompose.ui.layout.Fit -> {
+                // 默认让文档宽度填满视图宽度，这里先设为1，等layout完成后会重新计算
+                1f
+            }
+            is ovh.plrapps.mapcompose.ui.layout.Fill -> {
+                // 填满视图，这里先设为1，等layout完成后会重新计算
+                1f
+            }
+            is ovh.plrapps.mapcompose.ui.layout.Forced -> {
+                (initialValues.minimumScaleMode as Forced).scale
+            }
+        }
+    } else {
+        initialValues.scale
+    }
+    
     internal val zoomPanRotateState = ZoomPanRotateState(
         fullWidth = fullWidth,
         fullHeight = fullHeight,
         stateChangeListener = this,
         minimumScaleMode = initialValues.minimumScaleMode,
         maxScale = initialValues.maxScale,
-        scale = initialValues.scale,
+        scale = initialScale,
         rotation = initialValues.rotation,
         gestureConfiguration = initialValues.gestureConfiguration
     )
 
     internal val visibleTilesResolver =
         VisibleTilesResolver(
+            decoder = decoder,
             levelCount = levelCount,
             fullWidth = fullWidth,
             fullHeight = fullHeight,
@@ -69,6 +92,7 @@ class ViewState(
         tileSize,
         visibleTilesResolver,
         workerCount,
+        decoder
     )
 
     private val throttledTask = scope.throttle(wait = 18) {
@@ -100,6 +124,7 @@ class ViewState(
     override fun onStateChanged() {
         consumeLateInitialValues()
 
+        println("ViewState: onStateChanged: scrollX=${zoomPanRotateState.scrollX}, scrollY=${zoomPanRotateState.scrollY}")
         renderVisibleTilesThrottled()
         stateChangeListener?.invoke(this)
     }
@@ -142,12 +167,14 @@ class ViewState(
 
     private fun updateViewport(): Viewport {
         val padding = preloadingPadding
-        return viewport.apply {
+        val newViewport = viewport.apply {
             left = zoomPanRotateState.scrollX.toInt() - padding
             top = zoomPanRotateState.scrollY.toInt() - padding
             right = left + zoomPanRotateState.layoutSize.width + padding * 2
             bottom = top + zoomPanRotateState.layoutSize.height + padding * 2
         }
+        println("ViewState: updateViewport: scrollX=${zoomPanRotateState.scrollX}, scrollY=${zoomPanRotateState.scrollY}, viewport=$newViewport")
+        return newViewport
     }
 
     /**
@@ -187,7 +214,7 @@ class InitialValues internal constructor() {
     internal var screenOffset: Offset = Offset(-0.0f, -0.0f)
     internal var scale: Float = 1f
     internal var minimumScaleMode: MinimumScaleMode = Fit
-    internal var maxScale: Float = 4f
+    internal var maxScale: Float = 8f  // 增加最大缩放值，支持更大的缩放
     internal var rotation: AngleDegree = 0f
     internal var magnifyingFactor = 0
     internal var preloadingPadding: Int = 0

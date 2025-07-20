@@ -72,19 +72,19 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     private fun caculateSize(viewportSize: IntSize) {
         if (pageSizes.isNotEmpty()) {
-            var width = viewportSize.width
-            var height = 0
+            // 找到所有页面中的最大宽度
+            val maxPageWidth = pageSizes.maxOf { it.width }
+            var totalHeight = 0
+            
             for (page in pageSizes) {
-                val zoom = 1f * viewportSize.width / page.width
-                //page.zoom = zoom
+                // 使用最大宽度来计算缩放比例，确保所有页面都能完整显示
+                val zoom = 1f * maxPageWidth / page.width
                 val h = (page.height * zoom).toInt()
-                height += h
-                break
+                totalHeight += h
             }
-            val size = pageSizes[0]
-            width = size.width
-            height = size.height
-            imageSize = IntSize(width, height)
+            
+            imageSize = IntSize(maxPageWidth, totalHeight)
+            println("PdfDecoder.caculateSize: maxPageWidth=$maxPageWidth, totalHeight=$totalHeight, pageCount=${pageSizes.size}")
         }
     }
 
@@ -94,15 +94,19 @@ public class PdfDecoder(file: File) : ImageDecoder {
         ) {
             viewSize = viewportSize
             if (pageSizes.isNotEmpty()) {
-                var width = pageSizes[0].width
-                var height = 0
+                // 找到所有页面中的最大宽度
+                val maxPageWidth = pageSizes.maxOf { it.width }
+                var totalHeight = 0
+                
                 for (page in pageSizes) {
-                    val zoom = 1f * width / page.width
-                    //page.zoom = zoom
+                    // 使用最大宽度来计算缩放比例，确保所有页面都能完整显示
+                    val zoom = 1f * maxPageWidth / page.width
                     val h = (page.height * zoom).toInt()
-                    height += h
+                    totalHeight += h
                 }
-                imageSize = IntSize(width, height)
+                
+                imageSize = IntSize(maxPageWidth, totalHeight)
+                println("PdfDecoder.getSize: maxPageWidth=$maxPageWidth, totalHeight=$totalHeight, pageCount=${pageSizes.size}")
             }
         }
         return imageSize
@@ -167,67 +171,25 @@ public class PdfDecoder(file: File) : ImageDecoder {
         pageWidth: Int,
         pageHeight: Int
     ): ImageBitmap {
-        val cropBound = Rect()
-        val scale = scale * viewSize.width / pageWidth
-        val pageW: Int
-        val pageH: Int
-        val patchX: Int
-        val patchY: Int
+        // 计算tile在页面中的实际位置（region已经是相对于页面的坐标）
+        val tileX = region.left.toInt()
+        val tileY = region.top.toInt()
+        val tileWidth = region.width.toInt()
+        val tileHeight = region.height.toInt()
+        
+        println("renderPageRegion:index:$index, scale:$scale, viewSize:$viewSize, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$region")
 
-        //如果页面的缩放为1,那么这时的pageW就是view的宽.
-        pageW = (region.width).toInt()
-        pageH = (region.height).toInt()
-
-        patchX = ((region.left) + cropBound.left).toInt()
-        patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegion:index:${index}, scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
-
-        val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
+        val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
         val ctm = Matrix(scale)
-        val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
+        val dev = AndroidDrawDevice(bitmap, tileX, tileY, 0, 0, tileWidth, tileHeight)
 
         val page = document.loadPage(index)
         page.run(dev, ctm, null)
+        page.destroy()
 
         dev.close()
         dev.destroy()
 
         return (bitmap.asImageBitmap())
-    }
-
-    public fun renderPageRegionBitmap(
-        region: androidx.compose.ui.geometry.Rect,
-        index: Int,
-        scale: Float,
-        viewSize: IntSize,
-        pageWidth: Int,
-        pageHeight: Int
-    ): Bitmap {
-        val cropBound = Rect()
-        val scale = scale * viewSize.width / pageWidth
-        val pageW: Int
-        val pageH: Int
-        val patchX: Int
-        val patchY: Int
-
-        //如果页面的缩放为1,那么这时的pageW就是view的宽.
-        pageW = (region.width).toInt()
-        pageH = (region.height).toInt()
-
-        patchX = ((region.left) + cropBound.left).toInt()
-        patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegionBitmap:index:${index}, scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
-
-        val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
-        val ctm = Matrix(scale)
-        val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
-
-        val page = document.loadPage(index)
-        page.run(dev, ctm, null)
-
-        dev.close()
-        dev.destroy()
-
-        return bitmap
     }
 }

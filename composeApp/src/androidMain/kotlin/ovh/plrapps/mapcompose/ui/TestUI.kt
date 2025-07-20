@@ -46,7 +46,6 @@ fun TestUI(path: String) {
     }
     DisposableEffect(decoder) {
         onDispose {
-            println("onDispose")
             //decoder?.close()
         }
     }
@@ -63,10 +62,17 @@ fun TestUI(path: String) {
         }
     } else {
         val state = remember {
+            // 使用pdfDecoder已经计算好的imageSize
+            val fullWidth = decoder!!.imageSize.width
+            val fullHeight = decoder!!.imageSize.height
+            
+            println("TestUI: fullWidth=$fullWidth, fullHeight=$fullHeight")
+            
             ViewState(
-                4,
-                1024, 4096
-                //decoder!!.imageSize.width, decoder!!.imageSize.height,
+                decoder!!,
+                6,
+                fullWidth,
+                fullHeight,
             ) {
                 scale(1.0f)
             }.apply {

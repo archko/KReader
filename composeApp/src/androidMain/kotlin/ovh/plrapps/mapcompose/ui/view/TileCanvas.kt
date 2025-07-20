@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import ovh.plrapps.mapcompose.core.*
 import ovh.plrapps.mapcompose.ui.state.ZoomPanRotateState
+import kotlin.math.floor
+import kotlin.math.ln
 
 @Composable
 internal fun TileCanvas(
@@ -50,21 +52,35 @@ internal fun TileCanvas(
         }) {
             //paint.isFilterBitmap = isFilteringBitmap()
 
+            println("TileCanvas: rendering ${tilesToRender.size} tiles")
             for (tile in tilesToRender) {
-                val bitmap = tile.bitmap ?: continue
-                val scaleForLevel = visibleTilesResolver.getScaleForLevel(tile.zoom)
-                    ?: continue
-                val tileScaled = (tileSize / scaleForLevel).toInt()
-                val l = tile.col * tileScaled
-                val t = tile.row * tileScaled
-                val r = l + tileScaled
-                val b = t + tileScaled
-                dest.set(l, t, r, b)
+                val bitmap = tile.bitmap
+                if (bitmap == null) {
+                    println("TileCanvas: tile has no bitmap: $tile")
+                    continue
+                }
+                
+                // 计算页面在文档中的位置 - 使用与VisibleTilesResolver相同的逻辑
+                val pageStart = visibleTilesResolver.getPageStart(tile.pageIndex)
+                println("TileCanvas: tile.pageIndex=${tile.pageIndex}, calculated pageStart=$pageStart")
+                
+                // 计算tile在文档坐标系中的位置
+                // tile.pageOffsetX 和 tile.pageOffsetY 是页面内的偏移
+                // 需要加上页面在文档中的位置
+                val tileX = tile.pageOffsetX  // 页面在文档中的x偏移是0，所以直接使用页面内偏移
+                val tileY = pageStart + tile.pageOffsetY  // 需要加上页面在文档中的y位置
+                
+                // Canvas已经应用了缩放变换，所以这里不需要再乘以scale
+                // 但是bitmap的尺寸需要根据当前缩放进行调整
+                val currentScale = zoomPRState.scale
+                val l = tileX.toFloat()
+                val t = tileY.toFloat()
+                val r = l + (bitmap.width / currentScale)  // bitmap尺寸需要除以scale，因为Canvas已经应用了缩放
+                val b = t + (bitmap.height / currentScale)
+                dest.set(l.toInt(), t.toInt(), r.toInt(), b.toInt())
 
-                //val colorFilter = colorFilterProvider?.getColorFilter(tile.row, tile.col, tile.zoom)
-
-                //paint.alpha = (tile.alpha * 255).toInt()
-                //paint.colorFilter = colorFilter?.asAndroidColorFilter()
+                println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale $currentScale, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
+                println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}, adjustedWidth=${bitmap.width / currentScale}, adjustedHeight=${bitmap.height / currentScale}")
 
                 drawIntoCanvas {
                     it.nativeCanvas.drawBitmap(bitmap, null, dest, null)
