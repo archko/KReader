@@ -78,7 +78,7 @@ internal class TileCanvasState(
             val priority = if (it.zoom == visibleTiles.scale && it.level == visibleTiles.level) 100 else 0
             priority
         }
-        println("state:renderTiles: tiles details:")
+        println("state:renderTiles: tiles details:${tilesToRenderCopy.size}")
         tilesToRenderCopy.forEach { tile ->
             println("  - tile=$tile, bitmap=${tile.bitmap != null}")
         }
@@ -97,7 +97,7 @@ internal class TileCanvasState(
         }
 
         /* Launch the TileCollector */
-        tileCollector = TileCollector(workerCount.coerceAtLeast(1), tileSize, decoder, visibleTilesResolver)
+        tileCollector = TileCollector(workerCount.coerceAtLeast(1), tileSize, decoder)
         scope.launch {
             tileCollector.collectTiles(
                 tileSpecs = visibleTileLocationsChannel,
@@ -198,8 +198,6 @@ internal class TileCanvasState(
                             println("TileCanvasState: tileSpec already processed with bitmap=$tileSpec")
                         }
                     }
-                } else {
-                    println("state:collectNewTiles: visibleTiles is null")
                 }
             }
         }
@@ -224,6 +222,7 @@ internal class TileCanvasState(
                 println("state:consumeTiles: recycling tile=$tile (not visible)")
                 tile.recycle()
             }
+            //fullEvictionDebounced()
         }
     }
 
@@ -246,7 +245,7 @@ internal class TileCanvasState(
                     && spec.pageOffsetX == tile.pageOffsetX
                     && spec.pageOffsetY == tile.pageOffsetY
                     && spec.level == tile.level
-                    //&& spec.zoom == tile.zoom //这个如果加了,缩放时页面会空白.
+            //&& spec.zoom == tile.zoom //这个如果加了,缩放时页面会空白.
         }
 
         if (!found) {
@@ -261,9 +260,10 @@ internal class TileCanvasState(
         return if (level == tile.level) {
             // 如果level相同，检查是否有重叠的tile
             visibleTiles.any { spec ->
-                spec.pageIndex == tile.pageIndex &&
-                        spec.pageOffsetX == tile.pageOffsetX &&
-                        spec.pageOffsetY == tile.pageOffsetY
+                spec.pageIndex == tile.pageIndex
+                        && spec.pageOffsetX == tile.pageOffsetX
+                        && spec.pageOffsetY == tile.pageOffsetY
+                        && spec.level == tile.level
             }
         } else {
             // 如果level不同，检查是否有重叠的区域
@@ -300,19 +300,26 @@ internal class TileCanvasState(
         visibleTiles: VisibleTiles,
     ) {
         val currentLevel = visibleTiles.level
+        println("state:partialEviction:level:$currentLevel, size:${tilesCollected.size}")
 
         val iterator = tilesCollected.iterator()
         while (iterator.hasNext()) {
             val tile = iterator.next()
 
+            if ((tile.level != currentLevel && !visibleTiles.intersects(tile))) {
+                println("state:partialEviction1:$tile")
+                iterator.remove()
+                tile.recycle()
+                continue
+            }
+
             // 移除不在当前可见列表中的tile，或者level不匹配的tile
-            if (!visibleTiles.contains(tile) || tile.level != currentLevel) {
+            if (
+                tile.level != currentLevel
+                && (!visibleTiles.contains(tile))
+            ) {
                 println(
-                    "state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileLevel=${tile.level}, tileVisible=${
-                        visibleTiles.contains(
-                            tile
-                        )
-                    }"
+                    "state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileLevel=${tile.level}"
                 )
                 iterator.remove()
                 tile.recycle()
@@ -338,9 +345,8 @@ internal class TileCanvasState(
         while (iterator.hasNext()) {
             val tile = iterator.next()
 
-            /* Remove tiles at different level and sub-sample */
-            if ((tile.level != currentLevel) || (tile.level == 0)) {
-                println("state:aggressiveEviction:$tile")
+            if (tile.level != currentLevel) {
+                println("state:aggressiveEviction:level:$currentLevel, $tile")
                 iterator.remove()
                 tile.recycle()
             }
@@ -378,7 +384,6 @@ internal class TileCanvasState(
         } else {
             recycleChannel.trySend(this)
         }
-        //alpha = 0f
     }
 
     private fun Int.minAtGreaterLevel(n: Int): Int {

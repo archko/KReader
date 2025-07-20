@@ -124,7 +124,7 @@ class ViewState(
     override fun onStateChanged() {
         consumeLateInitialValues()
 
-        println("ViewState: onStateChanged: scrollX=${zoomPanRotateState.scrollX}, scrollY=${zoomPanRotateState.scrollY}")
+        //println("ViewState: onStateChanged: scrollX=${zoomPanRotateState.scrollX}, scrollY=${zoomPanRotateState.scrollY}")
         renderVisibleTilesThrottled()
         stateChangeListener?.invoke(this)
     }
@@ -173,7 +173,7 @@ class ViewState(
             right = left + zoomPanRotateState.layoutSize.width + padding * 2
             bottom = top + zoomPanRotateState.layoutSize.height + padding * 2
         }
-        println("ViewState: updateViewport: scrollX=${zoomPanRotateState.scrollX}, scrollY=${zoomPanRotateState.scrollY}, viewport=$newViewport")
+        //println("ViewState: updateViewport: scrollX=${zoomPanRotateState.scrollX}, scrollY=${zoomPanRotateState.scrollY}, viewport=$newViewport")
         return newViewport
     }
 

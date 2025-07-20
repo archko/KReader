@@ -45,20 +45,6 @@ internal class VisibleTilesResolver(
     }
 
     /**
-     * Level boundaries for tile recalculation
-     * Each level represents a range of scales where tile grid remains the same
-     */
-    private val scaleForLevel: Map<Int, Double> = (0 until levelCount).associateWith {
-        // Level 0: scale < 1.0
-        // Level 1: 1.0 <= scale < 2.0  
-        // Level 2: 2.0 <= scale < 4.0
-        // Level 3: 4.0 <= scale < 8.0
-        // Level 4: 8.0 <= scale < 16.0
-        // Level 5: 16.0 <= scale
-        2.0.pow(it.toDouble())
-    }
-
-    /**
      * Returns the level based on current scale
      * Level 0: scale < 1.0
      * Level 1: 1.0 <= scale < 2.0
@@ -173,7 +159,7 @@ internal class VisibleTilesResolver(
             visibleTiles.forEach { spec ->
                 println("  - spec=$spec")
             }
-            return VisibleTiles(level, visibleTiles, visibleTiles.size, getSubSample(scale), scale)
+            return VisibleTiles(level, visibleTiles, visibleTiles.size, scale)
         }
 
         return makeVisibleTiles(viewport.left, viewport.top, viewport.right, viewport.bottom)
@@ -195,15 +181,6 @@ internal class VisibleTilesResolver(
         }
     }
 
-    // internal for test purposes
-    internal fun getSubSample(scale: Float): Int {
-        return if (scale < (scaleForLevel[0]?.toFloat() ?: Float.MIN_VALUE)) {
-            ceil(ln((scaleForLevel[0] ?: error("")) / scale) / ln(2.0)).toInt()
-        } else {
-            0
-        }
-    }
-
     fun interface ScaleProvider {
         fun getScale(): Float
     }
@@ -222,6 +199,5 @@ internal data class VisibleTiles(
     val level: Int,
     val visibleTiles: List<TileSpec>,
     val count: Int,
-    val subSample: Int = 0,
     val scale: Float = 0f
 )

@@ -44,7 +44,6 @@ internal class TileCollector(
     private val workerCount: Int,
     private val tileSize: Int,
     private val decoder: com.archko.reader.pdf.subsampling.PdfDecoder,
-    private val visibleTilesResolver: VisibleTilesResolver
 ) {
     @Volatile
     var isIdle: Boolean = true
