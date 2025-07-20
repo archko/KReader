@@ -1,9 +1,8 @@
 package ovh.plrapps.mapcompose.core
 
-import com.archko.reader.pdf.subsampling.PdfDecoder
-import kotlin.math.ceil
-import kotlin.math.floor
-import kotlin.math.max
+import ovh.plrapps.mapcompose.utils.rotateX
+import ovh.plrapps.mapcompose.utils.rotateY
+import kotlin.math.*
 
 /**
  * Resolves the visible tiles.
@@ -23,16 +22,41 @@ import kotlin.math.max
  * @author p-lr on 25/05/2019
  */
 internal class VisibleTilesResolver(
-    private val decoder: PdfDecoder,
-    private val fullWidth: Int,
-    private val fullHeight: Int,
-    private val tileSize: Int = 512,
+    private val levelCount: Int, private val fullWidth: Int,
+    private val fullHeight: Int, private val tileSize: Int = 256,
     var magnifyingFactor: Int = 0,
     private val scaleProvider: ScaleProvider
 ) {
 
-    fun getScale(): Float {
-        return scaleProvider.getScale()
+    /**
+     * Last level is at scale 1.0f, others are at scale 1.0 / power_of_2
+     */
+    private val scaleForLevel: Map<Int, Double> = (0 until levelCount).associateWith {
+        (1.0 / 2.0.pow((levelCount - it - 1)))
+    }
+
+    /**
+     * Get the scale for a given [level] (also called zoom).
+     * @return the scale or null if no such level was configured.
+     */
+    fun getScaleForLevel(level: Int): Float? {
+        return scaleForLevel[level]?.toFloat()
+    }
+
+    /**
+     * Returns the level, an entire value belonging to [0 ; [levelCount] - 1]
+     * Internal for test purposes.
+     */
+    internal fun getLevel(scale: Float, magnifyingFactor: Int = 0): Int {
+        /* This value can be negative */
+        val partialLevel = levelCount - 1 - magnifyingFactor +
+                ln(scale.toDouble()) / ln(2.0)
+
+        /* The level can't be greater than levelCount - 1.0 */
+        val capedLevel = min(partialLevel, levelCount - 1.0)
+
+        /* The level can't be lower than 0 */
+        return ceil(max(capedLevel, 0.0)).toInt()
     }
 
     /**
@@ -43,12 +67,13 @@ internal class VisibleTilesResolver(
      */
     fun getVisibleTiles(viewport: Viewport): VisibleTiles {
         val scale = scaleProvider.getScale()
-        val relativeScale = scale
+        val level = getLevel(scale, magnifyingFactor)
+        val scaleAtLevel = scaleForLevel[level] ?: throw AssertionError()
+        val relativeScale = scale / scaleAtLevel
 
         /* At the current level, row and col index have maximum values */
-        val maxCol = max(0.0f, ceil(1f * fullWidth / tileSize) - 1).toInt()
-        val maxRow = max(0.0f, ceil(1f * fullHeight / tileSize) - 1).toInt()
-        println("state.getVisibleTiles.scale:$scale, relativeScale:$relativeScale, col-row:$maxCol-$maxRow")
+        val maxCol = max(0.0, ceil(fullWidth * scaleAtLevel / tileSize) - 1).toInt()
+        val maxRow = max(0.0, ceil(fullHeight * scaleAtLevel / tileSize) - 1).toInt()
 
         fun Int.lowerThan(limit: Int): Int {
             return if (this <= limit) this else limit
@@ -66,11 +91,79 @@ internal class VisibleTilesResolver(
                 colLeft..colRight
             }
             val count = (rowBottom - rowTop + 1) * (colRight - colLeft + 1)
-            println("VisibleTiles:$colLeft, $rowTop, $colRight, $rowBottom, $count, left:$left-$top-$right-$bottom $scale, $scaledTileSize, $tileMatrix")
-            return VisibleTiles(scale, tileMatrix, count, 0)
+            return VisibleTiles(level, tileMatrix, count, getSubSample(scale))
         }
 
-        return makeVisibleTiles(viewport.left, viewport.top, viewport.right, viewport.bottom)
+        return if (viewport.angleRad == 0f) {
+            makeVisibleTiles(viewport.left, viewport.top, viewport.right, viewport.bottom)
+        } else {
+            val xTopLeft = viewport.left
+            val yTopLeft = viewport.top
+
+            val xTopRight = viewport.right
+            val yTopRight = viewport.top
+
+            val xBotLeft = viewport.left
+            val yBotLeft = viewport.bottom
+
+            val xBotRight = viewport.right
+            val yBotRight = viewport.bottom
+
+            val xCenter = (viewport.right + viewport.left).toDouble() / 2
+            val yCenter = (viewport.bottom + viewport.top).toDouble() / 2
+
+            val xTopLeftRot =
+                rotateX(xTopLeft - xCenter, yTopLeft - yCenter, viewport.angleRad) + xCenter
+            val yTopLeftRot =
+                rotateY(xTopLeft - xCenter, yTopLeft - yCenter, viewport.angleRad) + yCenter
+            var xLeftMost = xTopLeftRot
+            var yTopMost = yTopLeftRot
+            var xRightMost = xTopLeftRot
+            var yBotMost = yTopLeftRot
+
+            val xTopRightRot =
+                rotateX(xTopRight - xCenter, yTopRight - yCenter, viewport.angleRad) + xCenter
+            val yTopRightRot =
+                rotateY(xTopRight - xCenter, yTopRight - yCenter, viewport.angleRad) + yCenter
+            xLeftMost = xLeftMost.coerceAtMost(xTopRightRot)
+            yTopMost = yTopMost.coerceAtMost(yTopRightRot)
+            xRightMost = xRightMost.coerceAtLeast(xTopRightRot)
+            yBotMost = yBotMost.coerceAtLeast(yTopRightRot)
+
+            val xBotLeftRot =
+                rotateX(xBotLeft - xCenter, yBotLeft - yCenter, viewport.angleRad) + xCenter
+            val yBotLeftRot =
+                rotateY(xBotLeft - xCenter, yBotLeft - yCenter, viewport.angleRad) + yCenter
+            xLeftMost = xLeftMost.coerceAtMost(xBotLeftRot)
+            yTopMost = yTopMost.coerceAtMost(yBotLeftRot)
+            xRightMost = xRightMost.coerceAtLeast(xBotLeftRot)
+            yBotMost = yBotMost.coerceAtLeast(yBotLeftRot)
+
+            val xBotRightRot =
+                rotateX(xBotRight - xCenter, yBotRight - yCenter, viewport.angleRad) + xCenter
+            val yBotRightRot =
+                rotateY(xBotRight - xCenter, yBotRight - yCenter, viewport.angleRad) + yCenter
+            xLeftMost = xLeftMost.coerceAtMost(xBotRightRot)
+            yTopMost = yTopMost.coerceAtMost(yBotRightRot)
+            xRightMost = xRightMost.coerceAtLeast(xBotRightRot)
+            yBotMost = yBotMost.coerceAtLeast(yBotRightRot)
+
+            makeVisibleTiles(
+                xLeftMost.toInt(),
+                yTopMost.toInt(),
+                xRightMost.toInt(),
+                yBotMost.toInt()
+            )
+        }
+    }
+
+    // internal for test purposes
+    internal fun getSubSample(scale: Float): Int {
+        return if (scale < (scaleForLevel[0]?.toFloat() ?: Float.MIN_VALUE)) {
+            ceil(ln((scaleForLevel[0] ?: error("")).toDouble() / scale) / ln(2.0)).toInt()
+        } else {
+            0
+        }
     }
 
     fun interface ScaleProvider {
@@ -88,7 +181,7 @@ internal class VisibleTilesResolver(
  * equals 0.
  */
 internal data class VisibleTiles(
-    val scale: Float,
+    val level: Int,
     val tileMatrix: TileMatrix,
     val count: Int,
     val subSample: Int = 0

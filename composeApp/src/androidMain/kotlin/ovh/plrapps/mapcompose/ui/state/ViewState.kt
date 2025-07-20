@@ -34,7 +34,7 @@ import ovh.plrapps.mapcompose.utils.AngleDegree
  * initialization. Note that the provided lambda should not start any coroutines.
  */
 class ViewState(
-    decoder: PdfDecoder,
+    levelCount: Int,
     fullWidth: Int,
     fullHeight: Int,
     tileSize: Int = 512,
@@ -56,7 +56,7 @@ class ViewState(
 
     internal val visibleTilesResolver =
         VisibleTilesResolver(
-            decoder = decoder,
+            levelCount = levelCount,
             fullWidth = fullWidth,
             fullHeight = fullHeight,
             tileSize = tileSize,
@@ -69,7 +69,6 @@ class ViewState(
         tileSize,
         visibleTilesResolver,
         workerCount,
-        decoder
     )
 
     private val throttledTask = scope.throttle(wait = 18) {

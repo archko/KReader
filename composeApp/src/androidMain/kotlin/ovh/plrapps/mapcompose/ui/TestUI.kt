@@ -64,9 +64,9 @@ fun TestUI(path: String) {
     } else {
         val state = remember {
             ViewState(
-                decoder!!,
-                //1024, 4096
-                decoder!!.imageSize.width, decoder!!.imageSize.height,
+                4,
+                1024, 4096
+                //decoder!!.imageSize.width, decoder!!.imageSize.height,
             ) {
                 scale(1.0f)
             }.apply {
@@ -106,6 +106,7 @@ private fun TestUI(
                 visibleTilesResolver = state.visibleTilesResolver,
                 tileSize = state.tileSize,
                 tilesToRender = state.tileCanvasState.tilesToRender,
+                alphaTick = 1.0f
             )
 
             content()

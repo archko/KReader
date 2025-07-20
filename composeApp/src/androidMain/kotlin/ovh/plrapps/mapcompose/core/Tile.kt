@@ -2,7 +2,7 @@ package ovh.plrapps.mapcompose.core
 
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
@@ -13,33 +13,27 @@ import androidx.compose.runtime.setValue
  * the original bitmap (the one at the lowest level), and so on.
  */
 internal data class Tile(
-    val zoom: Float,
+    val zoom: Int,
     val row: Int,
     val col: Int,
     val subSample: Int,
-    val width: Int = 512,
-    val height: Int = 512,
+    val layerIds: List<String>,
+    val opacities: List<Float>
 ) {
     var bitmap: Bitmap? = null
-    var alpha: Float by mutableFloatStateOf(0f)
+    var alpha: Float by mutableStateOf(0f)
 }
 
-internal data class TileSpec(
-    val zoom: Float,
-    val row: Int, val col: Int,
-    val subSample: Int = 0,
-    val width: Int = 512,
-    val height: Int = 512
-)
+internal data class TileSpec(val zoom: Int, val row: Int, val col: Int, val subSample: Int = 0)
 
 internal fun Tile.sameSpecAs(
-    zoom: Float,
+    zoom: Int,
     row: Int,
     col: Int,
     subSample: Int,
-    width: Int = 512,
-    height: Int = 512,
+    layerIds: List<String>,
+    opacities: List<Float>
 ): Boolean {
     return this.zoom == zoom && this.row == row && this.col == col && this.subSample == subSample
-            && this.width == width && this.height == height
+            && this.layerIds == layerIds && this.opacities == opacities
 }
