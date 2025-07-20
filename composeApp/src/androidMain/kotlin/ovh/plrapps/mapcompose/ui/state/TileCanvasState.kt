@@ -324,7 +324,7 @@ internal class TileCanvasState(
 
             // Remove tiles that are not in the current visible tiles list
             if (!visibleTiles.contains(tile)) {
-                println("state:partialEviction: removing tile=$tile (not in visible list)")
+                //println("state:partialEviction: removing tile=$tile (not in visible list)")
                 iterator.remove()
                 tile.recycle()
                 removedCount++
@@ -333,7 +333,7 @@ internal class TileCanvasState(
 
             // Remove tiles of different levels (keep only current level tiles)
             if (tile.level != currentLevel) {
-                println("state:partialEviction: removing tile=$tile (different level: ${tile.level} vs $currentLevel)")
+                //println("state:partialEviction: removing tile=$tile (different level: ${tile.level} vs $currentLevel)")
                 iterator.remove()
                 tile.recycle()
                 removedCount++
