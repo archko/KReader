@@ -19,6 +19,8 @@ internal data class Tile(
     val pageIndex: Int, // 页码
     val pageOffsetX: Int, // 页面在文档中的X偏移
     val pageOffsetY: Int, // 页面在文档中的Y偏移
+    val tileWidth: Int = 0, // tile的宽度
+    val tileHeight: Int = 0 // tile的高度
 ) {
     var bitmap: Bitmap? = null
 }
@@ -28,7 +30,9 @@ internal data class TileSpec(
     val level: Int,
     val pageIndex: Int = 0, // 页码
     val pageOffsetX: Int = 0, // 页面在文档中的X偏移
-    val pageOffsetY: Int = 0  // 页面在文档中的Y偏移
+    val pageOffsetY: Int = 0, // 页面在文档中的Y偏移
+    val tileWidth: Int = 0, // tile的宽度
+    val tileHeight: Int = 0  // tile的高度
 )
 
 internal fun Tile.sameSpecAs(
@@ -37,10 +41,14 @@ internal fun Tile.sameSpecAs(
     pageIndex: Int,
     pageOffsetX: Int,
     pageOffsetY: Int,
+    tileWidth: Int = 0,
+    tileHeight: Int = 0,
 ): Boolean {
     return this.zoom == zoom
             && this.level == level
             && this.pageIndex == pageIndex
             && this.pageOffsetX == pageOffsetX
             && this.pageOffsetY == pageOffsetY
+            && this.tileWidth == tileWidth
+            && this.tileHeight == tileHeight
 }

@@ -186,6 +186,8 @@ internal class TileCanvasState(
                                 tileSpec.pageIndex,
                                 tileSpec.pageOffsetX,
                                 tileSpec.pageOffsetY,
+                                tileSpec.tileWidth,
+                                tileSpec.tileHeight,
                             )
                         }
 

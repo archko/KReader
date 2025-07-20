@@ -143,6 +143,8 @@ internal class TileCollector(
                         spec.pageIndex,
                         spec.pageOffsetX,
                         spec.pageOffsetY,
+                        spec.tileWidth,
+                        spec.tileHeight,
                     )
                 )
                 null
@@ -155,6 +157,8 @@ internal class TileCollector(
                 spec.pageIndex,
                 spec.pageOffsetX,
                 spec.pageOffsetY,
+                spec.tileWidth,
+                spec.tileHeight,
             ).apply {
                 this.bitmap = resultBitmap
             }

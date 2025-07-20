@@ -125,7 +125,7 @@ internal class VisibleTilesResolver(
                 val cols = ceil(pageWidth / tileSize.toDouble()).toInt()
                 val rows = ceil(pageHeight / tileSize.toDouble()).toInt()
                 
-                // 使用固定的tileSize，但最后一个tile可能更小
+                // 计算每个tile的实际宽高，最后一个tile使用页面边界避免精度问题
                 val tileWidth = tileSize
                 val tileHeight = tileSize
                 
@@ -142,15 +142,23 @@ internal class VisibleTilesResolver(
                 // 创建页面内的tile
                 for (rowInPage in rowTop..rowBottom) {
                     for (col in colLeft..colRight) {
+                        // 计算tile的实际边界，最后一个tile使用页面边界避免精度问题
+                        val tileLeft = col * tileWidth
+                        val tileTop = rowInPage * tileHeight
+                        val tileRight = if (col == cols - 1) pageWidth else (col + 1) * tileWidth
+                        val tileBottom = if (rowInPage == rows - 1) pageHeight else (rowInPage + 1) * tileHeight
+                        
                         val tileSpec = TileSpec(
                             zoom = scale,
                             level = level,
                             pageIndex = pageIndex,
-                            pageOffsetX = (col * tileWidth),
-                            pageOffsetY = (rowInPage * tileHeight)  // 使用实际tile大小计算偏移
+                            pageOffsetX = tileLeft,
+                            pageOffsetY = tileTop,
+                            tileWidth = tileRight - tileLeft,
+                            tileHeight = tileBottom - tileTop
                         )
                         visibleTiles.add(tileSpec)
-                        //println("makeVisibleTiles: created tile spec=$tileSpec")
+                        //println("makeVisibleTiles: created tile spec=$tileSpec, bounds=($tileLeft,$tileTop,$tileRight,$tileBottom)")
                     }
                 }
             }
