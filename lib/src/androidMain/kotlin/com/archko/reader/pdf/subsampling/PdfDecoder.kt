@@ -24,10 +24,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     private val document: Document = Document.openDocument(file.absolutePath)
     public override var pageCount: Int = document.countPages()
-    
+
     // 私有变量存储原始页面尺寸
     private var originalPageSizes: List<Size> = listOf()
-    
+
     // 对外提供的缩放后页面尺寸
     public override var pageSizes: List<Size> = listOf()
         get() = field
@@ -80,28 +80,28 @@ public class PdfDecoder(file: File) : ImageDecoder {
             // 文档宽度直接使用viewportSize.width
             val documentWidth = viewportSize.width
             var totalHeight = 0
-            
+
             // 计算缩放后的页面尺寸
             val scaledPageSizes = mutableListOf<Size>()
-            
+
             for (i in originalPageSizes.indices) {
                 val originalPage = originalPageSizes[i]
                 // 计算每页的缩放比例，使宽度等于viewportSize.width
                 val scale = 1f * documentWidth / originalPage.width
                 val scaledWidth = documentWidth
                 val scaledHeight = (originalPage.height * scale).toInt()
-                totalHeight += scaledHeight
-                
+
                 // 创建缩放后的页面尺寸
-                val scaledPage = Size(scaledWidth, scaledHeight, i, scale)
+                val scaledPage = Size(scaledWidth, scaledHeight, i, scale, totalHeight)
                 scaledPageSizes.add(scaledPage)
-                
+                totalHeight += scaledHeight
+
                 println("PdfDecoder.caculateSize: page $i - original: ${originalPage.width}x${originalPage.height}, scale: $scale, scaled: ${scaledWidth}x${scaledHeight}")
             }
-            
+
             // 更新对外提供的页面尺寸
             pageSizes = scaledPageSizes
-            
+
             imageSize = IntSize(documentWidth, totalHeight)
             println("PdfDecoder.caculateSize: documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
         }
@@ -130,14 +130,18 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     private fun prepareSizes(): List<Size> {
         val list = mutableListOf<Size>()
+        var totalHeight = 0
         for (i in 0 until pageCount) {
             val page = document.loadPage(i)
             val bounds = page.bounds
             val size = Size(
                 bounds.x1.toInt() - bounds.x0.toInt(),
                 bounds.y1.toInt() - bounds.y0.toInt(),
-                i
+                i,
+                scale = 1.0f,
+                totalHeight,
             )
+            totalHeight += size.height
             page.destroy()
             list.add(size)
         }
@@ -228,7 +232,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
         val ctm = Matrix(scale)
-        val dev = AndroidDrawDevice(bitmap, 0, 0,tileX, tileY,  tileWidth, tileHeight)
+        val dev = AndroidDrawDevice(bitmap, 0, 0, tileX, tileY, tileWidth, tileHeight)
 
         val page = document.loadPage(index)
         page.run(dev, ctm, null)

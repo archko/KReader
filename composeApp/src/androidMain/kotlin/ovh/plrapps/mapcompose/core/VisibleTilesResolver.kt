@@ -101,22 +101,14 @@ internal class VisibleTilesResolver(
                 for (row in 0 until rows) {
                     for (col in 0 until cols) {
                         val tileLeft = col * tileWidth
-                        val tileTop = row * tileHeight
+                        val tileTop = row * tileHeight + pageSize.offsetHeight
                         val tileRight = if (col == cols - 1) pageWidth else (col + 1) * tileWidth
-                        val tileBottom = if (row == rows - 1) pageHeight else (rows + 1) * tileHeight
+                        val tileBottom = if (row == rows - 1) pageHeight else (row + 1) * tileHeight
                         // 判断 tile 是否与可见区域相交
                         if (tileRight > pageVisibleLeftInPage && tileLeft < pageVisibleRightInPage &&
                             tileBottom > pageVisibleTopInPage && tileTop < pageVisibleBottomInPage
                         ) {
-                            //add=(0, 0, 540, 2289), tile=540-763, 2-2, page:1080-1526
-                            //add=(540, 0, 1080, 2289), tile=540-763, 2-2, page:1080-1526
-                            //add=(0, 763, 540, 1526), tile=540-763, 2-2, page:1080-1526
-                            //add=(540, 763, 1080, 1526), tile=540-763, 2-2, page:1080-1526
-                            //add=(0, 0, 540, 2289), tile=540-763, 2-2, page:1080-1526
-                            //add=(540, 0, 1080, 2289), tile=540-763, 2-2, page:1080-1526
-                            //add=(0, 763, 540, 1526), tile=540-763, 2-2, page:1080-1526
-                            //add=(540, 763, 1080, 1526), tile=540-763, 2-2, page:1080-1526
-                            println("visibleTiles: add=($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), tile=$tileWidth-$tileHeight, $rows-$cols, page:$pageWidth-$pageHeight")
+                            println("visibleTiles: add=$pageIndex, ($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), tile=$tileWidth-$tileHeight, $rows-$cols, page:$pageWidth-$pageHeight")
                             visibleTiles.add(
                                 TileSpec(
                                     zoom = scale * pageSize.scale,

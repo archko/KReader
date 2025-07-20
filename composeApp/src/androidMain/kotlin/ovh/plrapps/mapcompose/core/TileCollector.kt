@@ -88,8 +88,8 @@ internal class TileCollector(
                 val tileWidth = spec.tileWidth
                 val tileHeight = spec.tileHeight
                 
-                if (tileInPageX >= tileWidth || tileInPageY >= tileHeight) {
-                    println("TileCollector: tile out of page bounds: spec=$spec, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY, pageWidth=$tileWidth, pageHeight=$tileHeight")
+                if (tileInPageX > tileWidth || tileInPageY > tileHeight) {
+                    println("TileCollector: tile out of page bounds: spec=$spec, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY, pageWidth=$tileWidth, pageHeight=$tileHeight")
                     return@async BitmapForLayer(null)
                 }
                 
