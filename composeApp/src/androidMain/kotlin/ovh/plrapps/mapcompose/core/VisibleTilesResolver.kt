@@ -152,9 +152,9 @@ internal class VisibleTilesResolver(
                 val colsNeeded = ceil(pageWidth / tileSize.toDouble()).toInt()
                 val rowsNeeded = ceil(pageHeight / tileSize.toDouble()).toInt()
                 
-                // 计算实际tile大小（确保所有tile大小一致）
-                val actualTileWidth = pageWidth / colsNeeded
-                val actualTileHeight = pageHeight / rowsNeeded
+                // 使用固定的tileSize，但最后一个tile可能更小
+                val actualTileWidth = tileSize
+                val actualTileHeight = tileSize
                 
                 // 计算可见区域对应的tile范围
                 val colLeft = floor(pageVisibleLeftInPage.toDouble() / actualTileWidth).toInt().coerceAtLeast(0)

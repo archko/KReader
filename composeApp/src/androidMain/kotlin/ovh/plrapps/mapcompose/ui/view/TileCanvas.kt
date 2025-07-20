@@ -70,17 +70,16 @@ internal fun TileCanvas(
                 val tileX = tile.pageOffsetX  // 页面在文档中的x偏移是0，所以直接使用页面内偏移
                 val tileY = pageStart + tile.pageOffsetY  // 需要加上页面在文档中的y位置
                 
-                // Canvas已经应用了缩放变换，所以这里不需要再乘以scale
-                // 但是bitmap的尺寸需要根据当前缩放进行调整
-                val currentScale = zoomPRState.scale
+                // Canvas已经应用了缩放变换，所以这里使用文档坐标系
+                // bitmap是按照1.0的scale解码的，所以直接使用bitmap的原始尺寸
                 val l = tileX.toFloat()
                 val t = tileY.toFloat()
-                val r = l + (bitmap.width / currentScale)  // bitmap尺寸需要除以scale，因为Canvas已经应用了缩放
-                val b = t + (bitmap.height / currentScale)
+                val r = l + bitmap.width.toFloat()  // 直接使用bitmap的原始宽度
+                val b = t + bitmap.height.toFloat()  // 直接使用bitmap的原始高度
                 dest.set(l.toInt(), t.toInt(), r.toInt(), b.toInt())
 
-                println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale $currentScale, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
-                println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}, adjustedWidth=${bitmap.width / currentScale}, adjustedHeight=${bitmap.height / currentScale}")
+                println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale ${zoomPRState.scale}, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
+                println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}")
 
                 drawIntoCanvas {
                     it.nativeCanvas.drawBitmap(bitmap, null, dest, null)

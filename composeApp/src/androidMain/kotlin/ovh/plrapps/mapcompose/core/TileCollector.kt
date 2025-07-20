@@ -113,17 +113,9 @@ internal class TileCollector(
                 }
                 
                 // 计算tile的实际大小
-                // 对于页面宽度595，tileSize=512的情况：
-                // colsNeeded = ceil(595/512) = 2
-                // actualTileWidth = 595/2 = 297.5
-                val colsNeeded = ceil(pageWidth / tileSize.toDouble()).toInt()
-                val rowsNeeded = ceil(pageHeight / tileSize.toDouble()).toInt()
-                val actualTileWidth = pageWidth / colsNeeded
-                val actualTileHeight = pageHeight / rowsNeeded
-                
-                // 计算当前tile的实际大小（可能被页面边界裁剪）
-                val currentTileWidth = min(actualTileWidth, pageWidth - tileInPageX)
-                val currentTileHeight = min(actualTileHeight, pageHeight - tileInPageY)
+                // 使用固定的tileSize，但最后一个tile可能更小
+                val currentTileWidth = min(tileSize, pageWidth - tileInPageX)
+                val currentTileHeight = min(tileSize, pageHeight - tileInPageY)
                 
                 // 解码时使用1.0的scale，因为Canvas已经处理了缩放变换
                 val decodeScale = 1.0f
