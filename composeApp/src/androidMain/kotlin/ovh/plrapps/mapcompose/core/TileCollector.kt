@@ -1,32 +1,17 @@
 package ovh.plrapps.mapcompose.core
 
 import android.graphics.Bitmap
-import android.graphics.Bitmap.Config
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Rect
-import android.os.Build
-import androidx.core.graphics.createBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Runnable
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
-import kotlin.math.ceil
-import kotlin.math.pow
 
 /**
  * The engine.The view-model uses two channels to communicate with the [TileCollector]:
@@ -59,7 +44,7 @@ internal class TileCollector(
     private val workerCount: Int,
     private val tileSize: Int,
     private val decoder: com.archko.reader.pdf.subsampling.PdfDecoder,
-    private val visibleTilesResolver: ovh.plrapps.mapcompose.core.VisibleTilesResolver
+    private val visibleTilesResolver: VisibleTilesResolver
 ) {
     @Volatile
     var isIdle: Boolean = true
@@ -134,7 +119,7 @@ internal class TileCollector(
                         region = region,
                         index = pageIndex,
                         scale = decodeScale,
-                        viewSize = androidx.compose.ui.unit.IntSize(currentTileWidth.toInt(), currentTileHeight.toInt()),
+                        viewSize = androidx.compose.ui.unit.IntSize(currentTileWidth, currentTileHeight),
                         pageWidth = pageWidth,
                         pageHeight = pageHeight
                     )
@@ -156,12 +141,9 @@ internal class TileCollector(
                     Tile(
                         spec.zoom,
                         spec.level,
-                        spec.subSample,
                         spec.pageIndex,
                         spec.pageOffsetX,
                         spec.pageOffsetY,
-                        emptyList(),
-                        emptyList()
                     )
                 )
                 null
@@ -171,12 +153,9 @@ internal class TileCollector(
             val tile = Tile(
                 spec.zoom,
                 spec.level,
-                spec.subSample,
                 spec.pageIndex,
                 spec.pageOffsetX,
                 spec.pageOffsetY,
-                emptyList(),
-                emptyList()
             ).apply {
                 this.bitmap = resultBitmap
             }

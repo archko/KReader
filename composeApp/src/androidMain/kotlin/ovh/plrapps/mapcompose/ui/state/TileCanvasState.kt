@@ -4,25 +4,13 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import ovh.plrapps.mapcompose.core.Tile
-import ovh.plrapps.mapcompose.core.TileCollector
-import ovh.plrapps.mapcompose.core.TileSpec
-import ovh.plrapps.mapcompose.core.Viewport
-import ovh.plrapps.mapcompose.core.VisibleTiles
-import ovh.plrapps.mapcompose.core.VisibleTilesResolver
-import ovh.plrapps.mapcompose.core.debounce
-import ovh.plrapps.mapcompose.core.sameSpecAs
-import ovh.plrapps.mapcompose.core.throttle
+import ovh.plrapps.mapcompose.core.*
 import java.util.concurrent.Executors
 import kotlin.math.pow
 
@@ -38,7 +26,7 @@ import kotlin.math.pow
  * @author P.Laurence on 04/06/2019
  */
 internal class TileCanvasState(
-    parentScope: CoroutineScope, 
+    parentScope: CoroutineScope,
     tileSize: Int,
     private val visibleTilesResolver: VisibleTilesResolver,
     workerCount: Int,
@@ -87,8 +75,7 @@ internal class TileCanvasState(
         /* Right before sending tiles to the view, reorder them so that tiles from current level are
          * above others. */
         val tilesToRenderCopy = tilesCollected.sortedBy {
-            val priority =
-                if (it.level == visibleTiles.level && it.subSample == visibleTiles.subSample) 100 else 0
+            val priority = if (it.zoom == visibleTiles.scale && it.level == visibleTiles.level) 100 else 0
             priority
         }
         println("state:renderTiles: tiles details:")
@@ -104,7 +91,12 @@ internal class TileCanvasState(
     private val tileCollector: TileCollector
 
     init {
-        /* Launch the TileCollector first */
+        /* Collect visible tiles and send specs to the TileCollector */
+        scope.launch {
+            collectNewTiles()
+        }
+
+        /* Launch the TileCollector */
         tileCollector = TileCollector(workerCount.coerceAtLeast(1), tileSize, decoder, visibleTilesResolver)
         scope.launch {
             tileCollector.collectTiles(
@@ -116,11 +108,6 @@ internal class TileCanvasState(
         /* Launch a coroutine to consume the produced tiles */
         scope.launch {
             consumeTiles(tilesOutput)
-        }
-
-        /* Collect visible tiles and send specs to the TileCollector */
-        scope.launch {
-            collectNewTiles(tileSize)
         }
 
         scope.launch(Dispatchers.Main) {
@@ -155,8 +142,9 @@ internal class TileCanvasState(
         }
 
         withContext(scope.coroutineContext) {
-            // 移除过于严格的scale检查，允许tile更新
-            setVisibleTiles(visibleTiles)
+            if (visibleTilesResolver.getScale() == visibleTiles.scale) {
+                setVisibleTiles(visibleTiles)
+            }
         }
     }
 
@@ -182,33 +170,37 @@ internal class TileCanvasState(
      * element are sent to the [TileCollector]. When the [TileCollector] is ready to resume processing,
      * the latest [VisibleTiles] element is processed right away.
      */
-    private suspend fun collectNewTiles(tileSize:Int) {
+    private suspend fun collectNewTiles() {
         visibleStateFlow.collectLatest { visibleState ->
             val visibleTiles = visibleState?.visibleTiles
             if (visibleTiles != null) {
                 val viewScale = visibleTilesResolver.getScale()
                 println("state:collectNewTiles: viewScale=$viewScale, visibleTiles.scale=${visibleTiles.scale}, visibleTiles.count=${visibleTiles.visibleTiles.size}")
-                
-                for (tileSpec in visibleTiles.visibleTiles) {
-                    // 检查是否已经有相同spec的tile，并且该tile有bitmap
-                    val existingTile = tilesCollected.find { tile ->
-                        tile.pageIndex == tileSpec.pageIndex &&
-                        tile.pageOffsetX == tileSpec.pageOffsetX &&
-                        tile.pageOffsetY == tileSpec.pageOffsetY &&
-                        tile.level == tileSpec.level
-                    }
+                if (visibleTiles.scale == viewScale) {
+                    for (tileSpec in visibleTiles.visibleTiles) {
+                        // 检查是否已经有相同spec的tile，并且该tile有bitmap
+                        val existingTile = tilesCollected.find { tile ->
+                            tile.sameSpecAs(
+                                tileSpec.zoom,
+                                tileSpec.level,
+                                tileSpec.pageIndex,
+                                tileSpec.pageOffsetY,
+                                tileSpec.pageOffsetY,
+                            )
+                        }
 
-                    /* Only emit specs which haven't already been processed by the collector
-                     * or if the existing tile doesn't have a bitmap */
-                    if (existingTile == null || existingTile.bitmap == null) {
-                        //println("TileCanvasState: sending tileSpec=$tileSpec")
-                        visibleTileLocationsChannel.send(tileSpec)
-                    } else {
-                        println("TileCanvasState: tileSpec already processed with bitmap=$tileSpec")
+                        /* Only emit specs which haven't already been processed by the collector
+                         * or if the existing tile doesn't have a bitmap */
+                        if (existingTile == null || existingTile.bitmap == null) {
+                            //println("TileCanvasState: sending tileSpec=$tileSpec")
+                            visibleTileLocationsChannel.send(tileSpec)
+                        } else {
+                            println("TileCanvasState: tileSpec already processed with bitmap=$tileSpec")
+                        }
                     }
+                } else {
+                    println("state:collectNewTiles: visibleTiles is null")
                 }
-            } else {
-                println("state:collectNewTiles: visibleTiles is null")
             }
         }
     }
@@ -220,16 +212,13 @@ internal class TileCanvasState(
     private suspend fun consumeTiles(tileChannel: ReceiveChannel<Tile>) {
         for (tile in tileChannel) {
             val lastVisible = lastVisible
-            
-            // 简化shouldKeep逻辑：只要tile在当前可见列表中就保留
-            val shouldKeep = lastVisible == null || lastVisible.contains(tile)
-            
-            if (shouldKeep) {
-                if (!tilesCollected.contains(tile)) {
-                    tile.prepare()
-                    tilesCollected.add(tile)
-                    println("state:consumeTiles: added tile=$tile, total=${tilesCollected.size}")
-                }
+            if (
+                (lastVisible == null || lastVisible.contains(tile))
+                && !tilesCollected.contains(tile)
+            ) {
+                tile.prepare()
+                tilesCollected.add(tile)
+                println("state:consumeTiles: added tile=$tile, total=${tilesCollected.size}")
                 renderThrottled()
             } else {
                 println("state:consumeTiles: recycling tile=$tile (not visible)")
@@ -247,24 +236,24 @@ internal class TileCanvasState(
      * 1f, the alpha won't be updated and there won't be any fade-in effect.
      */
     private fun Tile.prepare() {
-        alpha = alphaTick
     }
 
     private fun VisibleTiles.contains(tile: Tile): Boolean {
         // 检查tile是否在当前可见tile列表中
         // 需要匹配pageIndex、位置和level
         val found = visibleTiles.any { spec ->
-            spec.pageIndex == tile.pageIndex && 
-            spec.pageOffsetX == tile.pageOffsetX && 
-            spec.pageOffsetY == tile.pageOffsetY &&
-            spec.level == tile.level
+            spec.pageIndex == tile.pageIndex
+                    && spec.pageOffsetX == tile.pageOffsetX
+                    && spec.pageOffsetY == tile.pageOffsetY
+                    && spec.level == tile.level
+                    //&& spec.zoom == tile.zoom //这个如果加了,缩放时页面会空白.
         }
-        
+
         if (!found) {
             println("VisibleTiles.contains: tile not found in visible list - tile=$tile, visibleLevel=$level, tileLevel=${tile.level}")
             println("VisibleTiles.contains: visible tiles count=${visibleTiles.size}")
         }
-        
+
         return found
     }
 
@@ -272,9 +261,9 @@ internal class TileCanvasState(
         return if (level == tile.level) {
             // 如果level相同，检查是否有重叠的tile
             visibleTiles.any { spec ->
-                spec.pageIndex == tile.pageIndex && 
-                spec.pageOffsetX == tile.pageOffsetX && 
-                spec.pageOffsetY == tile.pageOffsetY
+                spec.pageIndex == tile.pageIndex &&
+                        spec.pageOffsetX == tile.pageOffsetX &&
+                        spec.pageOffsetY == tile.pageOffsetY
             }
         } else {
             // 如果level不同，检查是否有重叠的区域
@@ -292,14 +281,13 @@ internal class TileCanvasState(
         aggressiveAttempt: Boolean = false
     ) {
         val currentLevel = visibleTiles.level
-        val currentSubSample = visibleTiles.subSample
 
         /* Always perform partial eviction */
         partialEviction(visibleTiles)
 
         /* Only perform aggressive eviction when tile collector is idle */
         if (aggressiveAttempt && tileCollector.isIdle) {
-            aggressiveEviction(currentLevel, currentSubSample)
+            aggressiveEviction(currentLevel)
         }
     }
 
@@ -319,7 +307,13 @@ internal class TileCanvasState(
 
             // 移除不在当前可见列表中的tile，或者level不匹配的tile
             if (!visibleTiles.contains(tile) || tile.level != currentLevel) {
-                println("state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileLevel=${tile.level}, tileVisible=${visibleTiles.contains(tile)}")
+                println(
+                    "state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileLevel=${tile.level}, tileVisible=${
+                        visibleTiles.contains(
+                            tile
+                        )
+                    }"
+                )
                 iterator.remove()
                 tile.recycle()
             }
@@ -339,16 +333,13 @@ internal class TileCanvasState(
      */
     private fun aggressiveEviction(
         currentLevel: Int,
-        currentSubSample: Int,
     ) {
         val iterator = tilesCollected.iterator()
         while (iterator.hasNext()) {
             val tile = iterator.next()
 
             /* Remove tiles at different level and sub-sample */
-            if ((tile.level != currentLevel && tile.subSample == 0)
-                || (tile.level == 0 && tile.subSample != currentSubSample)
-            ) {
+            if ((tile.level != currentLevel) || (tile.level == 0)) {
                 println("state:aggressiveEviction:$tile")
                 iterator.remove()
                 tile.recycle()
@@ -387,7 +378,7 @@ internal class TileCanvasState(
         } else {
             recycleChannel.trySend(this)
         }
-        alpha = 0f
+        //alpha = 0f
     }
 
     private fun Int.minAtGreaterLevel(n: Int): Int {

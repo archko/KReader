@@ -127,7 +127,7 @@ internal class VisibleTilesResolver(
                 val pageVisibleLeft = max(docLeft, 0)
                 val pageVisibleRight = min(docRight, pageWidth)
                 
-                println("makeVisibleTiles: page $pageIndex visible rect:(left=$pageVisibleLeft, right=$pageVisibleRight, top=$pageVisibleTop, bottom=$pageVisibleBottom)")
+                //println("makeVisibleTiles: page $pageIndex visible rect:(left=$pageVisibleLeft, right=$pageVisibleRight, top=$pageVisibleTop, bottom=$pageVisibleBottom)")
                 
                 // 计算页面内可见的tile范围
                 val pageVisibleLeftInPage = pageVisibleLeft - 0  // 页面在文档中的x偏移是0
@@ -159,7 +159,6 @@ internal class VisibleTilesResolver(
                         val tileSpec = TileSpec(
                             zoom = scale,
                             level = level,
-                            subSample = level,
                             pageIndex = pageIndex,
                             pageOffsetX = (col * tileWidth),
                             pageOffsetY = (rowInPage * tileHeight)  // 使用实际tile大小计算偏移

@@ -1,6 +1,5 @@
 package ovh.plrapps.mapcompose.ui.view
 
-import android.graphics.Paint
 import android.graphics.Rect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,15 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import ovh.plrapps.mapcompose.core.*
 import ovh.plrapps.mapcompose.ui.state.ZoomPanRotateState
-import kotlin.math.floor
-import kotlin.math.ln
 
 @Composable
 internal fun TileCanvas(
@@ -24,15 +20,9 @@ internal fun TileCanvas(
     zoomPRState: ZoomPanRotateState,
     visibleTilesResolver: VisibleTilesResolver,
     tileSize: Int,
-    alphaTick: Float,
     tilesToRender: List<Tile>,
 ) {
     val dest = remember { Rect() }
-    val paint: Paint = remember {
-        Paint().apply {
-            isAntiAlias = false
-        }
-    }
 
     Canvas(
         modifier = modifier
@@ -52,7 +42,7 @@ internal fun TileCanvas(
         }) {
             //paint.isFilterBitmap = isFilteringBitmap()
 
-            println("TileCanvas: rendering ${tilesToRender.size} tiles")
+            //println("TileCanvas: rendering ${tilesToRender.size} tiles")
             for (tile in tilesToRender) {
                 val bitmap = tile.bitmap
                 if (bitmap == null) {
@@ -78,16 +68,11 @@ internal fun TileCanvas(
                 val b = t + bitmap.height.toFloat()  // 直接使用bitmap的原始高度
                 dest.set(l.toInt(), t.toInt(), r.toInt(), b.toInt())
 
-                println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale ${zoomPRState.scale}, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
+                //println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale ${zoomPRState.scale}, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
                 //println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}")
 
                 drawIntoCanvas {
                     it.nativeCanvas.drawBitmap(bitmap, null, dest, null)
-                }
-
-                /* If a tile isn't fully opaque, increase its alpha state by the alpha tick */
-                if (tile.alpha < 1f) {
-                    //tile.alpha = (tile.alpha + alphaTick).coerceAtMost(1f)
                 }
             }
         }

@@ -49,7 +49,7 @@ class ViewState(
     private val initialScale = if (initialValues.scale == 1f) {
         // 如果用户没有指定scale，则根据minimumScaleMode计算
         when (initialValues.minimumScaleMode) {
-            is ovh.plrapps.mapcompose.ui.layout.Fit -> {
+            is Fit -> {
                 // 默认让文档宽度填满视图宽度，这里先设为1，等layout完成后会重新计算
                 1f
             }
@@ -57,7 +57,7 @@ class ViewState(
                 // 填满视图，这里先设为1，等layout完成后会重新计算
                 1f
             }
-            is ovh.plrapps.mapcompose.ui.layout.Forced -> {
+            is Forced -> {
                 (initialValues.minimumScaleMode as Forced).scale
             }
         }

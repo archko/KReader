@@ -16,21 +16,16 @@ import androidx.compose.runtime.setValue
 internal data class Tile(
     val zoom: Float,
     val level: Int,
-    val subSample: Int,
     val pageIndex: Int, // 页码
     val pageOffsetX: Int, // 页面在文档中的X偏移
     val pageOffsetY: Int, // 页面在文档中的Y偏移
-    val layerIds: List<String>,
-    val opacities: List<Float>
 ) {
     var bitmap: Bitmap? = null
-    var alpha: Float by mutableFloatStateOf(0f)
 }
 
 internal data class TileSpec(
     val zoom: Float, 
     val level: Int,
-    val subSample: Int = 0,
     val pageIndex: Int = 0, // 页码
     val pageOffsetX: Int = 0, // 页面在文档中的X偏移
     val pageOffsetY: Int = 0  // 页面在文档中的Y偏移
@@ -39,14 +34,13 @@ internal data class TileSpec(
 internal fun Tile.sameSpecAs(
     zoom: Float,
     level: Int,
-    subSample: Int,
     pageIndex: Int,
     pageOffsetX: Int,
     pageOffsetY: Int,
-    layerIds: List<String>,
-    opacities: List<Float>
 ): Boolean {
-    return this.zoom == zoom && this.level == level && this.subSample == subSample
-            && this.pageIndex == pageIndex && this.pageOffsetX == pageOffsetX && this.pageOffsetY == pageOffsetY
-            && this.layerIds == layerIds && this.opacities == opacities
+    return this.zoom == zoom
+            && this.level == level
+            && this.pageIndex == pageIndex
+            && this.pageOffsetX == pageOffsetX
+            && this.pageOffsetY == pageOffsetY
 }
