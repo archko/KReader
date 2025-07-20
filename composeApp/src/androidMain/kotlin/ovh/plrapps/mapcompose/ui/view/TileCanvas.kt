@@ -50,26 +50,19 @@ internal fun TileCanvas(
                     continue
                 }
                 
-                // 计算页面在文档中的位置 - 使用与VisibleTilesResolver相同的逻辑
-                val pageStart = visibleTilesResolver.getPageStart(tile.pageIndex)
-                //println("TileCanvas: tile.pageIndex=${tile.pageIndex}, calculated pageStart=$pageStart")
+                // tile.pageOffsetX 和 tile.pageOffsetY 已经是文档坐标系中的位置
+                // 因为在VisibleTilesResolver中已经加上了pageSize.offsetHeight
+                val tileX = tile.pageOffsetX
+                val tileY = tile.pageOffsetY
                 
-                // 计算tile在文档坐标系中的位置
-                // tile.pageOffsetX 和 tile.pageOffsetY 是页面内的偏移
-                // 需要加上页面在文档中的位置
-                val tileX = tile.pageOffsetX  // 页面在文档中的x偏移是0，所以直接使用页面内偏移
-                val tileY = pageStart + tile.pageOffsetY  // 需要加上页面在文档中的y位置
-                
-                // Canvas已经应用了缩放变换，所以这里使用文档坐标系
-                // bitmap是按照1.0的scale解码的，所以直接使用bitmap的原始尺寸
+                // 使用tile的实际尺寸，而不是bitmap的原始尺寸
                 val l = tileX.toFloat()
                 val t = tileY.toFloat()
-                val r = l + bitmap.width.toFloat()  // 直接使用bitmap的原始宽度
-                val b = t + bitmap.height.toFloat()  // 直接使用bitmap的原始高度
+                val r = l + tile.tileWidth.toFloat()
+                val b = t + tile.tileHeight.toFloat()
                 dest.set(l.toInt(), t.toInt(), r.toInt(), b.toInt())
 
-                //println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale ${zoomPRState.scale}, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
-                //println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}")
+                println("TileCanvas: drawing tile pageIndex=${tile.pageIndex} at ($l,$t,$r,$b), tileSize=${tile.tileWidth}x${tile.tileHeight}, bitmapSize=${bitmap.width}x${bitmap.height}, tile.pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
 
                 drawIntoCanvas {
                     it.nativeCanvas.drawBitmap(bitmap, null, dest, null)

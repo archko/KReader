@@ -228,7 +228,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val tileWidth = rect.width.toInt()
         val tileHeight = rect.height.toInt()
 
-        println("renderPageRegion:index:$index, scale:$scale, viewSize:$viewSize, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
+        println("renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
 
         val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
         val ctm = Matrix(scale)

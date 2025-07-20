@@ -83,7 +83,9 @@ internal class TileCollector(
             val bitmapForLayers = async {
                 val pageIndex = spec.pageIndex
                 val tileInPageX = spec.pageOffsetX
-                val tileInPageY = spec.pageOffsetY
+                // 需要将文档坐标转换为页面内坐标
+                val pageStartY = (0 until pageIndex).sumOf { decoder.pageSizes[it].height }
+                val tileInPageY = spec.pageOffsetY - pageStartY
                 
                 val tileWidth = spec.tileWidth
                 val tileHeight = spec.tileHeight
