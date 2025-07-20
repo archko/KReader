@@ -62,7 +62,7 @@ internal fun TileCanvas(
                 
                 // 计算页面在文档中的位置 - 使用与VisibleTilesResolver相同的逻辑
                 val pageStart = visibleTilesResolver.getPageStart(tile.pageIndex)
-                println("TileCanvas: tile.pageIndex=${tile.pageIndex}, calculated pageStart=$pageStart")
+                //println("TileCanvas: tile.pageIndex=${tile.pageIndex}, calculated pageStart=$pageStart")
                 
                 // 计算tile在文档坐标系中的位置
                 // tile.pageOffsetX 和 tile.pageOffsetY 是页面内的偏移
@@ -79,7 +79,7 @@ internal fun TileCanvas(
                 dest.set(l.toInt(), t.toInt(), r.toInt(), b.toInt())
 
                 println("TileCanvas: drawing tile $tile at $l,$t,$r,$b with scale ${zoomPRState.scale}, pageIndex=${tile.pageIndex}, pageStart=$pageStart, tileSize=$tileSize, bitmapSize=${bitmap.width}x${bitmap.height}, tileX=$tileX, tileY=$tileY, pageOffsetX=${tile.pageOffsetX}, pageOffsetY=${tile.pageOffsetY}")
-                println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}")
+                //println("TileCanvas: calculated values: tileX=$tileX, tileY=$tileY, l=$l, t=$t, r=$r, b=$b, bitmapWidth=${bitmap.width}, bitmapHeight=${bitmap.height}")
 
                 drawIntoCanvas {
                     it.nativeCanvas.drawBitmap(bitmap, null, dest, null)

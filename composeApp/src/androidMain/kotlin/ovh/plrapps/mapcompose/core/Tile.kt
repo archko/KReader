@@ -2,6 +2,7 @@ package ovh.plrapps.mapcompose.core
 
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
@@ -23,7 +24,7 @@ internal data class Tile(
     val opacities: List<Float>
 ) {
     var bitmap: Bitmap? = null
-    var alpha: Float by mutableStateOf(0f)
+    var alpha: Float by mutableFloatStateOf(0f)
 }
 
 internal data class TileSpec(

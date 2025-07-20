@@ -91,7 +91,6 @@ internal class TileCanvasState(
                 if (it.level == visibleTiles.level && it.subSample == visibleTiles.subSample) 100 else 0
             priority
         }
-        println("state:renderTiles:${tilesToRenderCopy.size}")
         println("state:renderTiles: tiles details:")
         tilesToRenderCopy.forEach { tile ->
             println("  - tile=$tile, bitmap=${tile.bitmap != null}")
@@ -195,16 +194,14 @@ internal class TileCanvasState(
                     val existingTile = tilesCollected.find { tile ->
                         tile.pageIndex == tileSpec.pageIndex &&
                         tile.pageOffsetX == tileSpec.pageOffsetX &&
-                        tile.pageOffsetY == tileSpec.pageOffsetY
-                        // 暂时不检查level和subSample，因为可能存在计算不一致的情况
-                        // && tile.level == tileSpec.level &&
-                        // && tile.subSample == tileSpec.subSample
+                        tile.pageOffsetY == tileSpec.pageOffsetY &&
+                        tile.level == tileSpec.level
                     }
 
                     /* Only emit specs which haven't already been processed by the collector
                      * or if the existing tile doesn't have a bitmap */
                     if (existingTile == null || existingTile.bitmap == null) {
-                        println("TileCanvasState: sending tileSpec=$tileSpec")
+                        //println("TileCanvasState: sending tileSpec=$tileSpec")
                         visibleTileLocationsChannel.send(tileSpec)
                     } else {
                         println("TileCanvasState: tileSpec already processed with bitmap=$tileSpec")
@@ -255,14 +252,12 @@ internal class TileCanvasState(
 
     private fun VisibleTiles.contains(tile: Tile): Boolean {
         // 检查tile是否在当前可见tile列表中
-        // 主要匹配pageIndex和位置，level和subSample可以稍微宽松一些
+        // 需要匹配pageIndex、位置和level
         val found = visibleTiles.any { spec ->
             spec.pageIndex == tile.pageIndex && 
             spec.pageOffsetX == tile.pageOffsetX && 
-            spec.pageOffsetY == tile.pageOffsetY
-            // 暂时不检查level和subSample，因为可能存在level计算不一致的情况
-            // && spec.level == tile.level &&
-            // && spec.subSample == tile.subSample
+            spec.pageOffsetY == tile.pageOffsetY &&
+            spec.level == tile.level
         }
         
         if (!found) {
@@ -317,16 +312,14 @@ internal class TileCanvasState(
         visibleTiles: VisibleTiles,
     ) {
         val currentLevel = visibleTiles.level
-        //val currentSubSample = visibleTiles.subSample
 
         val iterator = tilesCollected.iterator()
         while (iterator.hasNext()) {
             val tile = iterator.next()
 
-            // 只移除不在当前可见列表中的tile
-            // 不要因为level不匹配就移除tile，因为不同页面的tile可能有不同的level
-            if (!visibleTiles.contains(tile)) {
-                println("state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileVisible=${visibleTiles.contains(tile)}")
+            // 移除不在当前可见列表中的tile，或者level不匹配的tile
+            if (!visibleTiles.contains(tile) || tile.level != currentLevel) {
+                println("state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileLevel=${tile.level}, tileVisible=${visibleTiles.contains(tile)}")
                 iterator.remove()
                 tile.recycle()
             }

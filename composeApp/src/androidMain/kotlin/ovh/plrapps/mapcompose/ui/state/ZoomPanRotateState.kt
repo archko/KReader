@@ -154,7 +154,7 @@ internal class ZoomPanRotateState(
         this.scrollX = constrainScrollX(scrollX)
         this.scrollY = constrainScrollY(scrollY)
         updateCentroid()
-        println("ZoomPanRotateState: setScroll: old=($oldScrollX, $oldScrollY), new=(${this.scrollX}, ${this.scrollY}), notify=$notify")
+        //println("ZoomPanRotateState: setScroll: old=($oldScrollX, $oldScrollY), new=(${this.scrollX}, ${this.scrollY}), notify=$notify")
         notifyStateChanged()
     }
 
@@ -389,7 +389,7 @@ internal class ZoomPanRotateState(
         scrollY -= if (rotRad == 0f) scrollDelta.y else {
             scrollDelta.x * sin(rotRad) + scrollDelta.y * cos(rotRad)
         }
-        println("ZoomPanRotateState: onScrollDelta: scrollDelta=$scrollDelta, oldScroll=(${this.scrollX}, ${this.scrollY}), newScroll=($scrollX, $scrollY)")
+        //println("ZoomPanRotateState: onScrollDelta: scrollDelta=$scrollDelta, oldScroll=(${this.scrollX}, ${this.scrollY}), newScroll=($scrollX, $scrollY)")
         setScroll(scrollX, scrollY)
     }
 
@@ -607,7 +607,7 @@ internal class ZoomPanRotateState(
         val maxScrollY = fullHeight * scale - layoutDimension + bias
         val minScrollY = -bias
 
-        println("ZoomPanRotateState: constrainScrollY: scrollY=$scrollY, fullHeight=$fullHeight, scale=$scale, layoutDimension=$layoutDimension, maxScrollY=$maxScrollY, minScrollY=$minScrollY")
+        //println("ZoomPanRotateState: constrainScrollY: scrollY=$scrollY, fullHeight=$fullHeight, scale=$scale, layoutDimension=$layoutDimension, maxScrollY=$maxScrollY, minScrollY=$minScrollY")
         
         return scrollY.coerceIn(minScrollY, maxScrollY)
     }

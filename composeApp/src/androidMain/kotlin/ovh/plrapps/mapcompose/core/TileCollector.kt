@@ -167,7 +167,7 @@ internal class TileCollector(
                 null
             } ?: continue // If the decoding failed, skip the rest
 
-            println("TileCollector: successfully decoded tile zoom:${spec.zoom}, level:${spec.level}, page:${spec.pageIndex}, subSample:${spec.subSample}")
+            //println("TileCollector: successfully decoded tile zoom:${spec.zoom}, level:${spec.level}, page:${spec.pageIndex}, subSample:${spec.subSample}")
             val tile = Tile(
                 spec.zoom,
                 spec.level,
