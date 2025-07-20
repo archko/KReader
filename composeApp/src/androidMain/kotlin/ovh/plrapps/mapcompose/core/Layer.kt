@@ -4,7 +4,7 @@ import java.util.*
 
 internal data class Layer(
     val id: String,
-    val tileStreamProvider: TileStreamProvider,
+    val tileStreamProvider: TileStreamProvider?,
     val alpha: Float = 1f
 )
 

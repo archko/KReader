@@ -4,8 +4,11 @@ import android.graphics.Bitmap
 import android.graphics.Bitmap.Config
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.os.Build
+import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -113,12 +116,13 @@ internal class TileCollector(
         }
 
         suspend fun getBitmap(
+            spec: TileSpec,
             subSamplingRatio: Int,
             layer: Layer,
-            inputStream: InputStream,
+            inputStream: InputStream?,
             isPrimaryLayer: Boolean,
         ): BitmapForLayer {
-            val bitmapLoadingOptions =
+            /*val bitmapLoadingOptions =
                 bitmapLoadingOptionsForLayer[layer.id] ?: return BitmapForLayer(null, layer)
 
             bitmapLoadingOptions.inSampleSize = subSamplingRatio
@@ -126,7 +130,7 @@ internal class TileCollector(
                 bitmapLoadingOptions.inPreferredConfig = Config.HARDWARE
             } else {
                 bitmapLoadingOptions.inMutable = true
-                /* Attempt to reuse an existing bitmap for the first layer */
+                *//* Attempt to reuse an existing bitmap for the first layer *//*
                 bitmapLoadingOptions.inBitmap = if (isPrimaryLayer) {
                     getBitmapFromPoolOrCreate(
                         subSamplingRatio
@@ -140,7 +144,22 @@ internal class TileCollector(
                     BitmapFactory.decodeStream(inputStream, null, bitmapLoadingOptions)
                 }.getOrNull()
                 BitmapForLayer(bitmap, layer)
-            }
+            }*/
+
+            val bitmap = createBitmap(512, 512, Config.ARGB_8888)
+            val paint = Paint()
+            val canvas = Canvas(bitmap)
+            paint.textSize = 60f
+            paint.strokeWidth = 4f
+            paint.isAntiAlias = true
+            paint.style = Paint.Style.STROKE
+            canvas.drawARGB(255, 255 * (spec.row % 2), 255 * (spec.col % 2), 0)
+            val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
+            paint.setColor(Color.YELLOW)
+            canvas.drawRect(rect, paint)
+            paint.setColor(Color.RED)
+            canvas.drawText("${spec.row}-${spec.col},${spec.zoom}", 130f, 130f, paint)
+            return BitmapForLayer(bitmap, layer)
         }
 
         for (spec in tilesToDownload) {
@@ -151,18 +170,19 @@ internal class TileCollector(
 
             val subSamplingRatio = 2.0.pow(spec.subSample).toInt()
             val bitmapForLayers = layers.mapIndexed { index, layer ->
-                async {
-                    val i = layer.tileStreamProvider.getTileStream(spec.row, spec.col, spec.zoom)
-                    if (i != null) {
+                //async {
+                    //val i = layer.tileStreamProvider.getTileStream(spec.row, spec.col, spec.zoom)
+                    //if (i != null) {
                         getBitmap(
+                            spec,
                             subSamplingRatio = subSamplingRatio,
                             layer = layer,
-                            inputStream = i,
+                            inputStream = null,
                             isPrimaryLayer = index == 0
                         )
-                    } else BitmapForLayer(null, layer)
-                }
-            }.awaitAll()
+                    //} else BitmapForLayer(null, layer)
+                //}
+            }//.awaitAll()
 
             val resultBitmap = bitmapForLayers.firstOrNull()?.bitmap ?: run {
                 tilesDownloaded.send(spec)

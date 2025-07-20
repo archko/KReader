@@ -123,6 +123,8 @@ internal class TileCanvasState(
                 b?.recycle()
             }
         }
+
+        setLayers(listOf(Layer("0", null, 0f)))
     }
 
     fun setLayers(layers: List<Layer>) {
