@@ -4,6 +4,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.archko.reader.pdf.subsampling.PdfDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -38,9 +39,11 @@ import kotlin.math.pow
  * @author P.Laurence on 04/06/2019
  */
 internal class TileCanvasState(
-    parentScope: CoroutineScope, tileSize: Int,
+    parentScope: CoroutineScope, 
+    tileSize: Int,
     private val visibleTilesResolver: VisibleTilesResolver,
-    workerCount: Int
+    workerCount: Int,
+    private val decoder: PdfDecoder
 ) {
 
     private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -105,7 +108,7 @@ internal class TileCanvasState(
         }
 
         /* Launch the TileCollector */
-        tileCollector = TileCollector(workerCount.coerceAtLeast(1), tileSize)
+        tileCollector = TileCollector(workerCount.coerceAtLeast(1), tileSize, decoder)
         scope.launch {
             tileCollector.collectTiles(
                 tileSpecs = visibleTileLocationsChannel,

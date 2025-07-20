@@ -82,6 +82,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import ovh.plrapps.mapcompose.ui.TestUI
 
 @Composable
 fun App(
@@ -181,8 +182,8 @@ fun App(
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
             )*/
-            //TestUI(viewModel.path.toString())
-            CustomView(viewModel.path.toString())
+            TestUI(viewModel.path.toString())
+            //CustomView(viewModel.path.toString())
         }
     }
 }

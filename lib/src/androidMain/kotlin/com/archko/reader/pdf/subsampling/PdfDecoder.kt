@@ -194,4 +194,40 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         return (bitmap.asImageBitmap())
     }
+
+    public fun renderPageRegionBitmap(
+        region: androidx.compose.ui.geometry.Rect,
+        index: Int,
+        scale: Float,
+        viewSize: IntSize,
+        pageWidth: Int,
+        pageHeight: Int
+    ): Bitmap {
+        val cropBound = Rect()
+        val scale = scale * viewSize.width / pageWidth
+        val pageW: Int
+        val pageH: Int
+        val patchX: Int
+        val patchY: Int
+
+        //如果页面的缩放为1,那么这时的pageW就是view的宽.
+        pageW = (region.width).toInt()
+        pageH = (region.height).toInt()
+
+        patchX = ((region.left) + cropBound.left).toInt()
+        patchY = ((region.top) + cropBound.top).toInt()
+        println("renderPageRegionBitmap:index:${index}, scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
+
+        val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
+        val ctm = Matrix(scale)
+        val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
+
+        val page = document.loadPage(index)
+        page.run(dev, ctm, null)
+
+        dev.close()
+        dev.destroy()
+
+        return bitmap
+    }
 }

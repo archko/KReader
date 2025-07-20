@@ -46,7 +46,8 @@ fun TestUI(path: String) {
     }
     DisposableEffect(decoder) {
         onDispose {
-            decoder?.close()
+            println("onDispose")
+            //decoder?.close()
         }
     }
 
@@ -64,8 +65,8 @@ fun TestUI(path: String) {
         val state = remember {
             ViewState(
                 decoder!!,
-                1024, 4096
-                //decoder!!.imageSize.width, decoder!!.imageSize.height,
+                //1024, 4096
+                decoder!!.imageSize.width, decoder!!.imageSize.height,
             ) {
                 scale(1.0f)
             }.apply {

@@ -69,6 +69,7 @@ class ViewState(
         tileSize,
         visibleTilesResolver,
         workerCount,
+        decoder
     )
 
     private val throttledTask = scope.throttle(wait = 18) {

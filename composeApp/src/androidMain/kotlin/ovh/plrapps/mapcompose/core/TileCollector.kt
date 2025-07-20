@@ -5,9 +5,10 @@ import android.graphics.Bitmap.Config
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.os.Build
+import androidx.compose.ui.unit.IntSize
 import androidx.core.graphics.createBitmap
+import com.archko.reader.pdf.subsampling.PdfDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
@@ -53,7 +54,8 @@ import java.util.concurrent.TimeUnit
  */
 internal class TileCollector(
     private val workerCount: Int,
-    private val tileSize: Int
+    private val tileSize: Int,
+    private val decoder: PdfDecoder
 ) {
     @Volatile
     var isIdle: Boolean = true
@@ -92,29 +94,8 @@ internal class TileCollector(
     ) = launch(dispatcher) {
         for (spec in tilesToDownload) {
             val bitmapForLayers = async {
-                val bitmap = createBitmap(512, 512, Config.ARGB_8888)
-                val paint = Paint()
-                val canvas = Canvas(bitmap)
-                paint.textSize = 60f
-                paint.strokeWidth = 4f
-                paint.isAntiAlias = true
-                paint.style = Paint.Style.STROKE
-                canvas.drawARGB(255, 255 * (spec.row % 2), 255 * (spec.col % 2), 0)
-                val rect = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
-                paint.setColor(Color.YELLOW)
-                canvas.drawRect(rect, paint)
-                paint.setColor(Color.RED)
-                canvas.drawText("${spec.row}-${spec.col},${spec.zoom}", 130f, 130f, paint)
-                BitmapForLayer(bitmap)
-                /*val i = layer.tileStreamProvider.getTileStream(spec.row, spec.col, spec.zoom)
-                if (i != null) {
-                    getBitmap(
-                        subSamplingRatio = subSamplingRatio,
-                        layer = layer,
-                        inputStream = i,
-                        isPrimaryLayer = index == 0
-                    )
-                } else BitmapForLayer(null, layer)*/
+                // 使用 PdfDecoder 进行真正的解码
+                decodePdfRegion(spec)
             }.await()
 
             val resultBitmap = bitmapForLayers.bitmap ?: run {
@@ -145,6 +126,46 @@ internal class TileCollector(
             }
             tilesOutput.send(tile)
             tilesDownloaded.send(spec)
+        }
+    }
+
+    private fun decodePdfRegion(spec: TileSpec): BitmapForLayer {
+        try {
+            // 计算图块在PDF中的区域
+            val tileWidth = tileSize
+            val tileHeight = tileSize
+            
+            // 根据缩放级别计算实际的图块位置
+            val scale = spec.zoom
+            val scaledTileWidth = (tileWidth / scale).toInt()
+            val scaledTileHeight = (tileHeight / scale).toInt()
+            
+            // 计算图块在PDF中的位置
+            val x = spec.col * scaledTileWidth
+            val y = spec.row * scaledTileHeight
+            
+            // 创建区域矩形
+            val region = androidx.compose.ui.geometry.Rect(
+                x.toFloat(),
+                y.toFloat(),
+                (x + scaledTileWidth).toFloat(),
+                (y + scaledTileHeight).toFloat()
+            )
+            
+            // 使用 PdfDecoder 解码区域
+            val bitmap = decoder.renderPageRegionBitmap(
+                region,
+                0, // 默认使用第一页，后续可以根据需要扩展
+                scale,
+                IntSize(tileWidth, tileHeight),
+                tileWidth,
+                tileHeight
+            )
+            
+            return BitmapForLayer(bitmap)
+        } catch (e: Exception) {
+            println("PDF decode error: ${e.message}")
+            return BitmapForLayer(null)
         }
     }
 
