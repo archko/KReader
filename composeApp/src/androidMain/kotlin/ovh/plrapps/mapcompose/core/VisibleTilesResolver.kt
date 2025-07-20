@@ -96,7 +96,7 @@ internal class VisibleTilesResolver(
                 val cols = (pageWidth / tileSize)
                 val rows = (pageHeight / tileSize)
                 val tileWidth = pageWidth / cols
-                val tileHeight = pageWidth / rows
+                val tileHeight = pageHeight / rows
 
                 for (row in 0 until rows) {
                     for (col in 0 until cols) {
@@ -108,6 +108,15 @@ internal class VisibleTilesResolver(
                         if (tileRight > pageVisibleLeftInPage && tileLeft < pageVisibleRightInPage &&
                             tileBottom > pageVisibleTopInPage && tileTop < pageVisibleBottomInPage
                         ) {
+                            //add=(0, 0, 540, 2289), tile=540-763, 2-2, page:1080-1526
+                            //add=(540, 0, 1080, 2289), tile=540-763, 2-2, page:1080-1526
+                            //add=(0, 763, 540, 1526), tile=540-763, 2-2, page:1080-1526
+                            //add=(540, 763, 1080, 1526), tile=540-763, 2-2, page:1080-1526
+                            //add=(0, 0, 540, 2289), tile=540-763, 2-2, page:1080-1526
+                            //add=(540, 0, 1080, 2289), tile=540-763, 2-2, page:1080-1526
+                            //add=(0, 763, 540, 1526), tile=540-763, 2-2, page:1080-1526
+                            //add=(540, 763, 1080, 1526), tile=540-763, 2-2, page:1080-1526
+                            println("visibleTiles: add=($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), tile=$tileWidth-$tileHeight, $rows-$cols, page:$pageWidth-$pageHeight")
                             visibleTiles.add(
                                 TileSpec(
                                     zoom = scale * pageSize.scale,
