@@ -184,7 +184,7 @@ internal class TileCanvasState(
                                 tileSpec.zoom,
                                 tileSpec.level,
                                 tileSpec.pageIndex,
-                                tileSpec.pageOffsetY,
+                                tileSpec.pageOffsetX,
                                 tileSpec.pageOffsetY,
                             )
                         }
@@ -210,16 +210,26 @@ internal class TileCanvasState(
     private suspend fun consumeTiles(tileChannel: ReceiveChannel<Tile>) {
         for (tile in tileChannel) {
             val lastVisible = lastVisible
+            val existingTile = tilesCollected.find { existing ->
+                existing.sameSpecAs(
+                    tile.zoom,
+                    tile.level,
+                    tile.pageIndex,
+                    tile.pageOffsetX,
+                    tile.pageOffsetY
+                )
+            }
+            
             if (
                 (lastVisible == null || lastVisible.contains(tile))
-                && !tilesCollected.contains(tile)
+                && existingTile == null
             ) {
                 tile.prepare()
                 tilesCollected.add(tile)
                 println("state:consumeTiles: added tile=$tile, total=${tilesCollected.size}")
                 renderThrottled()
             } else {
-                println("state:consumeTiles: recycling tile=$tile (not visible)")
+                println("state:consumeTiles: recycling tile=$tile (not visible or already exists)")
                 tile.recycle()
             }
             //fullEvictionDebounced()
@@ -251,6 +261,10 @@ internal class TileCanvasState(
         if (!found) {
             println("VisibleTiles.contains: tile not found in visible list - tile=$tile, visibleLevel=$level, tileLevel=${tile.level}")
             println("VisibleTiles.contains: visible tiles count=${visibleTiles.size}")
+            // Add more detailed debugging
+            visibleTiles.take(3).forEach { spec ->
+                println("  - visible spec: pageIndex=${spec.pageIndex}, offsetX=${spec.pageOffsetX}, offsetY=${spec.pageOffsetY}, level=${spec.level}")
+            }
         }
 
         return found
@@ -293,38 +307,40 @@ internal class TileCanvasState(
 
     /**
      * Evict:
-     * * tiles of levels different than the current one, that aren't visible,
-     * * tiles that aren't visible at current level, and tiles from current level which aren't made
+     * * tiles that are not in the current visible tiles list
+     * * tiles of different levels that are not needed
      */
     private fun partialEviction(
         visibleTiles: VisibleTiles,
     ) {
         val currentLevel = visibleTiles.level
-        println("state:partialEviction:level:$currentLevel, size:${tilesCollected.size}")
+        val initialSize = tilesCollected.size
+        //println("state:partialEviction:level:$currentLevel, size:$initialSize")
 
         val iterator = tilesCollected.iterator()
+        var removedCount = 0
         while (iterator.hasNext()) {
             val tile = iterator.next()
 
-            if ((tile.level != currentLevel && !visibleTiles.intersects(tile))) {
-                println("state:partialEviction1:$tile")
+            // Remove tiles that are not in the current visible tiles list
+            if (!visibleTiles.contains(tile)) {
+                println("state:partialEviction: removing tile=$tile (not in visible list)")
                 iterator.remove()
                 tile.recycle()
+                removedCount++
                 continue
             }
 
-            // 移除不在当前可见列表中的tile，或者level不匹配的tile
-            if (
-                tile.level != currentLevel
-                && (!visibleTiles.contains(tile))
-            ) {
-                println(
-                    "state:partialEviction: removing tile=$tile, currentLevel=$currentLevel, tileLevel=${tile.level}"
-                )
+            // Remove tiles of different levels (keep only current level tiles)
+            if (tile.level != currentLevel) {
+                println("state:partialEviction: removing tile=$tile (different level: ${tile.level} vs $currentLevel)")
                 iterator.remove()
                 tile.recycle()
+                removedCount++
             }
         }
+        
+        println("state:partialEviction: removed $removedCount tiles, final size:${tilesCollected.size}")
     }
 
     private fun shouldKeepTile(
