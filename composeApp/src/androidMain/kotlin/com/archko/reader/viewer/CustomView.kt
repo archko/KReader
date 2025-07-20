@@ -534,7 +534,7 @@ private class PdfViewState(
                 tilesToRenderCopy.add(it)
             }
         }
-        //println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
+        println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
         update++
         pageToRender = tilesToRenderCopy
     }

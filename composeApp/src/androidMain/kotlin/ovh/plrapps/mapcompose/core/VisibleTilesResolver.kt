@@ -1,7 +1,9 @@
 package ovh.plrapps.mapcompose.core
 
 import com.archko.reader.pdf.subsampling.PdfDecoder
-import kotlin.math.*
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Resolves the visible tiles.
@@ -22,42 +24,22 @@ import kotlin.math.*
  */
 internal class VisibleTilesResolver(
     private val decoder: PdfDecoder,
-    private val levelCount: Int, 
+    private val levelCount: Int,
     private val fullWidth: Int,
-    private val fullHeight: Int, 
+    private val fullHeight: Int,
     private val tileSize: Int = 256,
     var magnifyingFactor: Int = 0,
     private val scaleProvider: ScaleProvider
 ) {
 
-    // 计算每页在总高度中的位置
-    val pagePositions: List<Int> by lazy {
-        val positions = mutableListOf<Int>()
-        var currentY = 0
-        for (i in decoder.pageSizes.indices) {
-            val pageSize = decoder.pageSizes[i]
-            positions.add(currentY)
-            //println("pagePositions: page $i starts at $currentY, height=${pageSize.height}")
-            currentY += pageSize.height
-        }
-        println("pagePositions: total height=$currentY, positions=$positions")
-        positions
-    }
-
     /**
      * Returns the level based on current scale
-     * Level 0: scale < 1.0
-     * Level 1: 1.0 <= scale < 2.0
-     * Level 2: 2.0 <= scale < 4.0
-     * etc.
      */
     internal fun getLevel(scale: Float, magnifyingFactor: Int = 0): Int {
         if (scale < 1.0) {
             println("getLevel: scale=$scale, level=0")
             return 0
         }
-        
-        // 简单的向下取整计算level
         val level = floor(scale.toDouble()).toInt()
         val result = min(level, levelCount - 1)
         return result
@@ -65,128 +47,93 @@ internal class VisibleTilesResolver(
 
     /**
      * Get the [VisibleTiles], given the visible area in pixels.
-     *
-     * @param viewport The [Viewport] which represents the visible area. Its values depend on the
-     * scale.
      */
     fun getVisibleTiles(viewport: Viewport): VisibleTiles {
         val scale = scaleProvider.getScale()
         val level = getLevel(scale, magnifyingFactor)
-
         println("getVisibleTiles: scale=$scale, level=$level, viewport=(${viewport.left},${viewport.top},${viewport.right},${viewport.bottom})")
 
         fun makeVisibleTiles(left: Int, top: Int, right: Int, bottom: Int): VisibleTiles {
-            // viewport坐标已经是基于当前scale的，需要转换回文档坐标系
-            val docLeft = floor(left / scale).toInt()
-            val docTop = floor(top / scale).toInt()
-            val docRight = ceil(right / scale).toInt()
-            val docBottom = ceil(bottom / scale).toInt()
-
-            //println("makeVisibleTiles: docLeft=$docLeft, docTop=$docTop, docRight=$docRight, docBottom=$docBottom")
+            // viewport 坐标已经是基于当前 scale 的，需要转换回文档坐标系
+            val docLeft = left
+            val docTop = top
+            val docRight = right
+            val docBottom = bottom
 
             // 计算可见的页面范围
             val visiblePages = mutableListOf<Int>()
-            for (i in pagePositions.indices) {
-                val pageStart = pagePositions[i]
-                val pageEnd = if (i < pagePositions.size - 1) pagePositions[i + 1] else fullHeight
-                val pageHeight = decoder.pageSizes[i].height
-                val pageWidth = decoder.pageSizes[i].width
-                
-                // 检查页面是否与可见区域相交
-                if (docTop < pageEnd && docBottom > pageStart) {
+            var currentY = 0
+            for (i in decoder.pageSizes.indices) {
+                val pageSize = decoder.pageSizes[i]
+                val pageBottom = currentY + pageSize.height
+                if (docTop >= currentY && docTop < pageBottom || docBottom >= currentY && docBottom <= pageBottom) {
                     visiblePages.add(i)
-                    println("makeVisibleTiles: page $i is visible, pageStart=$pageStart, pageEnd=$pageEnd, pageWidth=$pageWidth, pageHeight=$pageHeight")
                 }
+                currentY = pageBottom
             }
 
-            // 收集所有可见的tile
+            // 收集所有可见的 tile
             val visibleTiles = mutableListOf<TileSpec>()
-
             for (pageIndex in visiblePages) {
-                val pageStart = pagePositions[pageIndex]
-                val pageWidth = decoder.pageSizes[pageIndex].width
-                val pageHeight = decoder.pageSizes[pageIndex].height
-                
+                val pageSize = decoder.pageSizes[pageIndex]
+                val pageWidth = pageSize.width
+                val pageHeight = pageSize.height
+                val pageStartY = (0 until pageIndex).sumOf { decoder.pageSizes[it].height }
+
                 // 计算页面在文档中的可见区域
-                val pageVisibleTop = max(docTop, pageStart)
-                val pageVisibleBottom = min(docBottom, pageStart + pageHeight)
+                val pageVisibleTop = max(docTop, pageStartY)
+                val pageVisibleBottom = min(docBottom, pageStartY + pageHeight)
                 val pageVisibleLeft = max(docLeft, 0)
                 val pageVisibleRight = min(docRight, pageWidth)
-                
-                //println("makeVisibleTiles: page $pageIndex visible rect:(left=$pageVisibleLeft, right=$pageVisibleRight, top=$pageVisibleTop, bottom=$pageVisibleBottom)")
-                
-                // 计算页面内可见的tile范围
-                val pageVisibleLeftInPage = pageVisibleLeft - 0  // 页面在文档中的x偏移是0
-                val pageVisibleRightInPage = pageVisibleRight - 0
-                val pageVisibleTopInPage = pageVisibleTop - pageStart
-                val pageVisibleBottomInPage = pageVisibleBottom - pageStart
-                
-                // 计算页面需要的tile数量（按最大tileSize划分）
-                val cols = ceil(pageWidth / tileSize.toDouble()).toInt()
-                val rows = ceil(pageHeight / tileSize.toDouble()).toInt()
-                
-                // 计算每个tile的实际宽高，最后一个tile使用页面边界避免精度问题
-                val tileWidth = tileSize
-                val tileHeight = tileSize
-                
-                // 计算可见区域对应的tile范围
-                val colLeft = floor(pageVisibleLeftInPage.toDouble() / tileWidth).toInt().coerceAtLeast(0)
-                val colRight = (ceil(pageVisibleRightInPage.toDouble() / tileWidth).toInt() - 1).coerceAtMost(cols - 1)
-                val rowTop = floor(pageVisibleTopInPage.toDouble() / tileHeight).toInt().coerceAtLeast(0)
-                val rowBottom = (ceil(pageVisibleBottomInPage.toDouble() / tileHeight).toInt() - 1).coerceAtMost(rows - 1)
-                
-                //println("makeVisibleTiles: page $pageIndex tile calculation: cols=$cols, rows=$rows, tile=$tileWidth-$tileHeight, visible tiles:colLeft=$colLeft, colRight=$colRight, rowTop=$rowTop, rowBottom=$rowBottom")
-                //println("makeVisibleTiles: page $pageIndex tile calculation: pageVisibleRect=($pageVisibleLeftInPage, $pageVisibleTopInPage, $pageVisibleRightInPage, $pageVisibleBottomInPage")
-                //println("makeVisibleTiles: page $pageIndex tile calculation: pageWidth=$pageWidth, pageHeight=$pageHeight, tileSize=$tileSize, maxCols=${ceil((pageWidth / tileSize).toDouble()).toInt()}, maxRows=${ceil((pageHeight / tileSize).toDouble()).toInt()}")
 
-                // 创建页面内的tile
-                for (rowInPage in rowTop..rowBottom) {
-                    for (col in colLeft..colRight) {
-                        // 计算tile的实际边界，最后一个tile使用页面边界避免精度问题
+                // 页面内可见区域
+                val pageVisibleLeftInPage = pageVisibleLeft
+                val pageVisibleRightInPage = pageVisibleRight
+                val pageVisibleTopInPage = pageVisibleTop - pageStartY
+                val pageVisibleBottomInPage = pageVisibleBottom - pageStartY
+
+                // tile 分割
+                val cols = (pageWidth / tileSize)
+                val rows = (pageHeight / tileSize)
+                val tileWidth = pageWidth / cols
+                val tileHeight = pageWidth / rows
+
+                for (row in 0 until rows) {
+                    for (col in 0 until cols) {
                         val tileLeft = col * tileWidth
-                        val tileTop = rowInPage * tileHeight
+                        val tileTop = row * tileHeight
                         val tileRight = if (col == cols - 1) pageWidth else (col + 1) * tileWidth
-                        val tileBottom = if (rowInPage == rows - 1) pageHeight else (rowInPage + 1) * tileHeight
-                        
-                        val tileSpec = TileSpec(
-                            zoom = scale,
-                            level = level,
-                            pageIndex = pageIndex,
-                            pageOffsetX = tileLeft,
-                            pageOffsetY = tileTop,
-                            tileWidth = tileRight - tileLeft,
-                            tileHeight = tileBottom - tileTop
-                        )
-                        visibleTiles.add(tileSpec)
-                        //println("makeVisibleTiles: created tile spec=$tileSpec, bounds=($tileLeft,$tileTop,$tileRight,$tileBottom)")
+                        val tileBottom = if (row == rows - 1) pageHeight else (rows + 1) * tileHeight
+                        // 判断 tile 是否与可见区域相交
+                        if (tileRight > pageVisibleLeftInPage && tileLeft < pageVisibleRightInPage &&
+                            tileBottom > pageVisibleTopInPage && tileTop < pageVisibleBottomInPage
+                        ) {
+                            visibleTiles.add(
+                                TileSpec(
+                                    zoom = scale * pageSize.scale,
+                                    level = level,
+                                    pageIndex = pageIndex,
+                                    pageOffsetX = tileLeft,
+                                    pageOffsetY = tileTop,
+                                    tileWidth = tileRight - tileLeft,
+                                    tileHeight = tileBottom - tileTop
+                                )
+                            )
+                        }
                     }
                 }
             }
-
-            println("makeVisibleTiles: final visibleTiles count=${visibleTiles.size}, visibleTiles details:")
-            visibleTiles.forEach { spec ->
-                println("  - spec=$spec")
-            }
             return VisibleTiles(level, visibleTiles, visibleTiles.size, scale)
         }
-
         return makeVisibleTiles(viewport.left, viewport.top, viewport.right, viewport.bottom)
     }
 
-    /**
-     * Get the current scale from the scale provider
-     */
     fun getScale(): Float {
         return scaleProvider.getScale()
     }
 
-    /**
-     * Get the start position of a page in the document
-     */
     fun getPageStart(pageIndex: Int): Int {
-        return if (pageIndex == 0) 0 else {
-            pagePositions[pageIndex]
-        }
+        return (0 until pageIndex).sumOf { decoder.pageSizes[it].height }
     }
 
     fun interface ScaleProvider {

@@ -11,7 +11,6 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import kotlin.math.min
 
 /**
  * The engine.The view-model uses two channels to communicate with the [TileCollector]:
@@ -82,45 +81,33 @@ internal class TileCollector(
     ) = launch(dispatcher) {
         for (spec in tilesToDownload) {
             val bitmapForLayers = async {
-                // 直接使用TileSpec中的页码和偏移量信息
                 val pageIndex = spec.pageIndex
                 val tileInPageX = spec.pageOffsetX
                 val tileInPageY = spec.pageOffsetY
                 
-                // 确保tile在页面范围内
-                val pageWidth = decoder.pageSizes[pageIndex].width
-                val pageHeight = decoder.pageSizes[pageIndex].height
+                val tileWidth = spec.tileWidth
+                val tileHeight = spec.tileHeight
                 
-                if (tileInPageX >= pageWidth || tileInPageY >= pageHeight) {
-                    println("TileCollector: tile out of page bounds: spec=$spec, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY, pageWidth=$pageWidth, pageHeight=$pageHeight")
+                if (tileInPageX >= tileWidth || tileInPageY >= tileHeight) {
+                    println("TileCollector: tile out of page bounds: spec=$spec, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY, pageWidth=$tileWidth, pageHeight=$tileHeight")
                     return@async BitmapForLayer(null)
                 }
                 
-                // 计算tile的实际大小
-                // 使用固定的tileSize，但最后一个tile可能更小
-                val currentTileWidth = min(tileSize, pageWidth - tileInPageX)
-                val currentTileHeight = min(tileSize, pageHeight - tileInPageY)
-                
-                // 解码时使用1.0的scale，因为Canvas已经处理了缩放变换
-                val decodeScale = 1.0f
-                
-                // 使用PdfDecoder解码指定区域
-                val region = androidx.compose.ui.geometry.Rect(
+                val rect = androidx.compose.ui.geometry.Rect(
                     left = tileInPageX.toFloat(),
                     top = tileInPageY.toFloat(),
-                    right = (tileInPageX + currentTileWidth).toFloat(),
-                    bottom = (tileInPageY + currentTileHeight).toFloat()
+                    right = (tileInPageX + tileWidth).toFloat(),
+                    bottom = (tileInPageY + tileHeight).toFloat()
                 )
                 
                 try {
-                    println("TileCollector: decoding tile spec=$spec, region=$region, pageIndex=$pageIndex, decodeScale=$decodeScale, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY")
+                    println("TileCollector: decoding tile=$spec, region=$rect, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY")
                     val bitmap = decoder.renderPageRegion(
-                        region = region,
+                        rect = rect,
                         index = pageIndex,
-                        scale = decodeScale,
-                        viewSize = androidx.compose.ui.unit.IntSize(currentTileWidth, currentTileHeight),
-                        pageWidth = pageWidth,
-                        pageHeight = pageHeight
+                        scale = spec.zoom,
+                        tileWidth = tileWidth,
+                        tileHeight = tileHeight
                     )
                     BitmapForLayer(bitmap.asAndroidBitmap())
                 } catch (e: Exception) {
