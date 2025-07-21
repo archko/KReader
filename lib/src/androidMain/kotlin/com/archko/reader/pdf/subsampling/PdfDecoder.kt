@@ -98,7 +98,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
                 scaledPageSizes.add(scaledPage)
                 totalHeight += scaledHeight
 
-                println("PdfDecoder.caculateSize: page $i - original: ${originalPage.width}x${originalPage.height}, scale: $scale, scaled: ${scaledWidth}x${scaledHeight}")
+                //println("PdfDecoder.caculateSize: page $i - original: ${originalPage.width}x${originalPage.height}, scale: $scale, scaled: ${scaledWidth}x${scaledHeight}")
             }
 
             // 更新对外提供的页面尺寸

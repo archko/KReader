@@ -1,7 +1,7 @@
 package ovh.plrapps.mapcompose.core
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
+import android.graphics.*
+import android.graphics.Bitmap.createBitmap
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -84,21 +84,21 @@ internal class TileCollector(
                 val pageSize = spec.pageSize
                 val pageIndex = spec.pageIndex
                 val tileInPageX = spec.pageOffsetX
-                val tileInPageY = pageSize.offsetHeight
+                val tileInPageY = spec.pageOffsetY - pageSize.offsetHeight
 
                 val tileWidth = spec.tileWidth
                 val tileHeight = spec.tileHeight
 
                 val rect = androidx.compose.ui.geometry.Rect(
                     left = tileInPageX.toFloat(),
-                    top = (spec.pageOffsetY - tileInPageY).toFloat(),
+                    top = (tileInPageY).toFloat(),
                     right = (tileInPageX + tileWidth).toFloat(),
-                    bottom = (spec.pageOffsetY - tileInPageY + tileHeight).toFloat()
+                    bottom = (tileInPageY + tileHeight).toFloat()
                 )
 
                 try {
                     println("TileCollector: decoding tile=$spec, region=$rect, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY")
-                    /*val bitmap = createBitmap(tileWidth, tileHeight, Config.ARGB_8888)
+                    val bitmap = createBitmap(tileWidth, tileHeight, Bitmap.Config.ARGB_8888)
                     val paint = Paint()
                     val canvas = Canvas(bitmap)
                     paint.textSize = 30f
@@ -110,17 +110,22 @@ internal class TileCollector(
                     paint.color = Color.YELLOW
                     canvas.drawRect(rect1, paint)
                     paint.color = Color.RED
-                    canvas.drawText("$pageIndex, (${rect.left},${rect.top},${rect.right},${rect.bottom}),${spec.zoom}", 30f, 130f, paint)
+                    canvas.drawText(
+                        "$pageIndex, (${rect.left},${rect.top},${rect.right},${rect.bottom}),${spec.zoom}",
+                        30f,
+                        130f,
+                        paint
+                    )
                     canvas.drawText("$pageIndex, $tileInPageX, $tileInPageY, $tileWidth, $tileHeight", 30f, 230f, paint)
-                    BitmapForLayer(bitmap)*/
-                    val bitmap = decoder.renderPageRegion(
+                    BitmapForLayer(bitmap)
+                    /*val bitmap = decoder.renderPageRegion(
                         rect = rect,
                         index = pageIndex,
                         scale = spec.zoom,
                         tileWidth = tileWidth,
                         tileHeight = tileHeight
                     )
-                    BitmapForLayer(bitmap.asAndroidBitmap())
+                    BitmapForLayer(bitmap.asAndroidBitmap())*/
                 } catch (e: Exception) {
                     println("TileCollector: decode error for tile $spec: ${e.message}")
                     e.printStackTrace()
