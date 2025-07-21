@@ -2,6 +2,7 @@ package ovh.plrapps.mapcompose.core
 
 import android.graphics.*
 import android.graphics.Bitmap.createBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -98,7 +99,7 @@ internal class TileCollector(
 
                 try {
                     println("TileCollector: decoding tile=$spec, region=$rect, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY")
-                    val bitmap = createBitmap(tileWidth, tileHeight, Bitmap.Config.ARGB_8888)
+                    /*val bitmap = createBitmap(tileWidth, tileHeight, Bitmap.Config.ARGB_8888)
                     val paint = Paint()
                     val canvas = Canvas(bitmap)
                     paint.textSize = 30f
@@ -117,15 +118,15 @@ internal class TileCollector(
                         paint
                     )
                     canvas.drawText("$pageIndex, $tileInPageX, $tileInPageY, $tileWidth, $tileHeight", 30f, 230f, paint)
-                    BitmapForLayer(bitmap)
-                    /*val bitmap = decoder.renderPageRegion(
+                    BitmapForLayer(bitmap)*/
+                    val bitmap = decoder.renderPageRegion(
                         rect = rect,
                         index = pageIndex,
                         scale = spec.zoom,
                         tileWidth = tileWidth,
                         tileHeight = tileHeight
                     )
-                    BitmapForLayer(bitmap.asAndroidBitmap())*/
+                    BitmapForLayer(bitmap.asAndroidBitmap())
                 } catch (e: Exception) {
                     println("TileCollector: decode error for tile $spec: ${e.message}")
                     e.printStackTrace()
