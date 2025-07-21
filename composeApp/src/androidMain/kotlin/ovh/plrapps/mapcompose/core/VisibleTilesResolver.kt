@@ -58,13 +58,14 @@ internal class VisibleTilesResolver(
             val visiblePages = mutableListOf<Size>()
             for (i in decoder.pageSizes.indices) {
                 val pageSize = decoder.pageSizes[i]
-                if (pageSize.offsetHeight >= top) {
-                    if (pageSize.offsetHeight < bottom) {
-                        println("makeVisibleTiles: visiblePage=$pageSize")
-                        visiblePages.add(pageSize)
-                    }
+                val pageTop = pageSize.offsetHeight
+                val pageBottom = pageSize.offsetHeight + pageSize.height
+                // 只要有重叠就算可见
+                if (pageBottom > top && pageTop < bottom) {
+                    println("makeVisibleTiles: visiblePage=$pageSize")
+                    visiblePages.add(pageSize)
                 }
-                if (pageSize.offsetHeight > bottom) {
+                if (pageTop > bottom) {
                     break
                 }
             }
@@ -77,27 +78,27 @@ internal class VisibleTilesResolver(
                 val offsetHeight = pageSize.offsetHeight
 
                 // tile 分割
-                val cols = (pageWidth / tileSize)
-                val rows = (pageHeight / tileSize)
+                val cols = maxOf(1, pageWidth / tileSize)
+                val rows = maxOf(1, pageHeight / tileSize)
                 val tileWidth = pageWidth / cols
                 val tileHeight = pageHeight / rows
 
-                for (row in 0 .. rows) {
-                    for (col in 0 .. cols) {
+                for (row in 0 until rows) {
+                    for (col in 0 until cols) {
                         val tileLeft = col * tileWidth
                         val tileTop = row * tileHeight + offsetHeight
-                        val tileRight =
-                            if (cols == 0) pageWidth else if (col == cols - 1) pageWidth else (col + 1) * tileWidth
-                        val tileBottom =
-                            if (rows == 0) pageHeight else if (row == rows - 1) pageHeight else (row + 1) * tileHeight + offsetHeight
+                        val tileRight = if (col == cols - 1) pageWidth else (col + 1) * tileWidth
+                        val tileBottom = if (row == rows - 1) pageHeight + offsetHeight else (row + 1) * tileHeight + offsetHeight
 
                         // 判断 tile 是否与可见区域相交 - 使用文档坐标系
-                        val isVisible = (tileLeft <= right) and
-                                (tileRight >= left) and
-                                (tileTop <= bottom) and
+                        val isVisible = (tileLeft <= right) &&
+                                (tileRight >= left) &&
+                                (tileTop <= bottom) &&
                                 (tileBottom >= top)
 
-                        if (isVisible) {
+                        val width = tileRight - tileLeft
+                        val height = tileBottom - tileTop
+                        if (isVisible && width > 0 && height > 0) {
                             val spec = TileSpec(
                                 pageSize,
                                 zoom = scale * pageSize.scale,
@@ -105,11 +106,13 @@ internal class VisibleTilesResolver(
                                 pageIndex = pageSize.page,
                                 pageOffsetX = tileLeft,
                                 pageOffsetY = tileTop,
-                                tileWidth = tileRight - tileLeft,
-                                tileHeight = tileBottom - tileTop
+                                tileWidth = width,
+                                tileHeight = height
                             )
-                            println("visibleTiles: add.page=${pageSize.page}, ($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), row=$row, col=$col, tile=$tileWidth-$tileHeight, page:$pageWidth-$pageHeight, ${pageSize.offsetHeight}")
+                            println("visibleTiles: add.page=${pageSize.page}, ($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), row=$row, col=$col, tile=$width-$height, page:$pageWidth-$pageHeight, ${pageSize.offsetHeight}")
                             visibleTiles.add(spec)
+                        } else if (isVisible) {
+                            println("visibleTiles: skip invalid size page=${pageSize.page}, ($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), width=$width, height=$height")
                         } else {
                             println("visibleTiles: page=${pageSize.page},isVisible=$isVisible, $tileRight>$left, $tileLeft<$right, $tileBottom>$top, $tileTop<$bottom")
                         }

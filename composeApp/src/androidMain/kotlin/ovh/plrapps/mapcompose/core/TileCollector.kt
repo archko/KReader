@@ -107,7 +107,7 @@ internal class TileCollector(
                     //paint.style = Paint.Style.STROKE
                     canvas.drawARGB(255, 255, 255, 0)
                     val rect1 = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
-                    paint.color = Color.YELLOW
+                    paint.color = if (tileInPageX > 0) Color.GREEN else Color.YELLOW
                     canvas.drawRect(rect1, paint)
                     paint.color = Color.RED
                     canvas.drawText(
