@@ -81,29 +81,38 @@ internal class TileCollector(
     ) = launch(dispatcher) {
         for (spec in tilesToDownload) {
             val bitmapForLayers = async {
+                val pageSize = spec.pageSize
                 val pageIndex = spec.pageIndex
                 val tileInPageX = spec.pageOffsetX
-                // 需要将文档坐标转换为页面内坐标
-                val pageStartY = (0 until pageIndex).sumOf { decoder.pageSizes[it].height }
-                val tileInPageY = spec.pageOffsetY - pageStartY
-                
+                val tileInPageY = pageSize.offsetHeight
+
                 val tileWidth = spec.tileWidth
                 val tileHeight = spec.tileHeight
-                
-                if (tileInPageX > tileWidth || tileInPageY > tileHeight) {
-                    println("TileCollector: tile out of page bounds: spec=$spec, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY, pageWidth=$tileWidth, pageHeight=$tileHeight")
-                    return@async BitmapForLayer(null)
-                }
-                
+
                 val rect = androidx.compose.ui.geometry.Rect(
                     left = tileInPageX.toFloat(),
-                    top = tileInPageY.toFloat(),
+                    top = (spec.pageOffsetY - tileInPageY).toFloat(),
                     right = (tileInPageX + tileWidth).toFloat(),
-                    bottom = (tileInPageY + tileHeight).toFloat()
+                    bottom = (spec.pageOffsetY - tileInPageY + tileHeight).toFloat()
                 )
-                
+
                 try {
                     println("TileCollector: decoding tile=$spec, region=$rect, pageIndex=$pageIndex, tileInPageX=$tileInPageX, tileInPageY=$tileInPageY")
+                    /*val bitmap = createBitmap(tileWidth, tileHeight, Config.ARGB_8888)
+                    val paint = Paint()
+                    val canvas = Canvas(bitmap)
+                    paint.textSize = 30f
+                    paint.isAntiAlias = true
+                    //paint.strokeWidth = 4f
+                    //paint.style = Paint.Style.STROKE
+                    canvas.drawARGB(255, 255, 255, 0)
+                    val rect1 = Rect(0, 0, bitmap.getWidth(), bitmap.getHeight())
+                    paint.color = Color.YELLOW
+                    canvas.drawRect(rect1, paint)
+                    paint.color = Color.RED
+                    canvas.drawText("$pageIndex, (${rect.left},${rect.top},${rect.right},${rect.bottom}),${spec.zoom}", 30f, 130f, paint)
+                    canvas.drawText("$pageIndex, $tileInPageX, $tileInPageY, $tileWidth, $tileHeight", 30f, 230f, paint)
+                    BitmapForLayer(bitmap)*/
                     val bitmap = decoder.renderPageRegion(
                         rect = rect,
                         index = pageIndex,

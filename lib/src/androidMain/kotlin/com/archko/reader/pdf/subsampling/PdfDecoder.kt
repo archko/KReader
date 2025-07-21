@@ -2,6 +2,7 @@ package com.archko.reader.pdf.subsampling
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.os.Environment
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
@@ -10,6 +11,7 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.subsampling.internal.ImageDecoder
+import com.archko.reader.pdf.util.BitmapUtils
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -228,11 +230,11 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val tileWidth = rect.width.toInt()
         val tileHeight = rect.height.toInt()
 
-        println("renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
+        println("decode.renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
 
         val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
         val ctm = Matrix(scale)
-        val dev = AndroidDrawDevice(bitmap, 0, 0, tileX, tileY, tileWidth, tileHeight)
+        val dev = AndroidDrawDevice(bitmap, tileX, tileY, 0, 0, tileWidth, tileHeight)
 
         val page = document.loadPage(index)
         page.run(dev, ctm, null)
@@ -240,6 +242,17 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         dev.close()
         dev.destroy()
+
+        /*val pathname = String.format(
+            "%s/%s/%s-%s%s",
+            Environment.getExternalStorageDirectory().absolutePath,
+            "Download",
+            index,
+            rect,
+            ".png"
+        )
+        BitmapUtils.saveBitmapToFile(bitmap, File(pathname))
+        println("decode.pathname:$pathname")*/
 
         return (bitmap.asImageBitmap())
     }

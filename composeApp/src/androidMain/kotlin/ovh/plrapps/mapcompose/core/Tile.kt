@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.archko.reader.pdf.component.Size
 
 /**
  * A [Tile] is defined by its coordinates in the "pyramid". A [Tile] is sub-sampled when the
@@ -26,7 +27,8 @@ internal data class Tile(
 }
 
 internal data class TileSpec(
-    val zoom: Float, 
+    val pageSize: Size,
+    val zoom: Float,
     val level: Int,
     val pageIndex: Int = 0, // 页码
     val pageOffsetX: Int = 0, // 页面在文档中的X偏移

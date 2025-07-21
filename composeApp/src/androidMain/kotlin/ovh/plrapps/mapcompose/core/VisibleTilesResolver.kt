@@ -73,7 +73,7 @@ internal class VisibleTilesResolver(
                 }
                 currentY = pageBottom
             }
-            
+
             println("makeVisibleTiles: visiblePages=$visiblePages")
 
             // 收集所有可见的 tile
@@ -98,26 +98,22 @@ internal class VisibleTilesResolver(
 
                 for (row in 0 until rows) {
                     for (col in 0 until cols) {
-                        // 页面内坐标
-                        val tileLeftInPage = col * tileWidth
-                        val tileTopInPage = row * tileHeight
-                        val tileRightInPage = if (col == cols - 1) pageWidth else (col + 1) * tileWidth
-                        val tileBottomInPage = if (row == rows - 1) pageHeight else (row + 1) * tileHeight
-                        
-                        // 文档坐标
-                        val tileLeft = tileLeftInPage
-                        val tileTop = tileTopInPage + pageSize.offsetHeight
-                        val tileRight = tileRightInPage
-                        val tileBottom = tileBottomInPage + pageSize.offsetHeight
-                        
+                        val tileLeft = col * tileWidth
+                        val tileTop = row * tileHeight + pageSize.offsetHeight
+                        val tileRight = if (col == cols - 1) pageWidth else (col + 1) * tileWidth
+                        val tileBottom = if (row == rows - 1) pageHeight else (row + 1) * tileHeight + pageSize.offsetHeight
+
                         // 判断 tile 是否与可见区域相交 - 使用文档坐标系
-                        val isVisible = tileRight > pageVisibleLeft && tileLeft < pageVisibleRight &&
-                            tileBottom > pageVisibleTop && tileTop < pageVisibleBottom
-                        
+                        val isVisible = tileRight > pageVisibleLeft
+                                && tileLeft < pageVisibleRight
+                                && tileBottom > pageVisibleTop
+                                && tileTop < pageVisibleBottom
+
                         if (isVisible) {
                             println("visibleTiles: add.page=$pageIndex, ($tileLeft, $tileTop, ${tileRight}, ${tileBottom}), row=$row, col=$col, tile=$tileWidth-$tileHeight, page:$pageWidth-$pageHeight, ${pageSize.offsetHeight}")
                             visibleTiles.add(
                                 TileSpec(
+                                    pageSize,
                                     zoom = scale * pageSize.scale,
                                     level = level,
                                     pageIndex = pageIndex,
