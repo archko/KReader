@@ -139,7 +139,7 @@ private class Page(
     internal var aPage: APage,
     private var yOffset: Float = 0f
 ) {
-    private var nodes: List<PageNode> = emptyList()
+    var nodes: List<PageNode> = emptyList()
 
     //page bound, should be caculate after view measured
     internal var bounds = Rect(0f, 0f, 0f, 0f)
@@ -301,6 +301,8 @@ private class PdfViewState(
     internal val decoderService: DecoderService
     internal val tilesCollected = mutableListOf<TileSpec>()
     internal val requestedTiles = mutableSetOf<String>() // 新增，记录已请求解码的tile
+
+    private var lastPageKeys: Set<String> = emptySet()
 
     init {
         //scope.launch {
@@ -541,6 +543,21 @@ private class PdfViewState(
         } else {
             emptyList()
         }
+        // 主动移除不再可见的页面图片缓存
+        val newPageKeys = tilesToRenderCopy.flatMap { page ->
+            // Page 可能有多个 tile，需与缓存 key 生成方式一致
+            // 这里假设 PageNode.cacheKey 生成方式为："${aPage.index}-${rect}-${aPage.scale}"
+            if (page is Page) {
+                page.nodes.map { node ->
+                    "${node.aPage.index}-${node.rect}-${node.aPage.scale}"
+                }
+            } else emptyList()
+        }.toSet()
+        val toRemove = lastPageKeys - newPageKeys
+        toRemove.forEach { key ->
+            ImageCache.remove(key)
+        }
+        lastPageKeys = newPageKeys
         if (tilesToRenderCopy != pageToRender) {
             println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
             update++

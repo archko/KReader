@@ -18,6 +18,7 @@ import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
+import com.archko.reader.pdf.component.ImageCache
 
 /**
  * @author: archko 2025/4/11 :11:26
@@ -171,7 +172,8 @@ public class PdfDecoder(file: File) : ImageDecoder {
         println("renderPage:index:$index, scale:$scale, $viewWidth-$viewHeight, bounds:${page.bounds}")
         val ctm = Matrix()
         ctm.scale(scale, scale)
-        val bitmap = BitmapPool.acquire(w, h)
+        // 优先尝试复用缓存池中的Bitmap
+        val bitmap = acquireReusableBitmap(w, h)
         val dev =
             AndroidDrawDevice(bitmap, 0, 0, 0, 0, bitmap.getWidth(), bitmap.getHeight())
         page.run(dev, ctm, null as Cookie?)
@@ -203,7 +205,8 @@ public class PdfDecoder(file: File) : ImageDecoder {
         patchY = ((region.top) + cropBound.top).toInt()
         println("renderPageRegion:index:${index} scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
 
-        val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
+        // 优先尝试复用缓存池中的Bitmap
+        val bitmap = acquireReusableBitmap(pageW, pageH)
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
 
@@ -242,17 +245,14 @@ public class PdfDecoder(file: File) : ImageDecoder {
         dev.close()
         dev.destroy()
 
-        /*val pathname = String.format(
-            "%s/%s/%s-%s%s",
-            Environment.getExternalStorageDirectory().absolutePath,
-            "Download",
-            index,
-            rect,
-            ".png"
-        )
-        BitmapUtils.saveBitmapToFile(bitmap, File(pathname))
-        println("decode.pathname:$pathname")*/
-
         return (bitmap.asImageBitmap())
+    }
+
+    /**
+     * 优先尝试从ImageCache/BitmapPool复用Bitmap
+     */
+    private fun acquireReusableBitmap(width: Int, height: Int): Bitmap {
+        // 先尝试从BitmapPool获取
+        return BitmapPool.acquire(width, height)
     }
 }
