@@ -28,7 +28,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     public override var pageCount: Int = document.countPages()
 
     // 私有变量存储原始页面尺寸
-    private var originalPageSizes: List<Size> = listOf()
+    public var originalPageSizes: List<Size> = listOf()
 
     // 对外提供的缩放后页面尺寸
     public override var pageSizes: List<Size> = listOf()
@@ -190,7 +190,6 @@ public class PdfDecoder(file: File) : ImageDecoder {
         pageHeight: Int
     ): ImageBitmap {
         val cropBound = Rect()
-        val scale = scale * viewSize.width / pageWidth
         val pageW: Int
         val pageH: Int
         val patchX: Int
@@ -202,7 +201,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         patchX = ((region.left) + cropBound.left).toInt()
         patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegion:index:${index}, scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
+        println("renderPageRegion:index:${index} scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
 
         val bitmap: Bitmap = BitmapPool.acquire(pageW, pageH)
         val ctm = Matrix(scale)

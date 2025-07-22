@@ -66,8 +66,8 @@ import kotlin.coroutines.cancellation.CancellationException
 
 private class PageNode(
     private val pdfViewState: PdfViewState,
-    public var rect: Rect,
-    public var bounds: Rect,
+    public var rect: Rect,  //view offset rect
+    public var bounds: Rect,    //page bounds
     public val aPage: APage  // 添加 APage 属性
 ) {
 
@@ -154,7 +154,7 @@ private fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: 
 private class Page(
     private val pdfViewState: PdfViewState,
     private var viewSize: IntSize,
-    private var zoom: Float,
+    private var scale: Float,   //view*vZoom/page.width
     private var viewOffset: Offset,
     internal var aPage: APage,
     private var yOffset: Float = 0f
@@ -166,21 +166,17 @@ private class Page(
 
     /**
      * @param viewSize view size
-     * @param zoom view zoom,not the page zoom,default=1f
+     * @param scale view zoom,not the page zoom,default=1f
      * @param yOffset page.top
      */
-    public fun update(viewSize: IntSize, zoom: Float, offset: Offset, yOffset: Float) {
-        val isViewSizeChanged = this.viewSize != viewSize
-        val isZoomChanged = this.zoom != zoom
-
+    public fun update(viewSize: IntSize, scale: Float, offset: Offset, rect: Rect) {
         this.viewSize = viewSize
-        this.zoom = zoom
+        this.scale = scale
         this.viewOffset = offset
-        this.yOffset = yOffset
+        this.bounds = rect
+        this.yOffset = bounds.top
 
-        if (isViewSizeChanged || isZoomChanged) {
-            recalculateNodes()
-        }
+        recalculateNodes()
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset) {
@@ -218,25 +214,19 @@ private class Page(
 
         val contentOffset = Offset(0f, yOffset)
 
-        val viewWidth = viewSize.width.toFloat()
-        val pageScale = viewWidth / aPage.width
-        val scaledWidth = viewWidth * zoom
-        val scaledHeight = aPage.height * pageScale * zoom
-        bounds = Rect(0f, contentOffset.y, scaledWidth, contentOffset.y + scaledHeight)
-
         val rootNode = PageNode(
             pdfViewState,
             Rect(
                 left = contentOffset.x,
                 top = contentOffset.y,
-                right = contentOffset.x + scaledWidth,
-                bottom = contentOffset.y + scaledHeight
+                right = contentOffset.x + bounds.width,
+                bottom = contentOffset.y + bounds.height
             ),
-            Rect(0f, 0f, scaledWidth, scaledHeight),
+            bounds,
             aPage
         )
 
-        println("page.recalculateNodes.viewSize:$viewSize, offset:$contentOffset, $bounds, w-h:$scaledWidth-$scaledHeight, $aPage")
+        println("page.recalculateNodes.scale:$scale, offset:$contentOffset, $bounds, w-h:${bounds.width}-${bounds.height}, $aPage")
         nodes = calculatePages(rootNode)
     }
 
@@ -288,7 +278,7 @@ private class Page(
         other as Page
 
         if (viewSize != other.viewSize) return false
-        if (zoom != other.zoom) return false
+        if (scale != other.scale) return false
         if (viewOffset != other.viewOffset) return false
         if (aPage != other.aPage) return false
         if (yOffset != other.yOffset) return false
@@ -300,7 +290,7 @@ private class Page(
 
     override fun hashCode(): Int {
         var result = viewSize.hashCode()
-        result = 31 * result + zoom.hashCode()
+        result = 31 * result + scale.hashCode()
         result = 31 * result + viewOffset.hashCode()
         result = 31 * result + aPage.hashCode()
         result = 31 * result + yOffset.hashCode()
@@ -432,18 +422,19 @@ private class PdfViewState(
             init = false
         } else {
             list.zip(pages).forEach { (aPage, page) ->
-                val pageWidth = viewSize.width * vZoom
-                val pageScale = pageWidth / aPage.width
-                val pageHeight = aPage.height * pageScale
+                val scaledPageWidth = viewSize.width * vZoom
+                val pageScale = scaledPageWidth / aPage.width
+                aPage.scale = pageScale
+                val scaledPageHeight = aPage.height * pageScale
                 val bounds = Rect(
                     0f,
                     currentY,
-                    pageWidth,
-                    currentY + pageHeight
+                    scaledPageWidth,
+                    currentY + scaledPageHeight
                 )
-                page.update(viewSize, vZoom, viewOffset, bounds.top)
-                currentY += pageHeight
-                //println("PdfViewState.bounds:$currentY, bounds:$bounds, page:${page.bounds}")
+                page.update(viewSize, pageScale, viewOffset, bounds)
+                currentY += scaledPageHeight
+                println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage")
             }
             init = true
         }
@@ -579,8 +570,8 @@ fun CustomView(path: String) {
     } else {
         fun createList(decoder: PdfDecoder): MutableList<APage> {
             var list = mutableListOf<APage>()
-            for (i in 0 until decoder.pageSizes.size) {
-                val page = decoder.pageSizes[i]
+            for (i in 0 until decoder.originalPageSizes.size) {
+                val page = decoder.originalPageSizes[i]
                 val aPage = APage(i, page.width, page.height, 1f)
                 list.add(aPage)
             }
