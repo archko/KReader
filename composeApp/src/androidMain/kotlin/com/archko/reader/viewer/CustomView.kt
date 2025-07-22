@@ -70,7 +70,7 @@ private class PageNode(
             )
         } else {
             pdfViewState.decode(bounds, aPage, cacheKey)
-            //println("pageNode.draw.offset:$offset, $rect, $aPage")
+            println("pageNode.draw.offset:$offset, $rect, $aPage")
             // 绘制边框
             drawScope.drawRect(
                 color = Color.Magenta,
@@ -174,8 +174,8 @@ private class Page(
         )
         drawScope.drawContext.canvas.nativeCanvas.drawText(
             aPage.index.toString(),
-            0 + drawScope.size.width / 2,
-            yOffset + drawScope.size.height / 2,
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2,
             android.graphics.Paint().apply {
                 color = android.graphics.Color.YELLOW
                 textSize = 160f
@@ -300,6 +300,7 @@ private class PdfViewState(
     private val tilesOutput = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
     internal val decoderService: DecoderService
     internal val tilesCollected = mutableListOf<TileSpec>()
+    internal val requestedTiles = mutableSetOf<String>() // 新增，记录已请求解码的tile
 
     init {
         //scope.launch {
@@ -344,9 +345,11 @@ private class PdfViewState(
         for (tile in tileChannel) {
             println("PdfViewState:consumeTiles:$tile")
             if (tile.imageBitmap == null) {
+                requestedTiles.remove(tile.cacheKey) // 解码失败也要移除
                 continue
             }
             ImageCache.put(tile.cacheKey, tile.imageBitmap!!)
+            requestedTiles.remove(tile.cacheKey) // 解码完成，移除
             if (isTileVisible(tile)) {
                 if (!tilesCollected.contains(tile)) {
                     tilesCollected.add(tile)
@@ -355,6 +358,8 @@ private class PdfViewState(
                 tilesCollected.remove(tile)
                 //ImageCache.remove(tile.cacheKey)
             }
+
+            update++
             renderThrottled()
         }
     }
@@ -460,6 +465,9 @@ private class PdfViewState(
     }
 
     fun decode(rect: Rect, page: APage, cacheKey: String) {
+        if (ImageCache.get(cacheKey) != null) return // 已有缓存
+        if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
+        requestedTiles.add(cacheKey)
         val tileSpec = TileSpec(
             page.index,
             page.scale,
@@ -470,15 +478,6 @@ private class PdfViewState(
             cacheKey,
             null
         )
-        if (tilesCollected.contains(tileSpec)) {
-            val index = tilesCollected.indexOf(tileSpec)
-            val bitmap = tilesCollected[index].imageBitmap
-            if (null != bitmap) {
-                ImageCache.put(cacheKey, bitmap)
-                println("PdfViewState:decode:$tileSpec")
-                return
-            }
-        }
         tilesCollected.add(tileSpec)
         scope.launch {
             visibleTilesChannel.send(tileSpec)
@@ -569,10 +568,10 @@ fun CustomView(path: String) {
             }
         }
     }
-    DisposableEffect(decoder) {
+    DisposableEffect(path) {
         onDispose {
             println("onDispose:$path, $decoder")
-            //decoder?.close()
+            decoder?.close()
         }
     }
 
@@ -635,6 +634,7 @@ fun CustomView(
         if (viewSize != IntSize.Zero) {
             println("DocumentView: 更新ViewSize:$viewSize, vZoom:$vZoom, list: ${list.size}")
             pdfViewState.updateViewSize(viewSize, vZoom)
+            pdfViewState.update++
         }
     }
 
@@ -644,11 +644,6 @@ fun CustomView(
             pdfViewState.shutdown()
         }
     }
-
-    // 定义背景渐变
-    val gradientBrush = Brush.verticalGradient(
-        colors = listOf(Color.Green, Color.Red)
-    )
 
     Box(
         modifier = Modifier
