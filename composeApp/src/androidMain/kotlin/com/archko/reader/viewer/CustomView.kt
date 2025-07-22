@@ -3,24 +3,11 @@ package com.archko.reader.viewer
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,16 +36,10 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import com.archko.reader.pdf.subsampling.PdfDecoder
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.NonCancellable.isActive
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import ovh.plrapps.mapcompose.core.throttle
 import java.io.File
 import java.util.concurrent.Executors
@@ -155,7 +136,6 @@ private class Page(
     private val pdfViewState: PdfViewState,
     private var viewSize: IntSize,
     private var scale: Float,   //view*vZoom/page.width
-    private var viewOffset: Offset,
     internal var aPage: APage,
     private var yOffset: Float = 0f
 ) {
@@ -169,10 +149,9 @@ private class Page(
      * @param scale view zoom,not the page zoom,default=1f
      * @param yOffset page.top
      */
-    public fun update(viewSize: IntSize, scale: Float, offset: Offset, rect: Rect) {
+    public fun update(viewSize: IntSize, scale: Float, rect: Rect) {
         this.viewSize = viewSize
         this.scale = scale
-        this.viewOffset = offset
         this.bounds = rect
         this.yOffset = bounds.top
 
@@ -203,10 +182,6 @@ private class Page(
                 textAlign = android.graphics.Paint.Align.CENTER
             }
         )
-    }
-
-    public fun updateOffset(newOffset: Offset) {
-        this.viewOffset = newOffset
     }
 
     private fun recalculateNodes() {
@@ -279,7 +254,6 @@ private class Page(
 
         if (viewSize != other.viewSize) return false
         if (scale != other.scale) return false
-        if (viewOffset != other.viewOffset) return false
         if (aPage != other.aPage) return false
         if (yOffset != other.yOffset) return false
         if (nodes != other.nodes) return false
@@ -291,7 +265,6 @@ private class Page(
     override fun hashCode(): Int {
         var result = viewSize.hashCode()
         result = 31 * result + scale.hashCode()
-        result = 31 * result + viewOffset.hashCode()
         result = 31 * result + aPage.hashCode()
         result = 31 * result + yOffset.hashCode()
         result = 31 * result + nodes.hashCode()
@@ -432,7 +405,7 @@ private class PdfViewState(
                     scaledPageWidth,
                     currentY + scaledPageHeight
                 )
-                page.update(viewSize, pageScale, viewOffset, bounds)
+                page.update(viewSize, pageScale, bounds)
                 currentY += scaledPageHeight
                 println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage")
             }
@@ -448,7 +421,6 @@ private class PdfViewState(
                 this,
                 viewSize,
                 1f,
-                Offset.Zero,
                 aPage,
                 0f,
             )
@@ -519,15 +491,62 @@ private class PdfViewState(
     }
 
     private fun setVisibilePage() {
-        val tilesToRenderCopy = mutableListOf<Page>()
-        pages.forEach {
-            if (isVisible(viewSize, viewOffset, it.bounds, it.aPage.index)) {
-                tilesToRenderCopy.add(it)
-            }
+        // 优化：使用二分查找定位可见页面范围（仅y方向）
+        if (pages.isEmpty()) {
+            pageToRender = emptyList()
+            return
         }
-        println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
-        update++
-        pageToRender = tilesToRenderCopy
+        val visibleTop = -viewOffset.y
+        val visibleBottom = viewSize.height - viewOffset.y
+
+        // 二分查找第一个可见页面
+        fun findFirstVisible(): Int {
+            var low = 0
+            var high = pages.size - 1
+            var result = pages.size
+            while (low <= high) {
+                val mid = (low + high) ushr 1
+                val page = pages[mid]
+                if (page.bounds.bottom > visibleTop) {
+                    result = mid
+                    high = mid - 1
+                } else {
+                    low = mid + 1
+                }
+            }
+            return result
+        }
+
+        // 二分查找最后一个可见页面
+        fun findLastVisible(): Int {
+            var low = 0
+            var high = pages.size - 1
+            var result = -1
+            while (low <= high) {
+                val mid = (low + high) ushr 1
+                val page = pages[mid]
+                if (page.bounds.top < visibleBottom) {
+                    result = mid
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
+            return result
+        }
+
+        val first = findFirstVisible()
+        val last = findLastVisible()
+        val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
+            pages.subList(first, last + 1)
+        } else {
+            emptyList()
+        }
+        if (tilesToRenderCopy != pageToRender) {
+            println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
+            update++
+            pageToRender = tilesToRenderCopy
+        }
     }
 }
 
@@ -647,11 +666,9 @@ fun CustomView(
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         var wasCancelled = false
-
+                        var zoom = 1f
+                        var pastTouchSlop = false
                         try {
-                            var zoom = 1f
-                            var pastTouchSlop = false
-
                             // 等待第一个触点
                             val trackingPointerId = awaitFirstDown(requireUnconsumed = false).id
                             var pointerCount = 1
@@ -724,14 +741,8 @@ fun CustomView(
                                                 newOffset.y.coerceIn(-maxY, 0f)
                                             )
 
-                                            // 更新状态
                                             vZoom = newZoom
                                             println("zoom:$vZoom, $centroid, $offset")
-                                            pdfViewState.pages.forEach { page ->
-                                                page.updateOffset(
-                                                    offset
-                                                )
-                                            }
                                             pdfViewState.updateOffset(offset)
                                         }
                                         event.changes.fastForEach {
@@ -752,6 +763,11 @@ fun CustomView(
                             // 计算最终速度
                             val velocity = velocityTracker.calculateVelocity()
                             velocityTracker.resetTracking()
+
+                            // 缩放手势结束时调用 updateViewSize
+                            if (pastTouchSlop) {
+                                pdfViewState.updateViewSize(viewSize, vZoom)
+                            }
 
                             // 创建优化后的decay动画spec
                             val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
@@ -781,11 +797,6 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(x = value.coerceIn(-maxX, maxX))
-                                            pdfViewState.pages.forEach { page ->
-                                                page.updateOffset(
-                                                    offset
-                                                )
-                                            }
                                             pdfViewState.updateOffset(offset)
                                         }
                                     }
@@ -799,11 +810,6 @@ fun CustomView(
                                             animationSpec = decayAnimationSpec
                                         ) { value, _ ->
                                             offset = offset.copy(y = value.coerceIn(-maxY, 0f))
-                                            pdfViewState.pages.forEach { page ->
-                                                page.updateOffset(
-                                                    offset
-                                                )
-                                            }
                                             pdfViewState.updateOffset(offset)
                                         }
                                     }
