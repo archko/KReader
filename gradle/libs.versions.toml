@@ -9,6 +9,7 @@ androidx-activityCompose = "1.10.1"
 androidx-appcompat = "1.7.1"
 jetbrains-lifecycle = "2.9.1"
 androidx-room = "2.7.2"
+androidx-navigation = "2.9.0-beta03"
 sqlite = "2.5.1"
 coil = "3.2.0"
 ktor = "3.2.0"
@@ -34,6 +35,9 @@ android-targetSdk = "36"
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
+
+androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "androidx-navigation" }
+
 filePicker = { module = "com.mohamedrejeb.calf:calf-file-picker", version.ref = "calf" }
 mupdf-fitz = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitz" }
 mupdf-fitz-aar = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitzAar" }

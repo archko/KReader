@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,11 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -47,25 +45,36 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         super.onCreate(savedInstanceState)
 
         // 设置全屏并处理刘海屏
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        /*WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.hide(WindowInsetsCompat.Type.statusBars())
             controller.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        }*/
 
         // 处理刘海屏区域
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        /*if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
+        }*/
 
         checkForExternalPermission()
     }
 
     fun loadView() {
         setContent {
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                val window = (view.context as? ComponentActivity)?.window
+                window?.let {
+                    WindowCompat.setDecorFitsSystemWindows(it, false)
+                    WindowCompat.getInsetsController(it, view).apply {
+                        //isAppearanceLightStatusBars = false // 设置状态栏文字为白色
+                    }
+                }
+            }
+
             val configuration = LocalConfiguration.current
             val density = LocalDensity.current
             val screenWidthInPixels = with(density) { configuration.screenWidthDp.dp.toPx() }
@@ -78,7 +87,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
-                App(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
+                NasApp(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
                 /*val list = mutableListOf<APage>()
                 for (i in 0..4) {
                     list.add(APage(i, 1024, 1280, 1f))
@@ -121,12 +130,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             )
         ) {
             val builder: AlertDialog.Builder = AlertDialog.Builder(this)
-            builder.setTitle("R.string.grant_files_permission")
-                .setMessage("R.string.grant_files_permission")
-                .setPositiveButton("R.string.grant_cancel") { _, _ ->
+            builder.setTitle("grant_files_permission")
+                .setMessage("grant_files_permission")
+                .setPositiveButton("grant_cancel") { _, _ ->
                     finish()
                 }
-                .setNegativeButton("R.string.grant_ok") { _, _ ->
+                .setNegativeButton("grant_ok") { _, _ ->
                     ActivityCompat.requestPermissions(
                         this, arrayOf(permission), STORAGE_PERMISSION
                     )
@@ -148,12 +157,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
     open fun requestAllFilesAccess(onPermissionGranted: OnPermissionGranted) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
             val builder: AlertDialog.Builder = AlertDialog.Builder(this)
-            builder.setTitle("R.string.grant_all_files_permission")
-                .setMessage("R.string.grant_all_files_permission")
-                .setPositiveButton("R.string.grant_cancel") { _, _ ->
+            builder.setTitle("grant_all_files_permission")
+                .setMessage("grant_all_files_permission")
+                .setPositiveButton("grant_cancel") { _, _ ->
                     finish()
                 }
-                .setNegativeButton("R.string.grant_ok") { _, _ ->
+                .setNegativeButton("grant_ok") { _, _ ->
                     permissionCallbacks[ALL_FILES_PERMISSION] = onPermissionGranted
                     try {
                         val intent =
@@ -198,7 +207,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             } else {
                 Toast.makeText(
                     this,
-                    "R.string.grantfailed",
+                    "grantfailed",
                     Toast.LENGTH_SHORT
                 ).show()
                 permissionCallbacks[STORAGE_PERMISSION]?.let {

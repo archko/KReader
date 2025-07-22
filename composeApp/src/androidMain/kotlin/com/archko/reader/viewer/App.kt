@@ -1,578 +1,210 @@
 package com.archko.reader.viewer
 
-import android.net.Uri
-import android.text.TextUtils
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Toc
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import coil3.compose.AsyncImage
-import com.archko.reader.pdf.PdfApp
-import com.archko.reader.pdf.component.ImageCache
-import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.entity.CustomImageData
-import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.scrollbar.scrollbarState
-import com.archko.reader.pdf.state.LocalPdfState
-import com.archko.reader.pdf.util.Dispatcher
-import com.archko.reader.pdf.util.IntentFile
-import com.archko.reader.pdf.util.inferName
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.archko.reader.pdf.viewmodel.PdfViewModel
-import com.mohamedrejeb.calf.io.KmpFile
-import com.mohamedrejeb.calf.picker.FilePickerFileType
-import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
-import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import ovh.plrapps.mapcompose.ui.TestUI
+import com.archko.reader.viewer.navigation.MainDestinations
+import com.archko.reader.viewer.navigation.rememberKNavController
 
+val LocalNavController = compositionLocalOf<NavHostController> {
+    error("No NavHostController provided in LocalNavController")
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
+
+
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun App(
+fun NasApp(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
 ) {
     Theme {
-        val errorIcon = rememberVectorPainter(Icons.Default.Error)
-        var pdf: LocalPdfState? by remember {
-            mutableStateOf(null, referentialEqualityPolicy())
-        }
-
-        BackHandler {
-            val path = viewModel.path
-            if (path.isNullOrEmpty()) {
-                return@BackHandler
-            }
-            pdf = null
-            viewModel.path = null
-        }
-
-        val scope = rememberCoroutineScope()
-
-        val recentList by viewModel.recentList.collectAsState()
-        LaunchedEffect(Unit) {
-            val recents = viewModel.loadRecents()
-            println("recents:$recents")
-        }
-
-        if (pdf == null) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White)
-                    .padding(paddingValues = PaddingValues(20.dp, 20.dp, 20.dp, 0.dp))
+        val jetsnackNavController = rememberKNavController()
+        SharedTransitionLayout {
+            CompositionLocalProvider(
+                LocalNavController provides jetsnackNavController.navController,
+                LocalSharedTransitionScope provides this
             ) {
-                val pickerLauncher = rememberFilePickerLauncher(
-                    type = FilePickerFileType.All,
-                    selectionMode = FilePickerSelectionMode.Single
-                ) { files ->
-                    scope.launch {
-                        files.singleOrNull()?.let { file ->
-                            pdf = LocalPdfState(file)
-                            loadProgress(viewModel, file, pdf)
-                        }
-                    }
-                }
-
-                Spacer(
-                    modifier = Modifier.height(16.dp)
-                )
-                Button(
-                    onClick = pickerLauncher::launch
+                NavHost(
+                    navController = jetsnackNavController.navController,
+                    startDestination = MainDestinations.HOME_SCREEN
                 ) {
-                    Text("Select PDF file")
-                }
-
-                Spacer(
-                    modifier = Modifier.height(16.dp)
-                )
-
-                if (recentList.isNotEmpty()) {
-                    Row(modifier = Modifier.align(Alignment.Start)) {
-                        Button(
-                            onClick = { viewModel.clear() }
-                        ) {
-                            Text("Clear")
-                        }
-                    }
-
-                    Spacer(
-                        modifier = Modifier.height(16.dp)
-                    )
-
-                    LazyVerticalGrid(
-                        columns = GridCells.FixedSize(140.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            count = recentList.size,
-                            key = { index -> "$index" }
-                        ) { i ->
-                            recentItem(recentList[i]) {
-                                val file = KmpFile(Uri.parse(it.path))
-                                pdf = LocalPdfState(file)
-                                loadProgress(viewModel, file, pdf)
-                            }
-                        }
+                    composable(
+                        route = MainDestinations.HOME_SCREEN
+                    ) { backStackEntry ->
+                        MainContainer(
+                            screenWidthInPixels,
+                            screenHeightInPixels,
+                            viewModel,
+                            modifier = Modifier,
+                        )
                     }
                 }
             }
-        } else {
-            if (pdf!!.pageCount < 1) {
-                errorIcon
-                return@Theme
-            }
-
-            /*PdfScreen(
-                screenWidth = screenWidthInPixels,
-                screenHeight = screenHeightInPixels,
-                pdf = pdf!!,
-                scope = scope,
-                viewModel = viewModel,
-                onClickBack = { pdf = null }
-            )*/
-            TestUI(viewModel.path.toString())
-            //CustomView(viewModel.path.toString())
         }
     }
 }
 
-private fun loadProgress(
+@Composable
+fun MainContainer(
+    screenWidthInPixels: Int,
+    screenHeightInPixels: Int,
     viewModel: PdfViewModel,
-    file: KmpFile,
-    pdf: LocalPdfState?
+    modifier: Modifier = Modifier,
 ) {
-    if (pdf != null && file.uri.lastPathSegment != null) {
-        var path = IntentFile.getPath(PdfApp.app!!, file.uri)
-        if (TextUtils.isEmpty(path)) {
-            path = file.uri.toString()
-        }
-        path?.run {
-            viewModel.insertOrUpdate(path.toString(), pdf.pageCount.toLong())
+    val nestedNavController = rememberKNavController()
+    val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    Scaffold(
+        bottomBar = {
+            KBottomBar(
+                tabs = HomeSections.entries.toTypedArray(),
+                currentRoute = currentRoute ?: HomeSections.FILE.route,
+                navigateToRoute = nestedNavController::navigateToBottomBarRoute,
+            )
+        },
+        modifier = modifier,
+    ) { padding ->
+        NavHost(
+            navController = nestedNavController.navController,
+            startDestination = HomeSections.FILE.route
+        ) {
+            addHomeGraph(
+                screenWidthInPixels,
+                screenHeightInPixels,
+                viewModel,
+                modifier = Modifier
+                    .consumeWindowInsets(padding),
+            )
         }
     }
 }
 
-@Composable
-fun Dp.toIntPx(): Int {
-    return with(LocalDensity.current) { this@toIntPx.roundToPx() }
-}
-
-@Composable
-private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(1.dp)
-            .clickable { click(recent) }) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(8.dp),
-                    clip = false,
-                    ambientColor = Color.Black.copy(alpha = 0.2f),
-                    spotColor = Color.Black.copy(alpha = 0.4f)
-                )
-                .border(BorderStroke(1.dp, Color.LightGray))
-        ) {
-            AsyncImage(
-                model = recent.path?.let {
-                    CustomImageData(
-                        it,
-                        135.dp.toIntPx(),
-                        180.dp.toIntPx()
-                    )
-                },
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Text(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(2.dp),
-                color = Color.Blue,
-                maxLines = 1,
-                text = "${recent.page?.plus(1)}/${recent.pageCount}",
-                fontSize = 11.sp,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Text(
-            modifier = Modifier.padding(2.dp),
-            color = Color.Black, maxLines = 2,
-            text = "${recent.path?.inferName()}",
-            fontSize = 13.sp,
-            overflow = TextOverflow.Ellipsis
+fun NavGraphBuilder.addHomeGraph(
+    screenWidthInPixels: Int,
+    screenHeightInPixels: Int,
+    viewModel: PdfViewModel,
+    modifier: Modifier = Modifier,
+) {
+    composable(HomeSections.FILE.route) { from ->
+        FileScreen(
+            screenWidthInPixels,
+            screenHeightInPixels,
+            viewModel,
+            modifier = modifier,
+        )
+    }
+    composable(HomeSections.SETTING.route) { from ->
+        SettingScreen(
+            modifier
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
-@Composable
-private fun PdfScreen(
-    screenWidth: Int,
-    screenHeight: Int,
-    pdf: LocalPdfState,
-    onClickBack: () -> Unit,
-    scope: CoroutineScope,
-    viewModel: PdfViewModel,
-    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
+enum class HomeSections(
+    val title: String,
+    //val icon: Int,
+    //val iconNormal: Int,
+    val route: String
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var scale by rememberSaveable { mutableFloatStateOf(1f) }
-    val lazyListState = rememberLazyListState()
-    val tocLazyListState = rememberLazyListState()
-    var width by remember { mutableIntStateOf(screenWidth) }
-    var height by remember { mutableIntStateOf(screenHeight) }
-    val tocVisibile = remember { mutableStateOf(false) }
-    val showTopBar = remember { mutableStateOf(false) }
-    val currentPage by remember {
-        derivedStateOf { lazyListState.firstVisibleItemIndex + 1 }
-    }
-    val scrollbarState = lazyListState.scrollbarState(
-        itemsAvailable = pdf.pageCount,
-    )
+    FILE(
+        "Home",
+        //R.drawable.ic_tab_home_selected,
+        //R.drawable.ic_tab_home_normal,
+        "home/buds"
+    ),
+    SETTING(
+        "Setting",
+        //R.drawable.ic_tab_user_selected,
+        //R.drawable.ic_tab_user_normal,
+        "home/setting"
+    ),
+}
 
-    var aPageList by remember { mutableStateOf(mutableListOf<APage>()) }
+@Composable
+fun KBottomBar(
+    tabs: Array<HomeSections>,
+    currentRoute: String,
+    navigateToRoute: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = Color.White,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer
+) {
+    Surface(
+        modifier = modifier,
+        color = color,
+        contentColor = contentColor
+    ) {
+        NavigationBar(
+            modifier = modifier.navigationBarsPadding(),
+            containerColor = color,
+            contentColor = contentColor,
+        ) {
+            tabs.forEach { section ->
+                val selected = currentRoute == section.route
+                val text = (section.title)
 
-    // 处理系统后退手势
-    BackHandler(enabled = true) {
-        if (showTopBar.value) {
-            showTopBar.value = false
-        } else {
-            onClickBack()
-        }
-    }
-
-    // 在组合完成后请求焦点
-    LaunchedEffect(Unit) {
-        println("开始计算页面列表，总页数: ${pdf.pageCount}")
-        scope.launch {
-            snapshotFlow {
-                if (isActive) {
-                    val list = mutableListOf<APage>()
-                    for (i in 0 until pdf.pageCount) {
-                        val pageSize = pdf.pageSizes[i]
-                        val aPage = APage(i, pageSize.width, pageSize.height, 1f)
-                        list.add(aPage)
-                    }
-                    return@snapshotFlow list
-                } else {
-                    return@snapshotFlow null
-                }
-            }.flowOn(Dispatcher.DECODE)
-                .collectLatest {
-                    if (it != null) {
-                        println("更新页面列表，大小: ${it.size}")
-                        aPageList = it
-                    }
-                }
-        }
-
-        println("launch.progress:${viewModel.progress}")
-        viewModel.progress?.page?.let { lazyListState.scrollToItem(it.toInt()) }
-    }
-
-    DisposableEffect(pdf) {
-        val observer = LifecycleEventObserver { _, event ->
-            //println("event:$event")
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                viewModel.updateProgress(
-                    lazyListState.firstVisibleItemIndex.toLong(),
-                    pdf.pageCount.toLong(),
-                    1.0,
-                    1
-                )
-            }
-        }
-
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            //println("onDispose")
-            viewModel.updateProgress(
-                lazyListState.firstVisibleItemIndex.toLong(),
-                pdf.pageCount.toLong(),
-                1.0,
-                1
-            )
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            ImageCache.clear()
-        }
-    }
-
-    Scaffold { paddingValues ->
-        @Composable
-        fun screen() {
-            val density = LocalDensity.current
-            val scrollDistance = remember(density) { with(density) { 16.dp.toPx() } }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Transparent)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                showTopBar.value = !showTopBar.value
-                            },
-                            onTap = { offset ->
-                                val tapY = offset.y
-                                val quarterHeight = height / 4
-
-                                if (tapY < quarterHeight) {
-                                    // 向上滚动
-                                    scope.launch {
-                                        lazyListState.scrollBy(-height.toFloat() + scrollDistance)
-                                    }
-                                } else if (tapY > 3 * quarterHeight) {
-                                    // 向下滚动
-                                    scope.launch {
-                                        lazyListState.scrollBy(height.toFloat() - scrollDistance)
-                                    }
-                                }
-                            }
-                        )
-                    }
-            ) {
-                /*PdfColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .onSizeChanged {
-                            width = it.width
-                            height = it.height
-                            println("app.LazyColumn:$width-$height, $screenWidth-$screenHeight")
-                        },
-                    viewWidth = width,
-                    viewHeight = height,
-                    state = pdf,
-                    lazyListState = lazyListState
-                )
-                lazyListState.DraggableScrollbar(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(horizontal = 2.dp)
-                        .align(Alignment.CenterEnd),
-                    state = scrollbarState,
-                    orientation = Orientation.Vertical,
-                    onThumbMoved = lazyListState.rememberDraggableScroller(
-                        itemsAvailable = pdf.pageCount,
-                    ),
-                )*/
-                //DocumentView(pdf, aPageList, width, height)
-                val list = mutableListOf<APage>()
-                for (i in 0..6) {
-                    list.add(APage(i, 1024, 1280))
-                }
-                //CustomView(aPageList, pdf)
-            }
-        }
-
-        @Composable
-        fun toc() {
-            if (pdf.outlineItems == null || pdf.outlineItems!!.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .background(Color.White)
-                        .padding(paddingValues)
-                ) {
-                    Text(
-                        modifier = Modifier
-                            .width(240.dp)
-                            .fillMaxHeight()
-                            .align(Alignment.Center),
-                        fontSize = 24.sp,
-                        color = Color.Black,
-                        text = "No Outline"
-                    )
-                }
-            } else {
-                val hoverStates = remember {
-                    mutableStateListOf<Boolean>().apply {
-                        repeat(pdf.outlineItems!!.size) {
-                            add(false)
-                        }
-                    }
-                }
-                val clickStates = remember {
-                    mutableStateListOf<Boolean>().apply {
-                        repeat(pdf.outlineItems!!.size) {
-                            add(false)
-                        }
-                    }
-                }
-                LazyColumn(
-                    modifier = Modifier
-                        .width(300.dp)
-                        .background(Color.White)
-                        .fillMaxHeight()
-                        .padding(paddingValues)
-                        .focusable(),
-                    state = tocLazyListState,
-                ) {
-                    items(
-                        count = pdf.outlineItems!!.size,
-                        key = { index -> "$index" }
-                    ) { i ->
-                        val isHovered = hoverStates[i]
-                        val isClicked = clickStates[i]
-
-                        // 根据悬停和点击状态设置背景色
-                        val backgroundColor = when {
-                            isClicked -> Color.Gray
-                            isHovered -> Color.LightGray
-                            else -> Color.Transparent
-                        }
-                        Row(
+                NavigationBarItem(
+                    icon = {
+                        /*Icon(
                             modifier = Modifier
-                                .background(backgroundColor)
-                                .padding(4.dp)
-                                .clickable {
-                                    clickStates.forEach { clickStates[i] = false }
-                                    clickStates[i] = !clickStates[i]
-                                    scope.launch {
-                                        lazyListState.scrollToItem(pdf.outlineItems!![i].page)
-                                    }
-                                }
-                        ) {
-                            Text(
-                                modifier = Modifier.weight(1f),
-                                fontSize = 14.sp,
-                                color = Color.Black,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                text = pdf.outlineItems!![i].title.toString()
-                            )
-                            Text(
-                                modifier = Modifier,
-                                fontSize = 12.sp,
-                                color = Color.Black,
-                                text = pdf.outlineItems!![i].page.toString()
-                            )
-                            VerticalDivider(
-                                thickness = 0.5.dp,
-                                modifier = Modifier.fillMaxHeight()
-                            )
-                        }
-                    }
-                }
+                                .height(28.dp)
+                                .width(28.dp),
+                            // 根据选中状态切换图标
+                            painter = painterResource(id = if (selected) section.icon else section.iconNormal),
+                            contentDescription = text,
+                            // 设置图标颜色为原始颜色
+                            tint = Color.Unspecified
+                        )*/
+                    },
+                    label = {
+                        Text(
+                            text = text,
+                            style = TextStyle(
+                                color = if (selected) Color(0xff895FFD) else Color.Black,
+                                fontSize = 15.sp
+                            ),
+                            maxLines = 1
+                        )
+                    },
+                    selected = selected,
+                    onClick = { navigateToRoute(section.route) },
+                    // 移除选中时的指示器
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Unspecified,
+                        unselectedIconColor = Color.Unspecified,
+                        selectedTextColor = Color(0xff895FFD),
+                        unselectedTextColor = Color.Black,
+                        indicatorColor = Color.Transparent
+                    )
+                )
             }
-        }
-
-        @Composable
-        fun topBar() {
-            if (showTopBar.value) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.Black)
-                        .padding(paddingValues),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 左边部分，使用 Modifier.weight 让其可伸缩
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onClickBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                        }
-                        Column(
-                            modifier = Modifier.padding(start = 8.dp)
-                        ) {
-                            Text(
-                                fontSize = 16.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = Color.White,
-                                text = "${viewModel.progress?.path}"
-                            )
-                            Text(
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                text = "$currentPage/${pdf.pageCount}"
-                            )
-                        }
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = {
-                            scope.launch {
-                                ImageCache.clear()
-                                tocVisibile.value = !tocVisibile.value
-                            }
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
-                        }
-                        IconButton(onClick = { scale -= 0.1f }) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = null)
-                        }
-
-                        IconButton(onClick = { scale += 0.1f }) {
-                            Icon(Icons.Default.ZoomIn, contentDescription = null)
-                        }
-                    }
-                }
-            }
-        }
-
-        if (tocVisibile.value) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Transparent)
-            ) {
-                screen()
-                toc()
-                topBar()
-            }
-        } else {
-            screen()
-            topBar()
         }
     }
 }
