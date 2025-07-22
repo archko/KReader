@@ -27,13 +27,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Toc
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -64,7 +57,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -104,6 +96,7 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 import java.io.File
 import java.util.Locale
 
@@ -114,7 +107,6 @@ fun App(
     viewModel: PdfViewModel,
 ) {
     Theme {
-        val errorIcon = rememberVectorPainter(Icons.Default.Error)
         var pdf: LocalPdfState? by remember {
             mutableStateOf(null, referentialEqualityPolicy())
         }
@@ -193,7 +185,13 @@ fun App(
             }
         } else {
             if (pdf!!.pageCount < 1) {
-                errorIcon
+                Text(
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White,
+                    text = "Error"
+                )
                 return@Theme
             }
 
@@ -567,7 +565,10 @@ private fun PdfScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onClickBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(
+                            painter = painterResource(R.drawable.ic_back),
+                            contentDescription = null
+                        )
                     }
                     Column(
                         modifier = Modifier.padding(start = 8.dp)
@@ -599,34 +600,44 @@ private fun PdfScreen(
                             }
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
+                        Icon(
+                            painter = painterResource(R.drawable.ic_back),
+                            contentDescription = null
+                        )
                     }
                     SearchTextField(scope)
                     IconButton(onClick = { scale -= 0.1f }) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = null)
+                        Icon(
+                            painter = painterResource(R.drawable.ic_zoom_out),
+                            contentDescription = null
+                        )
                     }
 
                     IconButton(onClick = { scale += 0.1f }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = null)
+                        Icon(
+                            painter = painterResource(R.drawable.ic_zoom_in),
+                            contentDescription = null
+                        )
                     }
                 }
             }
-            if (tocVisibile.value) {
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                        .background(Color.Transparent)
-                ) {
-                    screen()
-                    toc()
-                    /*HorizontalDivider(
-                        modifier = Modifier.width(1.dp),
-                        thickness = 1.dp,
-                        color = Color.Gray,
-                    )*/
-                }
-            } else {
+        }
+        if (tocVisibile.value) {
+            Box(
+                modifier = Modifier.fillMaxSize()
+                    .background(Color.Transparent)
+            ) {
                 screen()
+                toc()
+                /*HorizontalDivider(
+                    modifier = Modifier.width(1.dp),
+                    thickness = 1.dp,
+                    color = Color.Gray,
+                )*/
             }
+        } else {
+            screen()
         }
     }
+}
 }

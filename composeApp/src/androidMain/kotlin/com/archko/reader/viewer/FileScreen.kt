@@ -27,12 +27,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Toc
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -49,10 +43,10 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -91,7 +85,6 @@ fun FileScreen(
     modifier: Modifier = Modifier,
 ) {
     Theme {
-        val errorIcon = rememberVectorPainter(Icons.Default.Error)
         var pdf: LocalPdfState? by remember {
             mutableStateOf(null, referentialEqualityPolicy())
         }
@@ -180,7 +173,13 @@ fun FileScreen(
             }
         } else {
             if (pdf!!.pageCount < 1) {
-                errorIcon
+                Text(
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White,
+                    text = "Error"
+                )
                 return@Theme
             }
 
@@ -541,7 +540,10 @@ private fun PdfScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = onClickBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                            Icon(
+                                painter = painterResource(R.drawable.ic_back),
+                                contentDescription = null
+                            )
                         }
                         Column(
                             modifier = Modifier.padding(start = 8.dp)
@@ -570,14 +572,23 @@ private fun PdfScreen(
                                 tocVisibile.value = !tocVisibile.value
                             }
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.Toc, contentDescription = null)
+                            Icon(
+                                painter = painterResource(R.drawable.ic_back),
+                                contentDescription = null
+                            )
                         }
                         IconButton(onClick = { scale -= 0.1f }) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = null)
+                            Icon(
+                                painter = painterResource(R.drawable.ic_zoom_out),
+                                contentDescription = null
+                            )
                         }
 
                         IconButton(onClick = { scale += 0.1f }) {
-                            Icon(Icons.Default.ZoomIn, contentDescription = null)
+                            Icon(
+                                painter = painterResource(R.drawable.ic_zoom_in),
+                                contentDescription = null
+                            )
                         }
                     }
                 }
