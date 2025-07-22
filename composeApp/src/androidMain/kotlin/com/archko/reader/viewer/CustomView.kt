@@ -70,7 +70,7 @@ private class PageNode(
             )
         } else {
             pdfViewState.decode(bounds, aPage, cacheKey)
-            println("pageNode.draw.offset:$offset, $rect, $aPage")
+            //println("pageNode.draw.offset:$offset, $rect, $aPage")
             // 绘制边框
             drawScope.drawRect(
                 color = Color.Magenta,
