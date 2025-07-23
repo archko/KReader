@@ -88,11 +88,6 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
                 KApp(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
-                /*val list = mutableListOf<APage>()
-                for (i in 0..4) {
-                    list.add(APage(i, 1024, 1280, 1f))
-                }
-                CustomView(list)*/
             }
         }
     }

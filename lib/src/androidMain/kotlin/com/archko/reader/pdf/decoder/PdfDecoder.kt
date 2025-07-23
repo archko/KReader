@@ -1,4 +1,4 @@
-package com.archko.reader.pdf.subsampling
+package com.archko.reader.pdf.decoder
 
 import android.graphics.Bitmap
 import android.graphics.Rect
@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
-import com.archko.reader.pdf.subsampling.internal.ImageDecoder
+import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -180,7 +180,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return (bitmap.asImageBitmap())
     }
 
-    public fun renderPageRegion(
+    public override fun renderPageRegion(
         region: androidx.compose.ui.geometry.Rect,
         index: Int,
         scale: Float,

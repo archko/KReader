@@ -31,10 +31,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.component.ImageCache
+import com.archko.reader.pdf.decoder.DecoderService
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
 import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
-import com.archko.reader.pdf.subsampling.PdfDecoder
+import com.archko.reader.pdf.decoder.PdfDecoder
+import com.archko.reader.pdf.decoder.TileSpec
 import kotlinx.coroutines.*
 import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.channels.Channel

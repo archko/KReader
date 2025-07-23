@@ -1,17 +1,12 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.decoder
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Rect
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
-import androidx.core.graphics.createBitmap
-import com.archko.reader.pdf.subsampling.PdfDecoder
+import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -24,16 +19,16 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-internal class DecoderService(
+public class DecoderService(
     private val workerCount: Int,
-    private val decoder: PdfDecoder,
+    private val decoder: ImageDecoder,
 ) {
     @Volatile
-    var isIdle: Boolean = true
-    suspend fun collectTiles(
+    public var isIdle: Boolean = true
+    public suspend fun collectTiles(
         tileSpecs: ReceiveChannel<TileSpec>,
         tilesOutput: SendChannel<TileSpec>,
-    ) = coroutineScope {
+    ): Job = coroutineScope {
         val tilesToDownload = Channel<TileSpec>(capacity = Channel.Factory.RENDEZVOUS)
         val tilesDownloadedFromWorker = Channel<TileSpec>(capacity = 1)
 
@@ -76,7 +71,7 @@ internal class DecoderService(
         )
     }
 
-    private fun testBitmap(spec: TileSpec): ImageBitmap {
+    /*private fun testBitmap(spec: TileSpec): ImageBitmap {
         val bitmap = createBitmap(spec.width, spec.height, Bitmap.Config.ARGB_8888)
         val paint = Paint()
         val canvas = Canvas(bitmap)
@@ -107,7 +102,7 @@ internal class DecoderService(
             paint
         )
         return bitmap.asImageBitmap()
-    }
+    }*/
 
     private fun CoroutineScope.tileCollectorKernel(
         tileSpecs: ReceiveChannel<TileSpec>,
@@ -118,7 +113,7 @@ internal class DecoderService(
         val specsBeingProcessed = mutableListOf<TileSpec>()
 
         while (true) {
-            select<Unit> {
+            select {
                 tilesDownloadedFromWorker.onReceive {
                     specsBeingProcessed.remove(it)
                     isIdle = specsBeingProcessed.isEmpty()
@@ -135,7 +130,7 @@ internal class DecoderService(
         }
     }
 
-    fun shutdownNow() {
+    public fun shutdownNow() {
         executor.shutdownNow()
         decoder.close()
     }
@@ -149,10 +144,10 @@ internal class DecoderService(
     private val dispatcher = executor.asCoroutineDispatcher()
 }
 
-internal data class TileSpec(
+public data class TileSpec(
     val page: Int,
     val zoom: Float,
-    val rect: androidx.compose.ui.geometry.Rect,
+    val rect: Rect,
     val width: Int = 512,
     val height: Int = 512,
     val viewSize: IntSize,
