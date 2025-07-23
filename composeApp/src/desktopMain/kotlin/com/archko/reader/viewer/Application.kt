@@ -80,7 +80,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
-import com.archko.reader.pdf.component.ImageCache
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.PdfColumn
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent

@@ -1,7 +1,6 @@
-package com.archko.reader.pdf.component
+package com.archko.reader.pdf.cache
 
 import androidx.compose.ui.graphics.ImageBitmap
-import java.lang.ref.WeakReference
 
 private const val MAX_IMAGE_COUNT = 48 // 可根据平台内存调整
 private const val CANDIDATE_TIMEOUT = 3000L // 3秒，候选池图片最大保留时间

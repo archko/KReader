@@ -12,6 +12,7 @@ public interface ImageDecoder {
 
     public var pageCount: Int
     public var pageSizes: List<Size>
+    public var originalPageSizes: List<Size>
     public var outlineItems: List<Item>?
 
     /** Size of the full image, without any scaling applied. */

@@ -26,7 +26,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     public override var pageCount: Int = document.countPages()
 
     // 私有变量存储原始页面尺寸
-    public var originalPageSizes: List<Size> = listOf()
+    public override var originalPageSizes: List<Size> = listOf()
 
     // 对外提供的缩放后页面尺寸
     public override var pageSizes: List<Size> = listOf()

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.Dispatcher
 import kotlinx.coroutines.*
