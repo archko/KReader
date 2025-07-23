@@ -60,38 +60,63 @@ public fun CoroutineScope.throttle(wait: Long, block: suspend () -> Unit): SendC
 
 private class PageNode(
     private val pdfViewState: PdfViewState,
-    public var rect: Rect,  //view offset rect
-    public var bounds: Rect,    //page bounds
-    public val aPage: APage  // 添加 APage 属性
+    public var logicalRect: Rect,  // 逻辑坐标(0~1)
+    public var logicalBounds: Rect, // 逻辑坐标(0~1)
+    public val aPage: APage
 ) {
+    // 逻辑rect转实际像素，需乘以pageScale和vZoom
+    fun toPixelRect(pageWidth: Float, pageHeight: Float, yOffset: Float, pageScale: Float, vZoom: Float): Rect {
+        val totalScale = pageScale * vZoom
+        return Rect(
+            left = logicalRect.left * pageWidth * totalScale,
+            top = logicalRect.top * pageHeight * totalScale + yOffset * totalScale,
+            right = logicalRect.right * pageWidth * totalScale,
+            bottom = logicalRect.bottom * pageHeight * totalScale + yOffset * totalScale
+        )
+    }
 
-    val cacheKey = "${aPage.index}-${rect}-${aPage.scale}"
-    public fun draw(drawScope: DrawScope, offset: Offset) {
-        // 检查页面是否在可视区域内
-        if (!isVisible(drawScope, offset, rect, aPage.index)) {
-            //println("is not Visible:${aPage.index}, $offset, $rect")
-            pdfViewState.remove(bounds, aPage, cacheKey)
+    fun toPixelBounds(pageWidth: Float, pageHeight: Float, yOffset: Float, pageScale: Float, vZoom: Float): Rect {
+        val totalScale = pageScale * vZoom
+        return Rect(
+            left = logicalBounds.left * pageWidth * totalScale,
+            top = logicalBounds.top * pageHeight * totalScale + yOffset * totalScale,
+            right = logicalBounds.right * pageWidth * totalScale,
+            bottom = logicalBounds.bottom * pageHeight * totalScale + yOffset * totalScale
+        )
+    }
+
+    val cacheKey: String
+        get() = "${aPage.index}-${logicalRect}-${aPage.scale}-${pdfViewState.vZoom}"
+
+    public fun draw(
+        drawScope: DrawScope,
+        offset: Offset,
+        pageWidth: Float,
+        pageHeight: Float,
+        yOffset: Float,
+        pageScale: Float,
+        vZoom: Float
+    ) {
+        val pixelRect = toPixelRect(pageWidth, pageHeight, yOffset, pageScale, vZoom)
+        var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
+        println("[PageNode.draw] page=${aPage.index}, logicalRect=$logicalRect, pageWidth=$pageWidth, pageHeight=$pageHeight, yOffset=$yOffset, pageScale=$pageScale, vZoom=$vZoom, pixelRect=$pixelRect, bitmapSize=${loadedBitmap?.width}x${loadedBitmap?.height}")
+        if (!isVisible(drawScope, offset, pixelRect, aPage.index)) {
+            pdfViewState.remove(logicalRect, aPage, cacheKey, pageScale, vZoom)
             return
         }
-        var loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
-        //println("pageNode.draw.loadedBitmap:${loadedBitmap == null}, $rect, $aPage")
         if (loadedBitmap != null) {
-            //println("pageNode.draw.loadedBitmap:$rect, $aPage")
             drawScope.drawImage(
                 loadedBitmap,
-                dstOffset = IntOffset(rect.left.toInt(), rect.top.toInt())
+                dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt())
             )
         } else {
-            pdfViewState.decode(bounds, aPage, cacheKey)
-            //println("pageNode.draw.offset:$offset, $rect, $aPage")
-            // 绘制边框
+            pdfViewState.decode(logicalRect, aPage, cacheKey, pageScale, vZoom)
             drawScope.drawRect(
                 color = Color.Magenta,
-                topLeft = Offset(rect.left, rect.top),
-                size = rect.size,
+                topLeft = Offset(pixelRect.left, pixelRect.top),
+                size = pixelRect.size,
                 style = Stroke(width = 6f)
             )
-            // 文本绘制已移除，保证多平台兼容
         }
     }
 
@@ -118,9 +143,9 @@ private fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: 
 private class Page(
     private val pdfViewState: PdfViewState,
     private var viewSize: IntSize,
-    private var scale: Float,   //view*vZoom/page.width
+    private var scale: Float,   // pageScale
     internal var aPage: APage,
-    private var yOffset: Float = 0f
+    var yOffset: Float = 0f
 ) {
     var nodes: List<PageNode> = emptyList()
 
@@ -141,81 +166,60 @@ private class Page(
         recalculateNodes()
     }
 
-    public fun draw(drawScope: DrawScope, offset: Offset) {
+    public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
         if (!isVisible(drawScope, offset, bounds, aPage.index)) {
             return
         }
-        //println("page.draw.offset:$offset, $bounds, $aPage")
+        val pageWidth = aPage.width.toFloat()
+        val pageHeight = aPage.height.toFloat()
         nodes.forEach { node ->
-            node.draw(drawScope, offset)
+            node.draw(drawScope, offset, pageWidth, pageHeight, yOffset, scale, vZoom)
         }
+        val totalScale = scale * vZoom
         drawScope.drawRect(
             color = Color.Yellow,
-            topLeft = Offset(0f, bounds.top),
-            size = Size(bounds.width, bounds.height),
+            topLeft = Offset(0f, bounds.top * totalScale),
+            size = Size(bounds.width * totalScale, bounds.height * totalScale),
             style = Stroke(width = 8f)
         )
-        // 文本绘制已移除，保证多平台兼容
     }
 
     private fun recalculateNodes() {
         if (viewSize == IntSize.Zero) return
 
-        val contentOffset = Offset(0f, yOffset)
-
         val rootNode = PageNode(
             pdfViewState,
-            Rect(
-                left = contentOffset.x,
-                top = contentOffset.y,
-                right = contentOffset.x + bounds.width,
-                bottom = contentOffset.y + bounds.height
-            ),
-            bounds,
+            Rect(0f, 0f, 1f, 1f), // 逻辑坐标全页
+            Rect(0f, 0f, 1f, 1f),
             aPage
         )
 
-        println("page.recalculateNodes.scale:$scale, offset:$contentOffset, $bounds, w-h:${bounds.width}-${bounds.height}, $aPage")
+        println("page.recalculateNodes.scale:$scale, offset:$yOffset, $bounds, w-h:${bounds.width}-${bounds.height}, $aPage")
         nodes = calculatePages(rootNode)
     }
 
     private fun calculatePages(page: PageNode): List<PageNode> {
-        val rect = page.rect
-        if (rect.width * rect.height > maxSize) {
-            val halfWidth = rect.width / 2
-            val halfHeight = rect.height / 2
-            val list = listOf(
+        val rect = page.logicalRect
+        val area = (rect.right - rect.left) * (rect.bottom - rect.top)
+        if (area > 0.25f) { // 这里假设分4块，实际可根据需要调整
+            val halfW = (rect.left + rect.right) / 2
+            val halfH = (rect.top + rect.bottom) / 2
+            return listOf(
+                PageNode(pdfViewState, Rect(rect.left, rect.top, halfW, halfH), Rect(0f, 0f, 0.5f, 0.5f), page.aPage),
+                PageNode(pdfViewState, Rect(halfW, rect.top, rect.right, halfH), Rect(0.5f, 0f, 1f, 0.5f), page.aPage),
                 PageNode(
                     pdfViewState,
-                    Rect(rect.left, rect.top, rect.left + halfWidth, rect.top + halfHeight),
-                    Rect(0f, 0f, halfWidth, halfHeight),
+                    Rect(rect.left, halfH, halfW, rect.bottom),
+                    Rect(0f, 0.5f, 0.5f, 1f),
                     page.aPage
                 ),
                 PageNode(
                     pdfViewState,
-                    Rect(rect.left + halfWidth, rect.top, rect.right, rect.top + halfHeight),
-                    Rect(halfWidth, 0f, rect.width, halfHeight),
-                    page.aPage
-                ),
-                PageNode(
-                    pdfViewState,
-                    Rect(rect.left, rect.top + halfHeight, rect.left + halfWidth, rect.bottom),
-                    Rect(0f, halfHeight, halfWidth, rect.height),
-                    page.aPage
-                ),
-                PageNode(
-                    pdfViewState,
-                    Rect(rect.left + halfWidth, rect.top + halfHeight, rect.right, rect.bottom),
-                    Rect(halfWidth, halfHeight, rect.width, rect.height),
+                    Rect(halfW, halfH, rect.right, rect.bottom),
+                    Rect(0.5f, 0.5f, 1f, 1f),
                     page.aPage
                 )
-            ).flatMap {
-                calculatePages(it)
-            }
-            //list.forEach {
-            //    println("page.calculatePages.rect:${it.rect}, $aPage")
-            //}
-            return list
+            ).flatMap { calculatePages(it) }
         }
         return listOf(page)
     }
@@ -298,22 +302,6 @@ private class PdfViewState(
 
     private val renderTask = scope.throttle(wait = 34) {
         //evictTiles(lastVisible)
-        /*val sortedPages = pages.sortedBy { it.aPage.index }
-        val pagesIndices = sortedPages.map { it.aPage.index }.toIntArray()
-
-        val tilesToRenderCopy = mutableListOf<Page>()
-        val addedIndices = mutableSetOf<Int>()
-
-        for (tile in tilesCollected) {
-            val pageIndex = tile.page
-            val index = pagesIndices.binarySearch(pageIndex)
-            if (index >= 0 && !addedIndices.contains(pageIndex)) {
-                tilesToRenderCopy.add(sortedPages[index])
-                addedIndices.add(pageIndex)
-            }
-        }
-        println("PdfViewState:renderTask:${tilesCollected.size}, ${tilesToRenderCopy.size}")
-        pageToRender = tilesToRenderCopy*/
         setVisibilePage()
     }
 
@@ -344,7 +332,14 @@ private class PdfViewState(
     }
 
     private fun isTileVisible(spec: TileSpec): Boolean {
-        return isVisible(viewSize, viewOffset, spec.rect, spec.page)
+        // 将logicalRect映射为实际像素区域
+        val pixelRect = Rect(
+            left = spec.logicalRect.left * spec.pageWidth,
+            top = spec.logicalRect.top * spec.pageHeight,
+            right = spec.logicalRect.right * spec.pageWidth,
+            bottom = spec.logicalRect.bottom * spec.pageHeight
+        )
+        return isVisible(viewSize, viewOffset, pixelRect, spec.page)
     }
 
     private fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
@@ -422,13 +417,14 @@ private class PdfViewState(
         }
     }
 
-    fun remove(rect: Rect, page: APage, cacheKey: String) {
+    fun remove(logicalRect: Rect, page: APage, cacheKey: String, pageScale: Float, vZoom: Float) {
         val tileSpec = TileSpec(
             page.index,
-            page.scale,
-            rect,
-            rect.width.toInt(),
-            rect.height.toInt(),
+            pageScale,
+            vZoom,
+            logicalRect,
+            page.width,
+            page.height,
             viewSize,
             cacheKey,
             null
@@ -439,14 +435,15 @@ private class PdfViewState(
         }
     }
 
-    fun decode(rect: Rect, page: APage, cacheKey: String) {
+    fun decode(logicalRect: Rect, page: APage, cacheKey: String, pageScale: Float, vZoom: Float) {
         if (ImageCache.get(cacheKey) != null) return // 已有缓存
         if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
         requestedTiles.add(cacheKey)
         val tileSpec = TileSpec(
             page.index,
-            page.scale,
-            Rect(rect.left, rect.top, rect.right, rect.bottom),
+            pageScale,
+            vZoom,
+            logicalRect,
             page.width,
             page.height,
             viewSize,
@@ -531,7 +528,7 @@ private class PdfViewState(
             // 这里假设 PageNode.cacheKey 生成方式为："${aPage.index}-${rect}-${aPage.scale}"
             if (page is Page) {
                 page.nodes.map { node ->
-                    "${node.aPage.index}-${node.rect}-${node.aPage.scale}"
+                    "${node.aPage.index}-${node.logicalRect}-${node.aPage.scale}"
                 }
             } else emptyList()
         }.toSet()
@@ -766,7 +763,12 @@ public fun DocumentView(
                         topLeft = visibleRect.topLeft,
                         size = visibleRect.size
                     )*/
-                    pdfViewState.pages.forEach { page -> page.draw(this, offset) }
+                    pdfViewState.pages.forEach { page ->
+                        val pageWidth = page.bounds.width
+                        val pageHeight = page.bounds.height
+                        val yOffset = page.yOffset
+                        page.draw(this, offset, pdfViewState.vZoom)
+                    }
                 }
         }
     }

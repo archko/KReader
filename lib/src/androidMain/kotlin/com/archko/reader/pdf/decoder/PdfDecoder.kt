@@ -185,27 +185,16 @@ public class PdfDecoder(file: File) : ImageDecoder {
         index: Int,
         scale: Float,
         viewSize: IntSize,
-        pageWidth: Int,
-        pageHeight: Int
+        outWidth: Int,
+        outHeight: Int
     ): ImageBitmap {
-        val cropBound = Rect()
-        val pageW: Int
-        val pageH: Int
-        val patchX: Int
-        val patchY: Int
+        val patchX = region.left.toInt()
+        val patchY = region.top.toInt()
+        println("renderPageRegion:index:$index scale:$scale, viewSize:$viewSize, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
-        //如果页面的缩放为1,那么这时的pageW就是view的宽.
-        pageW = (region.width).toInt()
-        pageH = (region.height).toInt()
-
-        patchX = ((region.left) + cropBound.left).toInt()
-        patchY = ((region.top) + cropBound.top).toInt()
-        println("renderPageRegion:index:${index} scale:${scale}, viewSize:$viewSize, w-h:$pageW-$pageH, offset:$patchX-$patchY, bounds:${region}")
-
-        // 优先尝试复用缓存池中的Bitmap
-        val bitmap = acquireReusableBitmap(pageW, pageH)
+        val bitmap = acquireReusableBitmap(outWidth, outHeight)
         val ctm = Matrix(scale)
-        val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, pageW, pageH)
+        val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, outWidth, outHeight)
 
         val page = document.loadPage(index)
         page.run(dev, ctm, null)

@@ -54,20 +54,30 @@ public class DecoderService(
             }.await()
             spec.imageBitmap = imageBitmap
 
-            println("getBitmap.Tile:page:${spec.page}, w-h:${spec.width}-${spec.height}, zoom:${spec.zoom}, ${spec.rect}")
             tilesOutput.send(spec)
             tilesDownloaded.send(spec)
         }
     }
 
     private fun decodeBitmap(spec: TileSpec): ImageBitmap {
+        val totalScale = spec.pageScale * spec.vZoom
+        // 逻辑坐标转原始像素区域
+        val srcRect = Rect(
+            left = spec.logicalRect.left * spec.pageWidth*totalScale,
+            top = spec.logicalRect.top * spec.pageHeight*totalScale,
+            right = spec.logicalRect.right * spec.pageWidth*totalScale,
+            bottom = spec.logicalRect.bottom * spec.pageHeight*totalScale
+        )
+        val outWidth = ((srcRect.right - srcRect.left)).toInt()
+        val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
+        println("decodeBitmap.Tile:page:${spec.page}, rect:${spec.logicalRect}, scale:${spec.pageScale},${spec.vZoom}, $outWidth-$outHeight, $srcRect")
         return decoder.renderPageRegion(
-            spec.rect,
+            srcRect,
             spec.page,
-            spec.zoom,
+            totalScale,
             spec.viewSize,
-            spec.width,
-            spec.height
+            outWidth,
+            outHeight
         )
     }
 
@@ -146,10 +156,11 @@ public class DecoderService(
 
 public data class TileSpec(
     val page: Int,
-    val zoom: Float,
-    val rect: Rect,
-    val width: Int = 512,
-    val height: Int = 512,
+    val pageScale: Float,
+    val vZoom: Float,
+    val logicalRect: Rect, // 0~1
+    val pageWidth: Int,
+    val pageHeight: Int,
     val viewSize: IntSize,
     val cacheKey: String,
     var imageBitmap: ImageBitmap?,
@@ -161,10 +172,11 @@ public data class TileSpec(
         other as TileSpec
 
         if (page != other.page) return false
-        if (zoom != other.zoom) return false
-        if (width != other.width) return false
-        if (height != other.height) return false
-        if (rect != other.rect) return false
+        if (pageScale != other.pageScale) return false
+        if (vZoom != other.vZoom) return false
+        if (pageWidth != other.pageWidth) return false
+        if (pageHeight != other.pageHeight) return false
+        if (logicalRect != other.logicalRect) return false
         if (cacheKey != other.cacheKey) return false
 
         return true
@@ -172,10 +184,11 @@ public data class TileSpec(
 
     override fun hashCode(): Int {
         var result = page
-        result = 31 * result + zoom.hashCode()
-        result = 31 * result + width
-        result = 31 * result + height
-        result = 31 * result + rect.hashCode()
+        result = 31 * result + pageScale.hashCode()
+        result = 31 * result + vZoom.hashCode()
+        result = 31 * result + pageWidth
+        result = 31 * result + pageHeight
+        result = 31 * result + logicalRect.hashCode()
         result = 31 * result + cacheKey.hashCode()
         return result
     }
