@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -361,7 +360,6 @@ private class PdfViewState(
                 //ImageCache.remove(tile.cacheKey)
             }
 
-            update++
             renderThrottled()
         }
     }
@@ -480,6 +478,15 @@ private class PdfViewState(
             cacheKey,
             null
         )
+        if (tilesCollected.contains(tileSpec)) {
+            val index = tilesCollected.indexOf(tileSpec)
+            val bitmap = tilesCollected[index].imageBitmap
+            if (null != bitmap) {
+                ImageCache.put(cacheKey, bitmap)
+                println("PdfViewState:no decode:$tileSpec")
+                return
+            }
+        }
         tilesCollected.add(tileSpec)
         scope.launch {
             visibleTilesChannel.send(tileSpec)
