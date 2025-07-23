@@ -21,7 +21,6 @@ import coil3.util.DebugLogger
 import coil3.util.Logger
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.cache.AppDatabase
-import com.archko.reader.pdf.cache.DatabaseDriverFactory
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.util.CustomImageFetcher
 import org.jetbrains.skiko.setSystemLookAndFeel
@@ -51,14 +50,14 @@ fun main() {
         }
         println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
 
-        val driverFactory: DatabaseDriverFactory = DriverFactory()
-        val database = AppDatabase(driverFactory.createDriver())
+        val driverFactory = DriverFactory()
+        val database = driverFactory.createRoomDatabase()
 
         val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
         CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
             val viewModel: PdfViewModel = viewModel()
             viewModel.database = database
-            Application(screenWidthInPixels, screenHeightInPixels, viewModel)
+            App(screenWidthInPixels, screenHeightInPixels, viewModel)
         }
 
     }

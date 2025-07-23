@@ -3,7 +3,6 @@ package com.archko.reader.pdf.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
-import com.archko.reader.pdf.cache.Progress
 import com.archko.reader.pdf.entity.Recent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,42 +15,37 @@ public class PdfViewModel : ViewModel() {
     public var database: AppDatabase? = null
     private val _recentList = MutableStateFlow<List<Recent>>(mutableListOf())
     public val recentList: StateFlow<List<Recent>> = _recentList
-    public var progress: Progress? = null
+    public var progress: Recent? = null
+    public var path: String? = null
 
     public fun insertOrUpdate(path: String, pageCount: Long) {
+        this.path = path
         viewModelScope.launch {
-            val selProgress =
-                database?.appDatabaseQueries?.selectProgress(path)
-                    ?.executeAsOneOrNull()
+            val selProgress = database?.recentDao()?.getRecent(path)
             if (selProgress == null) {
-                database?.appDatabaseQueries?.insertProgress(
-                    path,
-                    0,
-                    pageCount,
-                    System.currentTimeMillis(),
-                    System.currentTimeMillis(),
-                    1,
-                    0,
-                    0,
-                    1.0,
-                    0,
-                    0
+                database?.recentDao()?.addRecent(
+                    Recent(
+                        path,
+                        0,
+                        pageCount,
+                        System.currentTimeMillis(),
+                        System.currentTimeMillis(),
+                        1,
+                        0,
+                        0,
+                        1.0,
+                        0,
+                        0
+                    )
                 )
             } else {
-                database?.appDatabaseQueries?.updateProgress(
-                    selProgress.page,
-                    pageCount,
-                    System.currentTimeMillis(),
-                    selProgress.crop,
-                    selProgress.reflow,
-                    selProgress.zoom,
-                    selProgress.scrollOri,
-                    selProgress.scrollX,
-                    selProgress.scrollY,
-                    selProgress.id
-                )
+                selProgress.apply {
+                    this.pageCount = pageCount
+                    createAt = System.currentTimeMillis()
+                }
+                database?.recentDao()?.updateRecent(selProgress)
             }
-            progress = database?.appDatabaseQueries?.selectProgress(path)?.executeAsOneOrNull()
+            progress = database?.recentDao()?.getRecent(path)
             println("insertOrUpdate:${progress}")
         }
     }
@@ -60,19 +54,17 @@ public class PdfViewModel : ViewModel() {
         println("updateProgress:$page, pc:$pageCount, old:$progress")
         progress?.run {
             viewModelScope.launch {
-                database?.appDatabaseQueries?.updateProgress(
-                    page,
-                    pageCount,
-                    System.currentTimeMillis(),
-                    crop,
-                    0,
-                    zoom,
-                    0,
-                    0,
-                    0,
-                    progress!!.id
-                )
-                progress = database?.appDatabaseQueries?.selectProgress(path)?.executeAsOneOrNull()
+                progress!!.apply {
+                    this.page = page
+                    this.pageCount = pageCount
+                    createAt = System.currentTimeMillis()
+                    this.crop = crop
+                    this.zoom = zoom
+                }
+                database?.recentDao()?.updateRecent(progress!!)
+                path?.run {
+                    progress = database?.recentDao()?.getRecent(path!!)
+                }
                 loadRecents()
             }
         }
@@ -80,29 +72,10 @@ public class PdfViewModel : ViewModel() {
 
     public fun loadRecents() {
         viewModelScope.launch {
-            val progresses = database?.appDatabaseQueries?.selectProgresses()?.executeAsList()
+            val progresses = database?.recentDao()?.getRecents(0, 100)
             if (progresses != null) {
                 if (progresses.isNotEmpty()) {
-                    val list = mutableListOf<Recent>()
-                    progresses.forEach {
-                        list.add(
-                            Recent(
-                                it.id,
-                                it.path,
-                                it.page,
-                                it.pageCount,
-                                it.createAt,
-                                it.updateAt,
-                                it.crop,
-                                it.reflow,
-                                it.scrollOri,
-                                it.zoom,
-                                it.scrollX,
-                                it.scrollY
-                            )
-                        )
-                    }
-                    _recentList.value = list
+                    _recentList.value = progresses
                 }
             }
         }
@@ -110,7 +83,7 @@ public class PdfViewModel : ViewModel() {
 
     public fun clear() {
         viewModelScope.launch {
-            database?.appDatabaseQueries?.removeAllProgresses()
+            database?.recentDao()?.deleteAllRecents()
             loadRecents()
         }
     }

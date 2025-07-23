@@ -1,26 +1,47 @@
 package com.archko.reader.pdf.entity
 
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 /**
  * @author: archko 2024/2/14 :14:32
  */
+@Entity(
+    tableName = "recent",
+)
 public class Recent {
-    public var id: Long? = 0
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    public var id: Long = 0
+
+    @ColumnInfo(name = "path")
     public var path: String? = null
+    @ColumnInfo(name = "updateAt")
     public var updateAt: Long? = 0
+    @ColumnInfo(name = "page")
     public var page: Long? = 0
+    @ColumnInfo(name = "pageCount")
     public var pageCount: Long? = 0
+    @ColumnInfo(name = "createAt")
     public var createAt: Long? = 0
 
+    @ColumnInfo(name = "crop")
     //0:autocrop,1:no crop, 2:manunal crop
     public var crop: Long? = 0
 
+    @ColumnInfo(name = "reflow")
     //0,no reflow mode,1,reflow mode
     public var reflow: Long? = 0
 
+    @ColumnInfo(name = "scrollOri")
     //0水平,1垂直
     public var scrollOri: Long? = 1
+    @ColumnInfo(name = "zoom")
     public var zoom: Double? = 1.0
+    @ColumnInfo(name = "scrollX")
     public var scrollX: Long? = 0
+    @ColumnInfo(name = "scrollY")
     public var scrollY: Long? = 0
 
     public constructor()
@@ -32,7 +53,7 @@ public class Recent {
     }
 
     public constructor(
-        id: Long,
+        //id: Long,
         path: String,
         page: Long?,
         pageCount: Long?,
@@ -45,7 +66,7 @@ public class Recent {
         scrollX: Long?,
         scrollY: Long?
     ) {
-        this.id = id
+        //this.id = id
         this.updateAt = updateAt
         this.page = page
         this.pageCount = pageCount

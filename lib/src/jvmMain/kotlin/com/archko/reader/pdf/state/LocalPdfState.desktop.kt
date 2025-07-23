@@ -21,18 +21,16 @@ import java.io.File
 import java.io.InputStream
 import java.net.URL
 
-internal const val SCALE = 1.0f
-
 @Stable
-public actual class LocalPdfState(private val document: Document) : PdfState {
-    public actual override var pageCount: Int = document.countPages()
-    override var pageSizes: List<Size> = listOf()
+public actual class LocalPdfState(private val document: Document) {
+    public actual var pageCount: Int = document.countPages()
+    public actual var pageSizes: List<Size> = listOf()
         get() = field
         set(value) {
             field = value
         }
 
-    override var outlineItems: List<Item>? = listOf()
+    public actual var outlineItems: List<Item>? = listOf()
         get() = field
         set(value) {
             field = value
@@ -84,7 +82,7 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         pageSizes = prepareSizes()
     }*/
 
-    public actual override fun renderPage(
+    public actual fun renderPage(
         index: Int,
         viewWidth: Int,
         viewHeight: Int
@@ -124,19 +122,20 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
     }
 
-    public actual override fun renderPageRegion(
+    public actual fun renderPageRegion(
         index: Int,
         viewWidth: Int,
         viewHeight: Int,
         xOffset: Int,
-        yOffset: Int
+        yOffset: Int,
+        zoom: Float,
     ): ImageBitmap {
         val page = document.loadPage(index)
         val bounds = page.bounds
         val scale: Float
         if (viewWidth > 0) {
-            // 计算原始页面的缩放比例
-            scale = (1f * viewWidth * 2 / (bounds.x1 - bounds.x0))
+            // 计算原始页面的缩放比例，纳入 chunkScale
+            scale = (1f * viewWidth / (bounds.x1 - bounds.x0)) * zoom
         } else {
             return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
         }
@@ -150,7 +149,7 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         val ctm = Matrix()
         ctm.scale(scale, scale)
         // 添加偏移，使渲染区域正确，需要考虑缩放比例
-        ctm.translate(-(xOffset / scale).toFloat(), -(yOffset / scale).toFloat())
+        ctm.translate(-(xOffset / scale), -(yOffset / scale))
 
         /* Render page to an RGB pixmap without transparency. */
         val bmp: ImageBitmap?
@@ -183,7 +182,7 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
     }
 
-    override fun close() {
+    public actual fun close() {
         document.destroy()
     }
 }

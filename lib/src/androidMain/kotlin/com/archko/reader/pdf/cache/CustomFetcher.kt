@@ -104,10 +104,16 @@ public class CustomImageFetcher(
         val ctm = Matrix()
         val xscale = 1f * width / pWidth
         val yscale = 1f * height / pHeight
-        val size = caculateSize(pWidth.toInt(), pHeight.toInt(), width, height)
+        var w: Int = width
+        var h: Int = height
+        if (xscale > yscale) {
+            h = (pHeight * xscale).toInt()
+        } else {
+            w = (pWidth * yscale).toInt()
+        }
 
         ctm.scale(xscale, yscale)
-        val bitmap = BitmapPool.acquire(size.width, size.height)
+        val bitmap = BitmapPool.acquire(w, h)
         val dev =
             AndroidDrawDevice(bitmap, 0, 0, 0, 0, bitmap.getWidth(), bitmap.getHeight())
         page.run(dev, ctm, null as Cookie?)

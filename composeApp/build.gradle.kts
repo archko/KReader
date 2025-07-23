@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.implementation
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -30,11 +31,11 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":lib"))
 
+            implementation(libs.androidx.navigation.compose)
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
-            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
             implementation(libs.jetbrains.lifecycle.viewmodel)
             implementation(libs.jetbrains.lifecycle.runtime.compose)
@@ -64,15 +65,36 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+    signingConfigs {
+        named("debug") {
+            storeFile = rootProject.file("composeApp/release_key.jks")
+            storePassword = ""
+            keyAlias = ""
+            keyPassword = ""
+        }
+    }
+    buildTypes {
+        getByName("debug") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
+
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
         }
     }
     compileOptions {

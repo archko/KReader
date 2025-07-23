@@ -6,7 +6,8 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.kotlinxSerialization)
-    alias(libs.plugins.sqldelight)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 kotlin {
@@ -22,7 +23,6 @@ kotlin {
 
     sourceSets {
         androidMain.dependencies {
-            implementation(libs.android.driver)
             implementation(libs.androidx.core)
             api(libs.mupdf.fitz.aar)
         }
@@ -31,12 +31,13 @@ kotlin {
                 implementation(compose.foundation)
                 implementation(compose.runtime)
                 implementation(libs.mmkv)
-                implementation(libs.gson)
                 implementation(compose.material3)
                 implementation(libs.jetbrains.lifecycle.viewmodel)
                 api(libs.coil.kt)
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)
+                implementation(libs.androidx.room.runtime)
+                implementation(libs.sqlite.bundled)
             }
         }
 
@@ -44,10 +45,19 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 api(libs.mupdf.fitz)
-                implementation(libs.jvm.driver)
             }
         }
     }
+}
+
+dependencies {
+    add("kspAndroid", libs.androidx.room.compiler)
+    add("kspJvm", libs.androidx.room.compiler)
+    //add("kspIosArm64", libs.androidx.room.compiler)
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 composeCompiler {
@@ -66,13 +76,5 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-sqldelight {
-    databases {
-        create("AppDatabase") {
-            packageName.set("com.archko.reader.pdf.cache")
-        }
     }
 }

@@ -1,11 +1,13 @@
 package com.archko.reader.viewer
 
+import android.net.Uri
+import android.text.TextUtils
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -25,52 +27,26 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.referentialEqualityPolicy
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -80,14 +56,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil3.compose.AsyncImage
+import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.component.ImageCache
-import com.archko.reader.pdf.component.PdfColumn
+import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.scrollbar.DraggableScrollbar
-import com.archko.reader.pdf.scrollbar.rememberDraggableScroller
 import com.archko.reader.pdf.scrollbar.scrollbarState
 import com.archko.reader.pdf.state.LocalPdfState
+import com.archko.reader.pdf.util.Dispatcher
+import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
@@ -95,20 +72,31 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.painterResource
-import java.io.File
-import java.util.Locale
 
 @Composable
-fun App(
+fun FileScreen(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
+    modifier: Modifier = Modifier,
 ) {
     Theme {
         var pdf: LocalPdfState? by remember {
             mutableStateOf(null, referentialEqualityPolicy())
+        }
+        val navController = LocalNavController.current
+        BackHandler {
+            val path = viewModel.path
+            if (path.isNullOrEmpty()) {
+                return@BackHandler
+            }
+            pdf = null
+            viewModel.path = null
+            navController.popBackStack()
         }
 
         val scope = rememberCoroutineScope()
@@ -125,7 +113,7 @@ fun App(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.White)
-                    .padding(paddingValues = PaddingValues(90.dp, 0.dp, 90.dp, 0.dp))
+                    .padding(paddingValues = PaddingValues(20.dp, 20.dp, 20.dp, 0.dp))
             ) {
                 val pickerLauncher = rememberFilePickerLauncher(
                     type = FilePickerFileType.All,
@@ -168,14 +156,14 @@ fun App(
                     LazyVerticalGrid(
                         columns = GridCells.FixedSize(140.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
                             count = recentList.size,
                             key = { index -> "$index" }
                         ) { i ->
                             recentItem(recentList[i]) {
-                                val file = KmpFile(File(it.path))
+                                val file = KmpFile(Uri.parse(it.path))
                                 pdf = LocalPdfState(file)
                                 loadProgress(viewModel, file, pdf)
                             }
@@ -195,14 +183,16 @@ fun App(
                 return@Theme
             }
 
-            PdfScreen(
+            /*PdfScreen(
                 screenWidth = screenWidthInPixels,
                 screenHeight = screenHeightInPixels,
                 pdf = pdf!!,
                 scope = scope,
                 viewModel = viewModel,
                 onClickBack = { pdf = null }
-            )
+            )*/
+            //TestUI(viewModel.path.toString())
+            CustomView(viewModel.path.toString())
         }
     }
 }
@@ -212,8 +202,14 @@ private fun loadProgress(
     file: KmpFile,
     pdf: LocalPdfState?
 ) {
-    if (pdf != null) {
-        viewModel.insertOrUpdate(file.file.absolutePath, pdf.pageCount.toLong())
+    if (pdf != null && file.uri.lastPathSegment != null) {
+        var path = IntentFile.getPath(PdfApp.app!!, file.uri)
+        if (TextUtils.isEmpty(path)) {
+            path = file.uri.toString()
+        }
+        path?.run {
+            viewModel.insertOrUpdate(path.toString(), pdf.pageCount.toLong())
+        }
     }
 }
 
@@ -225,11 +221,14 @@ fun Dp.toIntPx(): Int {
 @Composable
 private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
             .padding(1.dp)
             .clickable { click(recent) }) {
         Box(
-            modifier = Modifier.fillMaxWidth().height(180.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
                 .shadow(
                     elevation = 8.dp,
                     shape = RoundedCornerShape(8.dp),
@@ -243,8 +242,8 @@ private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
                 model = recent.path?.let {
                     CustomImageData(
                         it,
-                        180.dp.toIntPx(),
-                        135.dp.toIntPx()
+                        135.dp.toIntPx(),
+                        180.dp.toIntPx()
                     )
                 },
                 contentDescription = null,
@@ -273,45 +272,6 @@ private fun recentItem(recent: Recent, click: (Recent) -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchTextField(scope: CoroutineScope) {
-    var text by remember { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
-    val focusRequester = remember { FocusRequester() }
-
-    TextField(
-        value = text,
-        maxLines = 1,
-        onValueChange = { newText ->
-            text = newText
-        },
-        modifier = Modifier
-            .width(160.dp)
-            .focusRequester(focusRequester),
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = "Search"
-            )
-        },
-        placeholder = {
-            Text(text = "")
-        },
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Text,
-            imeAction = ImeAction.Search
-        ),
-        keyboardActions = KeyboardActions(
-            onSearch = {
-                // 在这里添加搜索逻辑，比如打印搜索内容
-                println("Searching for: ${text.lowercase(Locale.getDefault())}")
-                focusManager.clearFocus()
-            }
-        )
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 private fun PdfScreen(
@@ -323,13 +283,15 @@ private fun PdfScreen(
     viewModel: PdfViewModel,
     lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current,
 ) {
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val snackbarHostState = remember { SnackbarHostState() }
     var scale by rememberSaveable { mutableFloatStateOf(1f) }
     val lazyListState = rememberLazyListState()
     val tocLazyListState = rememberLazyListState()
-    val focusRequester1 = FocusRequester()
     var width by remember { mutableIntStateOf(screenWidth) }
     var height by remember { mutableIntStateOf(screenHeight) }
     val tocVisibile = remember { mutableStateOf(false) }
+    val showTopBar = remember { mutableStateOf(false) }
     val currentPage by remember {
         derivedStateOf { lazyListState.firstVisibleItemIndex + 1 }
     }
@@ -337,9 +299,42 @@ private fun PdfScreen(
         itemsAvailable = pdf.pageCount,
     )
 
+    var aPageList by remember { mutableStateOf(mutableListOf<APage>()) }
+
+    // 处理系统后退手势
+    BackHandler(enabled = true) {
+        if (showTopBar.value) {
+            showTopBar.value = false
+        } else {
+            onClickBack()
+        }
+    }
+
     // 在组合完成后请求焦点
     LaunchedEffect(Unit) {
-        focusRequester1.requestFocus()
+        println("开始计算页面列表，总页数: ${pdf.pageCount}")
+        scope.launch {
+            snapshotFlow {
+                if (isActive) {
+                    val list = mutableListOf<APage>()
+                    for (i in 0 until pdf.pageCount) {
+                        val pageSize = pdf.pageSizes[i]
+                        val aPage = APage(i, pageSize.width, pageSize.height, 1f)
+                        list.add(aPage)
+                    }
+                    return@snapshotFlow list
+                } else {
+                    return@snapshotFlow null
+                }
+            }.flowOn(Dispatcher.DECODE)
+                .collectLatest {
+                    if (it != null) {
+                        println("更新页面列表，大小: ${it.size}")
+                        aPageList = it
+                    }
+                }
+        }
+
         println("launch.progress:${viewModel.progress}")
         viewModel.progress?.page?.let { lazyListState.scrollToItem(it.toInt()) }
     }
@@ -371,82 +366,47 @@ private fun PdfScreen(
         }
     }
 
-    Scaffold(modifier = Modifier.background(Color.White)) { paddingValues ->
+    Scaffold { paddingValues ->
         @Composable
         fun screen() {
+            val density = LocalDensity.current
+            val scrollDistance = remember(density) { with(density) { 16.dp.toPx() } }
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
                     .background(Color.Transparent)
-                    .padding(paddingValues)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                showTopBar.value = !showTopBar.value
+                            },
+                            onTap = { offset ->
+                                val tapY = offset.y
+                                val quarterHeight = height / 4
+
+                                if (tapY < quarterHeight) {
+                                    // 向上滚动
+                                    scope.launch {
+                                        lazyListState.scrollBy(-height.toFloat() + scrollDistance)
+                                    }
+                                } else if (tapY > 3 * quarterHeight) {
+                                    // 向下滚动
+                                    scope.launch {
+                                        lazyListState.scrollBy(height.toFloat() - scrollDistance)
+                                    }
+                                }
+                            }
+                        )
+                    }
             ) {
-                PdfColumn(
+                /*PdfColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        //.padding(end = 8.dp) // 为滚动条留出空间
                         .onSizeChanged {
                             width = it.width
                             height = it.height
                             println("app.LazyColumn:$width-$height, $screenWidth-$screenHeight")
-                        }
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = {
-                                    scope.launch {
-                                        focusRequester1.requestFocus()
-                                    }
-                                }
-                            )
-                        }
-                        .focusRequester(focusRequester1)
-                        .focusable()
-                        .onKeyEvent { event ->
-                            // 处理按键按下事件
-                            if (event.type == KeyEventType.KeyDown) {
-                                //println("${event.type}, ${event.key}")
-                                when (event.key) {
-                                    Key.Enter,
-                                    Key.Spacebar -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(height.toFloat() - 10)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.PageUp -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(-height.toFloat() + 10)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.PageDown -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(height.toFloat() - 10)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.DirectionUp -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(-120f)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    Key.DirectionDown -> {
-                                        scope.launch {
-                                            lazyListState.scrollBy(120f)
-                                        }
-                                        return@onKeyEvent true
-                                    }
-
-                                    else -> return@onKeyEvent false
-                                }
-                            } else {
-                                return@onKeyEvent false // 返回 false 表示事件未处理
-                            }
                         },
-                    //.scale(scale),
                     viewWidth = width,
                     viewHeight = height,
                     state = pdf,
@@ -462,16 +422,29 @@ private fun PdfScreen(
                     onThumbMoved = lazyListState.rememberDraggableScroller(
                         itemsAvailable = pdf.pageCount,
                     ),
-                )
+                )*/
+                //DocumentView(pdf, aPageList, width, height)
+                val list = mutableListOf<APage>()
+                for (i in 0..6) {
+                    list.add(APage(i, 1024, 1280))
+                }
+                //CustomView(aPageList, pdf)
             }
         }
 
         @Composable
         fun toc() {
             if (pdf.outlineItems == null || pdf.outlineItems!!.isEmpty()) {
-                Box(modifier = Modifier.background(Color.White)) {
+                Box(
+                    modifier = Modifier
+                        .background(Color.White)
+                        .padding(paddingValues)
+                ) {
                     Text(
-                        modifier = Modifier.width(240.dp).fillMaxHeight().align(Alignment.Center),
+                        modifier = Modifier
+                            .width(240.dp)
+                            .fillMaxHeight()
+                            .align(Alignment.Center),
                         fontSize = 24.sp,
                         color = Color.Black,
                         text = "No Outline"
@@ -493,9 +466,11 @@ private fun PdfScreen(
                     }
                 }
                 LazyColumn(
-                    modifier = Modifier.width(300.dp)
+                    modifier = Modifier
+                        .width(300.dp)
                         .background(Color.White)
                         .fillMaxHeight()
+                        .padding(paddingValues)
                         .focusable(),
                     state = tocLazyListState,
                 ) {
@@ -513,14 +488,9 @@ private fun PdfScreen(
                             else -> Color.Transparent
                         }
                         Row(
-                            modifier = Modifier.background(backgroundColor)
+                            modifier = Modifier
+                                .background(backgroundColor)
                                 .padding(4.dp)
-                                .onPointerEvent(PointerEventType.Enter) {
-                                    hoverStates[i] = true
-                                }
-                                .onPointerEvent(PointerEventType.Exit) {
-                                    hoverStates[i] = false
-                                }
                                 .clickable {
                                     clickStates.forEach { clickStates[i] = false }
                                     clickStates[i] = !clickStates[i]
@@ -553,91 +523,91 @@ private fun PdfScreen(
             }
         }
 
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 左边部分，使用 Modifier.weight 让其可伸缩
+        @Composable
+        fun topBar() {
+            if (showTopBar.value) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black)
+                        .padding(paddingValues),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onClickBack) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_back),
-                            contentDescription = null
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.padding(start = 8.dp)
+                    // 左边部分，使用 Modifier.weight 让其可伸缩
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = Color.White,
-                            text = "${viewModel.progress?.path}"
-                        )
-                        Text(
-                            fontSize = 16.sp,
-                            color = Color.White,
-                            text = "$currentPage/${pdf.pageCount}"
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = {
-                        scope.launch {
-                            //ImageCache.clear()
-                            tocVisibile.value = !tocVisibile.value
-                            if (!tocVisibile.value) {
-                                focusRequester1.requestFocus()
-                            }
+                        IconButton(onClick = onClickBack) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_back),
+                                contentDescription = null
+                            )
                         }
-                    }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_back),
-                            contentDescription = null
-                        )
-                    }
-                    SearchTextField(scope)
-                    IconButton(onClick = { scale -= 0.1f }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_zoom_out),
-                            contentDescription = null
-                        )
+                        Column(
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(
+                                fontSize = 16.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = Color.White,
+                                text = "${viewModel.progress?.path}"
+                            )
+                            Text(
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                text = "$currentPage/${pdf.pageCount}"
+                            )
+                        }
                     }
 
-                    IconButton(onClick = { scale += 0.1f }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_zoom_in),
-                            contentDescription = null
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                ImageCache.clear()
+                                tocVisibile.value = !tocVisibile.value
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_back),
+                                contentDescription = null
+                            )
+                        }
+                        IconButton(onClick = { scale -= 0.1f }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_zoom_out),
+                                contentDescription = null
+                            )
+                        }
+
+                        IconButton(onClick = { scale += 0.1f }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_zoom_in),
+                                contentDescription = null
+                            )
+                        }
                     }
                 }
             }
         }
+
         if (tocVisibile.value) {
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
                     .background(Color.Transparent)
             ) {
                 screen()
                 toc()
-                /*HorizontalDivider(
-                    modifier = Modifier.width(1.dp),
-                    thickness = 1.dp,
-                    color = Color.Gray,
-                )*/
+                topBar()
             }
         } else {
             screen()
+            topBar()
         }
     }
-}
 }

@@ -2,27 +2,10 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,24 +19,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.archko.reader.pdf.state.PdfState
+import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.Dispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 @Composable
 private fun PdfSubPage(
-    state: PdfState,
+    state: LocalPdfState,
     index: Int,
     width: Int,
     height: Int,
     xOffset: Int,
     yOffset: Int,
+    scale: Float = 1f, // 添加 scale 参数
     modifier: Modifier = Modifier,
     loadingIconTint: Color = Color.White,
     errorIconTint: Color = Color.Red,
@@ -67,17 +47,17 @@ private fun PdfSubPage(
         }
     },
 ) {
-    val cacheKey = "$index-$width-$height-$xOffset-$yOffset"
+    val cacheKey = "$index-$width-$height-$xOffset-$yOffset-$scale" // 更新缓存键
     val imageState: MutableState<ImageBitmap?> = remember { mutableStateOf(ImageCache.get(cacheKey)) }
 
     if (imageState.value == null) {
         loadingIndicator()
-        DisposableEffect(index, width, height, xOffset, yOffset) {
+        DisposableEffect(index, width, height, xOffset, yOffset, scale) {
             val scope = CoroutineScope(SupervisorJob())
             scope.launch {
                 snapshotFlow {
                     if (isActive) {
-                        return@snapshotFlow state.renderPageRegion(index, width, height, xOffset, yOffset)
+                        return@snapshotFlow state.renderPageRegion(index, width, height, xOffset, yOffset, scale) // 传递 scale 参数
                     } else {
                         return@snapshotFlow null
                     }
@@ -97,7 +77,7 @@ private fun PdfSubPage(
         Image(
             painter = BitmapPainter(imageState.value!!),
             contentDescription = null,
-            contentScale = ContentScale.FillWidth,
+            contentScale = ContentScale.FillBounds,
             modifier = modifier
                 .width(with(LocalDensity.current) { width.toDp() })
                 .height(with(LocalDensity.current) { height.toDp() })
@@ -107,7 +87,7 @@ private fun PdfSubPage(
 
 @Composable
 public fun PdfPage(
-    state: PdfState,
+    state: LocalPdfState,
     index: Int,
     width: Int,
     height: Int,
@@ -150,60 +130,83 @@ public fun PdfPage(
         h = height
     }
 
-    val subWidth = width / 2
-    val subHeight = h / 2
+    if (width > 2048 || h > 2048) {
+        val subWidth = width / 2
+        val subHeight = h / 2
+        val scale = 2f
 
-    Column(
-        modifier = modifier
-            .width(with(LocalDensity.current) { width.toDp() })
-            .height(with(LocalDensity.current) { h.toDp() })
-    ) {
-        Row(
-            modifier = Modifier
+        Column(
+            modifier = modifier
                 .width(with(LocalDensity.current) { width.toDp() })
-                .height(with(LocalDensity.current) { subHeight.toDp() })
+                .height(with(LocalDensity.current) { h.toDp() })
         ) {
-            // 左上角子页面
-            PdfSubPage(
-                state = state,
-                index = index,
-                width = subWidth,
-                height = subHeight,
-                xOffset = 0,
-                yOffset = 0,
-            )
-            // 右上角子页面
-            PdfSubPage(
-                state = state,
-                index = index,
-                width = subWidth,
-                height = subHeight,
-                xOffset = subWidth,
-                yOffset = 0,
-            )
+            Row(
+                modifier = Modifier
+                    .width(with(LocalDensity.current) { width.toDp() })
+                    .height(with(LocalDensity.current) { subHeight.toDp() })
+            ) {
+                // 左上角子页面
+                PdfSubPage(
+                    state = state,
+                    index = index,
+                    width = subWidth,
+                    height = subHeight,
+                    xOffset = 0,
+                    yOffset = 0,
+                    scale = scale // 传递 scale 参数
+                )
+                // 右上角子页面
+                PdfSubPage(
+                    state = state,
+                    index = index,
+                    width = subWidth,
+                    height = subHeight,
+                    xOffset = subWidth,
+                    yOffset = 0,
+                    scale = scale // 传递 scale 参数
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .width(with(LocalDensity.current) { width.toDp() })
+                    .height(with(LocalDensity.current) { subHeight.toDp() })
+            ) {
+                // 左下角子页面
+                PdfSubPage(
+                    state = state,
+                    index = index,
+                    width = subWidth,
+                    height = subHeight,
+                    xOffset = 0,
+                    yOffset = subHeight,
+                    scale = scale // 传递 scale 参数
+                )
+                // 右下角子页面
+                PdfSubPage(
+                    state = state,
+                    index = index,
+                    width = subWidth,
+                    height = subHeight,
+                    xOffset = subWidth,
+                    yOffset = subHeight,
+                    scale = scale // 传递 scale 参数
+                )
+            }
         }
-        Row(
-            modifier = Modifier
+    } else {
+        Column(
+            modifier = modifier
                 .width(with(LocalDensity.current) { width.toDp() })
-                .height(with(LocalDensity.current) { subHeight.toDp() })
+                .height(with(LocalDensity.current) { h.toDp() })
         ) {
-            // 左下角子页面
             PdfSubPage(
                 state = state,
                 index = index,
-                width = subWidth,
-                height = subHeight,
+                width = width,
+                height = h,
                 xOffset = 0,
-                yOffset = subHeight,
-            )
-            // 右下角子页面
-            PdfSubPage(
-                state = state,
-                index = index,
-                width = subWidth,
-                height = subHeight,
-                xOffset = subWidth,
-                yOffset = subHeight,
+                yOffset = 0,
+                scale = 1f
             )
         }
     }

@@ -19,15 +19,15 @@ import java.io.InputStream
 import java.net.URL
 
 @Stable
-public actual class LocalPdfState(private val document: Document) : PdfState {
-    public actual override var pageCount: Int = document.countPages()
-    override var pageSizes: List<Size> = listOf()
+public actual class LocalPdfState(private val document: Document) {
+    public actual var pageCount: Int = document.countPages()
+    public actual var pageSizes: List<Size> = listOf()
         get() = field
         set(value) {
             field = value
         }
 
-    override var outlineItems: List<Item>? = listOf()
+    public actual var outlineItems: List<Item>? = listOf()
         get() = field
         set(value) {
             field = value
@@ -79,13 +79,13 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         pageSizes = prepareSizes()
     }*/
 
-    public actual override fun renderPage(
+    public actual fun renderPage(
         index: Int,
         viewWidth: Int,
         viewHeight: Int
     ): ImageBitmap {
         if (viewWidth <= 0) {
-            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
+            return (ImageBitmap(1024, viewHeight, ImageBitmapConfig.Rgb565))
         }
         val page = document.loadPage(index)
         val bounds = page.bounds
@@ -106,12 +106,13 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         return (bitmap.asImageBitmap())
     }
 
-    public actual override fun renderPageRegion(
+    public actual fun renderPageRegion(
         index: Int,
         viewWidth: Int,
         viewHeight: Int,
         xOffset: Int,
-        yOffset: Int
+        yOffset: Int,
+        zoom: Float
     ): ImageBitmap {
         if (viewWidth <= 0) {
             return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
@@ -141,7 +142,7 @@ public actual class LocalPdfState(private val document: Document) : PdfState {
         return (bitmap.asImageBitmap())
     }
 
-    override fun close() {
+    public actual fun close() {
         document.destroy()
     }
 }
