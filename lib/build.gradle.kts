@@ -28,6 +28,7 @@ kotlin {
         }
         commonMain {
             dependencies {
+                implementation(compose.components.resources)
                 implementation(compose.foundation)
                 implementation(compose.runtime)
                 implementation(libs.mmkv)
@@ -77,4 +78,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    experimentalProperties["android.experimental.kmp.enableAndroidResources"] = true
 }

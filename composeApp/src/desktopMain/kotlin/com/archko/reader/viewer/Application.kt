@@ -96,6 +96,10 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_zoom_in
+import kreader.composeapp.generated.resources.ic_zoom_out
 import org.jetbrains.compose.resources.painterResource
 import java.io.File
 import java.util.Locale
@@ -290,10 +294,10 @@ fun SearchTextField(scope: CoroutineScope) {
             .width(160.dp)
             .focusRequester(focusRequester),
         leadingIcon = {
-            Icon(
+            /*Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search"
-            )
+            )*/
         },
         placeholder = {
             Text(text = "")
@@ -566,7 +570,7 @@ private fun PdfScreen(
                 ) {
                     IconButton(onClick = onClickBack) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_back),
+                            painter = painterResource(Res.drawable.ic_back),
                             contentDescription = null
                         )
                     }
@@ -601,21 +605,21 @@ private fun PdfScreen(
                         }
                     }) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_back),
+                            painter = painterResource(Res.drawable.ic_back),
                             contentDescription = null
                         )
                     }
                     SearchTextField(scope)
                     IconButton(onClick = { scale -= 0.1f }) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_zoom_out),
+                            painter = painterResource(Res.drawable.ic_zoom_out),
                             contentDescription = null
                         )
                     }
 
                     IconButton(onClick = { scale += 0.1f }) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_zoom_in),
+                            painter = painterResource(Res.drawable.ic_zoom_in),
                             contentDescription = null
                         )
                     }
@@ -639,5 +643,4 @@ private fun PdfScreen(
             screen()
         }
     }
-}
 }

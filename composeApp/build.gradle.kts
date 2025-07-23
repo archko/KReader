@@ -31,6 +31,7 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":lib"))
 
+            implementation(compose.components.resources)
             implementation(libs.androidx.navigation.compose)
             implementation(compose.runtime)
             implementation(compose.foundation)

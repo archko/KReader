@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -76,6 +75,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_zoom_in
+import kreader.composeapp.generated.resources.ic_zoom_out
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun FileScreen(
@@ -541,7 +545,7 @@ private fun PdfScreen(
                     ) {
                         IconButton(onClick = onClickBack) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_back),
+                                painter = painterResource(Res.drawable.ic_back),
                                 contentDescription = null
                             )
                         }
@@ -573,20 +577,20 @@ private fun PdfScreen(
                             }
                         }) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_back),
+                                painter = painterResource(Res.drawable.ic_back),
                                 contentDescription = null
                             )
                         }
                         IconButton(onClick = { scale -= 0.1f }) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_zoom_out),
+                                painter = painterResource(Res.drawable.ic_zoom_out),
                                 contentDescription = null
                             )
                         }
 
                         IconButton(onClick = { scale += 0.1f }) {
                             Icon(
-                                painter = painterResource(R.drawable.ic_zoom_in),
+                                painter = painterResource(Res.drawable.ic_zoom_in),
                                 contentDescription = null
                             )
                         }
