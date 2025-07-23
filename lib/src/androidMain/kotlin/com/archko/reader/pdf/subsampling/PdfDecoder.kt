@@ -2,7 +2,6 @@ package com.archko.reader.pdf.subsampling
 
 import android.graphics.Bitmap
 import android.graphics.Rect
-import android.os.Environment
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
@@ -11,14 +10,12 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.subsampling.internal.ImageDecoder
-import com.archko.reader.pdf.util.BitmapUtils
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
-import com.archko.reader.pdf.component.ImageCache
 
 /**
  * @author: archko 2025/4/11 :11:26

@@ -1,6 +1,5 @@
 package com.archko.reader.pdf.cache
 
-import android.app.Application
 import android.content.Context
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver

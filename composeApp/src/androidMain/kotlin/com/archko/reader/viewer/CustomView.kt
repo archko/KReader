@@ -39,10 +39,24 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import ovh.plrapps.mapcompose.core.throttle
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.flow.receiveAsFlow
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
+
+fun CoroutineScope.throttle(wait: Long, block: suspend () -> Unit): SendChannel<Unit> {
+    val channel = Channel<Unit>(capacity = Channel.CONFLATED)
+    val flow = channel.receiveAsFlow()
+
+    launch {
+        flow.collect {
+            block()
+            delay(wait)
+        }
+    }
+    return channel
+}
 
 private class PageNode(
     private val pdfViewState: PdfViewState,

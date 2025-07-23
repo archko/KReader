@@ -39,7 +39,7 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun App(
+fun KApp(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
