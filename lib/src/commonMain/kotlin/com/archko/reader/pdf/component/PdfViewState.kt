@@ -158,7 +158,6 @@ public class PdfViewState(
             list.zip(pages).forEach { (aPage, page) ->
                 val scaledPageWidth = viewSize.width * vZoom
                 val pageScale = scaledPageWidth / aPage.width
-                aPage.scale = pageScale
                 val scaledPageHeight = aPage.height * pageScale
                 val bounds = Rect(
                     0f,
@@ -166,7 +165,8 @@ public class PdfViewState(
                     scaledPageWidth,
                     currentY + scaledPageHeight
                 )
-                page.update(viewSize, pageScale, bounds)
+                // 直接用最终宽高初始化Page
+                page.update(scaledPageWidth, scaledPageHeight, bounds)
                 currentY += scaledPageHeight
                 println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage")
             }
@@ -178,10 +178,14 @@ public class PdfViewState(
 
     private fun createPages(): List<Page> {
         val list = list.map { aPage ->
+            // 初始化时直接用viewSize和vZoom计算的宽高
+            val scaledPageWidth = viewSize.width * 1f
+            val pageScale = if (aPage.width == 0) 1f else scaledPageWidth / aPage.width
+            val scaledPageHeight = aPage.height * pageScale
             Page(
                 this,
-                viewSize,
-                1f,
+                scaledPageWidth,
+                scaledPageHeight,
                 aPage,
                 0f,
             )
@@ -198,6 +202,7 @@ public class PdfViewState(
         this.vZoom = vZoom
         if (isViewSizeChanged || isZoomChanged) {
             invalidatePageSizes()
+            update++
         } else {
             println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         }
@@ -208,15 +213,15 @@ public class PdfViewState(
         page: APage,
         cacheKey: String,
         pageScale: Float,
-        vZoom: Float
+        pageWidth: Float,
+        pageHeight: Float
     ) {
         val tileSpec = TileSpec(
             page.index,
-            pageScale,
-            vZoom,
+            pageScale, // totalScale
             logicalRect,
-            page.width,
-            page.height,
+            pageWidth.toInt(), // 原始宽高
+            pageHeight.toInt(),
             viewSize,
             cacheKey,
             null
@@ -232,18 +237,18 @@ public class PdfViewState(
         page: APage,
         cacheKey: String,
         pageScale: Float,
-        vZoom: Float
+        pageWidth: Float,
+        pageHeight: Float
     ) {
         if (ImageCache.get(cacheKey) != null) return // 已有缓存
         if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
         requestedTiles.add(cacheKey)
         val tileSpec = TileSpec(
             page.index,
-            pageScale,
-            vZoom,
+            pageScale, // totalScale
             logicalRect,
-            page.width,
-            page.height,
+            pageWidth.toInt(), // 原始宽高
+            pageHeight.toInt(),
             viewSize,
             cacheKey,
             null

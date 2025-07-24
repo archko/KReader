@@ -14,11 +14,12 @@ import com.archko.reader.pdf.entity.APage
  */
 public class Page(
     private val pdfViewState: PdfViewState,
-    private var viewSize: IntSize,
-    private var scale: Float,   // pageScale
+    public var width: Float,   // 最终缩放后的宽
+    public var height: Float,  // 最终缩放后的高
     internal var aPage: APage,
     public var yOffset: Float = 0f
 ) {
+    public var totalScale: Float = 1f
     public var nodes: List<PageNode> = emptyList()
 
     //page bound, should be caculate after view measured
@@ -29,12 +30,12 @@ public class Page(
      * @param scale view zoom,not the page zoom,default=1f
      * @param yOffset page.top
      */
-    public fun update(viewSize: IntSize, scale: Float, rect: Rect) {
-        this.viewSize = viewSize
-        this.scale = scale
+    public fun update(width: Float, height: Float, rect: Rect) {
+        this.width = width
+        this.height = height
         this.bounds = rect
         this.yOffset = bounds.top
-
+        this.totalScale = if (aPage.width == 0) 1f else width / aPage.width
         recalculateNodes()
     }
 
@@ -42,65 +43,39 @@ public class Page(
         if (!isVisible(drawScope, offset, bounds, aPage.index)) {
             return
         }
-        val pageWidth = aPage.width.toFloat()
-        val pageHeight = aPage.height.toFloat()
         nodes.forEach { node ->
-            node.draw(drawScope, offset, pageWidth, pageHeight, yOffset, scale, vZoom)
+            node.draw(drawScope, offset, width, height, yOffset, totalScale)
         }
-        val totalScale = scale * vZoom
+        // 占位框
         drawScope.drawRect(
             color = Color.Yellow,
-            topLeft = Offset(0f, bounds.top * totalScale),
-            size = Size(bounds.width * totalScale, bounds.height * totalScale),
+            topLeft = Offset(0f, bounds.top),
+            size = Size(bounds.width, bounds.height),
             style = Stroke(width = 8f)
         )
     }
 
     private fun recalculateNodes() {
-        if (viewSize == IntSize.Zero) return
-
         val rootNode = PageNode(
             pdfViewState,
-            Rect(0f, 0f, 1f, 1f), // 逻辑坐标全页
+            Rect(0f, 0f, 1f, 1f),
             Rect(0f, 0f, 1f, 1f),
             aPage
         )
-
-        println("page.recalculateNodes.scale:$scale, offset:$yOffset, $bounds, w-h:${bounds.width}-${bounds.height}, $aPage")
         nodes = calculatePages(rootNode)
     }
 
     private fun calculatePages(page: PageNode): List<PageNode> {
         val rect = page.logicalRect
         val area = (rect.right - rect.left) * (rect.bottom - rect.top)
-        if (area > 0.25f) { // 这里假设分4块，实际可根据需要调整
+        if (area > 0.25f) {
             val halfW = (rect.left + rect.right) / 2
             val halfH = (rect.top + rect.bottom) / 2
             return listOf(
-                PageNode(
-                    pdfViewState,
-                    Rect(rect.left, rect.top, halfW, halfH),
-                    Rect(0f, 0f, 0.5f, 0.5f),
-                    page.aPage
-                ),
-                PageNode(
-                    pdfViewState,
-                    Rect(halfW, rect.top, rect.right, halfH),
-                    Rect(0.5f, 0f, 1f, 0.5f),
-                    page.aPage
-                ),
-                PageNode(
-                    pdfViewState,
-                    Rect(rect.left, halfH, halfW, rect.bottom),
-                    Rect(0f, 0.5f, 0.5f, 1f),
-                    page.aPage
-                ),
-                PageNode(
-                    pdfViewState,
-                    Rect(halfW, halfH, rect.right, rect.bottom),
-                    Rect(0.5f, 0.5f, 1f, 1f),
-                    page.aPage
-                )
+                PageNode(pdfViewState, Rect(rect.left, rect.top, halfW, halfH), Rect(0f, 0f, 0.5f, 0.5f), page.aPage),
+                PageNode(pdfViewState, Rect(halfW, rect.top, rect.right, halfH), Rect(0.5f, 0f, 1f, 0.5f), page.aPage),
+                PageNode(pdfViewState, Rect(rect.left, halfH, halfW, rect.bottom), Rect(0f, 0.5f, 0.5f, 1f), page.aPage),
+                PageNode(pdfViewState, Rect(halfW, halfH, rect.right, rect.bottom), Rect(0.5f, 0.5f, 1f, 1f), page.aPage)
             ).flatMap { calculatePages(it) }
         }
         return listOf(page)
@@ -112,8 +87,8 @@ public class Page(
 
         other as Page
 
-        if (viewSize != other.viewSize) return false
-        if (scale != other.scale) return false
+        if (width != other.width) return false
+        if (height != other.height) return false
         if (aPage != other.aPage) return false
         if (yOffset != other.yOffset) return false
         if (nodes != other.nodes) return false
@@ -123,8 +98,8 @@ public class Page(
     }
 
     override fun hashCode(): Int {
-        var result = viewSize.hashCode()
-        result = 31 * result + scale.hashCode()
+        var result = width.hashCode()
+        result = 31 * result + height.hashCode()
         result = 31 * result + aPage.hashCode()
         result = 31 * result + yOffset.hashCode()
         result = 31 * result + nodes.hashCode()

@@ -19,14 +19,13 @@ public class PageNode(
     public var logicalBounds: Rect, // 逻辑坐标(0~1)
     public val aPage: APage
 ) {
-    // 逻辑rect转实际像素，需乘以pageScale和vZoom
-    public fun toPixelRect(pageWidth: Float, pageHeight: Float, yOffset: Float, pageScale: Float, vZoom: Float): Rect {
-        val totalScale = pageScale * vZoom
+    // 逻辑rect转实际像素，直接用Page的width/height
+    public fun toPixelRect(pageWidth: Float, pageHeight: Float, yOffset: Float): Rect {
         return Rect(
-            left = logicalRect.left * pageWidth * totalScale,
-            top = logicalRect.top * pageHeight * totalScale + yOffset * totalScale,
-            right = logicalRect.right * pageWidth * totalScale,
-            bottom = logicalRect.bottom * pageHeight * totalScale + yOffset * totalScale
+            left = logicalRect.left * pageWidth,
+            top = logicalRect.top * pageHeight + yOffset,
+            right = logicalRect.right * pageWidth,
+            bottom = logicalRect.bottom * pageHeight + yOffset
         )
     }
 
@@ -41,7 +40,7 @@ public class PageNode(
     }
 
     public val cacheKey: String
-        get() = "${aPage.index}-${logicalRect}-${aPage.scale}-${pdfViewState.vZoom}"
+        get() = "${aPage.index}-${logicalRect}-${pdfViewState.vZoom}-${pdfViewState.pages.find { it.aPage == aPage }?.width ?: 0f}-${pdfViewState.pages.find { it.aPage == aPage }?.height ?: 0f}-${pdfViewState.pages.find { it.aPage == aPage }?.totalScale ?: 1f}"
 
     public fun draw(
         drawScope: DrawScope,
@@ -49,23 +48,23 @@ public class PageNode(
         pageWidth: Float,
         pageHeight: Float,
         yOffset: Float,
-        pageScale: Float,
-        vZoom: Float
+        totalScale: Float
     ) {
-        val pixelRect = toPixelRect(pageWidth, pageHeight, yOffset, pageScale, vZoom)
+        val pixelRect = toPixelRect(pageWidth, pageHeight, yOffset)
         val loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
-        println("[PageNode.draw] page=${aPage.index}, logicalRect=$logicalRect, pageWidth=$pageWidth, pageHeight=$pageHeight, yOffset=$yOffset, pageScale=$pageScale, vZoom=$vZoom, pixelRect=$pixelRect, bitmapSize=${loadedBitmap?.width}x${loadedBitmap?.height}")
+        println("[PageNode.draw] page=${aPage.index}, logicalRect=$logicalRect, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${loadedBitmap?.width}x${loadedBitmap?.height}")
         if (!isVisible(drawScope, offset, pixelRect, aPage.index)) {
-            pdfViewState.remove(logicalRect, aPage, cacheKey, pageScale, vZoom)
+            pdfViewState.remove(logicalRect, aPage, cacheKey, totalScale, pageWidth, pageHeight)
             return
         }
         if (loadedBitmap != null) {
             drawScope.drawImage(
                 loadedBitmap,
-                dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt())
+                dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
             )
         } else {
-            pdfViewState.decode(logicalRect, aPage, cacheKey, pageScale, vZoom)
+            pdfViewState.decode(logicalRect, aPage, cacheKey, totalScale, pageWidth, pageHeight)
             drawScope.drawRect(
                 color = Color.Magenta,
                 topLeft = Offset(pixelRect.left, pixelRect.top),

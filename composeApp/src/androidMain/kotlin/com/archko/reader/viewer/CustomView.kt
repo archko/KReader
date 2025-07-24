@@ -71,7 +71,7 @@ fun CustomView(path: String) {
             return list
         }
 
-        var list: MutableList<APage> = remember {
+        val list: MutableList<APage> = remember {
             createList(decoder!!)
         }
         Box(

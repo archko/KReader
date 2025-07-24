@@ -67,7 +67,6 @@ public fun DocumentView(
         if (viewSize != IntSize.Zero) {
             println("DocumentView: 更新ViewSize:$viewSize, vZoom:$vZoom, list: ${list.size}")
             pdfViewState.updateViewSize(viewSize, vZoom)
-            pdfViewState.update++
         }
     }
 
@@ -263,9 +262,6 @@ public fun DocumentView(
                         size = visibleRect.size
                     )*/
                     pdfViewState.pages.forEach { page ->
-                        val pageWidth = page.bounds.width
-                        val pageHeight = page.bounds.height
-                        val yOffset = page.yOffset
                         page.draw(this, offset, pdfViewState.vZoom)
                     }
                 }
