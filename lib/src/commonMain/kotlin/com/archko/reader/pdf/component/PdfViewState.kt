@@ -86,7 +86,7 @@ public class PdfViewState(
         }
     }
 
-    private val renderTask = scope.throttle(wait = 34) {
+    private val renderTask = scope.throttle(wait = 50) {
         //evictTiles(lastVisible)
         setVisibilePage()
     }
@@ -105,6 +105,7 @@ public class PdfViewState(
                     tilesCollected.add(tile)
                 }
             } else {
+                println("PdfViewState:remove:$tile")
                 tilesCollected.remove(tile)
                 //ImageCache.remove(tile.cacheKey)
             }
@@ -114,6 +115,7 @@ public class PdfViewState(
     }
 
     private fun renderThrottled() {
+        println("PdfViewState:renderThrottled.size:${tilesCollected.size}")
         renderTask.trySend(Unit)
     }
 
@@ -331,7 +333,7 @@ public class PdfViewState(
             // 这里假设 PageNode.cacheKey 生成方式为："${aPage.index}-${rect}-${aPage.scale}"
             if (page is Page) {
                 page.nodes.map { node ->
-                    "${node.aPage.index}-${node.logicalRect}-${node.aPage.scale}"
+                    "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
                 }
             } else emptyList()
         }.toSet()

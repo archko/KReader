@@ -58,26 +58,47 @@ public class Page(
         val rootNode = PageNode(
             pdfViewState,
             Rect(0f, 0f, 1f, 1f),
-            Rect(0f, 0f, 1f, 1f),
             aPage
         )
         nodes = calculatePages(rootNode)
     }
 
     private fun calculatePages(page: PageNode): List<PageNode> {
-        val rect = page.logicalRect
-        val area = (rect.right - rect.left) * (rect.bottom - rect.top)
-        if (area > 0.25f) {
-            val halfW = (rect.left + rect.right) / 2
-            val halfH = (rect.top + rect.bottom) / 2
-            return listOf(
-                PageNode(pdfViewState, Rect(rect.left, rect.top, halfW, halfH), Rect(0f, 0f, 0.5f, 0.5f), page.aPage),
-                PageNode(pdfViewState, Rect(halfW, rect.top, rect.right, halfH), Rect(0.5f, 0f, 1f, 0.5f), page.aPage),
-                PageNode(pdfViewState, Rect(rect.left, halfH, halfW, rect.bottom), Rect(0f, 0.5f, 0.5f, 1f), page.aPage),
-                PageNode(pdfViewState, Rect(halfW, halfH, rect.right, rect.bottom), Rect(0.5f, 0.5f, 1f, 1f), page.aPage)
-            ).flatMap { calculatePages(it) }
+        val minBlockSize = 512f
+        val maxBlockSize = 512f * 1.41f // ≈724
+        val pageWidth = width
+        val pageHeight = height
+        val totalPixels = pageWidth * pageHeight
+        if (totalPixels < minBlockSize * minBlockSize * 2) {
+            // 不分块
+            return listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
         }
-        return listOf(page)
+        // 计算分块数
+        fun calcBlockCount(length: Float, min: Float, max: Float): Int {
+            val minCount = kotlin.math.ceil(length / max).toInt()
+            val maxCount = kotlin.math.floor(length / min).toInt().coerceAtLeast(1)
+            // 在[minCount, maxCount]区间内，优先选能整除的块数，否则选minCount
+            for (count in minCount..maxCount) {
+                val block = length / count
+                if (block in minBlockSize..maxBlockSize) {
+                    return count
+                }
+            }
+            return minCount
+        }
+        val xBlocks = calcBlockCount(pageWidth, minBlockSize, maxBlockSize)
+        val yBlocks = calcBlockCount(pageHeight, minBlockSize, maxBlockSize)
+        val nodes = mutableListOf<PageNode>()
+        for (y in 0 until yBlocks) {
+            for (x in 0 until xBlocks) {
+                val left = x / xBlocks.toFloat()
+                val top = y / yBlocks.toFloat()
+                val right = (x + 1) / xBlocks.toFloat()
+                val bottom = (y + 1) / yBlocks.toFloat()
+                nodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
+            }
+        }
+        return nodes
     }
 
     override fun equals(other: Any?): Boolean {
