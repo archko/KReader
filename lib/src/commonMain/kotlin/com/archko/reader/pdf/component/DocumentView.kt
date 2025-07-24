@@ -169,7 +169,7 @@ public fun DocumentView(
                                             )
 
                                             vZoom = newZoom
-                                            println("zoom:$vZoom, $centroid, $offset")
+                                            println("DocumentView.zoom:$vZoom, $centroid, $offset")
                                             pdfViewState.updateOffset(offset)
                                         }
                                         event.changes.fastForEach {
