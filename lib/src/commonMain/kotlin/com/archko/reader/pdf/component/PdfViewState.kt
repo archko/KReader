@@ -352,4 +352,17 @@ public class PdfViewState(
             pageToRender = tilesToRenderCopy
         }
     }
+
+    public enum class Align { Top, Center, Bottom }
+
+    public fun goToPage(pageIndex: Int, align: Align = Align.Top) {
+        val page = pages.getOrNull(pageIndex) ?: return
+        val targetOffsetY = when (align) {
+            Align.Top -> page.bounds.top
+            Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
+            Align.Bottom -> page.bounds.bottom - viewSize.height
+        }
+        val clampedY = -targetOffsetY.coerceIn(-(totalHeight - viewSize.height).coerceAtLeast(0f), 0f)
+        updateOffset(Offset(viewOffset.x, clampedY))
+    }
 }

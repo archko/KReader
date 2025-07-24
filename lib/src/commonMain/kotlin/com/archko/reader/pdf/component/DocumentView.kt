@@ -3,22 +3,10 @@ package com.archko.reader.pdf.component
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -32,6 +20,7 @@ import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.cache.ImageCache
@@ -48,7 +37,10 @@ import kotlin.math.abs
 @Composable
 public fun DocumentView(
     list: MutableList<APage>,
-    state: ImageDecoder
+    state: ImageDecoder,
+    jumpToPage: Int? = null,
+    align: PdfViewState.Align = PdfViewState.Align.Top,
+    onDocumentClosed: ((page: Int, pageCount: Int, zoom: Double) -> Unit)? = null
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -57,6 +49,7 @@ public fun DocumentView(
     val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val keepPx = with(density) { 6.dp.toPx() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
 
     val pdfViewState = remember(list) {
@@ -71,9 +64,35 @@ public fun DocumentView(
         }
     }
 
+    // 外部传入jumpToPage时自动跳转
+    LaunchedEffect(jumpToPage, align) {
+        if (jumpToPage != null) {
+            pdfViewState.goToPage(jumpToPage, align)
+        }
+    }
+
     DisposableEffect(list) {
         onDispose {
-            println("DocumentView: shutdown:$viewSize, vZoom:$vZoom, list: ${list.size}")
+            var lastPage = 0
+            val pages = pdfViewState.pages
+            if (pages.isNotEmpty()) {
+                val offsetY = offset.y
+                val firstVisible = pages.indexOfFirst { page ->
+                    val top = -offsetY
+                    val bottom = top + viewSize.height
+                    page.bounds.bottom > top && page.bounds.top < bottom
+                }
+                if (firstVisible != -1 && firstVisible != lastPage) {
+                    lastPage = firstVisible
+                }
+            }
+
+            val currentPage = lastPage
+            val pageCount = list.size
+            val zoom = vZoom.toDouble()
+            println("DocumentView: shutdown:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}")
+            onDocumentClosed?.invoke(currentPage, pageCount, zoom)
+
             pdfViewState.shutdown()
             ImageCache.clear()
         }
@@ -85,6 +104,28 @@ public fun DocumentView(
             .onSizeChanged {
                 viewSize = it
                 pdfViewState.updateViewSize(viewSize, vZoom)
+            }
+            .pointerInput(viewSize, keepPx) {
+                detectTapGestures { offsetTap ->
+                    val y = offsetTap.y
+                    val height = viewSize.height.toFloat()
+                    when {
+                        y < height / 4 -> {
+                            // 顶部1/4，向上滚动一屏，保留6dp
+                            val newY = (offset.y + viewSize.height - keepPx).coerceAtMost(0f)
+                            offset = Offset(offset.x, newY)
+                            pdfViewState.updateOffset(offset)
+                        }
+
+                        y > height * 3 / 4 -> {
+                            // 底部1/4，向下滚动一屏，保留6dp
+                            val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
+                            offset = Offset(offset.x, newY)
+                            pdfViewState.updateOffset(offset)
+                        }
+                    }
+                }
             },
         contentAlignment = Alignment.TopStart
     ) {

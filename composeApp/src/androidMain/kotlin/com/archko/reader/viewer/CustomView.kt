@@ -3,13 +3,7 @@ package com.archko.reader.viewer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
@@ -25,7 +19,10 @@ import java.io.File
  * @author: archko 2025/7/23 :09:09
  */
 @Composable
-fun CustomView(path: String) {
+fun CustomView(
+    path: String, progressPage: Int? = null,
+    onDocumentClosed: ((Int, Int, Double) -> Unit)? = null,
+) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     LaunchedEffect(path) {
@@ -79,8 +76,10 @@ fun CustomView(path: String) {
                 .fillMaxSize()
                 .onSizeChanged { viewportSize = it }) {
             DocumentView(
-                list,
-                decoder!!
+                list = list,
+                state = decoder!!,
+                jumpToPage = progressPage,
+                onDocumentClosed = onDocumentClosed
             )
         }
     }

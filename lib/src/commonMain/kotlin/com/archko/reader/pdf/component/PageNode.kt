@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 
@@ -40,17 +41,18 @@ public class PageNode(
         totalScale: Float
     ) {
         val pixelRect = toPixelRect(pageWidth, pageHeight, yOffset)
-        val loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
         if (!isVisible(drawScope, offset, pixelRect, aPage.index)) {
             pdfViewState.remove(bounds, aPage, cacheKey, totalScale, pageWidth, pageHeight)
             return
         }
+
+        val loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
         if (loadedBitmap != null) {
             //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${loadedBitmap.width}x${loadedBitmap.height}")
             drawScope.drawImage(
                 loadedBitmap,
                 dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),
-                dstSize = androidx.compose.ui.unit.IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
+                dstSize = IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
             )
         } else {
             pdfViewState.decode(bounds, aPage, cacheKey, totalScale, pageWidth, pageHeight)

@@ -35,6 +35,8 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 
+data class OpenDocRequest(val path: String, val page: Int?)
+
 @Composable
 fun FileScreen(
     screenWidthInPixels: Int,
@@ -44,31 +46,27 @@ fun FileScreen(
     onShowBottomBarChanged: (Boolean) -> Unit = {}
 ) {
     Theme {
-        var pdf: LocalPdfState? by remember {
-            mutableStateOf(null, referentialEqualityPolicy())
-        }
         val scope = rememberCoroutineScope()
-
         val recentList by viewModel.recentList.collectAsState()
+        var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
+
         LaunchedEffect(Unit) {
-            val recents = viewModel.loadRecents()
-            println("recents:$recents")
+            viewModel.loadRecents()
         }
 
-        // 优化返回逻辑：只在pdf!=null时启用BackHandler
-        BackHandler(enabled = pdf != null) {
-            pdf = null
+        BackHandler(enabled = openDocRequest != null) {
+            openDocRequest = null
             viewModel.path = null
-            viewModel.loadRecents() // 关闭文档时刷新最近列表
+            viewModel.loadRecents()
         }
 
         Surface(
             modifier = modifier
                 .statusBarsPadding()
                 .fillMaxSize(),
-            color = Color(0xFFF5F5F5) // 设置为浅灰色背景
+            color = Color(0xFFF5F5F5)
         ) {
-            if (pdf == null) {
+            if (openDocRequest == null) {
                 onShowBottomBarChanged(true)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -82,9 +80,15 @@ fun FileScreen(
                     ) { files ->
                         scope.launch {
                             files.singleOrNull()?.let { file ->
-                                pdf = null // 先清空，避免状态复用
-                                pdf = LocalPdfState(file)
-                                loadProgress(viewModel, file, pdf)
+                                val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
+                                // 查询历史进度
+                                val recent = viewModel.recentList.value.find { it.path == path }
+                                val page = recent?.page?.toInt()
+                                val pdf = LocalPdfState(file)
+                                scope.launch {
+                                    loadProgress(viewModel, file, pdf)
+                                    openDocRequest = OpenDocRequest(path, page)
+                                }
                             }
                         }
                     }
@@ -113,7 +117,7 @@ fun FileScreen(
                             columns = GridCells.Adaptive(100.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 56.dp) // 防止被BottomBar遮挡
+                            modifier = Modifier.padding(bottom = 56.dp)
                         ) {
                             items(
                                 count = recentList.size,
@@ -123,9 +127,13 @@ fun FileScreen(
                                     recent = recentList[i],
                                     onClick = {
                                         val file = KmpFile(Uri.parse(it.path))
-                                        pdf = null // 先清空，避免状态复用
-                                        pdf = LocalPdfState(file)
-                                        loadProgress(viewModel, file, pdf)
+                                        val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
+                                        val page = it.page?.toInt()
+                                        val pdf = LocalPdfState(file)
+                                        scope.launch {
+                                            loadProgress(viewModel, file, pdf)
+                                            openDocRequest = OpenDocRequest(path, page)
+                                        }
                                     },
                                     onDelete = {
                                         viewModel.deleteRecent(recentList[i])
@@ -137,18 +145,19 @@ fun FileScreen(
                 }
             } else {
                 onShowBottomBarChanged(false)
-                if (pdf!!.pageCount < 1) {
-                    Text(
-                        fontSize = 16.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = Color.White,
-                        text = "Error"
-                    )
-                    return@Surface
-                }
-
-                CustomView(viewModel.path.toString())
+                CustomView(
+                    path = openDocRequest!!.path,
+                    progressPage = openDocRequest!!.page,
+                    onDocumentClosed = { page, pageCount, zoom ->
+                        viewModel.updateProgress(
+                            page = page.toLong(),
+                            pageCount = pageCount.toLong(),
+                            zoom = zoom,
+                            crop = 0L
+                        )
+                        viewModel.loadRecents()
+                    }
+                )
             }
         }
     }

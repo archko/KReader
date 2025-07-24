@@ -46,12 +46,12 @@ public class PdfViewModel : ViewModel() {
                 database?.recentDao()?.updateRecent(selProgress)
             }
             progress = database?.recentDao()?.getRecent(path)
-            println("insertOrUpdate:${progress}")
+            println("PdfViewModel.insertOrUpdate:${progress}")
         }
     }
 
     public fun updateProgress(page: Long, pageCount: Long, zoom: Double, crop: Long) {
-        println("updateProgress:$page, pc:$pageCount, old:$progress")
+        println("PdfViewModel.updateProgress:$page, pc:$pageCount, old:$progress")
         progress?.run {
             viewModelScope.launch {
                 progress!!.apply {
@@ -73,6 +73,7 @@ public class PdfViewModel : ViewModel() {
     public fun loadRecents() {
         viewModelScope.launch {
             val progresses = database?.recentDao()?.getRecents(0, 100)
+            println("PdfViewModel.loadRecents:${progresses?.size}")
             if (progresses != null) {
                 if (progresses.isNotEmpty()) {
                     _recentList.value = progresses
@@ -91,7 +92,7 @@ public class PdfViewModel : ViewModel() {
     public fun deleteRecent(recent: Recent) {
         viewModelScope.launch {
             database?.recentDao()?.deleteRecent(recent)
-            println("deleteRecent:${recent}")
+            println("PdfViewModel.deleteRecent:${recent}")
             loadRecents()
         }
     }
