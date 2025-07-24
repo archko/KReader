@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.flinger.FlingConfiguration
@@ -74,6 +75,7 @@ public fun DocumentView(
         onDispose {
             println("DocumentView: shutdown:$viewSize, vZoom:$vZoom, list: ${list.size}")
             pdfViewState.shutdown()
+            ImageCache.clear()
         }
     }
 

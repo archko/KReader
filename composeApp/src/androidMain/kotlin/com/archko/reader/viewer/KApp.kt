@@ -4,6 +4,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -16,6 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -28,6 +32,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.navigation.MainDestinations
 import com.archko.reader.viewer.navigation.rememberKNavController
+import androidx.compose.ui.unit.dp
 
 val LocalNavController = compositionLocalOf<NavHostController> {
     error("No NavHostController provided in LocalNavController")
@@ -81,13 +86,16 @@ fun MainContainer(
     val nestedNavController = rememberKNavController()
     val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    var showBottomBar by remember { mutableStateOf(true) }
     Scaffold(
         bottomBar = {
-            KBottomBar(
-                tabs = HomeSections.entries.toTypedArray(),
-                currentRoute = currentRoute ?: HomeSections.FILE.route,
-                navigateToRoute = nestedNavController::navigateToBottomBarRoute,
-            )
+            if (showBottomBar) {
+                KBottomBar(
+                    tabs = HomeSections.entries.toTypedArray(),
+                    currentRoute = currentRoute ?: HomeSections.FILE.route,
+                    navigateToRoute = nestedNavController::navigateToBottomBarRoute,
+                )
+            }
         },
         modifier = modifier,
     ) { padding ->
@@ -101,6 +109,7 @@ fun MainContainer(
                 viewModel,
                 modifier = Modifier
                     .consumeWindowInsets(padding),
+                onShowBottomBarChanged = { showBottomBar = it }
             )
         }
     }
@@ -111,6 +120,7 @@ fun NavGraphBuilder.addHomeGraph(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
+    onShowBottomBarChanged: (Boolean) -> Unit = {}
 ) {
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
@@ -118,6 +128,7 @@ fun NavGraphBuilder.addHomeGraph(
             screenHeightInPixels,
             viewModel,
             modifier = modifier,
+            onShowBottomBarChanged = onShowBottomBarChanged
         )
     }
     composable(HomeSections.SETTING.route) { from ->
@@ -162,7 +173,9 @@ fun KBottomBar(
         contentColor = contentColor
     ) {
         NavigationBar(
-            modifier = modifier.navigationBarsPadding(),
+            modifier = modifier
+                .navigationBarsPadding()
+                .height(56.dp), // 调小高度
             containerColor = color,
             contentColor = contentColor,
         ) {

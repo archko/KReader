@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,13 +39,23 @@ fun SettingScreen(
         Surface(
             modifier = modifier
                 .statusBarsPadding()
-                .fillMaxSize()
+                .fillMaxSize(),
+            color = Color(0xFFF5F5F5) // 设置为浅灰色背景
         ) {
             Box {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Spacer(modifier = Modifier.height(30.dp))
-
-                    Avatar()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Avatar()
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = "KReader",
+                            style = TextStyle(
+                                color = Color(0xFF1976D2),
+                                fontSize = 28.sp
+                            ),
+                            maxLines = 1
+                        )
+                    }
 
                     SettingCategory()
                 }
@@ -62,6 +73,33 @@ fun Avatar(
                 .padding(horizontal = 6.dp)
                 .align(alignment = Alignment.CenterVertically)
         ) {
+            // 添加圆形头像
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFFE3F2FD))
+            ) {
+                // 绘制渐变圆形
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF42A5F5),
+                            Color(0xFF1976D2)
+                        ),
+                        center = center,
+                        radius = size.minDimension / 2
+                    ),
+                    radius = size.minDimension / 2,
+                    center = center
+                )
+                // 绘制中间的白色图案（如字母或简单图形）
+                drawCircle(
+                    color = Color.White,
+                    radius = size.minDimension / 4,
+                    center = center
+                )
+            }
         }
     }
 }

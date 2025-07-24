@@ -87,4 +87,12 @@ public class PdfViewModel : ViewModel() {
             loadRecents()
         }
     }
+
+    public fun deleteRecent(recent: Recent) {
+        viewModelScope.launch {
+            database?.recentDao()?.deleteRecent(recent)
+            println("deleteRecent:${recent}")
+            loadRecents()
+        }
+    }
 }

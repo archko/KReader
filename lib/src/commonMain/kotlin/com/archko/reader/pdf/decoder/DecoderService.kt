@@ -76,7 +76,7 @@ public class DecoderService(
         )
         val outWidth = ((srcRect.right - srcRect.left)).toInt()
         val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
-        println("decodeBitmap.Tile:page:${spec.page}, rect:${spec.bounds}, scale:${spec.pageScale}, $outWidth-$outHeight, $srcRect")
+        //println("decodeBitmap.Tile:page:${spec.page}, rect:${spec.bounds}, scale:${spec.pageScale}, $outWidth-$outHeight, $srcRect")
         return decoder.renderPageRegion(
             srcRect,
             spec.page,

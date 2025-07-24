@@ -93,7 +93,7 @@ public class PdfViewState(
 
     private suspend fun consumeTiles(tileChannel: ReceiveChannel<TileSpec>) {
         for (tile in tileChannel) {
-            println("PdfViewState:consumeTiles:$tile")
+            //println("PdfViewState:consumeTiles:$tile")
             if (tile.imageBitmap == null) {
                 requestedTiles.remove(tile.cacheKey) // 解码失败也要移除
                 continue
@@ -115,7 +115,7 @@ public class PdfViewState(
     }
 
     private fun renderThrottled() {
-        println("PdfViewState:renderThrottled.size:${tilesCollected.size}")
+        //println("PdfViewState:renderThrottled.size:${tilesCollected.size}")
         renderTask.trySend(Unit)
     }
 
@@ -171,7 +171,7 @@ public class PdfViewState(
                 // 直接用最终宽高初始化Page
                 page.update(scaledPageWidth, scaledPageHeight, bounds)
                 currentY += scaledPageHeight
-                println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage")
+                //println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage")
             }
             init = true
         }
