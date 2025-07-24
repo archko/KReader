@@ -29,7 +29,7 @@ public class PageNode(
     }
 
     public val cacheKey: String
-        get() = "${aPage.index}-${bounds}-${pdfViewState.vZoom}}"
+        get() = "${aPage.index}-${bounds}-${pdfViewState.vZoom}"
 
     public fun draw(
         drawScope: DrawScope,
@@ -46,7 +46,7 @@ public class PageNode(
             return
         }
         if (loadedBitmap != null) {
-            println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${loadedBitmap.width}x${loadedBitmap.height}")
+            //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${loadedBitmap.width}x${loadedBitmap.height}")
             drawScope.drawImage(
                 loadedBitmap,
                 dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),

@@ -73,7 +73,7 @@ public class PdfViewState(
         //collectNewTiles()
         //}
 
-        decoderService = DecoderService(1, state)
+        decoderService = DecoderService(1, state, this::isTileVisible)
         scope.launch {
             decoderService.collectTiles(
                 visibleTilesChannel,
@@ -120,12 +120,13 @@ public class PdfViewState(
     }
 
     private fun isTileVisible(spec: TileSpec): Boolean {
-        // 将logicalRect映射为实际像素区域
+        val page = pages.getOrNull(spec.page) ?: return false
+        val yOffset = page.yOffset
         val pixelRect = Rect(
-            left = spec.logicalRect.left * spec.pageWidth,
-            top = spec.logicalRect.top * spec.pageHeight,
-            right = spec.logicalRect.right * spec.pageWidth,
-            bottom = spec.logicalRect.bottom * spec.pageHeight
+            left = spec.bounds.left * spec.pageWidth,
+            top = spec.bounds.top * spec.pageHeight + yOffset,
+            right = spec.bounds.right * spec.pageWidth,
+            bottom = spec.bounds.bottom * spec.pageHeight + yOffset
         )
         return isVisible(viewSize, viewOffset, pixelRect, spec.page)
     }
@@ -211,7 +212,7 @@ public class PdfViewState(
     }
 
     public fun remove(
-        logicalRect: Rect,
+        bounds: Rect,
         page: APage,
         cacheKey: String,
         pageScale: Float,
@@ -221,7 +222,7 @@ public class PdfViewState(
         val tileSpec = TileSpec(
             page.index,
             pageScale, // totalScale
-            logicalRect,
+            bounds,
             pageWidth.toInt(), // 原始宽高
             pageHeight.toInt(),
             viewSize,
@@ -235,20 +236,23 @@ public class PdfViewState(
     }
 
     public fun decode(
-        logicalRect: Rect,
+        bounds: Rect,
         page: APage,
         cacheKey: String,
         pageScale: Float,
         pageWidth: Float,
         pageHeight: Float
     ) {
-        if (ImageCache.get(cacheKey) != null) return // 已有缓存
+        if (ImageCache.get(cacheKey) != null) {
+            update++
+            return // 已有缓存
+        }
         if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
         requestedTiles.add(cacheKey)
         val tileSpec = TileSpec(
             page.index,
             pageScale, // totalScale
-            logicalRect,
+            bounds,
             pageWidth.toInt(), // 原始宽高
             pageHeight.toInt(),
             viewSize,

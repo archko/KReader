@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 public class DecoderService(
     private val workerCount: Int,
     private val decoder: ImageDecoder,
+    private val isTileVisible: ((TileSpec) -> Boolean)? = null // 新增
 ) {
     @Volatile
     public var isIdle: Boolean = true
@@ -48,6 +49,12 @@ public class DecoderService(
         tilesOutput: SendChannel<TileSpec>,
     ) = launch(dispatcher) {
         for (spec in tilesToDownload) {
+            // 新增：解码前判断可见性
+            if (isTileVisible != null && !isTileVisible.invoke(spec)) {
+                println("DecoderService.not visible:$spec")
+                tilesDownloaded.send(spec) // 仍然要通知已处理，避免队列阻塞
+                continue
+            }
             val imageBitmap = async {
                 //testBitmap(spec)
                 decodeBitmap(spec)
@@ -62,14 +69,14 @@ public class DecoderService(
     private fun decodeBitmap(spec: TileSpec): ImageBitmap {
         // 逻辑坐标转原始像素区域（原始宽高）
         val srcRect = Rect(
-            left = spec.logicalRect.left * spec.pageWidth,
-            top = spec.logicalRect.top * spec.pageHeight,
-            right = spec.logicalRect.right * spec.pageWidth,
-            bottom = spec.logicalRect.bottom * spec.pageHeight
+            left = spec.bounds.left * spec.pageWidth,
+            top = spec.bounds.top * spec.pageHeight,
+            right = spec.bounds.right * spec.pageWidth,
+            bottom = spec.bounds.bottom * spec.pageHeight
         )
         val outWidth = ((srcRect.right - srcRect.left)).toInt()
         val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
-        println("decodeBitmap.Tile:page:${spec.page}, rect:${spec.logicalRect}, scale:${spec.pageScale}, $outWidth-$outHeight, $srcRect")
+        println("decodeBitmap.Tile:page:${spec.page}, rect:${spec.bounds}, scale:${spec.pageScale}, $outWidth-$outHeight, $srcRect")
         return decoder.renderPageRegion(
             srcRect,
             spec.page,
@@ -156,7 +163,7 @@ public class DecoderService(
 public data class TileSpec(
     val page: Int,
     val pageScale: Float,
-    val logicalRect: Rect, // 0~1
+    val bounds: Rect, // 0~1
     val pageWidth: Int,
     val pageHeight: Int,
     val viewSize: IntSize,
@@ -173,7 +180,7 @@ public data class TileSpec(
         if (pageScale != other.pageScale) return false
         if (pageWidth != other.pageWidth) return false
         if (pageHeight != other.pageHeight) return false
-        if (logicalRect != other.logicalRect) return false
+        if (bounds != other.bounds) return false
         if (cacheKey != other.cacheKey) return false
 
         return true
@@ -184,7 +191,7 @@ public data class TileSpec(
         result = 31 * result + pageScale.hashCode()
         result = 31 * result + pageWidth
         result = 31 * result + pageHeight
-        result = 31 * result + logicalRect.hashCode()
+        result = 31 * result + bounds.hashCode()
         result = 31 * result + cacheKey.hashCode()
         return result
     }
