@@ -59,6 +59,7 @@ fun FileScreen(
         BackHandler(enabled = pdf != null) {
             pdf = null
             viewModel.path = null
+            viewModel.loadRecents() // 关闭文档时刷新最近列表
         }
 
         Surface(
@@ -89,7 +90,7 @@ fun FileScreen(
                     }
 
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
