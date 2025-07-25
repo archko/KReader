@@ -51,8 +51,8 @@ public class Page(
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {
         if (thumbDecoding) return
-        val w = (width / 4).toInt().coerceAtLeast(1)
-        val h = (height / 4).toInt().coerceAtLeast(1)
+        val w = (width / 3).toInt().coerceAtLeast(1)
+        val h = (height / 3).toInt().coerceAtLeast(1)
         val cacheKey = "thumb-${aPage.index}-${w}x${h}"
         val cached = ImageCache.get(cacheKey)
         if (cached != null) {
