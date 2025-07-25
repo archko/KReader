@@ -1,12 +1,24 @@
 package com.archko.reader.pdf.component
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * @author: archko 2025/7/24 :08:20
@@ -22,7 +34,54 @@ public class Page(
     public var nodes: List<PageNode> = emptyList()
 
     //page bound, should be caculate after view measured
-    internal var bounds = Rect(0f, 0f, 0f, 0f)
+    internal var bounds = Rect(0f, 0f, 1f, 1f)
+
+    // 缩略图缓存，响应式
+    private var thumbBitmap by mutableStateOf<ImageBitmap?>(null)
+    private var thumbDecoding = false
+    private var thumbJob: Job? = null
+
+    public fun recycleThumb() {
+        thumbBitmap = null
+        thumbDecoding = false
+        thumbJob?.cancel()
+        thumbJob = null
+    }
+
+    // 异步加载缩略图，参考PageNode解码逻辑
+    public fun loadThumbnail() {
+        if (thumbDecoding) return
+        val w = (width / 4).toInt().coerceAtLeast(1)
+        val h = (height / 4).toInt().coerceAtLeast(1)
+        val cacheKey = "thumb-${aPage.index}-${w}x${h}"
+        val cached = ImageCache.get(cacheKey)
+        if (cached != null) {
+            thumbBitmap = cached
+            return
+        }
+        thumbDecoding = true
+        thumbJob = pdfViewState.decodeScope.launch {
+            // 可见性判断（Page始终可见，或可加自定义判断）
+            if (!isActive) return@launch
+            try {
+                val region = Rect(0f, 0f, 1f, 1f)
+                val bitmap = pdfViewState.state.renderPageRegion(
+                    region,
+                    aPage.index,
+                    totalScale / 3,
+                    pdfViewState.viewSize,
+                    w,
+                    h
+                )
+                if (!isActive) return@launch
+                thumbBitmap = bitmap
+                ImageCache.put(cacheKey, bitmap)
+            } catch (_: Exception) {
+            } finally {
+                thumbDecoding = false
+            }
+        }
+    }
 
     /**
      * @param viewSize view size
@@ -42,16 +101,29 @@ public class Page(
         if (!isVisible(drawScope, offset, bounds, aPage.index)) {
             return
         }
+        // 优先绘制缩略图
+        if (null != thumbBitmap) {
+            drawScope.drawImage(
+                image = thumbBitmap!!,
+                dstOffset = IntOffset(0, bounds.top.toInt()),
+                dstSize = IntSize(width.toInt(), height.toInt())
+            )
+        } else {
+            if (!thumbDecoding) {
+                loadThumbnail()
+            }
+        }
+        // 再绘制高清块
         nodes.forEach { node ->
             node.draw(drawScope, offset, width, height, yOffset, totalScale)
         }
         // 占位框
-        drawScope.drawRect(
-            color = Color.Yellow,
+        /*drawScope.drawRect(
+            color = Color.Green,
             topLeft = Offset(0f, bounds.top),
             size = Size(bounds.width, bounds.height),
-            style = Stroke(width = 4f)
-        )
+            style = Stroke(width = 6f)
+        )*/
     }
 
     public fun recycle() {
@@ -80,8 +152,8 @@ public class Page(
         }
         // 计算分块数
         fun calcBlockCount(length: Float, min: Float, max: Float): Int {
-            val minCount = kotlin.math.ceil(length / max).toInt()
-            val maxCount = kotlin.math.floor(length / min).toInt().coerceAtLeast(1)
+            val minCount = ceil(length / max).toInt()
+            val maxCount = floor(length / min).toInt().coerceAtLeast(1)
             // 在[minCount, maxCount]区间内，优先选能整除的块数，否则选minCount
             for (count in minCount..maxCount) {
                 val block = length / count

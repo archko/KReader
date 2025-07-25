@@ -138,12 +138,12 @@ public class PageNode(
                     isDecoding = false
                 }
             }
-            drawScope.drawRect(
+            /*drawScope.drawRect(
                 color = Color.Magenta,
                 topLeft = Offset(pixelRect.left, pixelRect.top),
                 size = pixelRect.size,
                 style = Stroke(width = 4f)
-            )
+            )*/
         }
     }
 }

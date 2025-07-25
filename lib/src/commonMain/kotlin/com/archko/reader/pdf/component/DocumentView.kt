@@ -1,48 +1,31 @@
 package com.archko.reader.pdf.component
 
 import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.flinger.FlingConfiguration
-import com.archko.reader.pdf.flinger.SplineBasedFloatDecayAnimationSpec
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
@@ -59,7 +42,6 @@ public fun DocumentView(
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var vZoom by remember { mutableFloatStateOf(1f) }
-    val velocityTracker = remember { VelocityTracker() }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val keepPx = with(density) { 6.dp.toPx() }
@@ -153,156 +135,120 @@ public fun DocumentView(
                 .background(Color.White)
                 .pointerInput(Unit) {
                     awaitEachGesture {
-                        var wasCancelled = false
-                        var zoom = 1f
-                        var pastTouchSlop = false
+                        var zooming = false
+                        var initialZoom = vZoom
+                        var initialOffset = offset
+                        var lastCentroid = Offset.Zero
+                        // pan惯性
+                        val panVelocityTracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                        var pan = Offset.Zero
                         try {
-                            // 等待第一个触点
-                            val trackingPointerId = awaitFirstDown(requireUnconsumed = false).id
-                            var pointerCount = 1
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            lastCentroid = down.position
+                            initialOffset = offset
+                            initialZoom = vZoom
+                            pan = Offset.Zero
+                            panVelocityTracker.resetTracking()
+                            flingJob?.cancel()
                             do {
-                                flingJob?.cancel()
-                                flingJob = null
                                 val event = awaitPointerEvent()
-                                val canceled = event.changes.fastAny { it.isConsumed }
-                                pointerCount = event.changes.size
-                                if (!canceled) {
-                                    event.changes.fastForEach {
-                                        if (it.id == trackingPointerId) {
-                                            velocityTracker.addPointerInputChange(it)
-                                        }
-                                    }
-                                    val zoomChange = event.calculateZoom()
-                                    val panChange = event.calculatePan()
-                                    if (!pastTouchSlop) {
-                                        zoom *= zoomChange
-                                        //pan += panChange
+                                val pointerCount = event.changes.size
+                                val zoomChange = event.calculateZoom()
+                                val panChange = event.calculatePan()
+                                val centroid = event.calculateCentroid()
+                                // 采集pan速度
+                                val uptime = event.changes.maxByOrNull { it.uptimeMillis }?.uptimeMillis ?: 0L
+                                pan += panChange
+                                panVelocityTracker.addPosition(uptime, pan)
+                                if (pointerCount > 1) {
+                                    zooming = true
+                                    val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
+                                    val zoomFactor = newZoom / vZoom
+                                    val newOffset = centroid + (offset - centroid) * zoomFactor
+                                    vZoom = newZoom
+                                    offset = newOffset
+                                    val scaledWidth = viewSize.width * vZoom
+                                    val scaledHeight = pdfViewState.totalHeight
+                                    val minX = minOf(0f, viewSize.width - scaledWidth)
+                                    val maxX = 0f
+                                    val minY =
+                                        if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                    val maxY = 0f
+                                    offset = Offset(
+                                        offset.x.coerceIn(minX, maxX),
+                                        offset.y.coerceIn(minY, maxY)
+                                    )
+                                    pdfViewState.updateOffset(offset)
+                                    pdfViewState.updateViewSize(viewSize, vZoom)
+                                    event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                                } else {
+                                    // 单指拖动
+                                    if (!zooming) {
+                                        offset += panChange
                                         val scaledWidth = viewSize.width * vZoom
-                                        val scaledHeight = pdfViewState.totalHeight * vZoom
-
-                                        // 计算最大滚动范围
-                                        val maxX =
-                                            (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
-                                        val maxY =
-                                            (scaledHeight - viewSize.height).coerceAtLeast(
-                                                0f
-                                            )
-
-                                        // 更新偏移量
+                                        val scaledHeight = pdfViewState.totalHeight
+                                        val minX = minOf(0f, viewSize.width - scaledWidth)
+                                        val maxX = 0f
+                                        val minY =
+                                            if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                        val maxY = 0f
                                         offset = Offset(
-                                            (offset.x + panChange.x).coerceIn(-maxX, maxX),
-                                            (offset.y + panChange.y).coerceIn(-maxY, 0f)
+                                            offset.x.coerceIn(minX, maxX),
+                                            offset.y.coerceIn(minY, maxY)
                                         )
-
-                                        // 更新页面位置
-                                        /*pages.forEach { page ->
-                                            page.updateOffset(offset)
-                                        }*/
                                         pdfViewState.updateOffset(offset)
-
-                                        if (event.changes.size > 1) {
-                                            pastTouchSlop = true
-                                        }
-                                    }
-                                    if (pastTouchSlop) {    //zoom
-                                        val centroid = event.calculateCentroid(useCurrent = false)
-                                        if (zoomChange != 1f) {
-                                            val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
-                                            // 计算缩放前后的偏移量变化
-                                            val zoomFactor = newZoom / vZoom
-                                            val newOffset = Offset(
-                                                centroid.x + (offset.x - centroid.x) * zoomFactor,
-                                                centroid.y + (offset.y - centroid.y) * zoomFactor
-                                            )
-
-                                            // 计算最大滚动范围
-                                            val scaledWidth = viewSize.width * newZoom
-                                            val scaledHeight = pdfViewState.totalHeight/* newZoom*/
-                                            val maxX =
-                                                (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
-                                            val maxY =
-                                                (scaledHeight - viewSize.height).coerceAtLeast(0f)
-
-                                            // 更新偏移量
-                                            offset = Offset(
-                                                newOffset.x.coerceIn(-maxX, maxX),
-                                                newOffset.y.coerceIn(-maxY, 0f)
-                                            )
-
-                                            vZoom = newZoom
-                                            println("DocumentView.zoom:$vZoom, $centroid, $offset")
-                                            pdfViewState.updateOffset(offset)
-                                        }
-                                        event.changes.fastForEach {
-                                            if (it.positionChanged()) {
-                                                it.consume()
-                                            }
-                                        }
                                     }
                                 }
-                                val finalEvent = awaitPointerEvent(pass = PointerEventPass.Final)
-                                val finallyCanceled =
-                                    finalEvent.changes.fastAny { it.isConsumed } && !pastTouchSlop
-                            } while (!canceled && !finallyCanceled && event.changes.fastAny { it.pressed })
-                        } catch (exception: CancellationException) {
-                            wasCancelled = true
-                            if (!isActive) throw exception
+                                event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                            } while (event.changes.fastAny { it.pressed })
+                        } catch (_: CancellationException) {
                         } finally {
-                            // 计算最终速度
-                            val velocity = velocityTracker.calculateVelocity()
-                            velocityTracker.resetTracking()
-
-                            // 缩放手势结束时调用 updateViewSize
-                            if (pastTouchSlop) {
-                                pdfViewState.updateViewSize(viewSize, vZoom)
-                            }
-
-                            // 创建优化后的decay动画spec
-                            val decayAnimationSpec = SplineBasedFloatDecayAnimationSpec(
-                                density = density,
-                                scrollConfiguration = FlingConfiguration.Builder()
-                                    .scrollViewFriction(0.01f)  // 减小摩擦力，使滑动更流畅
-                                    .numberOfSplinePoints(150)  // 提高采样率
-                                    .splineInflection(0.1f)
-                                    .splineStartTension(0.2f)
-                                    .splineEndTension(1f)
-                                    .build()
-                            )
-
+                            // 计算pan velocity
+                            val velocity =
+                                runCatching { panVelocityTracker.calculateVelocity() }.getOrDefault(Velocity.Zero)
+                            //val velocitySquared = velocity.x * velocity.x + velocity.y * velocity.y
+                            //val velocityThreshold = with(density) { 50.dp.toPx() * 50.dp.toPx() }
+                            flingJob?.cancel()
+                            //if (velocitySquared > velocityThreshold) {
+                            val decayAnimationSpec = exponentialDecay<Float>(frictionMultiplier = 0.35f)
                             flingJob = scope.launch {
-                                // 同时处理水平和垂直方向的惯性滑动
-                                val scaledWidth = viewSize.width * vZoom
-                                val scaledHeight = pdfViewState.totalHeight * vZoom
-                                val maxX = (scaledWidth - viewSize.width).coerceAtLeast(0f) / 2
-                                val maxY = (scaledHeight - viewSize.height).coerceAtLeast(0f)
-
-                                // 创建两个协程同时处理x和y方向的动画
-                                launch {
-                                    if (abs(velocity.x) > 50f) {  // 添加最小速度阈值
-                                        animateDecay(
-                                            initialValue = offset.x,
-                                            initialVelocity = velocity.x,
-                                            animationSpec = decayAnimationSpec
-                                        ) { value, _ ->
-                                            offset = offset.copy(x = value.coerceIn(-maxX, maxX))
+                                // X方向
+                                if (abs(velocity.x) > 50f) {
+                                    val animX = androidx.compose.animation.core.AnimationState(
+                                        initialValue = offset.x,
+                                        initialVelocity = velocity.x
+                                    )
+                                    launch {
+                                        animX.animateDecay(decayAnimationSpec) {
+                                            val scaledWidth = viewSize.width * vZoom
+                                            val minX = minOf(0f, viewSize.width - scaledWidth)
+                                            val maxX = 0f
+                                            val newX = value.coerceIn(minX, maxX)
+                                            offset = Offset(newX, offset.y)
                                             pdfViewState.updateOffset(offset)
                                         }
                                     }
                                 }
-
-                                launch {
-                                    if (abs(velocity.y) > 50f) {  // 添加最小速度阈值
-                                        animateDecay(
-                                            initialValue = offset.y,
-                                            initialVelocity = velocity.y,
-                                            animationSpec = decayAnimationSpec
-                                        ) { value, _ ->
-                                            offset = offset.copy(y = value.coerceIn(-maxY, 0f))
+                                // Y方向
+                                if (abs(velocity.y) > 50f) {
+                                    val animY = androidx.compose.animation.core.AnimationState(
+                                        initialValue = offset.y,
+                                        initialVelocity = velocity.y
+                                    )
+                                    launch {
+                                        animY.animateDecay(decayAnimationSpec) {
+                                            val scaledHeight = pdfViewState.totalHeight
+                                            val minY =
+                                                if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                            val maxY = 0f
+                                            val newY = value.coerceIn(minY, maxY)
+                                            offset = Offset(offset.x, newY)
                                             pdfViewState.updateOffset(offset)
                                         }
                                     }
                                 }
                             }
+                            //}
                         }
                     }
                 }
