@@ -57,17 +57,20 @@ public fun DocumentView(
         PdfViewState(list, state)
     }
     // 确保在 list 变化时重新计算总高度
-    LaunchedEffect(list, viewSize) {
+    LaunchedEffect(list) {
         if (viewSize != IntSize.Zero) {
             println("DocumentView: 更新ViewSize:$viewSize, vZoom:$vZoom, list: ${list.size}")
             pdfViewState.updateViewSize(viewSize, vZoom)
         }
     }
 
-    // 外部传入jumpToPage时自动跳转
-    LaunchedEffect(jumpToPage, align) {
-        if (jumpToPage != null) {
+    // jumpToPage 只在页面真正初始化完成后且仅执行一次
+    var didJump by remember { mutableStateOf(false) }
+    LaunchedEffect(pdfViewState.init, jumpToPage, align) {
+        println("DocumentView: jumpToPage:$jumpToPage, vZoom:$vZoom, init: ${pdfViewState.init}")
+        if (!didJump && jumpToPage != null && pdfViewState.init) {
             pdfViewState.goToPage(jumpToPage, align)
+            didJump = true
         }
     }
 
@@ -103,6 +106,7 @@ public fun DocumentView(
             .fillMaxSize()
             .onSizeChanged {
                 viewSize = it
+                println("DocumentView: onSizeChanged:$viewSize, vZoom:$vZoom, list: ${list.size}")
                 pdfViewState.updateViewSize(viewSize, vZoom)
             }
             .pointerInput(viewSize, keepPx) {

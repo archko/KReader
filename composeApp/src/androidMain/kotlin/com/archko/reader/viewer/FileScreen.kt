@@ -57,7 +57,6 @@ fun FileScreen(
         BackHandler(enabled = openDocRequest != null) {
             openDocRequest = null
             viewModel.path = null
-            viewModel.loadRecents()
         }
 
         Surface(
@@ -85,10 +84,8 @@ fun FileScreen(
                                 val recent = viewModel.recentList.value.find { it.path == path }
                                 val page = recent?.page?.toInt()
                                 val pdf = LocalPdfState(file)
-                                scope.launch {
-                                    loadProgress(viewModel, file, pdf)
-                                    openDocRequest = OpenDocRequest(path, page)
-                                }
+                                loadProgress(viewModel, file, pdf)
+                                openDocRequest = OpenDocRequest(path, page)
                             }
                         }
                     }
@@ -155,7 +152,6 @@ fun FileScreen(
                             zoom = zoom,
                             crop = 0L
                         )
-                        viewModel.loadRecents()
                     }
                 )
             }
