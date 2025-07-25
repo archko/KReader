@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.TileSpec
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.Job
@@ -85,6 +86,12 @@ public class PageNode(
                     // 解码前判断可见性和协程活跃性
                     if (!isActive) {
                         println("[PageNode.decodeScope] page=!isActive")
+                    }
+                    // 先查缓存
+                    val cacheBitmap = ImageCache.get(cacheKey)
+                    if (cacheBitmap != null) {
+                        imageBitmap = cacheBitmap
+                        isDecoding = false
                         return@launch
                     }
                     val tileSpec = TileSpec(
@@ -126,6 +133,8 @@ public class PageNode(
                     if (!pdfViewState.isTileVisible(tileSpec)) return@launch
 
                     imageBitmap = bitmap
+                    // 放入缓存
+                    ImageCache.put(cacheKey, bitmap)
                     isDecoding = false
                 }
             }
