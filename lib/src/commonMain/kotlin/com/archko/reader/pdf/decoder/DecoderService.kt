@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.decoder
 
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
@@ -22,7 +23,8 @@ import java.util.concurrent.TimeUnit
 public class DecoderService(
     private val workerCount: Int,
     private val decoder: ImageDecoder,
-    private val isTileVisible: ((TileSpec) -> Boolean)? = null // 新增
+    private val isTileVisible: ((TileSpec) -> Boolean)? = null, // 新增
+    private val stateImageCache: SnapshotStateMap<String, ImageBitmap?>? = null // 新增，可选Compose StateMap
 ) {
     @Volatile
     public var isIdle: Boolean = true
@@ -60,6 +62,9 @@ public class DecoderService(
                 decodeBitmap(spec)
             }.await()
             spec.imageBitmap = imageBitmap
+            // 删除所有 ImageCache.put、ImageCache.get、ImageCache.remove、ImageCache.clear 相关代码
+            // 新增：同步到 Compose StateMap
+            stateImageCache?.set(spec.cacheKey, imageBitmap)
 
             tilesOutput.send(spec)
             tilesDownloaded.send(spec)

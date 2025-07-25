@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.mutableStateMapOf
 
 public fun CoroutineScope.throttle(wait: Long, block: suspend () -> Unit): SendChannel<Unit> {
     val channel = Channel<Unit>(capacity = Channel.CONFLATED)
@@ -56,6 +58,7 @@ public class PdfViewState(
     public var vZoom: Float by mutableFloatStateOf(1f)
     internal val tilesCollected = mutableStateListOf<TileSpec>() // 变为可观察的 StateList
     internal val requestedTiles = mutableSetOf<String>() // 新增，记录已请求解码的tile
+    internal val stateImageCache: SnapshotStateMap<String, androidx.compose.ui.graphics.ImageBitmap?> = mutableStateMapOf()
 
     private val parentScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -73,7 +76,7 @@ public class PdfViewState(
         //collectNewTiles()
         //}
 
-        decoderService = DecoderService(1, state, this::isTileVisible)
+        decoderService = DecoderService(1, state, this::isTileVisible, stateImageCache)
         scope.launch {
             decoderService.collectTiles(
                 visibleTilesChannel,
@@ -93,24 +96,14 @@ public class PdfViewState(
 
     private suspend fun consumeTiles(tileChannel: ReceiveChannel<TileSpec>) {
         for (tile in tileChannel) {
-            //println("PdfViewState:consumeTiles:$tile")
+            // 解码失败也要移除 requestedTiles，避免死锁
             if (tile.imageBitmap == null) {
-                requestedTiles.remove(tile.cacheKey) // 解码失败也要移除
+                requestedTiles.remove(tile.cacheKey)
                 continue
             }
-            ImageCache.put(tile.cacheKey, tile.imageBitmap!!)
-            requestedTiles.remove(tile.cacheKey) // 解码完成，移除
-            if (isTileVisible(tile)) {
-                if (!tilesCollected.contains(tile)) {
-                    tilesCollected.add(tile)
-                }
-            } else {
-                println("PdfViewState:remove:$tile")
-                tilesCollected.remove(tile)
-                //ImageCache.remove(tile.cacheKey)
-            }
-            // 依赖 tilesCollected 的变化自动刷新，无需 update++
-            renderThrottled()
+            // 解码成功也要移除
+            requestedTiles.remove(tile.cacheKey)
+            stateImageCache[tile.cacheKey] = tile.imageBitmap
         }
     }
 
@@ -230,10 +223,8 @@ public class PdfViewState(
             cacheKey,
             null
         )
-        if (tilesCollected.contains(tileSpec)) {
-            println("PdfViewState:remove:$tileSpec")
-            tilesCollected.remove(tileSpec)
-        }
+        // 同步移除 StateMap
+        stateImageCache.remove(cacheKey)
     }
 
     public fun decode(
@@ -244,8 +235,7 @@ public class PdfViewState(
         pageWidth: Float,
         pageHeight: Float
     ) {
-        if (ImageCache.get(cacheKey) != null) {
-            // update++ 不再需要
+        if (stateImageCache[cacheKey] != null) {
             return // 已有缓存
         }
         if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
@@ -260,16 +250,7 @@ public class PdfViewState(
             cacheKey,
             null
         )
-        if (tilesCollected.contains(tileSpec)) {
-            val index = tilesCollected.indexOf(tileSpec)
-            val bitmap = tilesCollected[index].imageBitmap
-            if (null != bitmap) {
-                ImageCache.put(cacheKey, bitmap)
-                println("PdfViewState:no decode:$tileSpec")
-                return
-            }
-        }
-        tilesCollected.add(tileSpec)
+        // 不再提前写 stateImageCache[cacheKey] = null
         scope.launch {
             visibleTilesChannel.send(tileSpec)
         }
@@ -344,7 +325,7 @@ public class PdfViewState(
         }.toSet()
         val toRemove = lastPageKeys - newPageKeys
         toRemove.forEach { key ->
-            ImageCache.remove(key)
+            stateImageCache.remove(key)
         }
         lastPageKeys = newPageKeys
         if (tilesToRenderCopy != pageToRender) {

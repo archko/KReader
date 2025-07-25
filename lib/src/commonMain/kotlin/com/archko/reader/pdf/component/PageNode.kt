@@ -46,9 +46,9 @@ public class PageNode(
             return
         }
 
-        val loadedBitmap: ImageBitmap? = ImageCache.get(cacheKey)
+        val loadedBitmap: ImageBitmap? = pdfViewState.stateImageCache[cacheKey]
+        println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${loadedBitmap?.width}x${loadedBitmap?.height}")
         if (loadedBitmap != null) {
-            //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${loadedBitmap.width}x${loadedBitmap.height}")
             drawScope.drawImage(
                 loadedBitmap,
                 dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),
