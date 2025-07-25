@@ -110,6 +110,7 @@ public fun DocumentView(
             onDocumentClosed?.invoke(currentPage, pageCount, zoom)
 
             pdfViewState.shutdown()
+            ImageCache.clear()
         }
     }
 
