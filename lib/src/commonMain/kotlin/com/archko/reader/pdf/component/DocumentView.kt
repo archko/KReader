@@ -3,10 +3,23 @@ package com.archko.reader.pdf.component
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -97,7 +110,6 @@ public fun DocumentView(
             onDocumentClosed?.invoke(currentPage, pageCount, zoom)
 
             pdfViewState.shutdown()
-            ImageCache.clear()
         }
     }
 
@@ -123,7 +135,8 @@ public fun DocumentView(
 
                         y > height * 3 / 4 -> {
                             // 底部1/4，向下滚动一屏，保留6dp
-                            val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            val maxY =
+                                (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                             val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
                             offset = Offset(offset.x, newY)
                             pdfViewState.updateOffset(offset)
@@ -293,25 +306,21 @@ public fun DocumentView(
                     }
                 }
         ) {
-            //if (pdfViewState.update > 0)
-            //println("state:Canvas:${pdfState.tilesToRender.size}")
-                translate(left = offset.x, top = offset.y) {
-                    //只绘制可见区域.
-                    /*val visibleRect = Rect(
-                        left = -offset.x,
-                        top = -offset.y,
-                        right = size.width - offset.x,
-                        bottom = size.height - offset.y
-                    )
-                    drawRect(
-                        brush = gradientBrush,
-                        topLeft = visibleRect.topLeft,
-                        size = visibleRect.size
-                    )*/
-                    pdfViewState.pages.forEach { page ->
-                        page.draw(this, offset, pdfViewState.vZoom)
-                    }
-                }
+            translate(left = offset.x, top = offset.y) {
+                //只绘制可见区域.
+                /*val visibleRect = Rect(
+                    left = -offset.x,
+                    top = -offset.y,
+                    right = size.width - offset.x,
+                    bottom = size.height - offset.y
+                )
+                drawRect(
+                    brush = gradientBrush,
+                    topLeft = visibleRect.topLeft,
+                    size = visibleRect.size
+                )*/
+                pdfViewState.drawVisiblePages(this, offset, vZoom, viewSize)
+            }
         }
     }
 }

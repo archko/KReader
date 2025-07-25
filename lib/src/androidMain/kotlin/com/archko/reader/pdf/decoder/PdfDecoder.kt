@@ -190,7 +190,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     ): ImageBitmap {
         val patchX = region.left.toInt()
         val patchY = region.top.toInt()
-        println("renderPageRegion:index:$index scale:$scale, viewSize:$viewSize, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
+        println("renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
         val bitmap = acquireReusableBitmap(outWidth, outHeight)
         val ctm = Matrix(scale)

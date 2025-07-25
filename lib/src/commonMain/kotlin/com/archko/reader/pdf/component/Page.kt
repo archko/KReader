@@ -50,8 +50,13 @@ public class Page(
             color = Color.Yellow,
             topLeft = Offset(0f, bounds.top),
             size = Size(bounds.width, bounds.height),
-            style = Stroke(width = 8f)
+            style = Stroke(width = 4f)
         )
+    }
+
+    public fun recycle() {
+        println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
+        nodes.forEach { it.recycle() }
     }
 
     private fun recalculateNodes() {
@@ -86,6 +91,7 @@ public class Page(
             }
             return minCount
         }
+
         val xBlocks = calcBlockCount(pageWidth, minBlockSize, maxBlockSize)
         val yBlocks = calcBlockCount(pageHeight, minBlockSize, maxBlockSize)
         val nodes = mutableListOf<PageNode>()

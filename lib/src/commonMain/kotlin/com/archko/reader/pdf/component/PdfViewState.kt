@@ -2,44 +2,16 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.cache.ImageCache
-import com.archko.reader.pdf.decoder.DecoderService
 import com.archko.reader.pdf.decoder.TileSpec
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.launch
-import java.util.concurrent.Executors
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.runtime.mutableStateMapOf
-
-public fun CoroutineScope.throttle(wait: Long, block: suspend () -> Unit): SendChannel<Unit> {
-    val channel = Channel<Unit>(capacity = Channel.CONFLATED)
-    val flow = channel.receiveAsFlow()
-
-    launch {
-        flow.collect {
-            block()
-            delay(wait)
-        }
-    }
-    return channel
-}
 
 /**
  * @author: archko 2025/7/24 :08:21
@@ -56,64 +28,14 @@ public class PdfViewState(
     internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
-    internal val tilesCollected = mutableStateListOf<TileSpec>() // 变为可观察的 StateList
-    internal val requestedTiles = mutableSetOf<String>() // 新增，记录已请求解码的tile
-    internal val stateImageCache: SnapshotStateMap<String, androidx.compose.ui.graphics.ImageBitmap?> = mutableStateMapOf()
 
-    private val parentScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    private val scope = CoroutineScope(
-        parentScope.coroutineContext + singleThreadDispatcher
-    )
-    private val visibleTilesChannel = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
-    private val tilesOutput = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
-    internal val decoderService: DecoderService
+    // 全局单线程解码作用域
+    public val decodeScope: CoroutineScope =
+        CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     private var lastPageKeys: Set<String> = emptySet()
 
-    init {
-        //scope.launch {
-        //collectNewTiles()
-        //}
-
-        decoderService = DecoderService(1, state, this::isTileVisible, stateImageCache)
-        scope.launch {
-            decoderService.collectTiles(
-                visibleTilesChannel,
-                tilesOutput
-            )
-        }
-
-        scope.launch {
-            consumeTiles(tilesOutput)
-        }
-    }
-
-    private val renderTask = scope.throttle(wait = 34) {
-        //evictTiles(lastVisible)
-        setVisibilePage()
-    }
-
-    private suspend fun consumeTiles(tileChannel: ReceiveChannel<TileSpec>) {
-        for (tile in tileChannel) {
-            // 解码失败也要移除 requestedTiles，避免死锁
-            if (tile.imageBitmap == null) {
-                requestedTiles.remove(tile.cacheKey)
-                continue
-            }
-            // 解码成功也要移除
-            requestedTiles.remove(tile.cacheKey)
-            stateImageCache[tile.cacheKey] = tile.imageBitmap
-        }
-    }
-
-    private fun renderThrottled() {
-        // 不再需要 update++，只需依赖 tilesCollected 的变化
-        //println("PdfViewState:renderThrottled.size:${tilesCollected.size}")
-        renderTask.trySend(Unit)
-    }
-
-    private fun isTileVisible(spec: TileSpec): Boolean {
+    public fun isTileVisible(spec: TileSpec): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
         val pixelRect = Rect(
@@ -141,8 +63,6 @@ public class PdfViewState(
     }
 
     public fun shutdown() {
-        singleThreadDispatcher.close()
-        decoderService.shutdownNow()
     }
 
     public fun invalidatePageSizes() {
@@ -187,7 +107,6 @@ public class PdfViewState(
                 0f,
             )
         }
-        pageToRender = list
         return list
     }
 
@@ -205,70 +124,14 @@ public class PdfViewState(
         }
     }
 
-    public fun remove(
-        bounds: Rect,
-        page: APage,
-        cacheKey: String,
-        pageScale: Float,
-        pageWidth: Float,
-        pageHeight: Float
-    ) {
-        val tileSpec = TileSpec(
-            page.index,
-            pageScale, // totalScale
-            bounds,
-            pageWidth.toInt(), // 原始宽高
-            pageHeight.toInt(),
-            viewSize,
-            cacheKey,
-            null
-        )
-        // 同步移除 StateMap
-        stateImageCache.remove(cacheKey)
-    }
-
-    public fun decode(
-        bounds: Rect,
-        page: APage,
-        cacheKey: String,
-        pageScale: Float,
-        pageWidth: Float,
-        pageHeight: Float
-    ) {
-        if (stateImageCache[cacheKey] != null) {
-            return // 已有缓存
-        }
-        if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
-        requestedTiles.add(cacheKey)
-        val tileSpec = TileSpec(
-            page.index,
-            pageScale, // totalScale
-            bounds,
-            pageWidth.toInt(), // 原始宽高
-            pageHeight.toInt(),
-            viewSize,
-            cacheKey,
-            null
-        )
-        // 不再提前写 stateImageCache[cacheKey] = null
-        scope.launch {
-            visibleTilesChannel.send(tileSpec)
-        }
-    }
-
-    public fun updateOffset(newOffset: Offset) {
-        this.viewOffset = newOffset
-        setVisibilePage()
-    }
-
-    private fun setVisibilePage() {
+    public fun updateVisiblePages(offset: Offset, viewSize: IntSize) {
         // 优化：使用二分查找定位可见页面范围（仅y方向）
         if (pages.isEmpty()) {
             pageToRender = emptyList()
             return
         }
-        val visibleTop = -viewOffset.y
-        val visibleBottom = viewSize.height - viewOffset.y
+        val visibleTop = -offset.y
+        val visibleBottom = viewSize.height - offset.y
 
         // 二分查找第一个可见页面
         fun findFirstVisible(): Int {
@@ -315,8 +178,6 @@ public class PdfViewState(
         }
         // 主动移除不再可见的页面图片缓存
         val newPageKeys = tilesToRenderCopy.flatMap { page ->
-            // Page 可能有多个 tile，需与缓存 key 生成方式一致
-            // 这里假设 PageNode.cacheKey 生成方式为："${aPage.index}-${rect}-${aPage.scale}"
             if (page is Page) {
                 page.nodes.map { node ->
                     "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
@@ -325,13 +186,20 @@ public class PdfViewState(
         }.toSet()
         val toRemove = lastPageKeys - newPageKeys
         toRemove.forEach { key ->
-            stateImageCache.remove(key)
+            // key格式: "index-bounds-scale"
+            val index = key.substringBefore("-").toIntOrNull() ?: return@forEach
+            val page = pages.getOrNull(index) as? Page ?: return@forEach
+            page.recycle()
         }
         lastPageKeys = newPageKeys
         if (tilesToRenderCopy != pageToRender) {
-            println("PdfViewState:updateOffset:${tilesToRenderCopy.size}")
             pageToRender = tilesToRenderCopy
         }
+    }
+
+    public fun updateOffset(newOffset: Offset) {
+        this.viewOffset = newOffset
+        // setVisibilePage() 调用移除，由 DocumentView 主动调用 updateVisiblePages
     }
 
     public enum class Align { Top, Center, Bottom }
@@ -343,7 +211,20 @@ public class PdfViewState(
             Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
             Align.Bottom -> page.bounds.bottom - viewSize.height
         }
-        val clampedY = -targetOffsetY.coerceIn(-(totalHeight - viewSize.height).coerceAtLeast(0f), 0f)
+        val clampedY =
+            -targetOffsetY.coerceIn(-(totalHeight - viewSize.height).coerceAtLeast(0f), 0f)
         updateOffset(Offset(viewOffset.x, clampedY))
+    }
+
+    public fun drawVisiblePages(
+        drawScope: androidx.compose.ui.graphics.drawscope.DrawScope,
+        offset: Offset,
+        vZoom: Float,
+        viewSize: IntSize
+    ) {
+        updateVisiblePages(offset, viewSize)
+        pageToRender.forEach { page ->
+            page.draw(drawScope, offset, vZoom)
+        }
     }
 }
