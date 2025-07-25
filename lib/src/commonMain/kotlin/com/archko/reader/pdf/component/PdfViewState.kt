@@ -24,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+import androidx.compose.runtime.mutableStateListOf
 
 public fun CoroutineScope.throttle(wait: Long, block: suspend () -> Unit): SendChannel<Unit> {
     val channel = Channel<Unit>(capacity = Channel.CONFLATED)
@@ -53,7 +54,8 @@ public class PdfViewState(
     internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
-    public var update: Int by mutableIntStateOf(1)
+    internal val tilesCollected = mutableStateListOf<TileSpec>() // 变为可观察的 StateList
+    internal val requestedTiles = mutableSetOf<String>() // 新增，记录已请求解码的tile
 
     private val parentScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val singleThreadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -63,8 +65,6 @@ public class PdfViewState(
     private val visibleTilesChannel = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
     private val tilesOutput = Channel<TileSpec>(capacity = Channel.RENDEZVOUS)
     internal val decoderService: DecoderService
-    internal val tilesCollected = mutableListOf<TileSpec>()
-    internal val requestedTiles = mutableSetOf<String>() // 新增，记录已请求解码的tile
 
     private var lastPageKeys: Set<String> = emptySet()
 
@@ -86,7 +86,7 @@ public class PdfViewState(
         }
     }
 
-    private val renderTask = scope.throttle(wait = 50) {
+    private val renderTask = scope.throttle(wait = 34) {
         //evictTiles(lastVisible)
         setVisibilePage()
     }
@@ -109,12 +109,13 @@ public class PdfViewState(
                 tilesCollected.remove(tile)
                 //ImageCache.remove(tile.cacheKey)
             }
-
+            // 依赖 tilesCollected 的变化自动刷新，无需 update++
             renderThrottled()
         }
     }
 
     private fun renderThrottled() {
+        // 不再需要 update++，只需依赖 tilesCollected 的变化
         //println("PdfViewState:renderThrottled.size:${tilesCollected.size}")
         renderTask.trySend(Unit)
     }
@@ -205,7 +206,7 @@ public class PdfViewState(
         this.vZoom = vZoom
         if (isViewSizeChanged || isZoomChanged) {
             invalidatePageSizes()
-            update++
+            // update++ 不再需要
         } else {
             println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, viewSize:$viewSize")
         }
@@ -244,7 +245,7 @@ public class PdfViewState(
         pageHeight: Float
     ) {
         if (ImageCache.get(cacheKey) != null) {
-            update++
+            // update++ 不再需要
             return // 已有缓存
         }
         if (requestedTiles.contains(cacheKey)) return // 已经在解码队列
@@ -347,8 +348,7 @@ public class PdfViewState(
         }
         lastPageKeys = newPageKeys
         if (tilesToRenderCopy != pageToRender) {
-            println("PdfViewState:updateOffset:${tilesToRenderCopy.size}, $update")
-            update++
+            println("PdfViewState:updateOffset:${tilesToRenderCopy.size}")
             pageToRender = tilesToRenderCopy
         }
     }

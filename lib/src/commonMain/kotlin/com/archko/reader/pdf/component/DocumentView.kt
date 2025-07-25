@@ -293,7 +293,7 @@ public fun DocumentView(
                     }
                 }
         ) {
-            if (pdfViewState.update > 0)
+            //if (pdfViewState.update > 0)
             //println("state:Canvas:${pdfState.tilesToRender.size}")
                 translate(left = offset.x, top = offset.y) {
                     //只绘制可见区域.
