@@ -3,7 +3,8 @@ package com.archko.reader.viewer
 import android.net.Uri
 import android.text.TextUtils
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -11,10 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,6 +32,11 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.components_thumbnail_corner
+import kreader.composeapp.generated.resources.components_thumbnail_left
+import kreader.composeapp.generated.resources.components_thumbnail_top
+import org.jetbrains.compose.resources.painterResource
 
 data class OpenDocRequest(val path: String, val page: Int?)
 
@@ -210,95 +213,72 @@ private fun RecentItem(
             val aspectRatio = 1.3f
             val itemHeight = itemWidth * aspectRatio
 
-            val spineWidth = 12.dp
-            val thicknessHeight = 12.dp // 使底部和左侧一致
-
+            val leftBorder = 15.dp
+            val topBorder = 10.dp
             Box(
                 modifier = Modifier
                     .width(itemWidth)
                     .height(itemHeight)
-                    .border(BorderStroke(1.dp, Color.LightGray))
             ) {
-                // 左上角三角形高光
-                Canvas(
+                // 顶部区域：左上角图片 + 顶部装饰条图片
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .width(spineWidth)
-                        .height(spineWidth)
+                        .width(itemWidth)
+                        .height(topBorder)
                 ) {
-                    drawPath(
-                        path = Path().apply {
-                            moveTo(0f, 0f)
-                            lineTo(size.width, 0f)
-                            lineTo(0f, size.height)
-                            close()
-                        },
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFFEFEFEF), Color(0xFFCCCCCC)),
-                            start = Offset.Zero,
-                            end = Offset(size.width, size.height)
-                        )
+                    Image(
+                        painter = painterResource(Res.drawable.components_thumbnail_corner),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .width(leftBorder)
+                            .height(topBorder)
+                            .offset(x = 1.dp)
+                    )
+                    Image(
+                        painter = painterResource(Res.drawable.components_thumbnail_top),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .width(itemWidth - leftBorder)
+                            .height(topBorder)
                     )
                 }
-                // 左侧高光（细长矩形，模拟书脊高光）
-                Box(
-                    Modifier
+                // 左侧装饰条图片
+                Image(
+                    painter = painterResource(Res.drawable.components_thumbnail_left),
+                    contentDescription = null,
+                    modifier = Modifier
                         .align(Alignment.TopStart)
-                        .width(3.dp)
-                        .fillMaxHeight()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color.White.copy(alpha = 0.7f), Color.Transparent),
-                                startY = 0f,
-                                endY = itemHeight.value
-                            )
-                        )
+                        .width(leftBorder)
+                        .height(itemHeight - topBorder)
+                        .offset(y = topBorder)
                 )
-                // 右下角三角形阴影
-                Canvas(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .width(thicknessHeight)
-                        .height(thicknessHeight)
-                ) {
-                    drawPath(
-                        path = Path().apply {
-                            moveTo(size.width, size.height)
-                            lineTo(0f, size.height)
-                            lineTo(size.width, 0f)
-                            close()
-                        },
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFFB0B0B0), Color(0xFFEEEEEE)),
-                            start = Offset(size.width, size.height),
-                            end = Offset(0f, 0f)
-                        )
-                    )
-                }
-                // 封面图片（右移、上移，尺寸缩小）
+                // 封面图片
                 AsyncImage(
                     model = recent.path?.let {
                         CustomImageData(
                             it,
-                            (itemWidth - spineWidth).toIntPx(),
-                            (itemHeight - thicknessHeight).toIntPx()
+                            (itemWidth - leftBorder).toIntPx(),
+                            (itemHeight - topBorder).toIntPx()
                         )
                     },
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = spineWidth, bottom = thicknessHeight)
+                        .width(itemWidth - leftBorder)
+                        .height(itemHeight - topBorder)
+                        .offset(x = leftBorder - 1.dp, y = topBorder),
+                    alignment = Alignment.Center
                 )
                 // 页码进度
                 Text(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(2.dp),
-                    color = Color.Black.copy(alpha = 0.6f),
+                    color = Color(0xFF444444).copy(alpha = 0.85f),
                     maxLines = 1,
                     text = "${recent.page?.plus(1)}/${recent.pageCount}",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     overflow = TextOverflow.Ellipsis
                 )
             }
