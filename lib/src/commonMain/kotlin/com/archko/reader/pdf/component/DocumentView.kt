@@ -162,7 +162,7 @@ public fun DocumentView(
                                 panVelocityTracker.addPosition(uptime, pan)
                                 if (pointerCount > 1) {
                                     zooming = true
-                                    val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
+                                    val newZoom = (zoomChange * vZoom).coerceIn(1f, 10f)
                                     val zoomFactor = newZoom / vZoom
                                     
                                     // 计算缩放中心点：手势中心相对于内容的位置
