@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -74,7 +75,7 @@ fun FileScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 10.dp, vertical = 20.dp)
+                        .padding(horizontal = 10.dp)
                 ) {
                     val pickerLauncher = rememberFilePickerLauncher(
                         type = FilePickerFileType.All,
@@ -94,7 +95,7 @@ fun FileScreen(
                     }
 
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
@@ -115,10 +116,15 @@ fun FileScreen(
                     if (recentList.isNotEmpty()) {
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(100.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(bottom = 56.dp)
                         ) {
+                            // 顶部间距 - 占满一行
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            
                             items(
                                 count = recentList.size,
                                 key = { index -> "$index" }
@@ -139,6 +145,11 @@ fun FileScreen(
                                         viewModel.deleteRecent(recentList[i])
                                     }
                                 )
+                            }
+
+                            // 底部间距 - 占满一行
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Spacer(modifier = Modifier.height(8.dp))
                             }
                         }
                     }
@@ -187,11 +198,6 @@ fun Dp.toIntPx(): Int {
 }
 
 @Composable
-fun Float.toIntPx(): Int {
-    return with(LocalDensity.current) { this@toIntPx.toInt() }
-}
-
-@Composable
 private fun RecentItem(
     recent: Recent,
     onClick: (Recent) -> Unit,
@@ -233,7 +239,7 @@ private fun RecentItem(
                         modifier = Modifier
                             .width(leftBorder)
                             .height(topBorder)
-                            .offset(x = 1.dp)
+                            .offset(x = 0.7.dp)
                     )
                     Image(
                         painter = painterResource(Res.drawable.components_thumbnail_top),
