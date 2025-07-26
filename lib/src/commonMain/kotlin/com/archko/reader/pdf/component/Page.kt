@@ -28,6 +28,7 @@ public class Page(
 ) {
     public var totalScale: Float = 1f
     public var nodes: List<PageNode> = emptyList()
+    private var currentTileConfig: TileConfig? = null
 
     //page bound, should be caculate after view measured
     internal var bounds = Rect(0f, 0f, 1f, 1f)
@@ -90,10 +91,10 @@ public class Page(
         this.bounds = rect
         this.yOffset = bounds.top
         this.totalScale = if (aPage.width == 0) 1f else width / aPage.width
-        recalculateNodes()
+        invalidateNodes()
     }
 
-        public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
+    public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
         // 计算当前缩放下的实际显示尺寸和位置
         // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变
         val scaleRatio = vZoom / pdfViewState.vZoom
@@ -105,11 +106,11 @@ public class Page(
             bounds.right * scaleRatio,
             bounds.bottom * scaleRatio
         )
-        
+
         if (!isVisible(drawScope, offset, currentBounds, aPage.index)) {
             return
         }
-        
+
         // 优先绘制缩略图
         if (null != thumbBitmap) {
             drawScope.drawImage(
@@ -147,64 +148,67 @@ public class Page(
         nodes.forEach { it.recycle() }
     }
 
-    private fun recalculateNodes() {
-        val rootNode = PageNode(
-            pdfViewState,
-            Rect(0f, 0f, 1f, 1f),
-            aPage
-        )
-        nodes = calculatePages(rootNode)
+    // 计算分块数的通用函数
+    private fun calcBlockCount(length: Float): Int {
+        if (length <= minBlockSize) {
+            return 1
+        }
+        val blockCount = ceil(length / maxBlockSize).toInt()
+        val actualBlockSize = length / blockCount
+        if (actualBlockSize >= minBlockSize && actualBlockSize <= maxBlockSize) {
+            return blockCount
+        } else {
+            return ceil(length / minBlockSize).toInt()
+        }
     }
 
-    private fun calculatePages(page: PageNode): List<PageNode> {
-        val minBlockSize = 256f * 3f // 768
-        val maxBlockSize = 256f * 4f // 1024
-        val pageWidth = width
-        val pageHeight = height
+    // 计算分块配置
+    private data class TileConfig(val xBlocks: Int, val yBlocks: Int) {
+        // 当 xBlocks 和 yBlocks 都是 1 时，表示整个页面作为一个块
+        // 这种情况下不需要分块，直接返回原始页面
+        val isSingleBlock: Boolean get() = xBlocks == 1 && yBlocks == 1
+    }
 
-        // 如果页面的宽或高都小于最小块大小，则不分块
-        if (pageWidth <= maxBlockSize && pageHeight <= maxBlockSize) {
-            return listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
+    private fun calculateTileConfig(width: Float, height: Float): TileConfig {
+        // 如果页面的宽或高都小于最大块大小，则不分块
+        if (width <= maxBlockSize && height <= maxBlockSize) {
+            return TileConfig(1, 1)
         }
 
-        // 计算分块数
-        fun calcBlockCount(length: Float): Int {
-            if (length <= minBlockSize) {
-                return 1 // 如果长度小于等于最小块大小，不分块
-            }
+        val xBlocks = calcBlockCount(width)
+        val yBlocks = calcBlockCount(height)
 
-            val blockCount = ceil(length / maxBlockSize).toInt()
-            val actualBlockSize = length / blockCount
+        return TileConfig(xBlocks, yBlocks)
+    }
 
-            // 确保实际块大小在合理范围内
-            if (actualBlockSize >= minBlockSize && actualBlockSize <= maxBlockSize) {
-                return blockCount
-            } else {
-                // 如果计算出的块大小不合适，调整块数
-                val adjustedCount = ceil(length / minBlockSize).toInt()
-                return adjustedCount
-            }
+    private fun invalidateNodes() {
+        val config = calculateTileConfig(width, height)
+        println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
+        if (config == currentTileConfig) {
+            return
         }
 
-        val xBlocks = calcBlockCount(pageWidth)
-        val yBlocks = calcBlockCount(pageHeight)
+        // 保存当前配置
+        currentTileConfig = config
 
-        // 如果只有一个块，直接返回
-        if (xBlocks == 1 && yBlocks == 1) {
-            return listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
+        // 如果是单个块，直接返回原始页面
+        if (config.isSingleBlock) {
+            nodes = listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
+            return
         }
 
-        val nodes = mutableListOf<PageNode>()
-        for (y in 0 until yBlocks) {
-            for (x in 0 until xBlocks) {
-                val left = x / xBlocks.toFloat()
-                val top = y / yBlocks.toFloat()
-                val right = (x + 1) / xBlocks.toFloat()
-                val bottom = (y + 1) / yBlocks.toFloat()
-                nodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
+        // 创建分块节点
+        val newNodes = mutableListOf<PageNode>()
+        for (y in 0 until config.yBlocks) {
+            for (x in 0 until config.xBlocks) {
+                val left = x / config.xBlocks.toFloat()
+                val top = y / config.yBlocks.toFloat()
+                val right = (x + 1) / config.xBlocks.toFloat()
+                val bottom = (y + 1) / config.yBlocks.toFloat()
+                newNodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
             }
         }
-        return nodes
+        nodes = newNodes
     }
 
     override fun equals(other: Any?): Boolean {
@@ -234,7 +238,8 @@ public class Page(
     }
 
     public companion object {
-        private const val maxSize = 256 * 384 * 4f * 2
+        private val minBlockSize = 256f * 3f // 768
+        private val maxBlockSize = 256f * 4f // 1024
     }
 }
 

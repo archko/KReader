@@ -176,8 +176,8 @@ public fun DocumentView(
                                     val newOffsetY = centroid.y - contentCenterY * zoomFactor
                                     
                                     // 调试信息
-                                    println("缩放中心点: centroid=$centroid, contentCenter=($contentCenterX, $contentCenterY), zoomFactor=$zoomFactor")
-                                    println("偏移量: oldOffset=$offset, newOffset=($newOffsetX, $newOffsetY)")
+                                    //println("缩放中心点: centroid=$centroid, contentCenter=($contentCenterX, $contentCenterY), zoomFactor=$zoomFactor")
+                                    //println("偏移量: oldOffset=$offset, newOffset=($newOffsetX, $newOffsetY)")
                                     
                                     vZoom = newZoom
                                     offset = Offset(newOffsetX, newOffsetY)
