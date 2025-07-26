@@ -24,7 +24,8 @@ public class Page(
     public var width: Float,   // 最终缩放后的宽
     public var height: Float,  // 最终缩放后的高
     internal var aPage: APage,
-    public var yOffset: Float = 0f
+    public var yOffset: Float = 0f,
+    public var xOffset: Float = 0f
 ) {
     public var totalScale: Float = 1f
     public var nodes: List<PageNode> = emptyList()
@@ -84,12 +85,14 @@ public class Page(
      * @param viewSize view size
      * @param scale view zoom,not the page zoom,default=1f
      * @param yOffset page.top
+     * @param xOffset page.left
      */
     public fun update(width: Float, height: Float, rect: Rect) {
         this.width = width
         this.height = height
         this.bounds = rect
         this.yOffset = bounds.top
+        this.xOffset = bounds.left
         this.totalScale = if (aPage.width == 0) 1f else width / aPage.width
         invalidateNodes()
     }
@@ -115,7 +118,7 @@ public class Page(
         if (null != thumbBitmap) {
             drawScope.drawImage(
                 image = thumbBitmap!!,
-                dstOffset = IntOffset(0, currentBounds.top.toInt()),
+                dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
                 dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
             )
         } else {
@@ -221,6 +224,7 @@ public class Page(
         if (height != other.height) return false
         if (aPage != other.aPage) return false
         if (yOffset != other.yOffset) return false
+        if (xOffset != other.xOffset) return false
         if (nodes != other.nodes) return false
         if (bounds != other.bounds) return false
 
@@ -232,6 +236,7 @@ public class Page(
         result = 31 * result + height.hashCode()
         result = 31 * result + aPage.hashCode()
         result = 31 * result + yOffset.hashCode()
+        result = 31 * result + xOffset.hashCode()
         result = 31 * result + nodes.hashCode()
         result = 31 * result + bounds.hashCode()
         return result

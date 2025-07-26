@@ -152,6 +152,9 @@ fun FileScreen(
                             zoom = zoom,
                             crop = 0L
                         )
+                    },
+                    onCloseDocument = {
+                        openDocRequest = null
                     }
                 )
             }
