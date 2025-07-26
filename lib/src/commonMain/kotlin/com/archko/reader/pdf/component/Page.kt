@@ -5,11 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
@@ -18,7 +15,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
-import kotlin.math.floor
 
 /**
  * @author: archko 2025/7/24 :08:20
@@ -97,16 +93,29 @@ public class Page(
         recalculateNodes()
     }
 
-    public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
-        if (!isVisible(drawScope, offset, bounds, aPage.index)) {
+        public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
+        // 计算当前缩放下的实际显示尺寸和位置
+        // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变
+        val scaleRatio = vZoom / pdfViewState.vZoom
+        val currentWidth = width * scaleRatio
+        val currentHeight = height * scaleRatio
+        val currentBounds = Rect(
+            bounds.left * scaleRatio,
+            bounds.top * scaleRatio,
+            bounds.right * scaleRatio,
+            bounds.bottom * scaleRatio
+        )
+        
+        if (!isVisible(drawScope, offset, currentBounds, aPage.index)) {
             return
         }
+        
         // 优先绘制缩略图
         if (null != thumbBitmap) {
             drawScope.drawImage(
                 image = thumbBitmap!!,
-                dstOffset = IntOffset(0, bounds.top.toInt()),
-                dstSize = IntSize(width.toInt(), height.toInt())
+                dstOffset = IntOffset(0, currentBounds.top.toInt()),
+                dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
             )
         } else {
             if (!thumbDecoding) {
@@ -115,13 +124,20 @@ public class Page(
         }
         // 再绘制高清块
         nodes.forEach { node ->
-            node.draw(drawScope, offset, width, height, yOffset, totalScale)
+            node.draw(
+                drawScope,
+                offset,
+                currentWidth,
+                currentHeight,
+                currentBounds.top,
+                totalScale * scaleRatio
+            )
         }
         // 占位框
         /*drawScope.drawRect(
             color = Color.Green,
-            topLeft = Offset(0f, bounds.top),
-            size = Size(bounds.width, bounds.height),
+            topLeft = Offset(0f, currentBounds.top),
+            size = Size(currentBounds.width, currentBounds.height),
             style = Stroke(width = 6f)
         )*/
     }
@@ -141,31 +157,43 @@ public class Page(
     }
 
     private fun calculatePages(page: PageNode): List<PageNode> {
-        val minBlockSize = 512f
-        val maxBlockSize = 512f * 1.41f // ≈724
+        val minBlockSize = 256f * 3f // 768
+        val maxBlockSize = 256f * 4f // 1024
         val pageWidth = width
         val pageHeight = height
-        val totalPixels = pageWidth * pageHeight
-        if (totalPixels < minBlockSize * minBlockSize * 2) {
-            // 不分块
+
+        // 如果页面的宽或高都小于最小块大小，则不分块
+        if (pageWidth <= maxBlockSize && pageHeight <= maxBlockSize) {
             return listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
         }
+
         // 计算分块数
-        fun calcBlockCount(length: Float, min: Float, max: Float): Int {
-            val minCount = ceil(length / max).toInt()
-            val maxCount = floor(length / min).toInt().coerceAtLeast(1)
-            // 在[minCount, maxCount]区间内，优先选能整除的块数，否则选minCount
-            for (count in minCount..maxCount) {
-                val block = length / count
-                if (block in minBlockSize..maxBlockSize) {
-                    return count
-                }
+        fun calcBlockCount(length: Float): Int {
+            if (length <= minBlockSize) {
+                return 1 // 如果长度小于等于最小块大小，不分块
             }
-            return minCount
+
+            val blockCount = ceil(length / maxBlockSize).toInt()
+            val actualBlockSize = length / blockCount
+
+            // 确保实际块大小在合理范围内
+            if (actualBlockSize >= minBlockSize && actualBlockSize <= maxBlockSize) {
+                return blockCount
+            } else {
+                // 如果计算出的块大小不合适，调整块数
+                val adjustedCount = ceil(length / minBlockSize).toInt()
+                return adjustedCount
+            }
         }
 
-        val xBlocks = calcBlockCount(pageWidth, minBlockSize, maxBlockSize)
-        val yBlocks = calcBlockCount(pageHeight, minBlockSize, maxBlockSize)
+        val xBlocks = calcBlockCount(pageWidth)
+        val yBlocks = calcBlockCount(pageHeight)
+
+        // 如果只有一个块，直接返回
+        if (xBlocks == 1 && yBlocks == 1) {
+            return listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
+        }
+
         val nodes = mutableListOf<PageNode>()
         for (y in 0 until yBlocks) {
             for (x in 0 until xBlocks) {
@@ -224,3 +252,4 @@ public fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: I
     //println("page.draw.isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
     return visible
 }
+

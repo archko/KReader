@@ -124,7 +124,7 @@ public class PdfViewState(
         }
     }
 
-    public fun updateVisiblePages(offset: Offset, viewSize: IntSize) {
+    public fun updateVisiblePages(offset: Offset, viewSize: IntSize, currentVZoom: Float = vZoom) {
         // 优化：使用二分查找定位可见页面范围（仅y方向）
         if (pages.isEmpty()) {
             pageToRender = emptyList()
@@ -141,7 +141,10 @@ public class PdfViewState(
             while (low <= high) {
                 val mid = (low + high) ushr 1
                 val page = pages[mid]
-                if (page.bounds.bottom > visibleTop) {
+                // 在缩放过程中，需要考虑当前缩放比例
+                val scaleRatio = currentVZoom / this.vZoom
+                val currentBottom = page.bounds.bottom * scaleRatio
+                if (currentBottom > visibleTop) {
                     result = mid
                     high = mid - 1
                 } else {
@@ -159,7 +162,10 @@ public class PdfViewState(
             while (low <= high) {
                 val mid = (low + high) ushr 1
                 val page = pages[mid]
-                if (page.bounds.top < visibleBottom) {
+                // 在缩放过程中，需要考虑当前缩放比例
+                val scaleRatio = currentVZoom / this.vZoom
+                val currentTop = page.bounds.top * scaleRatio
+                if (currentTop < visibleBottom) {
                     result = mid
                     low = mid + 1
                 } else {
@@ -222,7 +228,7 @@ public class PdfViewState(
         vZoom: Float,
         viewSize: IntSize
     ) {
-        updateVisiblePages(offset, viewSize)
+        updateVisiblePages(offset, viewSize, vZoom)
         pageToRender.forEach { page ->
             page.draw(drawScope, offset, vZoom)
         }

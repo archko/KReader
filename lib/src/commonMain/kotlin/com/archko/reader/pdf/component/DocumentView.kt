@@ -164,11 +164,29 @@ public fun DocumentView(
                                     zooming = true
                                     val newZoom = (zoomChange * vZoom).coerceIn(1f, 5f)
                                     val zoomFactor = newZoom / vZoom
-                                    val newOffset = centroid + (offset - centroid) * zoomFactor
+                                    
+                                    // 计算缩放中心点：手势中心相对于内容的位置
+                                    // centroid 是手势中心在视图中的位置
+                                    // 需要将其转换为相对于内容的位置
+                                    val contentCenterX = centroid.x - offset.x
+                                    val contentCenterY = centroid.y - offset.y
+                                    
+                                    // 计算新的偏移量，保持内容中心点不变
+                                    val newOffsetX = centroid.x - contentCenterX * zoomFactor
+                                    val newOffsetY = centroid.y - contentCenterY * zoomFactor
+                                    
+                                    // 调试信息
+                                    println("缩放中心点: centroid=$centroid, contentCenter=($contentCenterX, $contentCenterY), zoomFactor=$zoomFactor")
+                                    println("偏移量: oldOffset=$offset, newOffset=($newOffsetX, $newOffsetY)")
+                                    
                                     vZoom = newZoom
-                                    offset = newOffset
+                                    offset = Offset(newOffsetX, newOffsetY)
+                                    
+                                    // 边界检查
                                     val scaledWidth = viewSize.width * vZoom
-                                    val scaledHeight = pdfViewState.totalHeight
+                                    // 在缩放过程中，需要根据当前缩放比例调整总高度
+                                    val scaleRatio = vZoom / pdfViewState.vZoom
+                                    val scaledHeight = pdfViewState.totalHeight * scaleRatio
                                     val minX = minOf(0f, viewSize.width - scaledWidth)
                                     val maxX = 0f
                                     val minY =
@@ -179,7 +197,8 @@ public fun DocumentView(
                                         offset.y.coerceIn(minY, maxY)
                                     )
                                     pdfViewState.updateOffset(offset)
-                                    pdfViewState.updateViewSize(viewSize, vZoom)
+                                    // 缩放过程中不调用 updateViewSize，避免频繁的页面重新计算
+                                    // pdfViewState.updateViewSize(viewSize, vZoom)
                                     event.changes.fastForEach { if (it.positionChanged()) it.consume() }
                                 } else {
                                     // 单指拖动
@@ -203,6 +222,10 @@ public fun DocumentView(
                             } while (event.changes.fastAny { it.pressed })
                         } catch (_: CancellationException) {
                         } finally {
+                            // 缩放结束后调用 updateViewSize 重新计算页面
+                            if (zooming) {
+                                pdfViewState.updateViewSize(viewSize, vZoom)
+                            }
                             // 计算pan velocity
                             val velocity =
                                 runCatching { panVelocityTracker.calculateVelocity() }.getOrDefault(Velocity.Zero)
