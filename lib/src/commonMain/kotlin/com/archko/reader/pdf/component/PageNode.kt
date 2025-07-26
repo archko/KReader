@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
-import com.archko.reader.pdf.decoder.TileSpec
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
