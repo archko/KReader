@@ -31,7 +31,6 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":lib"))
 
-            implementation(compose.components.resources)
             implementation(libs.androidx.navigation.compose)
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -42,7 +41,6 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.runtime.compose)
 
             implementation(libs.filePicker)
-            implementation(libs.mmkv)
 
             api(libs.coil.kt)
             api(libs.coil.kt.compose)
