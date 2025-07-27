@@ -1,10 +1,6 @@
 package com.archko.reader.viewer
 
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -19,10 +15,9 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.util.DebugLogger
 import coil3.util.Logger
-import com.archko.reader.pdf.viewmodel.PdfViewModel
-import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.util.CustomImageFetcher
+import com.archko.reader.pdf.viewmodel.PdfViewModel
 import org.jetbrains.skiko.setSystemLookAndFeel
 
 @OptIn(ExperimentalComposeUiApi::class)

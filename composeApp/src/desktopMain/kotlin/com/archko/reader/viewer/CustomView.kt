@@ -33,7 +33,7 @@ import java.io.File
  */
 @Composable
 fun CustomView(
-    path: String,
+    path: String, 
     progressPage: Int? = null,
     onDocumentClosed: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -192,7 +192,7 @@ fun CustomView(
                                 painter = painterResource(Res.drawable.ic_search),
                                 contentDescription = "搜索",
                                 tint = Color.White
-                            )
+            )
                         }
                     }
                 }

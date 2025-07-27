@@ -1,10 +1,6 @@
 package com.archko.reader.viewer
 
-import android.net.Uri
-import android.text.TextUtils
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -13,7 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -21,11 +20,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.state.LocalPdfState
-import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
@@ -34,10 +31,9 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.components_thumbnail_corner
-import kreader.composeapp.generated.resources.components_thumbnail_left
-import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import java.io.File
 
 data class OpenDocRequest(val path: String, val page: Int?)
 
@@ -56,11 +52,6 @@ fun FileScreen(
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
-        }
-
-        BackHandler(enabled = openDocRequest != null) {
-            openDocRequest = null
-            viewModel.path = null
         }
 
         Surface(
@@ -83,19 +74,20 @@ fun FileScreen(
                     ) { files ->
                         scope.launch {
                             files.singleOrNull()?.let { file ->
-                                val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
                                 val pdf = LocalPdfState(file)
-                                // 先加载进度
-                                loadProgress(viewModel, file, pdf)
-                                // 等待进度加载完成后再设置 openDocRequest
-                                val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(path, startPage)
+                                scope.launch {
+                                    loadProgress(viewModel, file, pdf)
+                                    // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
+                                    viewModel.getProgress(file.file.absolutePath)
+                                    val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                    openDocRequest = OpenDocRequest(file.file.absolutePath, startPage)
+                                }
                             }
                         }
                     }
 
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
@@ -115,10 +107,9 @@ fun FileScreen(
 
                     if (recentList.isNotEmpty()) {
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(100.dp),
+                            columns = GridCells.Adaptive(180.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 56.dp)
                         ) {
                             // 顶部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -132,15 +123,12 @@ fun FileScreen(
                                 RecentItem(
                                     recent = recentList[i],
                                     onClick = {
-                                        val file = KmpFile(Uri.parse(it.path))
-                                        val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
+                                        val file = KmpFile(File(it.path))
                                         val page = it.page?.toInt()
                                         val pdf = LocalPdfState(file)
                                         scope.launch {
-                                            // 先加载进度
                                             loadProgress(viewModel, file, pdf)
-                                            // 等待进度加载完成后再设置 openDocRequest
-                                            openDocRequest = OpenDocRequest(path, page)
+                                            openDocRequest = OpenDocRequest(file.file.absolutePath, page)
                                         }
                                     },
                                     onDelete = {
@@ -189,15 +177,9 @@ private suspend fun loadProgress(
     file: KmpFile,
     pdf: LocalPdfState?
 ) {
-    if (pdf != null && file.uri.lastPathSegment != null) {
-        var path = IntentFile.getPath(PdfApp.app!!, file.uri)
-        if (TextUtils.isEmpty(path)) {
-            path = file.uri.toString()
-        }
-        path?.run {
-            // 等待 insertOrUpdate 完成
-            viewModel.insertOrUpdateAndWait(path, pdf.pageCount.toLong())
-        }
+    if (pdf != null) {
+        val path = file.file.absolutePath
+        viewModel.insertOrUpdate(path, pdf.pageCount.toLong())
     }
 }
 
@@ -245,7 +227,7 @@ private fun RecentItem(
                     Image(
                         painter = painterResource(Res.drawable.components_thumbnail_corner),
                         contentDescription = null,
-                        modifier = Modifier
+                    modifier = Modifier
                             .width(leftBorder)
                             .height(topBorder)
                             .offset(x = 0.7.dp)
@@ -256,7 +238,7 @@ private fun RecentItem(
                         modifier = Modifier
                             .width(itemWidth - leftBorder)
                             .height(topBorder)
-                    )
+                        )
                 }
                 // 左侧装饰条图片
                 Image(
@@ -267,7 +249,7 @@ private fun RecentItem(
                         .width(leftBorder)
                         .height(itemHeight - topBorder)
                         .offset(y = topBorder)
-                )
+                    )
                 // 封面图片
                 AsyncImage(
                     model = recent.path?.let {

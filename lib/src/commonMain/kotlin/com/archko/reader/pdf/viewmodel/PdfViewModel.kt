@@ -144,4 +144,15 @@ public class PdfViewModel : ViewModel() {
             loadRecents()
         }
     }
+
+    public suspend fun getProgress(absolutePath: String) {
+        this.path = absolutePath
+        val deferred = CompletableDeferred<Unit>()
+        viewModelScope.launch {
+            progress = database?.recentDao()?.getRecent(absolutePath)
+            println("PdfViewModel.getProgress:${progress}")
+            deferred.complete(Unit)
+        }
+        deferred.await()
+    }
 }
