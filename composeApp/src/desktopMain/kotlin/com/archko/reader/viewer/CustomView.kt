@@ -164,7 +164,7 @@ fun CustomView(
                 state = decoder!!,
                 jumpToPage = if (jumpToPage >= 0) jumpToPage else null,
                 orientation = if (isVertical) Vertical else Horizontal,
-                onDocumentClosed = onDocumentClosed,
+                onDocumentClosed = if (decoder != null && list.isNotEmpty()) onDocumentClosed else null,
                 onDoubleTapToolbar = { showToolbar = !showToolbar },
                 onPageChanged = { page -> currentPage = page },
                 initialScrollX = initialScrollX,
@@ -201,8 +201,10 @@ fun CustomView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
-                            // 先保存进度
-                            onDocumentClosed?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
+                            // 只有在文档加载成功时才保存进度
+                            if (decoder != null && list.isNotEmpty()) {
+                                onDocumentClosed?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
+                            }
                             // 然后关闭文档
                             onCloseDocument?.invoke()
                         }) {

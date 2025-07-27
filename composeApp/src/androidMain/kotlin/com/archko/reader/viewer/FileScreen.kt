@@ -82,7 +82,6 @@ fun FileScreen(
 
         BackHandler(enabled = openDocRequest != null) {
             openDocRequest = null
-            viewModel.path = null
             // 恢复状态栏显示
             val activity = context as? ComponentActivity
             activity?.window?.let { window ->

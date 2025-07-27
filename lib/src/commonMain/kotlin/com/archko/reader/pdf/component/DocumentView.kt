@@ -207,14 +207,17 @@ public fun DocumentView(
             val pageCount = list.size
             val zoom = vZoom.toDouble()
             println("DocumentView: shutdown:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-            onDocumentClosed?.invoke(
-                currentPage,
-                pageCount,
-                zoom,
-                offset.x.toLong(),
-                offset.y.toLong(),
-                lastOrientation.toLong()
-            )
+            
+            if (!list.isEmpty()){
+                onDocumentClosed?.invoke(
+                    currentPage,
+                    pageCount,
+                    zoom,
+                    offset.x.toLong(),
+                    offset.y.toLong(),
+                    lastOrientation.toLong()
+                )
+            }
 
             pdfViewState.shutdown()
             ImageCache.clear()
