@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
 data class OpenDocRequest(val path: String, val page: Int?)
@@ -48,6 +50,8 @@ fun FileScreen(
     Theme {
         val scope = rememberCoroutineScope()
         val recentList by viewModel.recentList.collectAsState()
+        val hasMoreData by viewModel.hasMoreData.collectAsState()
+        val isLoading by viewModel.isLoading.collectAsState()
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
 
         LaunchedEffect(Unit) {
@@ -105,7 +109,26 @@ fun FileScreen(
                     }
 
                     if (recentList.isNotEmpty()) {
+                        val gridState = rememberLazyGridState()
+                        
+                        // 监听滚动到底部自动加载更多
+                        LaunchedEffect(gridState) {
+                            snapshotFlow { gridState.layoutInfo.visibleItemsInfo }
+                                .collect { visibleItems ->
+                                    if (visibleItems.isNotEmpty()) {
+                                        val lastVisibleItem = visibleItems.last()
+                                        val totalItems = recentList.size
+                                        
+                                        // 当滚动到最后几个项目时，自动加载更多
+                                        if (lastVisibleItem.index >= totalItems - 3 && hasMoreData && !isLoading) {
+                                            viewModel.loadMoreRecents()
+                                        }
+                                    }
+                                }
+                        }
+                        
                         LazyVerticalGrid(
+                            state = gridState,
                             columns = GridCells.Adaptive(180.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -117,7 +140,7 @@ fun FileScreen(
 
                             items(
                                 count = recentList.size,
-                                key = { index -> "$index" }
+                                key = { index -> recentList[index].path ?: "$index" }
                             ) { i ->
                                 RecentItem(
                                     recent = recentList[i],
@@ -133,6 +156,35 @@ fun FileScreen(
                                         viewModel.deleteRecent(recentList[i])
                                     }
                                 )
+                            }
+
+                            // 加载更多按钮 - 占满一行
+                            if (hasMoreData) {
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isLoading) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Button(
+                                                onClick = { viewModel.loadMoreRecents() },
+                                                modifier = Modifier.padding(horizontal = 16.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Load More",
+                                                    color = Color.Black
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             // 底部间距 - 占满一行

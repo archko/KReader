@@ -95,6 +95,38 @@ public class Recent {
                 '}'
     }
 
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Recent) return false
+        
+        return path == other.path &&
+                page == other.page &&
+                pageCount == other.pageCount &&
+                updateAt == other.updateAt &&
+                createAt == other.createAt &&
+                crop == other.crop &&
+                reflow == other.reflow &&
+                scrollOri == other.scrollOri &&
+                zoom == other.zoom &&
+                scrollX == other.scrollX &&
+                scrollY == other.scrollY
+    }
+
+    override fun hashCode(): Int {
+        var result = path?.hashCode() ?: 0
+        result = 31 * result + (page?.hashCode() ?: 0)
+        result = 31 * result + (pageCount?.hashCode() ?: 0)
+        result = 31 * result + (updateAt?.hashCode() ?: 0)
+        result = 31 * result + (createAt?.hashCode() ?: 0)
+        result = 31 * result + (crop?.hashCode() ?: 0)
+        result = 31 * result + (reflow?.hashCode() ?: 0)
+        result = 31 * result + (scrollOri?.hashCode() ?: 0)
+        result = 31 * result + (zoom?.hashCode() ?: 0)
+        result = 31 * result + (scrollX?.hashCode() ?: 0)
+        result = 31 * result + (scrollY?.hashCode() ?: 0)
+        return result
+    }
+
     public companion object {
         public fun encode(
             path: String?,

@@ -26,8 +26,11 @@ public interface RecentDao {
     @Query("SELECT * FROM recent WHERE path = :path")
     public suspend fun getRecent(path: String): Recent?
 
-    @Query("SELECT * FROM recent order by createAt desc limit :start, :count")
+    @Query("SELECT * FROM recent order by updateAt desc limit :start, :count")
     public suspend fun getRecents(start: Int, count: Int): List<Recent>?
+
+    @Query("SELECT * FROM recent WHERE updateAt < :lastUpdateAt order by updateAt desc limit :count")
+    public suspend fun getRecentsAfter(lastUpdateAt: Long, count: Int): List<Recent>?
 
     @Query("SELECT count(id) FROM recent")
     public suspend fun recentCount(): Int

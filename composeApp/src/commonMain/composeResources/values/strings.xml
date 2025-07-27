@@ -11,6 +11,7 @@
     <string name="clear">Clear</string>
     <string name="select_pdf">Select PDF</string>
     <string name="delete_history">Delete History</string>
+    <string name="load_more">Load More</string>
     <string name="back">Back</string>
     <string name="vertical">Vertical</string>
     <string name="horizontal">Horizontal</string>
