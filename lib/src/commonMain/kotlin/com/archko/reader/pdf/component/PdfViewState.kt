@@ -11,6 +11,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 
 /**
  * @author: archko 2025/7/24 :08:21
@@ -18,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 public class PdfViewState(
     public val list: List<APage>,
     public val state: ImageDecoder,
-    public var orientation: Orientation = Orientation.Vertical
+    public var orientation: Int = Vertical
 ) {
     public var viewOffset: Offset = Offset.Zero
     public var init: Boolean by mutableStateOf(false)
@@ -35,12 +36,15 @@ public class PdfViewState(
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     private var lastPageKeys: Set<String> = emptySet()
+    
+    // 添加关闭标志
+    private var isShutdown = false
 
     public fun isTileVisible(spec: TileSpec): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
         val xOffset = page.xOffset
-        val pixelRect = if (orientation == Orientation.Vertical) {
+        val pixelRect = if (orientation == Vertical) {
             Rect(
                 left = spec.bounds.left * spec.pageWidth,
                 top = spec.bounds.top * spec.pageHeight + yOffset,
@@ -74,7 +78,11 @@ public class PdfViewState(
     }
 
     public fun shutdown() {
+        isShutdown = true
+        decodeScope.cancel()
     }
+    
+    public fun isShutdown(): Boolean = isShutdown
 
     public fun invalidatePageSizes() {
         init = false
@@ -83,7 +91,7 @@ public class PdfViewState(
             totalHeight = viewSize.height.toFloat()
             totalWidth = viewSize.width.toFloat()
         } else {
-            if (orientation == Orientation.Vertical) {
+            if (orientation == Vertical) {
                 var currentY = 0f
                 list.zip(pages).forEach { (aPage, page) ->
                     val scaledPageWidth = viewSize.width * vZoom
@@ -131,7 +139,7 @@ public class PdfViewState(
     private fun createPages(): List<Page> {
         val list = list.map { aPage ->
             // 初始化时直接用viewSize和vZoom计算的宽高
-            if (orientation == Orientation.Vertical) {
+            if (orientation == Vertical) {
                 val scaledPageWidth = viewSize.width * 1f
                 val pageScale = if (aPage.width == 0) 1f else scaledPageWidth / aPage.width
                 val scaledPageHeight = aPage.height * pageScale
@@ -160,7 +168,7 @@ public class PdfViewState(
         return list
     }
 
-    public fun updateViewSize(viewSize: IntSize, vZoom: Float, orientation: Orientation = this.orientation) {
+    public fun updateViewSize(viewSize: IntSize, vZoom: Float, orientation: Int = this.orientation) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.vZoom != vZoom
         val isOrientationChanged = this.orientation != orientation
@@ -172,7 +180,7 @@ public class PdfViewState(
             this.orientation = orientation
             println("PdfViewState.updateViewSize: 方向改变 - $orientation")
         }
-        
+
         if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
             println("PdfViewState.updateViewSize: 重新计算页面布局 - orientation: $orientation")
             invalidatePageSizes()
@@ -187,8 +195,8 @@ public class PdfViewState(
             pageToRender = emptyList()
             return
         }
-        
-        if (orientation == Orientation.Vertical) {
+
+        if (orientation == Vertical) {
             val visibleTop = -offset.y
             val visibleBottom = viewSize.height - offset.y
 
@@ -243,11 +251,9 @@ public class PdfViewState(
             }
             // 主动移除不再可见的页面图片缓存
             val newPageKeys = tilesToRenderCopy.flatMap { page ->
-                if (page is Page) {
-                    page.nodes.map { node ->
-                        "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
-                    }
-                } else emptyList()
+                page.nodes.map { node ->
+                    "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
+                }
             }.toSet()
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->
@@ -315,11 +321,9 @@ public class PdfViewState(
             }
             // 主动移除不再可见的页面图片缓存
             val newPageKeys = tilesToRenderCopy.flatMap { page ->
-                if (page is Page) {
-                    page.nodes.map { node ->
-                        "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
-                    }
-                } else emptyList()
+                page.nodes.map { node ->
+                    "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
+                }
             }.toSet()
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->

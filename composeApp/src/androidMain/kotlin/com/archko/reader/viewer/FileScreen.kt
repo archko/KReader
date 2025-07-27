@@ -88,7 +88,9 @@ fun FileScreen(
                                 val recent = viewModel.recentList.value.find { it.path == path }
                                 val page = recent?.page?.toInt()
                                 val pdf = LocalPdfState(file)
+                                // 先加载进度
                                 loadProgress(viewModel, file, pdf)
+                                // 等待进度加载完成后再设置 openDocRequest
                                 openDocRequest = OpenDocRequest(path, page)
                             }
                         }
@@ -124,7 +126,7 @@ fun FileScreen(
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
-                            
+
                             items(
                                 count = recentList.size,
                                 key = { index -> "$index" }
@@ -137,7 +139,9 @@ fun FileScreen(
                                         val page = it.page?.toInt()
                                         val pdf = LocalPdfState(file)
                                         scope.launch {
+                                            // 先加载进度
                                             loadProgress(viewModel, file, pdf)
+                                            // 等待进度加载完成后再设置 openDocRequest
                                             openDocRequest = OpenDocRequest(path, page)
                                         }
                                     },
@@ -159,24 +163,30 @@ fun FileScreen(
                 CustomView(
                     path = openDocRequest!!.path,
                     progressPage = openDocRequest!!.page,
-                    onDocumentClosed = { page, pageCount, zoom ->
+                    onDocumentClosed = { page, pageCount, zoom, scrollX, scrollY, scrollOri ->
                         viewModel.updateProgress(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
                             zoom = zoom,
-                            crop = 0L
+                            crop = 0L,
+                            scrollX,
+                            scrollY,
+                            scrollOri,
                         )
                     },
                     onCloseDocument = {
                         openDocRequest = null
-                    }
+                    },
+                    initialScrollX = viewModel.progress?.scrollX ?: 0L,
+                    initialScrollY = viewModel.progress?.scrollY ?: 0L,
+                    initialZoom = viewModel.progress?.zoom ?: 1.0
                 )
             }
         }
     }
 }
 
-private fun loadProgress(
+private suspend fun loadProgress(
     viewModel: PdfViewModel,
     file: KmpFile,
     pdf: LocalPdfState?
@@ -187,7 +197,8 @@ private fun loadProgress(
             path = file.uri.toString()
         }
         path?.run {
-            viewModel.insertOrUpdate(path, pdf.pageCount.toLong())
+            // 等待 insertOrUpdate 完成
+            viewModel.insertOrUpdateAndWait(path, pdf.pageCount.toLong())
         }
     }
 }

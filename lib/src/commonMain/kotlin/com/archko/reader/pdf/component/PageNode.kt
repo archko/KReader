@@ -85,7 +85,17 @@ public class PageNode(
                     // 解码前判断可见性和协程活跃性
                     if (!isActive) {
                         println("[PageNode.decodeScope] page=!isActive")
+                        isDecoding = false
+                        return@launch
                     }
+                    
+                    // 检查 PdfViewState 是否已关闭
+                    if (pdfViewState.isShutdown()) {
+                        println("[PageNode.decodeScope] page=PdfViewState已关闭")
+                        isDecoding = false
+                        return@launch
+                    }
+                    
                     // 先查缓存
                     val cacheBitmap = ImageCache.get(cacheKey)
                     if (cacheBitmap != null) {
@@ -106,6 +116,7 @@ public class PageNode(
 
                     if (!pdfViewState.isTileVisible(tileSpec)) {
                         println("[PageNode.decodeScope] page=!isTileVisible")
+                        isDecoding = false
                         return@launch
                     }
 
@@ -118,6 +129,13 @@ public class PageNode(
                     val outWidth = ((srcRect.right - srcRect.left)).toInt()
                     val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
 
+                    // 再次检查 PdfViewState 是否已关闭
+                    if (pdfViewState.isShutdown()) {
+                        println("[PageNode.decodeScope] page=渲染前PdfViewState已关闭")
+                        isDecoding = false
+                        return@launch
+                    }
+
                     val bitmap = pdfViewState.state.renderPageRegion(
                         srcRect,
                         aPage.index,
@@ -128,8 +146,19 @@ public class PageNode(
                     )
 
                     // 解码后再次判断可见性和协程活跃性
-                    if (!isActive) return@launch
-                    if (!pdfViewState.isTileVisible(tileSpec)) return@launch
+                    if (!isActive) {
+                        isDecoding = false
+                        return@launch
+                    }
+                    if (pdfViewState.isShutdown()) {
+                        println("[PageNode.decodeScope] page=解码后PdfViewState已关闭")
+                        isDecoding = false
+                        return@launch
+                    }
+                    if (!pdfViewState.isTileVisible(tileSpec)) {
+                        isDecoding = false
+                        return@launch
+                    }
 
                     imageBitmap = bitmap
                     // 放入缓存

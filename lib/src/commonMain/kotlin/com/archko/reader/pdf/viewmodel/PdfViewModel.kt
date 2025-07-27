@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.entity.Recent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -50,20 +51,67 @@ public class PdfViewModel : ViewModel() {
         }
     }
 
-    public fun updateProgress(page: Long, pageCount: Long, zoom: Double, crop: Long) {
-        println("PdfViewModel.updateProgress:$page, pc:$pageCount, old:$progress")
+    public suspend fun insertOrUpdateAndWait(path: String, pageCount: Long) {
+        this.path = path
+        val deferred = CompletableDeferred<Unit>()
+        viewModelScope.launch {
+            val selProgress = database?.recentDao()?.getRecent(path)
+            if (selProgress == null) {
+                database?.recentDao()?.addRecent(
+                    Recent(
+                        path,
+                        0,
+                        pageCount,
+                        System.currentTimeMillis(),
+                        System.currentTimeMillis(),
+                        1,
+                        0,
+                        0,
+                        1.0,
+                        0,
+                        0
+                    )
+                )
+            } else {
+                selProgress.apply {
+                    this.pageCount = pageCount
+                    createAt = System.currentTimeMillis()
+                }
+                database?.recentDao()?.updateRecent(selProgress)
+            }
+            progress = database?.recentDao()?.getRecent(path)
+            println("PdfViewModel.insertOrUpdateAndWait:${progress}")
+            deferred.complete(Unit)
+        }
+        deferred.await()
+    }
+
+    public fun updateProgress(
+        page: Long,
+        pageCount: Long,
+        zoom: Double,
+        crop: Long,
+        scrollX: Long,
+        scrollY: Long,
+        scrollOri: Long
+    ) {
+        println("PdfViewModel.updateProgress:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, old:$progress")
         progress?.run {
             viewModelScope.launch {
                 progress!!.apply {
                     this.page = page
                     this.pageCount = pageCount
-                    createAt = System.currentTimeMillis()
+                    updateAt = System.currentTimeMillis()
                     this.crop = crop
                     this.zoom = zoom
+                    this.scrollX = scrollX
+                    this.scrollY = scrollY
+                    this.scrollOri = scrollOri
                 }
                 database?.recentDao()?.updateRecent(progress!!)
                 path?.run {
                     progress = database?.recentDao()?.getRecent(path!!)
+                    println("PdfViewModel.updateProgress.after:$progress")
                 }
                 loadRecents()
             }

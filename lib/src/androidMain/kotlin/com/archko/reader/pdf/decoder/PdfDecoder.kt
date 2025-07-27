@@ -192,17 +192,23 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val patchY = region.top.toInt()
         println("renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
-        val bitmap = acquireReusableBitmap(outWidth, outHeight)
-        val ctm = Matrix(scale)
-        val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, outWidth, outHeight)
+        try {
+            val bitmap = acquireReusableBitmap(outWidth, outHeight)
+            val ctm = Matrix(scale)
+            val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, outWidth, outHeight)
 
-        val page = document.loadPage(index)
-        page.run(dev, ctm, null)
+            val page = document.loadPage(index)
+            page.run(dev, ctm, null)
 
-        dev.close()
-        dev.destroy()
+            dev.close()
+            dev.destroy()
 
-        return (bitmap.asImageBitmap())
+            return (bitmap.asImageBitmap())
+        } catch (e: Exception) {
+            println("renderPageRegion error: $e")
+            // 返回一个空的位图，避免崩溃
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
     }
 
     public fun renderPageRegion(

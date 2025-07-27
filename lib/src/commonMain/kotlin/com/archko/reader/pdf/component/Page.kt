@@ -60,7 +60,18 @@ public class Page(
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
             // 可见性判断（Page始终可见，或可加自定义判断）
-            if (!isActive) return@launch
+            if (!isActive) {
+                thumbDecoding = false
+                return@launch
+            }
+            
+            // 检查 PdfViewState 是否已关闭
+            if (pdfViewState.isShutdown()) {
+                println("[Page.loadThumbnail] page=PdfViewState已关闭")
+                thumbDecoding = false
+                return@launch
+            }
+            
             try {
                 val region = Rect(0f, 0f, 1f, 1f)
                 val bitmap = pdfViewState.state.renderPageRegion(
@@ -71,7 +82,15 @@ public class Page(
                     w,
                     h
                 )
-                if (!isActive) return@launch
+                if (!isActive) {
+                    thumbDecoding = false
+                    return@launch
+                }
+                if (pdfViewState.isShutdown()) {
+                    println("[Page.loadThumbnail] page=解码后PdfViewState已关闭")
+                    thumbDecoding = false
+                    return@launch
+                }
                 thumbBitmap = bitmap
                 ImageCache.put(cacheKey, bitmap)
             } catch (_: Exception) {

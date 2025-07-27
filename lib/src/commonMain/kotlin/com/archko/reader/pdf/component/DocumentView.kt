@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.component
 
+import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
@@ -15,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -30,9 +32,8 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 
-public enum class Orientation {
-    Vertical, Horizontal
-}
+public const val Vertical: Int = 0
+public const val Horizontal: Int = 1
 
 @Composable
 public fun DocumentView(
@@ -40,22 +41,29 @@ public fun DocumentView(
     state: ImageDecoder,
     jumpToPage: Int? = null,
     align: PdfViewState.Align = PdfViewState.Align.Top,
-    orientation: Orientation = Orientation.Vertical,
-    onDocumentClosed: ((page: Int, pageCount: Int, zoom: Double) -> Unit)? = null,
+    orientation: Int,
+    onDocumentClosed: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
-    onPageChanged: ((page: Int) -> Unit)? = null // 新增页面变化回调
+    onPageChanged: ((page: Int) -> Unit)? = null, // 新增页面变化回调
+    initialScrollX: Long = 0L, // 新增：初始X偏移量
+    initialScrollY: Long = 0L, // 新增：初始Y偏移量
+    initialZoom: Double = 1.0, // 新增：初始缩放比例
+    isUserJump: Boolean = false // 新增：是否为用户主动跳转（如进度条拖动）
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    var vZoom by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset(initialScrollX.toFloat(), initialScrollY.toFloat())) }
+    var vZoom by remember { mutableFloatStateOf(initialZoom.toFloat()) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val keepPx = with(density) { 6.dp.toPx() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
-    
+
     // 跟踪上一次的orientation
     var lastOrientation by remember { mutableStateOf(orientation) }
+    
+    // 标记是否已经应用了初始偏移量
+    var hasAppliedInitialOffset by remember { mutableStateOf(false) }
 
     val pdfViewState = remember(list, orientation) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
@@ -71,19 +79,58 @@ public fun DocumentView(
                 offset = Offset.Zero
                 vZoom = 1f
                 lastOrientation = orientation
+                // 重置初始偏移量应用标志，允许在新的orientation下重新应用
+                hasAppliedInitialOffset = false
             }
             pdfViewState.updateViewSize(viewSize, vZoom, orientation)
         }
     }
 
-    // jumpToPage 跳转逻辑 - 只在有明确跳转请求时执行
-    LaunchedEffect(jumpToPage, pdfViewState.init, align, orientation) {
-        println("DocumentView: jumpToPage:$jumpToPage, vZoom:$vZoom, init: ${pdfViewState.init}, orientation: $orientation")
-        if (jumpToPage != null && pdfViewState.init) {
+    // 初始偏移量应用逻辑 - 优先使用精确的偏移量定位
+    LaunchedEffect(pdfViewState.init, viewSize, orientation) {
+        if (pdfViewState.init && viewSize != IntSize.Zero && !hasAppliedInitialOffset) {
+            val hasInitialOffset = initialScrollX != 0L || initialScrollY != 0L
+            val hasInitialZoom = initialZoom != 1.0
+            
+            println("DocumentView: 检查初始偏移量: hasInitialOffset=$hasInitialOffset, hasInitialZoom=$hasInitialZoom, scrollX=$initialScrollX, scrollY=$initialScrollY, zoom=$initialZoom")
+            
+            if (hasInitialOffset || hasInitialZoom) {
+                println("DocumentView: 应用初始偏移量: scrollX=$initialScrollX, scrollY=$initialScrollY, zoom=$initialZoom")
+                
+                // 应用初始缩放
+                if (hasInitialZoom) {
+                    vZoom = initialZoom.toFloat()
+                    println("DocumentView: 已应用初始缩放: $vZoom")
+                }
+                
+                // 应用初始偏移量
+                if (hasInitialOffset) {
+                    offset = Offset(initialScrollX.toFloat(), initialScrollY.toFloat())
+                    pdfViewState.updateOffset(offset)
+                    println("DocumentView: 已应用初始偏移量: $offset")
+                }
+                
+                hasAppliedInitialOffset = true
+                println("DocumentView: 标记已应用初始偏移量")
+            } else {
+                println("DocumentView: 没有初始偏移量或缩放，跳过应用")
+            }
+        }
+    }
+
+    // jumpToPage 跳转逻辑 - 只在用户主动跳转时执行，且没有初始偏移量时
+    LaunchedEffect(jumpToPage, pdfViewState.init, align, orientation, hasAppliedInitialOffset) {
+        println("DocumentView: jumpToPage:$jumpToPage, isUserJump:$isUserJump, hasAppliedInitialOffset:$hasAppliedInitialOffset, init: ${pdfViewState.init}")
+        
+        // 只有在以下情况才执行页面跳转：
+        // 1. 有明确的跳转页码
+        // 2. PdfViewState已初始化
+        // 3. 是用户主动跳转（如进度条拖动）或者没有初始偏移量
+        if (jumpToPage != null && pdfViewState.init && (isUserJump || !hasAppliedInitialOffset)) {
             println("DocumentView: 执行跳转到第 $jumpToPage 页, $offset")
             val page = pdfViewState.pages.getOrNull(jumpToPage)
             if (page != null) {
-                if (orientation == Orientation.Vertical) {
+                if (orientation == Vertical) {
                     val targetOffsetY = when (align) {
                         PdfViewState.Align.Top -> page.bounds.top
                         PdfViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
@@ -118,7 +165,7 @@ public fun DocumentView(
             val offsetY = offset.y
             val offsetX = offset.x
             val firstVisible = pages.indexOfFirst { page ->
-                if (orientation == Orientation.Vertical) {
+                if (orientation == Vertical) {
                     val top = -offsetY
                     val bottom = top + viewSize.height
                     page.bounds.bottom > top && page.bounds.top < bottom
@@ -134,15 +181,15 @@ public fun DocumentView(
         }
     }
 
-    DisposableEffect(list) {
+    DisposableEffect(Unit) {
         onDispose {
-            var lastPage = 0
             val pages = pdfViewState.pages
+            var currentPage = 0
             if (pages.isNotEmpty()) {
                 val offsetY = offset.y
                 val offsetX = offset.x
                 val firstVisible = pages.indexOfFirst { page ->
-                    if (orientation == Orientation.Vertical) {
+                    if (orientation == Vertical) {
                         val top = -offsetY
                         val bottom = top + viewSize.height
                         page.bounds.bottom > top && page.bounds.top < bottom
@@ -152,16 +199,21 @@ public fun DocumentView(
                         page.bounds.right > left && page.bounds.left < right
                     }
                 }
-                if (firstVisible != -1 && firstVisible != lastPage) {
-                    lastPage = firstVisible
+                if (firstVisible != -1) {
+                    currentPage = firstVisible
                 }
             }
-
-            val currentPage = lastPage
             val pageCount = list.size
             val zoom = vZoom.toDouble()
             println("DocumentView: shutdown:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-            onDocumentClosed?.invoke(currentPage, pageCount, zoom)
+            onDocumentClosed?.invoke(
+                currentPage,
+                pageCount,
+                zoom,
+                offset.x.toLong(),
+                offset.y.toLong(),
+                lastOrientation.toLong()
+            )
 
             pdfViewState.shutdown()
             ImageCache.clear()
@@ -179,43 +231,10 @@ public fun DocumentView(
             .pointerInput(viewSize, keepPx, orientation) {
                 detectTapGestures(
                     onTap = { offsetTap ->
-                        // 单击翻页逻辑
-                        if (orientation == Orientation.Vertical) {
-                            val y = offsetTap.y
-                            val height = viewSize.height.toFloat()
-                            when {
-                                y < height / 4 -> {
-                                    val newY = (offset.y + viewSize.height - keepPx).coerceAtMost(0f)
-                                    offset = Offset(offset.x, newY)
-                                    pdfViewState.updateOffset(offset)
-                                }
-                                y > height * 3 / 4 -> {
-                                    val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                                    val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
-                                    offset = Offset(offset.x, newY)
-                                    pdfViewState.updateOffset(offset)
-                                }
-                            }
-                        } else {
-                            val x = offsetTap.x
-                            val width = viewSize.width.toFloat()
-                            when {
-                                x < width / 4 -> {
-                                    val newX = (offset.x + viewSize.width - keepPx).coerceAtMost(0f)
-                                    offset = Offset(newX, offset.y)
-                                    pdfViewState.updateOffset(offset)
-                                }
-                                x > width * 3 / 4 -> {
-                                    val maxX = if (orientation == Orientation.Vertical) {
-                                        (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                                    } else {
-                                        (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                                    }
-                                    val newX = (offset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
-                                    offset = Offset(newX, offset.y)
-                                    pdfViewState.updateOffset(offset)
-                                }
-                            }
+                        // 单击翻页逻辑 - 提取公共方法避免重复代码
+                        handleTapGesture(offsetTap, viewSize, offset, orientation, pdfViewState, keepPx) { newOffset ->
+                            offset = newOffset
+                            pdfViewState.updateOffset(offset)
                         }
                     },
                     onDoubleTap = { offsetTap ->
@@ -240,8 +259,8 @@ public fun DocumentView(
                         var initialOffset = offset
                         var lastCentroid = Offset.Zero
                         // pan惯性
-                        val panVelocityTracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
-                        var pan = Offset.Zero
+                        val panVelocityTracker = VelocityTracker()
+                        var pan: Offset
                         try {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             lastCentroid = down.position
@@ -264,26 +283,26 @@ public fun DocumentView(
                                     zooming = true
                                     val newZoom = (zoomChange * vZoom).coerceIn(1f, 10f)
                                     val zoomFactor = newZoom / vZoom
-                                    
+
                                     // 计算缩放中心点：手势中心相对于内容的位置
                                     // centroid 是手势中心在视图中的位置
                                     // 需要将其转换为相对于内容的位置
                                     val contentCenterX = centroid.x - offset.x
                                     val contentCenterY = centroid.y - offset.y
-                                    
+
                                     // 计算新的偏移量，保持内容中心点不变
                                     val newOffsetX = centroid.x - contentCenterX * zoomFactor
                                     val newOffsetY = centroid.y - contentCenterY * zoomFactor
-                                    
+
                                     // 调试信息
                                     //println("缩放中心点: centroid=$centroid, contentCenter=($contentCenterX, $contentCenterY), zoomFactor=$zoomFactor")
                                     //println("偏移量: oldOffset=$offset, newOffset=($newOffsetX, $newOffsetY)")
-                                    
+
                                     vZoom = newZoom
                                     offset = Offset(newOffsetX, newOffsetY)
-                                    
+
                                     // 边界检查
-                                    if (orientation == Orientation.Vertical) {
+                                    if (orientation == Vertical) {
                                         val scaledWidth = viewSize.width * vZoom
                                         // 在缩放过程中，需要根据当前缩放比例调整总高度
                                         val scaleRatio = vZoom / pdfViewState.vZoom
@@ -319,7 +338,7 @@ public fun DocumentView(
                                     // 单指拖动
                                     if (!zooming) {
                                         offset += panChange
-                                        if (orientation == Orientation.Vertical) {
+                                        if (orientation == Vertical) {
                                             val scaledWidth = viewSize.width * vZoom
                                             val scaledHeight = pdfViewState.totalHeight
                                             val minX = minOf(0f, viewSize.width - scaledWidth)
@@ -364,10 +383,10 @@ public fun DocumentView(
                             //if (velocitySquared > velocityThreshold) {
                             val decayAnimationSpec = exponentialDecay<Float>(frictionMultiplier = 0.35f)
                             flingJob = scope.launch {
-                                if (orientation == Orientation.Vertical) {
+                                if (orientation == Vertical) {
                                     // X方向
                                     if (abs(velocity.x) > 50f) {
-                                        val animX = androidx.compose.animation.core.AnimationState(
+                                        val animX = AnimationState(
                                             initialValue = offset.x,
                                             initialVelocity = velocity.x
                                         )
@@ -384,13 +403,13 @@ public fun DocumentView(
                                     }
                                     // Y方向
                                     if (abs(velocity.y) > 50f) {
-                                        val animY = androidx.compose.animation.core.AnimationState(
+                                        val animY = AnimationState(
                                             initialValue = offset.y,
                                             initialVelocity = velocity.y
                                         )
                                         launch {
                                             animY.animateDecay(decayAnimationSpec) {
-                                                val scaledHeight = if (orientation == Orientation.Vertical) {
+                                                val scaledHeight = if (orientation == Vertical) {
                                                     pdfViewState.totalHeight
                                                 } else {
                                                     pdfViewState.totalWidth
@@ -407,13 +426,13 @@ public fun DocumentView(
                                 } else {
                                     // X方向
                                     if (abs(velocity.x) > 50f) {
-                                        val animX = androidx.compose.animation.core.AnimationState(
+                                        val animX = AnimationState(
                                             initialValue = offset.x,
                                             initialVelocity = velocity.x
                                         )
                                         launch {
                                             animX.animateDecay(decayAnimationSpec) {
-                                                val scaledWidth = if (orientation == Orientation.Vertical) {
+                                                val scaledWidth = if (orientation == Vertical) {
                                                     pdfViewState.totalHeight
                                                 } else {
                                                     pdfViewState.totalWidth
@@ -429,7 +448,7 @@ public fun DocumentView(
                                     }
                                     // Y方向
                                     if (abs(velocity.y) > 50f) {
-                                        val animY = androidx.compose.animation.core.AnimationState(
+                                        val animY = AnimationState(
                                             initialValue = offset.y,
                                             initialVelocity = velocity.y
                                         )
@@ -469,3 +488,53 @@ public fun DocumentView(
         }
     }
 }
+
+/**
+ * 处理点击手势的公共方法，避免重复代码
+ */
+private fun handleTapGesture(
+    offsetTap: Offset,
+    viewSize: IntSize,
+    currentOffset: Offset,
+    orientation: Int,
+    pdfViewState: PdfViewState,
+    keepPx: Float,
+    onOffsetChanged: (Offset) -> Unit
+) {
+    if (orientation == Vertical) {
+        // 垂直方向：上下翻页
+        val y = offsetTap.y
+        val height = viewSize.height.toFloat()
+        when {
+            y < height / 4 -> {
+                // 点击上方区域，向上翻页
+                val newY = (currentOffset.y + viewSize.height - keepPx).coerceAtMost(0f)
+                onOffsetChanged(Offset(currentOffset.x, newY))
+            }
+            y > height * 3 / 4 -> {
+                // 点击下方区域，向下翻页
+                val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                val newY = (currentOffset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
+                onOffsetChanged(Offset(currentOffset.x, newY))
+            }
+        }
+    } else {
+        // 水平方向：左右翻页
+        val x = offsetTap.x
+        val width = viewSize.width.toFloat()
+        when {
+            x < width / 4 -> {
+                // 点击左侧区域，向左翻页
+                val newX = (currentOffset.x + viewSize.width - keepPx).coerceAtMost(0f)
+                onOffsetChanged(Offset(newX, currentOffset.y))
+            }
+            x > width * 3 / 4 -> {
+                // 点击右侧区域，向右翻页
+                val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                val newX = (currentOffset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
+                onOffsetChanged(Offset(newX, currentOffset.y))
+            }
+        }
+    }
+}
+

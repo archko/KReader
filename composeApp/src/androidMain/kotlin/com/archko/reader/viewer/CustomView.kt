@@ -17,7 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.component.DocumentView
-import com.archko.reader.pdf.component.Orientation
+import com.archko.reader.pdf.component.Horizontal
+import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -34,8 +35,11 @@ import java.io.File
 fun CustomView(
     path: String,
     progressPage: Int? = null,
-    onDocumentClosed: ((Int, Int, Double) -> Unit)? = null,
+    onDocumentClosed: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
+    initialScrollX: Long = 0L,
+    initialScrollY: Long = 0L,
+    initialZoom: Double = 1.0,
 ) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
@@ -57,6 +61,12 @@ fun CustomView(
     DisposableEffect(path) {
         onDispose {
             println("onDispose:$path, $decoder")
+            // 先保存当前状态
+            if (decoder != null) {
+                // 这里可以调用 onDocumentClosed 来保存进度
+                // 但由于我们没有当前页面信息，暂时跳过
+                println("CustomView: 销毁 decoder")
+            }
             decoder?.close()
         }
     }
@@ -97,6 +107,8 @@ fun CustomView(
         val pageCount: Int = list.size
         // 跳转页面状态
         var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+        // 标记是否为用户主动跳转
+        var isUserJump by remember { mutableStateOf(false) }
         // 大纲列表
         val outlineList = decoder?.outlineItems ?: emptyList()
 
@@ -110,17 +122,23 @@ fun CustomView(
                 list = list,
                 state = decoder!!,
                 jumpToPage = if (jumpToPage >= 0) jumpToPage else null,
-                orientation = if (isVertical) Orientation.Vertical else Orientation.Horizontal,
+                orientation = if (isVertical) Vertical else Horizontal,
                 onDocumentClosed = onDocumentClosed,
                 onDoubleTapToolbar = { showToolbar = !showToolbar },
-                onPageChanged = { page -> currentPage = page }
+                onPageChanged = { page -> currentPage = page },
+                initialScrollX = initialScrollX,
+                initialScrollY = initialScrollY,
+                initialZoom = initialZoom,
+                isUserJump = isUserJump // 使用内部状态
             )
 
             // 重置跳转页面状态 - 延迟重置，确保DocumentView能接收到跳转指令
             LaunchedEffect(jumpToPage) {
                 if (jumpToPage >= 0) {
-                    println("CustomView: 设置跳转到第 $jumpToPage 页")
+                    println("CustomView: 设置跳转到第 $jumpToPage 页, isUserJump: $isUserJump")
                     jumpToPage = -1
+                    // 重置用户跳转标志
+                    isUserJump = false
                 }
             }
 
@@ -143,7 +161,7 @@ fun CustomView(
                     ) {
                         IconButton(onClick = {
                             // 先保存进度
-                            onDocumentClosed?.invoke(currentPage, pageCount, 1.0)
+                            onDocumentClosed?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
                             // 然后关闭文档
                             onCloseDocument?.invoke()
                         }) {
@@ -233,6 +251,7 @@ fun CustomView(
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     jumpToPage = item.page
+                                                    isUserJump = true // 大纲点击是用户主动跳转
                                                     showOutlineDialog = false
                                                 }
                                                 .padding(vertical = 6.dp, horizontal = 16.dp),
@@ -296,6 +315,7 @@ fun CustomView(
                                 val targetPage = sliderValue.toInt() - 1
                                 if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
                                     jumpToPage = targetPage
+                                    isUserJump = true // 进度条拖动是用户主动跳转
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
