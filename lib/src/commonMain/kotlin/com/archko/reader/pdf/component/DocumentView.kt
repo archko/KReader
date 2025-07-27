@@ -6,15 +6,22 @@ import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
@@ -35,6 +42,7 @@ import kotlin.math.abs
 public const val Vertical: Int = 0
 public const val Horizontal: Int = 1
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 public fun DocumentView(
     list: MutableList<APage>,
@@ -59,6 +67,14 @@ public fun DocumentView(
     val density = LocalDensity.current
     val keepPx = with(density) { 6.dp.toPx() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
+    
+    // 焦点请求器，用于键盘操作
+    val focusRequester = remember { FocusRequester() }
+    
+    // 鼠标拖拽状态
+    var isDragging by remember { mutableStateOf(false) }
+    var dragStartOffset by remember { mutableStateOf(Offset.Zero) }
+    var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
 
     // 跟踪上一次的orientation
     var lastOrientation by remember { mutableStateOf(orientation) }
@@ -70,6 +86,132 @@ public fun DocumentView(
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PdfViewState(list, state, orientation)
     }
+    
+    // 处理键盘和鼠标滚轮事件的函数
+    val handleKeyboardEvent = { event: KeyEvent ->
+        if (event.type == KeyEventType.KeyDown) {
+            when (event.key) {
+                Key.Spacebar -> {
+                    // 空格键翻页
+                    if (orientation == Vertical) {
+                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
+                        offset = Offset(offset.x, newY)
+                    } else {
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val newX = (offset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.PageUp -> {
+                    // PageUp键向上翻页
+                    if (orientation == Vertical) {
+                        val newY = (offset.y + viewSize.height - keepPx).coerceAtMost(0f)
+                        offset = Offset(offset.x, newY)
+                    } else {
+                        val newX = (offset.x + viewSize.width - keepPx).coerceAtMost(0f)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.PageDown -> {
+                    // PageDown键向下翻页
+                    if (orientation == Vertical) {
+                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
+                        offset = Offset(offset.x, newY)
+                    } else {
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val newX = (offset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.DirectionUp -> {
+                    // 上方向键滚动
+                    if (orientation == Vertical) {
+                        val newY = (offset.y + 120f).coerceAtMost(0f)
+                        offset = Offset(offset.x, newY)
+                    } else {
+                        val newX = (offset.x + 120f).coerceAtMost(0f)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.DirectionDown -> {
+                    // 下方向键滚动
+                    if (orientation == Vertical) {
+                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val newY = (offset.y - 120f).coerceAtLeast(-maxY)
+                        offset = Offset(offset.x, newY)
+                    } else {
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val newX = (offset.x - 120f).coerceAtLeast(-maxX)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.DirectionLeft -> {
+                    // 左方向键滚动
+                    if (orientation == Vertical) {
+                        val newX = (offset.x + 120f).coerceAtMost(0f)
+                        offset = Offset(newX, offset.y)
+                    } else {
+                        val newX = (offset.x + 120f).coerceAtMost(0f)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.DirectionRight -> {
+                    // 右方向键滚动
+                    if (orientation == Vertical) {
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val newX = (offset.x - 120f).coerceAtLeast(-maxX)
+                        offset = Offset(newX, offset.y)
+                    } else {
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val newX = (offset.x - 120f).coerceAtLeast(-maxX)
+                        offset = Offset(newX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.NumPad0 -> {
+                    // Home键回到顶部
+                    if (orientation == Vertical) {
+                        offset = Offset(offset.x, 0f)
+                    } else {
+                        offset = Offset(0f, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                Key.NumPad1 -> {
+                    // End键到底部
+                    if (orientation == Vertical) {
+                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        offset = Offset(offset.x, -maxY)
+                    } else {
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        offset = Offset(-maxX, offset.y)
+                    }
+                    pdfViewState.updateOffset(offset)
+                    true
+                }
+                else -> false
+            }
+        } else {
+            false
+        }
+    }
+
     // 确保在 list 或 orientation 变化时重新计算总高度
     LaunchedEffect(list, orientation) {
         if (viewSize != IntSize.Zero) {
@@ -261,7 +403,136 @@ public fun DocumentView(
                         }
                     }
                 )
-            },
+            }
+            // 添加鼠标拖拽支持
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { startOffset ->
+                        isDragging = true
+                        dragStartOffset = offset
+                        dragStartPosition = startOffset
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                    },
+                    onDragCancel = {
+                        isDragging = false
+                    },
+                    onDrag = { change, dragAmount ->
+                        if (isDragging) {
+                            val newOffset = Offset(
+                                dragStartOffset.x - dragAmount.x,
+                                dragStartOffset.y - dragAmount.y
+                            )
+                            
+                            // 边界检查
+                            if (orientation == Vertical) {
+                                val scaledWidth = viewSize.width * vZoom
+                                val scaledHeight = pdfViewState.totalHeight
+                                val minX = minOf(0f, viewSize.width - scaledWidth)
+                                val maxX = 0f
+                                val minY = if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                val maxY = 0f
+                                offset = Offset(
+                                    newOffset.x.coerceIn(minX, maxX),
+                                    newOffset.y.coerceIn(minY, maxY)
+                                )
+                            } else {
+                                val scaledHeight = viewSize.height * vZoom
+                                val scaledWidth = pdfViewState.totalWidth
+                                val minY = minOf(0f, viewSize.height - scaledHeight)
+                                val maxY = 0f
+                                val minX = if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                                val maxX = 0f
+                                offset = Offset(
+                                    newOffset.x.coerceIn(minX, maxX),
+                                    newOffset.y.coerceIn(minY, maxY)
+                                )
+                            }
+                            pdfViewState.updateOffset(offset)
+                        }
+                        change.consume()
+                    }
+                )
+            }
+            // 添加鼠标滚轮支持（支持多种模式）
+            .onPointerEvent(PointerEventType.Scroll) { event ->
+                val scrollAmount = event.changes.firstOrNull()?.scrollDelta ?: return@onPointerEvent
+                // 暂时简化，只支持普通滚动，后续可以添加键盘修饰符检测
+                val isCtrlPressed = false
+                val isShiftPressed = false
+                
+                when {
+                    isCtrlPressed -> {
+                        // Ctrl + 滚轮 = 缩放
+                        val zoomFactor = if (scrollAmount.y > 0) 1.1f else 0.9f
+                        val newZoom = (vZoom * zoomFactor).coerceIn(0.5f, 5f)
+                        
+                        // 计算缩放中心点（鼠标位置）
+                        val mousePosition = event.changes.firstOrNull()?.position ?: Offset.Zero
+                        val contentCenterX = mousePosition.x - offset.x
+                        val contentCenterY = mousePosition.y - offset.y
+                        
+                        val zoomRatio = newZoom / vZoom
+                        val newOffsetX = mousePosition.x - contentCenterX * zoomRatio
+                        val newOffsetY = mousePosition.y - contentCenterY * zoomRatio
+                        
+                        vZoom = newZoom
+                        offset = Offset(newOffsetX, newOffsetY)
+                        
+                        // 边界检查
+                        if (orientation == Vertical) {
+                            val scaledWidth = viewSize.width * vZoom
+                            val scaledHeight = pdfViewState.totalHeight
+                            val minX = minOf(0f, viewSize.width - scaledWidth)
+                            val maxX = 0f
+                            val minY = if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                            val maxY = 0f
+                            offset = Offset(
+                                offset.x.coerceIn(minX, maxX),
+                                offset.y.coerceIn(minY, maxY)
+                            )
+                        } else {
+                            val scaledHeight = viewSize.height * vZoom
+                            val scaledWidth = pdfViewState.totalWidth
+                            val minY = minOf(0f, viewSize.height - scaledHeight)
+                            val maxY = 0f
+                            val minX = if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                            val maxX = 0f
+                            offset = Offset(
+                                offset.x.coerceIn(minX, maxX),
+                                offset.y.coerceIn(minY, maxY)
+                            )
+                        }
+                        pdfViewState.updateOffset(offset)
+                        pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                    }
+                    isShiftPressed -> {
+                        // Shift + 滚轮 = 水平滚动
+                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val newX = (offset.x + scrollAmount.y * 50f).coerceIn(-maxX, 0f)
+                        offset = Offset(newX, offset.y)
+                        pdfViewState.updateOffset(offset)
+                    }
+                    else -> {
+                        // 普通滚轮 = 垂直滚动
+                        if (orientation == Vertical) {
+                            val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            val newY = (offset.y + scrollAmount.y * 50f).coerceIn(-maxY, 0f)
+                            offset = Offset(offset.x, newY)
+                        } else {
+                            val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                            val newX = (offset.x + scrollAmount.y * 50f).coerceIn(-maxX, 0f)
+                            offset = Offset(newX, offset.y)
+                        }
+                        pdfViewState.updateOffset(offset)
+                    }
+                }
+            }
+            // 添加键盘支持
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent(handleKeyboardEvent),
         contentAlignment = Alignment.TopStart
     ) {
         Canvas(
@@ -502,6 +773,11 @@ public fun DocumentView(
                 pdfViewState.drawVisiblePages(this, offset, vZoom, viewSize)
             }
         }
+    }
+    
+    // 自动请求焦点，确保键盘事件能被捕获
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 }
 

@@ -28,7 +28,7 @@ import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import java.io.File
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * @author: archko 2025/7/23 :09:09

@@ -52,7 +52,7 @@ fun main() {
         CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
             val viewModel: PdfViewModel = viewModel()
             viewModel.database = database
-            App(screenWidthInPixels, screenHeightInPixels, viewModel)
+            FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel)
         }
 
     }
