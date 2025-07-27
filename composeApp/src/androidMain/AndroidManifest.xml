@@ -5,11 +5,24 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
+    <supports-screens
+            android:anyDensity="true"
+            android:largeScreens="true"
+            android:normalScreens="true"
+            android:smallScreens="true"
+            android:xlargeScreens="true" />
+
     <application
         android:name="com.archko.reader.pdf.PdfApp"
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
+        android:fullBackupContent="false"
+        android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:largeHeap="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.KReader">
@@ -22,6 +35,70 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            
+            <!-- 支持打开PDF文件 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+
+            <intent-filter>
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="text/xml" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/x-mobipocket-ebook" />
+                <data android:mimeType="image/svg+xml" />
+                <data android:mimeType="image/djvu" />
+                <data android:mimeType="application/xhtml+xml" />
+                <data android:mimeType="application/x-cbz" />
+                <data android:mimeType="application/vnd.ms-xpsdocument" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="*/*" />
+                <data android:host="*" />
+                <data android:pathPattern="/.*\.xps" />
+                <data android:pathPattern="/.*\.cbz" />
+                <data android:pathPattern="/.*\.epub" />
+                <data android:pathPattern="/.*\.mobi" />
+                <data android:pathPattern="/.*\.azw" />
+                <data android:pathPattern="/.*\.azw2" />
+                <data android:pathPattern="/.*\.azw3" />
+                <data android:pathPattern="/.*\.azw4" />
+                <data android:pathPattern="/.*\.fb2" />
+                <data android:pathPattern="/.*\.xml" />
+                <data android:pathPattern="/.*\.html" />
+                <data android:pathPattern="/.*\.xhtml" />
+                <data android:pathPattern="/.*\.txt" />
+                <data android:pathPattern="/.*\.log" />
+                <data android:pathPattern="/.*\.js" />
+                <data android:pathPattern="/.*\.json" />
+                <data android:pathPattern="/.*\.djvu" />
+                <data android:pathPattern="/.*\.pptx" />
+                <data android:pathPattern="/.*\.docx" />
+                <data android:pathPattern="/.*\.xlsx" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:mimeType="image/*" />  <!-- djvu is image? -->
             </intent-filter>
         </activity>
     </application>

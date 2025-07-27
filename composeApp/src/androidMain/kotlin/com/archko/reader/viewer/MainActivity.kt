@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.text.TextUtils
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -29,6 +30,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archko.reader.pdf.cache.DriverFactory
+import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
@@ -39,6 +41,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
 
     private val permissionCallbacks = arrayOfNulls<OnPermissionGranted>(PERMISSION_LENGTH)
     private var permissionDialog: Dialog? = null
+    private var externalPath: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -62,7 +65,44 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         checkForExternalPermission()
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // 处理新的intent
+        processExternalIntent(intent)
+    }
+
+    private fun processExternalIntent(intent: Intent?) {
+        if (intent == null) return
+
+        externalPath = when (intent.action) {
+            Intent.ACTION_VIEW -> {
+                // 处理ACTION_VIEW，从intent.data获取文件路径
+                val uri = intent.data
+                if (uri != null) {
+                    val path = IntentFile.getPath(this, uri)
+                    if (!TextUtils.isEmpty(path)) {
+                        path
+                    } else {
+                        uri.toString()
+                    }
+                } else {
+                    null
+                }
+            }
+
+            else -> {
+                // 处理自定义路径参数
+                intent.getStringExtra("path")?.takeIf { !TextUtils.isEmpty(it) }
+            }
+        }
+
+        Log.d(TAG, "处理外部intent，路径: $externalPath")
+    }
+
     fun loadView() {
+        // 处理外部intent
+        processExternalIntent(intent)
+
         setContent {
             val view = LocalView.current
             if (!view.isInEditMode) {
@@ -87,7 +127,13 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
-                KApp(screenWidthInPixels.toInt(), screenHeightInPixels.toInt(), viewModel)
+
+                KApp(
+                    screenWidthInPixels.toInt(),
+                    screenHeightInPixels.toInt(),
+                    viewModel,
+                    externalPath
+                )
             }
         }
     }

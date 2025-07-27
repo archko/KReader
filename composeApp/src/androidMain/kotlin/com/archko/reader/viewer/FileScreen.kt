@@ -38,6 +38,7 @@ import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
 import org.jetbrains.compose.resources.painterResource
+import java.io.File
 
 data class OpenDocRequest(val path: String, val page: Int?)
 
@@ -47,7 +48,8 @@ fun FileScreen(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
-    onShowBottomBarChanged: (Boolean) -> Unit = {}
+    onShowBottomBarChanged: (Boolean) -> Unit = {},
+    externalPath: String? = null
 ) {
     Theme {
         val scope = rememberCoroutineScope()
@@ -56,6 +58,34 @@ fun FileScreen(
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
+        }
+
+        // 处理外部路径
+        LaunchedEffect(externalPath) {
+            externalPath?.let { path ->
+                scope.launch {
+                    try {
+                        val file = File(path)
+                        if (file.exists()) {
+                            val pdf = LocalPdfState(file)
+                            // 先加载进度
+                            loadProgressFromPath(viewModel, path, pdf)
+                            // 等待进度加载完成后再设置 openDocRequest
+                            val startPage = viewModel.progress?.page?.toInt() ?: 0
+                            openDocRequest = OpenDocRequest(path, startPage)
+                        } else {
+                            // 如果文件不存在，尝试使用KmpFile处理
+                            val kmpFile = KmpFile(Uri.parse(path))
+                            val pdf = LocalPdfState(kmpFile)
+                            loadProgress(viewModel, kmpFile, pdf)
+                            val startPage = viewModel.progress?.page?.toInt() ?: 0
+                            openDocRequest = OpenDocRequest(path, startPage)
+                        }
+                    } catch (e: Exception) {
+                        println("处理外部路径失败: $path, 错误: ${e.message}")
+                    }
+                }
+            }
         }
 
         BackHandler(enabled = openDocRequest != null) {
@@ -181,6 +211,17 @@ fun FileScreen(
                 )
             }
         }
+    }
+}
+
+private suspend fun loadProgressFromPath(
+    viewModel: PdfViewModel,
+    path: String,
+    pdf: LocalPdfState?
+) {
+    if (pdf != null) {
+        // 等待 insertOrUpdate 完成
+        viewModel.insertOrUpdateAndWait(path, pdf.pageCount.toLong())
     }
 }
 

@@ -48,6 +48,7 @@ fun KApp(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
+    externalPath: String? = null
 ) {
     Theme {
         val jetsnackNavController = rememberKNavController()
@@ -68,6 +69,7 @@ fun KApp(
                             screenHeightInPixels,
                             viewModel,
                             modifier = Modifier,
+                            externalPath = externalPath
                         )
                     }
                 }
@@ -82,6 +84,7 @@ fun MainContainer(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
+    externalPath: String? = null
 ) {
     val nestedNavController = rememberKNavController()
     val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
@@ -109,7 +112,8 @@ fun MainContainer(
                 viewModel,
                 modifier = Modifier
                     .consumeWindowInsets(padding),
-                onShowBottomBarChanged = { showBottomBar = it }
+                onShowBottomBarChanged = { showBottomBar = it },
+                externalPath = externalPath
             )
         }
     }
@@ -120,7 +124,8 @@ fun NavGraphBuilder.addHomeGraph(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
-    onShowBottomBarChanged: (Boolean) -> Unit = {}
+    onShowBottomBarChanged: (Boolean) -> Unit = {},
+    externalPath: String? = null
 ) {
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
@@ -128,7 +133,8 @@ fun NavGraphBuilder.addHomeGraph(
             screenHeightInPixels,
             viewModel,
             modifier = modifier,
-            onShowBottomBarChanged = onShowBottomBarChanged
+            onShowBottomBarChanged = onShowBottomBarChanged,
+            externalPath = externalPath
         )
     }
     composable(HomeSections.SETTING.route) { from ->
