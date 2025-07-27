@@ -1,16 +1,19 @@
 package com.archko.reader.viewer
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -93,6 +96,8 @@ fun CustomView(
         var showToolbar by remember { mutableStateOf(false) }
         // 大纲弹窗状态
         var showOutlineDialog by remember { mutableStateOf(false) }
+        // 大纲列表滚动位置状态
+        var outlineScrollPosition by remember { mutableIntStateOf(0) }
         // 横竖切换、重排等按钮内部状态
         var isVertical by remember { mutableStateOf(true) }
         var isReflow by remember { mutableStateOf(false) }
@@ -111,6 +116,7 @@ fun CustomView(
                 .fillMaxSize()
                 .onSizeChanged { viewportSize = it }
         ) {
+            val context = LocalContext.current
             // 文档视图（最底层）
             DocumentView(
                 list = list,
@@ -120,6 +126,14 @@ fun CustomView(
                 onDocumentClosed = onDocumentClosed,
                 onDoubleTapToolbar = { showToolbar = !showToolbar },
                 onPageChanged = { page -> currentPage = page },
+                onTapNonPageArea = { clickedPageIndex ->
+                    // 点击非翻页区域时隐藏工具栏
+                    if (showToolbar) {
+                        showToolbar = false
+                    }
+                    // 显示点击的页码的Toast
+                    Toast.makeText(context, "第${clickedPageIndex + 1}页", Toast.LENGTH_SHORT).show()
+                },
                 initialScrollX = initialScrollX,
                 initialScrollY = initialScrollY,
                 initialZoom = initialZoom,
@@ -203,11 +217,13 @@ fun CustomView(
                 Dialog(onDismissRequest = { showOutlineDialog = false }) {
                     val hasOutline = outlineList.isNotEmpty()
                     Surface(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
                         color = Color.White.copy(alpha = 0.72f),
                         shape = MaterialTheme.shapes.medium
                     ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize()
+                        ) {
                             Box(
                                 Modifier.fillMaxWidth(),
                                 contentAlignment = Alignment.CenterStart
@@ -232,13 +248,30 @@ fun CustomView(
                                     style = MaterialTheme.typography.titleMedium
                                 )
                             }
-                            // 内容区充满剩余空间
+                            // 内容区
                             if (!hasOutline) {
-                                Box(Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(250.dp)
+                                        .padding(bottom = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text("无大纲", color = Color.Gray)
                                 }
                             } else {
-                                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                val lazyListState =
+                                    rememberLazyListState(initialFirstVisibleItemIndex = outlineScrollPosition)
+
+                                // 监听滚动位置变化并保存
+                                LaunchedEffect(lazyListState.firstVisibleItemIndex) {
+                                    outlineScrollPosition = lazyListState.firstVisibleItemIndex
+                                }
+
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    state = lazyListState
+                                ) {
                                     itemsIndexed(outlineList) { index, item ->
                                         Row(
                                             modifier = Modifier

@@ -45,6 +45,7 @@ public fun DocumentView(
     onDocumentClosed: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
     onPageChanged: ((page: Int) -> Unit)? = null, // 新增页面变化回调
+    onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null, // 新增：点击非翻页区域回调，传递页面索引
     initialScrollX: Long = 0L, // 新增：初始X偏移量
     initialScrollY: Long = 0L, // 新增：初始Y偏移量
     initialZoom: Double = 1.0, // 新增：初始缩放比例
@@ -61,7 +62,7 @@ public fun DocumentView(
 
     // 跟踪上一次的orientation
     var lastOrientation by remember { mutableStateOf(orientation) }
-    
+
     // 标记是否已经应用了初始偏移量
     var hasAppliedInitialOffset by remember { mutableStateOf(false) }
 
@@ -91,25 +92,25 @@ public fun DocumentView(
         if (pdfViewState.init && viewSize != IntSize.Zero && !hasAppliedInitialOffset) {
             val hasInitialOffset = initialScrollX != 0L || initialScrollY != 0L
             val hasInitialZoom = initialZoom != 1.0
-            
+
             println("DocumentView: 检查初始偏移量: hasInitialOffset=$hasInitialOffset, hasInitialZoom=$hasInitialZoom, scrollX=$initialScrollX, scrollY=$initialScrollY, zoom=$initialZoom")
-            
+
             if (hasInitialOffset || hasInitialZoom) {
                 println("DocumentView: 应用初始偏移量: scrollX=$initialScrollX, scrollY=$initialScrollY, zoom=$initialZoom")
-                
+
                 // 应用初始缩放
                 if (hasInitialZoom) {
                     vZoom = initialZoom.toFloat()
                     println("DocumentView: 已应用初始缩放: $vZoom")
                 }
-                
+
                 // 应用初始偏移量
                 if (hasInitialOffset) {
                     offset = Offset(initialScrollX.toFloat(), initialScrollY.toFloat())
                     pdfViewState.updateOffset(offset)
                     println("DocumentView: 已应用初始偏移量: $offset")
                 }
-                
+
                 hasAppliedInitialOffset = true
                 println("DocumentView: 标记已应用初始偏移量")
             } else {
@@ -121,7 +122,7 @@ public fun DocumentView(
     // jumpToPage 跳转逻辑 - 只在用户主动跳转时执行，且没有初始偏移量时
     LaunchedEffect(jumpToPage, pdfViewState.init, align, orientation, hasAppliedInitialOffset) {
         println("DocumentView: jumpToPage:$jumpToPage, isUserJump:$isUserJump, hasAppliedInitialOffset:$hasAppliedInitialOffset, init: ${pdfViewState.init}")
-        
+
         // 只有在以下情况才执行页面跳转：
         // 1. 有明确的跳转页码
         // 2. PdfViewState已初始化
@@ -232,9 +233,21 @@ public fun DocumentView(
                 detectTapGestures(
                     onTap = { offsetTap ->
                         // 单击翻页逻辑 - 提取公共方法避免重复代码
-                        handleTapGesture(offsetTap, viewSize, offset, orientation, pdfViewState, keepPx) { newOffset ->
+                        val isPageTurned = handleTapGesture(
+                            offsetTap,
+                            viewSize,
+                            offset,
+                            orientation,
+                            pdfViewState,
+                            keepPx
+                        ) { newOffset ->
                             offset = newOffset
                             pdfViewState.updateOffset(offset)
+                        }
+                        // 如果不是翻页区域，计算点击的页面并触发回调
+                        if (!isPageTurned) {
+                            val clickedPage = calculateClickedPage(offsetTap, offset, orientation, pdfViewState)
+                            onTapNonPageArea?.invoke(clickedPage)
                         }
                     },
                     onDoubleTap = { offsetTap ->
@@ -490,7 +503,52 @@ public fun DocumentView(
 }
 
 /**
+ * 根据点击坐标计算点击的页面索引
+ */
+private fun calculateClickedPage(
+    tapOffset: Offset,
+    currentOffset: Offset,
+    orientation: Int,
+    pdfViewState: PdfViewState
+): Int {
+    // 将点击坐标转换为相对于内容的位置
+    val contentX = tapOffset.x - currentOffset.x
+    val contentY = tapOffset.y - currentOffset.y
+
+    // 查找包含该坐标的页面
+    val pages = pdfViewState.pages
+    for (i in pages.indices) {
+        val page = pages[i]
+        if (orientation == Vertical) {
+            // 垂直模式：检查Y坐标是否在页面范围内
+            if (contentY >= page.bounds.top && contentY <= page.bounds.bottom) {
+                return i
+            }
+        } else {
+            // 水平模式：检查X坐标是否在页面范围内
+            if (contentX >= page.bounds.left && contentX <= page.bounds.right) {
+                return i
+            }
+        }
+    }
+
+    // 如果没有找到匹配的页面，返回第一个可见页面
+    return pages.indexOfFirst { page ->
+        if (orientation == Vertical) {
+            val top = -currentOffset.y
+            val bottom = top + pdfViewState.viewSize.height
+            page.bounds.bottom > top && page.bounds.top < bottom
+        } else {
+            val left = -currentOffset.x
+            val right = left + pdfViewState.viewSize.width
+            page.bounds.right > left && page.bounds.left < right
+        }
+    }.coerceAtLeast(0)
+}
+
+/**
  * 处理点击手势的公共方法，避免重复代码
+ * @return 是否发生了翻页操作
  */
 private fun handleTapGesture(
     offsetTap: Offset,
@@ -500,40 +558,50 @@ private fun handleTapGesture(
     pdfViewState: PdfViewState,
     keepPx: Float,
     onOffsetChanged: (Offset) -> Unit
-) {
+): Boolean {
     if (orientation == Vertical) {
         // 垂直方向：上下翻页
         val y = offsetTap.y
         val height = viewSize.height.toFloat()
-        when {
+        return when {
             y < height / 4 -> {
                 // 点击上方区域，向上翻页
                 val newY = (currentOffset.y + viewSize.height - keepPx).coerceAtMost(0f)
                 onOffsetChanged(Offset(currentOffset.x, newY))
+                true
             }
+
             y > height * 3 / 4 -> {
                 // 点击下方区域，向下翻页
                 val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                 val newY = (currentOffset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
                 onOffsetChanged(Offset(currentOffset.x, newY))
+                true
             }
+
+            else -> false // 点击中间区域，不是翻页
         }
     } else {
         // 水平方向：左右翻页
         val x = offsetTap.x
         val width = viewSize.width.toFloat()
-        when {
+        return when {
             x < width / 4 -> {
                 // 点击左侧区域，向左翻页
                 val newX = (currentOffset.x + viewSize.width - keepPx).coerceAtMost(0f)
                 onOffsetChanged(Offset(newX, currentOffset.y))
+                true
             }
+
             x > width * 3 / 4 -> {
                 // 点击右侧区域，向右翻页
                 val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                 val newX = (currentOffset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
                 onOffsetChanged(Offset(newX, currentOffset.y))
+                true
             }
+
+            else -> false // 点击中间区域，不是翻页
         }
     }
 }
