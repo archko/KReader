@@ -1,8 +1,10 @@
 package com.archko.reader.viewer
 
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -19,6 +21,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
@@ -44,6 +49,38 @@ fun CustomView(
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
 ) {
+    // 在打开文档时隐藏状态栏
+    val context = LocalContext.current
+    val isDarkTheme = isSystemInDarkTheme()
+    
+    LaunchedEffect(Unit) {
+        val activity = context as? ComponentActivity
+        activity?.window?.let { window ->
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                hide(WindowInsetsCompat.Type.statusBars())
+                hide(WindowInsetsCompat.Type.navigationBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+    }
+
+    // 在组件销毁时恢复状态栏
+    DisposableEffect(Unit) {
+        onDispose {
+            val activity = context as? ComponentActivity
+            activity?.window?.let { window ->
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    show(WindowInsetsCompat.Type.statusBars())
+                    show(WindowInsetsCompat.Type.navigationBars())
+                    // 根据主题设置状态栏文字颜色
+                    isAppearanceLightStatusBars = !isDarkTheme
+                }
+            }
+        }
+    }
+
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     LaunchedEffect(path) {

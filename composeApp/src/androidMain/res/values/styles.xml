@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme. -->
-    <style name="Theme.KReader" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Customize your theme here. -->
+    <style name="Theme.KReader.FullScreen" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 移除全屏设置，让状态栏在首页时显示 -->
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Activity</item>
+        <!-- 移除 android:windowFullscreen 设置 -->
     </style>
 
-    <style name="Theme.FullScreen" parent="android:Theme.Material.Light.NoActionBar.Fullscreen">
-        <!-- Customize your theme here. -->
-        <item name="android:windowFullscreen">true</item>
+    <!-- 黑夜主题 - 使用现有的Light主题，通过Compose控制颜色 -->
+    <style name="Theme.KReader.FullScreen.Dark" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowContentOverlay">@null</item>

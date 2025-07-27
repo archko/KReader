@@ -2,9 +2,11 @@ package com.archko.reader.viewer
 
 import android.net.Uri
 import android.text.TextUtils
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -15,11 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.entity.CustomImageData
@@ -88,16 +94,29 @@ fun FileScreen(
             }
         }
 
+        val context = LocalContext.current
+        val isDarkTheme = isSystemInDarkTheme()
+        
         BackHandler(enabled = openDocRequest != null) {
             openDocRequest = null
             viewModel.path = null
+            // 恢复状态栏显示
+            val activity = context as? ComponentActivity
+            activity?.window?.let { window ->
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    show(WindowInsetsCompat.Type.statusBars())
+                    show(WindowInsetsCompat.Type.navigationBars())
+                    // 根据主题设置状态栏文字颜色
+                    isAppearanceLightStatusBars = !isDarkTheme
+                }
+            }
         }
 
         Surface(
             modifier = modifier
-                .statusBarsPadding()
                 .fillMaxSize(),
-            color = Color(0xFFF5F5F5)
+            color = MaterialTheme.colorScheme.background
         ) {
             if (openDocRequest == null) {
                 onShowBottomBarChanged(true)
@@ -132,14 +151,14 @@ fun FileScreen(
                                 onClick = { viewModel.clear() },
                                 modifier = Modifier.align(Alignment.CenterStart)
                             ) {
-                                Text("Clear")
+                                Text("Clear", color = MaterialTheme.colorScheme.onBackground)
                             }
                         }
                         Button(
                             onClick = pickerLauncher::launch,
                             modifier = Modifier.align(Alignment.Center)
                         ) {
-                            Text("Select PDF")
+                            Text("Select PDF", color = MaterialTheme.colorScheme.onBackground)
                         }
                     }
 
@@ -331,7 +350,7 @@ private fun RecentItem(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(2.dp),
-                    color = Color(0xFF444444).copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                     maxLines = 1,
                     text = "${recent.page?.plus(1)}/${recent.pageCount}",
                     fontSize = 12.sp,
@@ -342,7 +361,7 @@ private fun RecentItem(
 
         Text(
             modifier = Modifier.padding(2.dp),
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             text = "${recent.path?.inferName()}",
             fontSize = 13.sp,

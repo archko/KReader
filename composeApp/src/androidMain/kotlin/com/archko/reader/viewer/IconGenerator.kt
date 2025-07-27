@@ -110,7 +110,7 @@ object IconGenerator {
 
         // 绘制字母"k"
         val kSize = bookWidth * 0.5f
-        val kLeft = bookLeft + bookWidth - kSize - size * 0.02f
+        val kLeft = bookLeft + bookWidth - kSize - size * 0.06f  // 向左移动，与SettingScreen一致
         val kTop = bookTop + (bookHeight - kSize) / 2 + size * 0.04f
 
         val kBrush = Brush.linearGradient(
@@ -157,18 +157,38 @@ object IconGenerator {
             center = Offset(kLeft + kSize * 0.2f, kTop + letterHeight * 0.45f)
         )
 
-        // 装饰球
+        // 左上角装饰圆（紫色，与SettingScreen一致）
+        val leftTopRadius = size * 0.13f  // 与SettingScreen中的13.dp.toPx()对应
         drawCircle(
-            color = Color(0xFF2196F3),
-            radius = size * 0.07f,
-            center = Offset(bookLeft + size * 0.1f, bookTop + size * 0.1f)
+            color = Color(0xFF9C27B0).copy(alpha = 0.3f), // 紫色，透明度与SettingScreen一致
+            radius = leftTopRadius,
+            center = Offset(bookLeft + size * 0.1f, bookTop + size * 0.11f)  // 位置与SettingScreen一致
         )
 
-        // 底部装饰
+        // 右下角装饰圆（绿色，与SettingScreen一致）
+        val dotRadius2 = size * 0.09f  // 与SettingScreen中的9.dp.toPx()对应
         drawCircle(
-            color = Color.White.copy(alpha = 0.3f),
-            radius = size * 0.15f,
-            center = Offset(centerX - size * 0.2f, centerY - size * 0.2f)
+            color = Color(0xFF4CAF50).copy(alpha = 0.3f), // 绿色，透明度与SettingScreen一致
+            radius = dotRadius2,
+            center = Offset(bookLeft + bookWidth - size * 0.1f, bookTop + bookHeight - size * 0.1f)
+        )
+
+        // 底部背景装饰圆形 - 形成正三角形（与SettingScreen一致）
+        val triangleRadius = size * 0.18f  // 与SettingScreen中的0.18f对应
+        
+        // 第一个圆形（左上角，带渐变效果，显示在最上层）
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.2f), // 上半部分浅色
+                    Color.White.copy(alpha = 0.4f), // 中间过渡
+                    Color.White.copy(alpha = 0.6f)  // 下半部分深色
+                ),
+                center = Offset(centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f),
+                radius = triangleRadius * 1.2f
+            ),
+            radius = triangleRadius,
+            center = Offset(centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f)
         )
     }
 
@@ -457,7 +477,7 @@ object IconGenerator {
 
         // 绘制字母"k"
         val kSize = bookWidth * 0.5f
-        val kLeft = bookLeft + bookWidth - kSize - size * 0.02f
+        val kLeft = bookLeft + bookWidth - kSize - size * 0.06f  // 向左移动，与SettingScreen一致
         val kTop = bookTop + (bookHeight - kSize) / 2 + size * 0.04f
 
         val kPaint = android.graphics.Paint().apply {
@@ -506,22 +526,45 @@ object IconGenerator {
             strokeWidth * 1.0f, kPaint
         )
 
-        // 装饰球
-        val dotPaint = android.graphics.Paint().apply {
-            color = 0xFF2196F3.toInt()
+        // 左上角装饰圆（紫色，与SettingScreen一致）
+        val leftTopRadius = size * 0.13f  // 与SettingScreen中的13.dp.toPx()对应
+        val leftTopPaint = android.graphics.Paint().apply {
+            color = 0x4D9C27B0.toInt() // 紫色，30%透明度
         }
         canvas.drawCircle(
-            bookLeft + size * 0.1f, bookTop + size * 0.1f,
-            size * 0.07f, dotPaint
+            bookLeft + size * 0.1f, bookTop + size * 0.11f,
+            leftTopRadius, leftTopPaint
         )
 
-        // 底部装饰
-        val bottomPaint = android.graphics.Paint().apply {
-            color = 0x4DFFFFFF.toInt() // 30% white
+        // 右下角装饰圆（绿色，与SettingScreen一致）
+        val dotRadius2 = size * 0.09f  // 与SettingScreen中的9.dp.toPx()对应
+        val rightBottomPaint = android.graphics.Paint().apply {
+            color = 0x4D4CAF50.toInt() // 绿色，30%透明度
         }
         canvas.drawCircle(
-            centerX - size * 0.2f, centerY - size * 0.2f,
-            size * 0.15f, bottomPaint
+            bookLeft + bookWidth - size * 0.1f, bookTop + bookHeight - size * 0.1f,
+            dotRadius2, rightBottomPaint
+        )
+
+        // 底部背景装饰圆形 - 形成正三角形（与SettingScreen一致）
+        val triangleRadius = size * 0.18f  // 与SettingScreen中的0.18f对应
+        
+        // 第一个圆形（左上角，带渐变效果，显示在最上层）
+        val trianglePaint = android.graphics.Paint().apply {
+            shader = android.graphics.RadialGradient(
+                centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f, triangleRadius * 1.2f,
+                intArrayOf(
+                    0x33FFFFFF.toInt(), // 20% alpha
+                    0x66FFFFFF.toInt(), // 40% alpha
+                    0x99FFFFFF.toInt()  // 60% alpha
+                ),
+                floatArrayOf(0f, 0.5f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawCircle(
+            centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f,
+            triangleRadius, trianglePaint
         )
     }
 } 

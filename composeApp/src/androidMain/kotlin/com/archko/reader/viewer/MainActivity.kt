@@ -16,8 +16,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -46,21 +48,6 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        // 设置全屏并处理刘海屏
-        /*WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).let { controller ->
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.hide(WindowInsetsCompat.Type.statusBars())
-            controller.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }*/
-
-        // 处理刘海屏区域
-        /*if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.attributes.layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }*/
 
         checkForExternalPermission()
     }
@@ -102,15 +89,34 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
     fun loadView() {
         // 处理外部intent
         processExternalIntent(intent)
+        val activity = this as? ComponentActivity
 
         setContent {
+            val isDarkTheme = isSystemInDarkTheme()
+            
+            // 根据系统主题切换应用主题
+            LaunchedEffect(isDarkTheme) {
+                activity?.let {
+                    if (isDarkTheme) {
+                        it.setTheme(R.style.Theme_KReader_FullScreen_Dark)
+                    } else {
+                        it.setTheme(R.style.Theme_KReader_FullScreen)
+                    }
+                }
+            }
+
             val view = LocalView.current
             if (!view.isInEditMode) {
                 val window = (view.context as? ComponentActivity)?.window
                 window?.let {
-                    WindowCompat.setDecorFitsSystemWindows(it, false)
+                    // 确保状态栏在首页时显示
+                    WindowCompat.setDecorFitsSystemWindows(it, true)
                     WindowCompat.getInsetsController(it, view).apply {
-                        //isAppearanceLightStatusBars = false // 设置状态栏文字为白色
+                        // 显示状态栏
+                        show(WindowInsetsCompat.Type.statusBars())
+                        show(WindowInsetsCompat.Type.navigationBars())
+                        // 根据主题设置状态栏文字颜色
+                        isAppearanceLightStatusBars = !isDarkTheme
                     }
                 }
             }
