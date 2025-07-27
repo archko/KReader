@@ -22,13 +22,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.about
 import kreader.composeapp.generated.resources.about_content
+import kreader.composeapp.generated.resources.about_kreader
+import kreader.composeapp.generated.resources.app_author
+import kreader.composeapp.generated.resources.confirm
+import kreader.composeapp.generated.resources.version
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -65,7 +69,7 @@ fun SettingScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Author:archko@gmail.com",
+                            text = stringResource(Res.string.app_author),
                             style = TextStyle(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                 fontSize = 14.sp
@@ -323,7 +327,7 @@ fun SettingCategory() {
                 .fillMaxWidth()
         ) {
             Text(
-                text = "Version",
+                text = stringResource(Res.string.version),
                 style = TextStyle(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp
@@ -409,7 +413,7 @@ fun SettingCategory() {
                 .fillMaxWidth()
         ) {
             Text(
-                text = "About",
+                text = stringResource(Res.string.about),
                 style = TextStyle(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp
@@ -435,7 +439,7 @@ fun AboutDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "About KReader",
+                text = stringResource(Res.string.about_kreader),
                 style = TextStyle(
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 18.sp,
@@ -470,7 +474,7 @@ fun AboutDialog(
                 )
             ) {
                 Text(
-                    text = "确定",
+                    text = stringResource(Res.string.confirm),
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 14.sp
                 )

@@ -23,8 +23,8 @@ import java.io.File
  */
 public class PdfDecoder(file: File) : ImageDecoder {
 
-    private val document: Document = Document.openDocument(file.absolutePath)
-    public override var pageCount: Int = document.countPages()
+    private val document: Document
+    public override var pageCount: Int = 0
 
     // 私有变量存储原始页面尺寸
     public override var originalPageSizes: List<Size> = listOf()
@@ -51,11 +51,26 @@ public class PdfDecoder(file: File) : ImageDecoder {
     public var viewSize: IntSize = IntSize.Zero
 
     init {
-        val fontSize = 54f
-        document.layout(1280f, 2160f, fontSize)
-        pageCount = document.countPages()
-        originalPageSizes = prepareSizes()
-        outlineItems = prepareOutlines()
+        // 检查文件是否存在
+        if (!file.exists()) {
+            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
+        }
+        
+        // 检查文件是否可读
+        if (!file.canRead()) {
+            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
+        }
+        
+        try {
+            document = Document.openDocument(file.absolutePath)
+            val fontSize = 54f
+            document.layout(1280f, 2160f, fontSize)
+            pageCount = document.countPages()
+            originalPageSizes = prepareSizes()
+            outlineItems = prepareOutlines()
+        } catch (e: Exception) {
+            throw RuntimeException("无法打开文档: ${file.absolutePath}, 错误: ${e.message}", e)
+        }
     }
 
     /*override fun decodeRegion(

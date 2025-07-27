@@ -65,7 +65,21 @@ public actual class LocalPdfState(private val document: Document) {
     }*/
 
     public actual constructor(file: File) : this(
-        document = Document.openDocument(file.absolutePath)
+        document = try {
+            // 检查文件是否存在
+            if (!file.exists()) {
+                throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
+            }
+            
+            // 检查文件是否可读
+            if (!file.canRead()) {
+                throw SecurityException("无法读取文档文件: ${file.absolutePath}")
+            }
+            
+            Document.openDocument(file.absolutePath)
+        } catch (e: Exception) {
+            throw RuntimeException("无法打开文档: ${file.absolutePath}, 错误: ${e.message}", e)
+        }
     ) {
         val fontSize = 26f;
         document.layout(1280f, 1280f, fontSize)

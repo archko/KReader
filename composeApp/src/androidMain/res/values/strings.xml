@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">KReader</string>
-</resources>
+    <string name="grant_files_permission">Grant Files Permission</string>
+    <string name="grant_cancel">Cancel</string>
+    <string name="grant_ok">OK</string>
+    <string name="grant_all_files_permission">Grant All Files Access Permission</string>
+    <string name="no_sdcard_permission">No SD card read permission obtained</string>
+    <string name="grant_failed">Permission grant failed</string>
+    </resources>

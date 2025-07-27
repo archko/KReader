@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.graphics.createBitmap
 
 object IconGenerator {
 
@@ -212,7 +213,7 @@ object IconGenerator {
     private fun generateIcon(context: Context, size: Int, fileName: String, isCircular: Boolean = true) {
         try {
             // 创建位图
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val bitmap = createBitmap(size, size)
             val canvas = android.graphics.Canvas(bitmap)
 
             // 直接绘制图标内容
@@ -427,9 +428,9 @@ object IconGenerator {
             shader = android.graphics.RadialGradient(
                 centerX + size * 0.2f, centerY + size * 0.2f, size * 0.4f,
                 intArrayOf(
-                    0x4D90CAF9.toInt(), // 30% alpha
-                    0x1A90CAF9.toInt(), // 10% alpha
-                    0x00000000.toInt()  // transparent
+                    0x4D90CAF9, // 30% alpha
+                    0x1A90CAF9, // 10% alpha
+                    0x00000000  // transparent
                 ),
                 floatArrayOf(0f, 0.5f, 1f),
                 android.graphics.Shader.TileMode.CLAMP
@@ -445,7 +446,7 @@ object IconGenerator {
 
         // 书本阴影
         val shadowPaint = android.graphics.Paint().apply {
-            color = 0x1A000000.toInt() // 10% black
+            color = 0x1A000000 // 10% black
         }
         canvas.drawRoundRect(
             bookLeft + size * 0.02f, bookTop + size * 0.02f,
@@ -529,7 +530,7 @@ object IconGenerator {
         // 左上角装饰圆（紫色，与SettingScreen一致）
         val leftTopRadius = size * 0.13f  // 与SettingScreen中的13.dp.toPx()对应
         val leftTopPaint = android.graphics.Paint().apply {
-            color = 0x4D9C27B0.toInt() // 紫色，30%透明度
+            color = 0x4D9C27B0 // 紫色，30%透明度
         }
         canvas.drawCircle(
             bookLeft + size * 0.1f, bookTop + size * 0.11f,
@@ -539,7 +540,7 @@ object IconGenerator {
         // 右下角装饰圆（绿色，与SettingScreen一致）
         val dotRadius2 = size * 0.09f  // 与SettingScreen中的9.dp.toPx()对应
         val rightBottomPaint = android.graphics.Paint().apply {
-            color = 0x4D4CAF50.toInt() // 绿色，30%透明度
+            color = 0x4D4CAF50 // 绿色，30%透明度
         }
         canvas.drawCircle(
             bookLeft + bookWidth - size * 0.1f, bookTop + bookHeight - size * 0.1f,
@@ -554,8 +555,8 @@ object IconGenerator {
             shader = android.graphics.RadialGradient(
                 centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f, triangleRadius * 1.2f,
                 intArrayOf(
-                    0x33FFFFFF.toInt(), // 20% alpha
-                    0x66FFFFFF.toInt(), // 40% alpha
+                    0x33FFFFFF, // 20% alpha
+                    0x66FFFFFF, // 40% alpha
                     0x99FFFFFF.toInt()  // 60% alpha
                 ),
                 floatArrayOf(0f, 0.5f, 1f),

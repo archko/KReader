@@ -1,3 +1,32 @@
 <resources>
     <string name="about_content">Why this app? There are many PDF readers based on the Android View system on the market, but I haven't seen any based on Compose.\nThose that claim to be Compose PDF readers either use AndroidView wrappers around old View system readers, or are just simple lists that load documents without rich gestures and smooth zooming and scrolling effects.\nSo I made this app because I had already created a PDF reader based on Android View, and I wanted to implement a PDF reader based on Compose.\nCurrently, zooming and scrolling are very smooth, but the complete functionality from the old reader hasn't been migrated yet. I'll work on that gradually.\nThis app supports desktop, iOS and other platforms. Time is limited, so it's currently implemented on Android, while iOS requires compiling MuPDF, and the desktop version of MuPDF is easy to compile so I won't upload it.</string>
+    <string name="app_author">Author:archko@gmail.com</string>
+    <string name="version">Version</string>
+    <string name="about">About</string>
+    <string name="about_kreader">About KReader</string>
+    <string name="confirm">Confirm</string>
+    <string name="home">Home</string>
+    <string name="setting">Setting</string>
+    <string name="loading">Loading</string>
+    <string name="clear">Clear</string>
+    <string name="select_pdf">Select PDF</string>
+    <string name="delete_history">Delete History</string>
+    <string name="back">Back</string>
+    <string name="vertical">Vertical</string>
+    <string name="horizontal">Horizontal</string>
+    <string name="outline">Outline</string>
+    <string name="reflow">Reflow</string>
+    <string name="search">Search</string>
+    <string name="document_outline">Document Outline</string>
+    <string name="no_outline">No Outline</string>
+    <string name="page_number">Page %d</string>
+    <string name="current_page">Page %d</string>
+    <string name="generate_icon">Generate App Icon</string>
+    <string name="circular_rectangular">Circular + Rectangular</string>
+    <string name="icon_generated">Icon generated: %s</string>
+    <string name="icon_generation_failed">Icon generation failed: %s</string>
+    <string name="adaptive_icon_regenerated">Adaptive icon XML file regenerated, consistent with Canvas effect</string>
+    <string name="adaptive_icon_generation_failed">Adaptive icon generation failed: %s</string>
+    <string name="document_open_failed">Failed to open document</string>
+    <string name="close">Close</string>
 </resources>

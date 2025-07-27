@@ -1,6 +1,7 @@
 package com.archko.reader.viewer
 
-import androidx.compose.foundation.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -9,10 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +29,9 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.components_thumbnail_corner
+import kreader.composeapp.generated.resources.components_thumbnail_left
+import kreader.composeapp.generated.resources.components_thumbnail_top
 import org.jetbrains.compose.resources.painterResource
 import java.io.File
 
@@ -76,7 +76,6 @@ fun FileScreen(
                             files.singleOrNull()?.let { file ->
                                 val pdf = LocalPdfState(file)
                                 scope.launch {
-                                    loadProgress(viewModel, file, pdf)
                                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                                     viewModel.getProgress(file.file.absolutePath)
                                     val startPage = viewModel.progress?.page?.toInt() ?: 0
@@ -125,9 +124,8 @@ fun FileScreen(
                                     onClick = {
                                         val file = KmpFile(File(it.path))
                                         val page = it.page?.toInt()
-                                        val pdf = LocalPdfState(file)
                                         scope.launch {
-                                            loadProgress(viewModel, file, pdf)
+                                            viewModel.getProgress(file.file.absolutePath)
                                             openDocRequest = OpenDocRequest(file.file.absolutePath, page)
                                         }
                                     },
@@ -169,17 +167,6 @@ fun FileScreen(
                 )
             }
         }
-    }
-}
-
-private suspend fun loadProgress(
-    viewModel: PdfViewModel,
-    file: KmpFile,
-    pdf: LocalPdfState?
-) {
-    if (pdf != null) {
-        val path = file.file.absolutePath
-        viewModel.insertOrUpdate(path, pdf.pageCount.toLong())
     }
 }
 

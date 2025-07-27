@@ -34,7 +34,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import kreader.composeapp.generated.resources.Res
+import org.jetbrains.compose.resources.getString
 import java.io.File
+import androidx.compose.ui.text.style.TextAlign
 
 /**
  * @author: archko 2025/7/23 :09:09
@@ -83,18 +87,27 @@ fun CustomView(
 
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
+    var loadingError by remember { mutableStateOf<String?>(null) }
+    
     LaunchedEffect(path) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, $path")
-            val pdfDecoder = if (viewportSize == IntSize.Zero) {
-                null
-            } else {
-                PdfDecoder(File(path))
-            }
-            if (pdfDecoder != null) {
-                pdfDecoder.getSize(viewportSize)
-                println("init.size:${pdfDecoder.imageSize.width}-${pdfDecoder.imageSize.height}")
-                decoder = pdfDecoder
+            try {
+                val pdfDecoder = if (viewportSize == IntSize.Zero) {
+                    null
+                } else {
+                    PdfDecoder(File(path))
+                }
+                if (pdfDecoder != null) {
+                    pdfDecoder.getSize(viewportSize)
+                    println("init.size:${pdfDecoder.imageSize.width}-${pdfDecoder.imageSize.height}")
+                    decoder = pdfDecoder
+                    loadingError = null // 清除之前的错误
+                }
+            } catch (e: Exception) {
+                println("文档加载失败: $path, 错误: ${e.message}")
+                loadingError = "document_open_failed"
+                decoder = null
             }
         }
     }
@@ -110,10 +123,55 @@ fun CustomView(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { viewportSize = it }) {
-            Text(
-                "Loading",
-                modifier = Modifier
-            )
+            if (loadingError != null) {
+                // 显示错误信息
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = when (loadingError) {
+                            "document_open_failed" -> stringResource(Res.string.document_open_failed)
+                            else -> stringResource(Res.string.document_open_failed)
+                        },
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = path,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = { onCloseDocument?.invoke() }
+                    ) {
+                        Text(stringResource(Res.string.close))
+                    }
+                }
+            } else {
+                // 显示加载中
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        stringResource(Res.string.loading),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {
@@ -147,6 +205,9 @@ fun CustomView(
         var isUserJump by remember { mutableStateOf(false) }
         // 大纲列表
         val outlineList = decoder?.outlineItems ?: emptyList()
+        
+        // 获取字符串资源
+        val currentPageString = stringResource(Res.string.current_page)
 
         Box(
             modifier = Modifier
@@ -168,8 +229,8 @@ fun CustomView(
                     if (showToolbar) {
                         showToolbar = false
                     }
-                    // 显示点击的页码的Toast
-                    Toast.makeText(context, "第${clickedPageIndex + 1}页", Toast.LENGTH_SHORT).show()
+                    val pageText = currentPageString.format(clickedPageIndex + 1)
+                    Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
                 },
                 initialScrollX = initialScrollX,
                 initialScrollY = initialScrollY,
@@ -212,7 +273,7 @@ fun CustomView(
                         }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = "返回",
+                                contentDescription = stringResource(Res.string.back),
                                 tint = Color.White
                             )
                         }
@@ -220,28 +281,28 @@ fun CustomView(
                         IconButton(onClick = { isVertical = !isVertical }) {
                             Icon(
                                 painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                contentDescription = if (isVertical) "竖向" else "横向",
+                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(Res.string.horizontal),
                                 tint = Color.White
                             )
                         }
                         IconButton(onClick = { showOutlineDialog = true }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_toc),
-                                contentDescription = "大纲",
+                                contentDescription = stringResource(Res.string.outline),
                                 tint = Color.White
                             )
                         }
                         IconButton(onClick = { isReflow = !isReflow }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_reflow),
-                                contentDescription = "重排",
+                                contentDescription = stringResource(Res.string.reflow),
                                 tint = if (isReflow) Color.Green else Color.White
                             )
                         }
                         IconButton(onClick = { /* TODO: 搜索功能 */ }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_search),
-                                contentDescription = "搜索",
+                                contentDescription = stringResource(Res.string.search),
                                 tint = Color.White
                             )
                         }
@@ -272,14 +333,14 @@ fun CustomView(
                                     IconButton(onClick = { showOutlineDialog = false }) {
                                         Icon(
                                             painter = painterResource(Res.drawable.ic_back),
-                                            contentDescription = "返回",
+                                            contentDescription = stringResource(Res.string.back),
                                             tint = Color.Black
                                         )
                                     }
                                     Spacer(Modifier.weight(1f))
                                 }
                                 Text(
-                                    "文档大纲",
+                                    stringResource(Res.string.document_outline),
                                     color = Color.Black,
                                     modifier = Modifier.align(Alignment.Center),
                                     style = MaterialTheme.typography.titleMedium
@@ -294,7 +355,7 @@ fun CustomView(
                                         .padding(bottom = 16.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("无大纲", color = Color.Gray)
+                                    Text(stringResource(Res.string.no_outline), color = Color.Gray)
                                 }
                             } else {
                                 val lazyListState =
@@ -330,7 +391,7 @@ fun CustomView(
                                             )
                                             Spacer(Modifier.weight(1f))
                                             Text(
-                                                text = "第${item.page + 1}页",
+                                                text = stringResource(Res.string.page_number, item.page + 1),
                                                 color = Color.Gray,
                                                 fontSize = 12.sp
                                             )

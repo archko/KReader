@@ -33,6 +33,10 @@ import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.navigation.MainDestinations
 import com.archko.reader.viewer.navigation.rememberKNavController
 import androidx.compose.ui.unit.dp
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.home
+import kreader.composeapp.generated.resources.setting
+import org.jetbrains.compose.resources.stringResource
 
 val LocalNavController = compositionLocalOf<NavHostController> {
     error("No NavHostController provided in LocalNavController")
@@ -187,7 +191,11 @@ fun KBottomBar(
         ) {
             tabs.forEach { section ->
                 val selected = currentRoute == section.route
-                val text = (section.title)
+                val text = when (section.route) {
+                    "home/buds" -> stringResource(Res.string.home)
+                    "home/setting" -> stringResource(Res.string.setting)
+                    else -> section.title
+                }
 
                 NavigationBarItem(
                     icon = {

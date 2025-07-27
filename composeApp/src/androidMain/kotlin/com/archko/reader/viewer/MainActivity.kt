@@ -177,12 +177,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             )
         ) {
             val builder: AlertDialog.Builder = AlertDialog.Builder(this)
-            builder.setTitle("grant_files_permission")
-                .setMessage("grant_files_permission")
-                .setPositiveButton("grant_cancel") { _, _ ->
+            builder.setTitle(getString(R.string.grant_files_permission))
+                .setMessage(getString(R.string.grant_files_permission))
+                .setPositiveButton(getString(R.string.grant_cancel)) { _, _ ->
                     finish()
                 }
-                .setNegativeButton("grant_ok") { _, _ ->
+                .setNegativeButton(getString(R.string.grant_ok)) { _, _ ->
                     ActivityCompat.requestPermissions(
                         this, arrayOf(permission), STORAGE_PERMISSION
                     )
@@ -204,12 +204,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
     open fun requestAllFilesAccess(onPermissionGranted: OnPermissionGranted) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
             val builder: AlertDialog.Builder = AlertDialog.Builder(this)
-            builder.setTitle("grant_all_files_permission")
-                .setMessage("grant_all_files_permission")
-                .setPositiveButton("grant_cancel") { _, _ ->
+            builder.setTitle(getString(R.string.grant_all_files_permission))
+                .setMessage(getString(R.string.grant_all_files_permission))
+                .setPositiveButton(getString(R.string.grant_cancel)) { _, _ ->
                     finish()
                 }
-                .setNegativeButton("grant_ok") { _, _ ->
+                .setNegativeButton(getString(R.string.grant_ok)) { _, _ ->
                     permissionCallbacks[ALL_FILES_PERMISSION] = onPermissionGranted
                     try {
                         val intent =
@@ -224,7 +224,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                         )
                         Toast.makeText(
                             this,
-                            "没有获取sdcard的读取权限",
+                            getString(R.string.no_sdcard_permission),
                             Toast.LENGTH_LONG
                         )
                             .show()
@@ -254,7 +254,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             } else {
                 Toast.makeText(
                     this,
-                    "grantfailed",
+                    getString(R.string.grant_failed),
                     Toast.LENGTH_SHORT
                 ).show()
                 permissionCallbacks[STORAGE_PERMISSION]?.let {

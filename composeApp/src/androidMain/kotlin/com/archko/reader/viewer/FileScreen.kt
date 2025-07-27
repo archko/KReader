@@ -1,7 +1,6 @@
 package com.archko.reader.viewer
 
 import android.net.Uri
-import android.text.TextUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -15,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -25,12 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -39,11 +35,9 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.components_thumbnail_corner
-import kreader.composeapp.generated.resources.components_thumbnail_left
-import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
 data class OpenDocRequest(val path: String, val page: Int?)
@@ -70,25 +64,11 @@ fun FileScreen(
         LaunchedEffect(externalPath) {
             externalPath?.let { path ->
                 scope.launch {
-                    try {
-                        val file = File(path)
-                        if (file.exists()) {
-                            val pdf = LocalPdfState(file)
-                            // 先加载进度
-                            loadProgressFromPath(viewModel, path, pdf)
-                            // 等待进度加载完成后再设置 openDocRequest
-                            val startPage = viewModel.progress?.page?.toInt() ?: 0
-                            openDocRequest = OpenDocRequest(path, startPage)
-                        } else {
-                            // 如果文件不存在，尝试使用KmpFile处理
-                            val kmpFile = KmpFile(Uri.parse(path))
-                            val pdf = LocalPdfState(kmpFile)
-                            loadProgress(viewModel, kmpFile, pdf)
-                            val startPage = viewModel.progress?.page?.toInt() ?: 0
-                            openDocRequest = OpenDocRequest(path, startPage)
-                        }
-                    } catch (e: Exception) {
-                        println("处理外部路径失败: $path, 错误: ${e.message}")
+                    val file = File(path)
+                    if (file.exists()) {
+                        viewModel.getProgress(file.absolutePath)
+                        val startPage = viewModel.progress?.page?.toInt() ?: 0
+                        openDocRequest = OpenDocRequest(file.absolutePath, startPage)
                     }
                 }
             }
@@ -96,7 +76,7 @@ fun FileScreen(
 
         val context = LocalContext.current
         val isDarkTheme = isSystemInDarkTheme()
-        
+
         BackHandler(enabled = openDocRequest != null) {
             openDocRequest = null
             viewModel.path = null
@@ -131,14 +111,14 @@ fun FileScreen(
                         selectionMode = FilePickerSelectionMode.Single
                     ) { files ->
                         scope.launch {
-                            files.singleOrNull()?.let { file ->
-                                val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
-                                val pdf = LocalPdfState(file)
-                                // 先加载进度
-                                loadProgress(viewModel, file, pdf)
-                                // 等待进度加载完成后再设置 openDocRequest
-                                val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(path, startPage)
+                            files.singleOrNull()?.let { kmpFile ->
+                                val path = IntentFile.getPath(PdfApp.app!!, kmpFile.uri) ?: kmpFile.uri.toString()
+                                val file = File(path)
+                                if (file.exists()) {
+                                    viewModel.getProgress(file.absolutePath)
+                                    val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                    openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                                }
                             }
                         }
                     }
@@ -151,14 +131,14 @@ fun FileScreen(
                                 onClick = { viewModel.clear() },
                                 modifier = Modifier.align(Alignment.CenterStart)
                             ) {
-                                Text("Clear", color = MaterialTheme.colorScheme.onBackground)
+                                Text(stringResource(Res.string.clear), color = MaterialTheme.colorScheme.onBackground)
                             }
                         }
                         Button(
                             onClick = pickerLauncher::launch,
                             modifier = Modifier.align(Alignment.Center)
                         ) {
-                            Text("Select PDF", color = MaterialTheme.colorScheme.onBackground)
+                            Text(stringResource(Res.string.select_pdf), color = MaterialTheme.colorScheme.onBackground)
                         }
                     }
 
@@ -181,15 +161,16 @@ fun FileScreen(
                                 RecentItem(
                                     recent = recentList[i],
                                     onClick = {
-                                        val file = KmpFile(Uri.parse(it.path))
-                                        val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
-                                        val page = it.page?.toInt()
-                                        val pdf = LocalPdfState(file)
-                                        scope.launch {
-                                            // 先加载进度
-                                            loadProgress(viewModel, file, pdf)
-                                            // 等待进度加载完成后再设置 openDocRequest
-                                            openDocRequest = OpenDocRequest(path, page)
+                                        val kmpFile = KmpFile(Uri.parse(it.path))
+                                        val path =
+                                            IntentFile.getPath(PdfApp.app!!, kmpFile.uri) ?: kmpFile.uri.toString()
+                                        val file = File(path)
+                                        if (file.exists()) {
+                                            scope.launch {
+                                                viewModel.getProgress(file.absolutePath)
+                                                val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                                openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                                            }
                                         }
                                     },
                                     onDelete = {
@@ -229,34 +210,6 @@ fun FileScreen(
                     initialZoom = viewModel.progress?.zoom ?: 1.0
                 )
             }
-        }
-    }
-}
-
-private suspend fun loadProgressFromPath(
-    viewModel: PdfViewModel,
-    path: String,
-    pdf: LocalPdfState?
-) {
-    if (pdf != null) {
-        // 等待 insertOrUpdate 完成
-        viewModel.insertOrUpdateAndWait(path, pdf.pageCount.toLong())
-    }
-}
-
-private suspend fun loadProgress(
-    viewModel: PdfViewModel,
-    file: KmpFile,
-    pdf: LocalPdfState?
-) {
-    if (pdf != null && file.uri.lastPathSegment != null) {
-        var path = IntentFile.getPath(PdfApp.app!!, file.uri)
-        if (TextUtils.isEmpty(path)) {
-            path = file.uri.toString()
-        }
-        path?.run {
-            // 等待 insertOrUpdate 完成
-            viewModel.insertOrUpdateAndWait(path, pdf.pageCount.toLong())
         }
     }
 }
@@ -374,7 +327,7 @@ private fun RecentItem(
             onDismissRequest = { showMenu = false }
         ) {
             DropdownMenuItem(
-                text = { Text("删除历史记录") },
+                text = { Text(stringResource(Res.string.delete_history)) },
                 onClick = {
                     showMenu = false
                     onDelete(recent)

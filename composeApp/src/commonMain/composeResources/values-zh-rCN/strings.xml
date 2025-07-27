@@ -1,3 +1,32 @@
 <resources>
     <string name="about_content">为什么有这个app,市面上基于android view系统的pdf阅读器很多,基于compose的,目前没有看到有.\n那些说是compose的pdf阅读器,要么基于的是旧的view系统的阅读器使用androidview包装,要么就是简单的列表,加载文档,没有丰富的手势,流畅的缩放与滚动的效果.\n所以我做了这个app,因为我已经做了一个基于android view的pdf阅读器了,我想实现一个基于compose的pdf阅读器.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来,以后慢慢做.\n此app支持桌面端,ios等多平台.时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.</string>
+    <string name="app_author">作者:archko@gmail.com</string>
+    <string name="version">版本</string>
+    <string name="about">关于</string>
+    <string name="about_kreader">关于KReader</string>
+    <string name="confirm">确定</string>
+    <string name="home">首页</string>
+    <string name="setting">设置</string>
+    <string name="loading">加载中</string>
+    <string name="clear">清除</string>
+    <string name="select_pdf">选择PDF</string>
+    <string name="delete_history">删除历史记录</string>
+    <string name="back">返回</string>
+    <string name="vertical">竖向</string>
+    <string name="horizontal">横向</string>
+    <string name="outline">大纲</string>
+    <string name="reflow">重排</string>
+    <string name="search">搜索</string>
+    <string name="document_outline">文档大纲</string>
+    <string name="no_outline">无大纲</string>
+    <string name="page_number">第%d页</string>
+    <string name="current_page">第%d页</string>
+    <string name="generate_icon">生成应用图标</string>
+    <string name="circular_rectangular">圆形+矩形</string>
+    <string name="icon_generated">图标已生成: %s</string>
+    <string name="icon_generation_failed">生成图标失败: %s</string>
+    <string name="adaptive_icon_regenerated">自适应图标XML文件已重新生成，与Canvas效果一致</string>
+    <string name="adaptive_icon_generation_failed">生成自适应图标失败: %s</string>
+    <string name="document_open_failed">打开文档失败</string>
+    <string name="close">关闭</string>
 </resources>

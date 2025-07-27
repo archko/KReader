@@ -27,6 +27,8 @@ import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import java.io.File
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 
 /**
  * @author: archko 2025/7/23 :09:09
@@ -43,18 +45,27 @@ fun CustomView(
 ) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
+    var loadingError by remember { mutableStateOf<String?>(null) }
+    
     LaunchedEffect(path) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, $path")
-            val pdfDecoder = if (viewportSize == IntSize.Zero) {
-                null
-            } else {
-                PdfDecoder(File(path))
-            }
-            if (pdfDecoder != null) {
-                pdfDecoder.getSize(viewportSize)
-                println("init.size:${pdfDecoder.imageSize.width}-${pdfDecoder.imageSize.height}")
-                decoder = pdfDecoder
+            try {
+                val pdfDecoder = if (viewportSize == IntSize.Zero) {
+                    null
+                } else {
+                    PdfDecoder(File(path))
+                }
+                if (pdfDecoder != null) {
+                    pdfDecoder.getSize(viewportSize)
+                    println("init.size:${pdfDecoder.imageSize.width}-${pdfDecoder.imageSize.height}")
+                    decoder = pdfDecoder
+                    loadingError = null // 清除之前的错误
+                }
+            } catch (e: Exception) {
+                println("文档加载失败: $path, 错误: ${e.message}")
+                loadingError = "document_open_failed"
+                decoder = null
             }
         }
     }
@@ -70,10 +81,46 @@ fun CustomView(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { viewportSize = it }) {
-            Text(
-                "Loading",
-                modifier = Modifier
-            )
+            if (loadingError != null) {
+                // 显示错误信息
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = when (loadingError) {
+                            "document_open_failed" -> stringResource(Res.string.document_open_failed)
+                            else -> stringResource(Res.string.document_open_failed)
+                        },
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = { onCloseDocument?.invoke() }
+                    ) {
+                        Text(stringResource(Res.string.close))
+                    }
+                }
+            } else {
+                // 显示加载中
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Loading",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {
