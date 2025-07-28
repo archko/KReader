@@ -140,22 +140,23 @@ public class Page(
                 dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
                 dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
             )
+            // 再绘制高清块
+            nodes.forEach { node ->
+                node.draw(
+                    drawScope,
+                    offset,
+                    currentWidth,
+                    currentHeight,
+                    currentBounds.top,
+                    totalScale * scaleRatio
+                )
+            }
         } else {
             if (!thumbDecoding) {
                 loadThumbnail()
             }
         }
-        // 再绘制高清块
-        nodes.forEach { node ->
-            node.draw(
-                drawScope,
-                offset,
-                currentWidth,
-                currentHeight,
-                currentBounds.top,
-                totalScale * scaleRatio
-            )
-        }
+
         // 占位框
         /*drawScope.drawRect(
             color = Color.Green,

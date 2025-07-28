@@ -318,7 +318,7 @@ fun CustomView(
                     val hasOutline = outlineList.isNotEmpty()
                     Surface(
                         modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
-                        color = Color.White.copy(alpha = 0.72f),
+                        color = Color.White.copy(alpha = 0.8f),
                         shape = MaterialTheme.shapes.medium
                     ) {
                         Column(
@@ -393,7 +393,7 @@ fun CustomView(
                                             )
                                             Spacer(Modifier.weight(1f))
                                             Text(
-                                                text = stringResource(Res.string.page_number, item.page + 1),
+                                                text = stringResource(Res.string.page_number).format(item.page + 1),
                                                 color = Color.Gray,
                                                 fontSize = 12.sp
                                             )

@@ -22,12 +22,7 @@
     <string name="no_outline">无大纲</string>
     <string name="page_number">第%d页</string>
     <string name="current_page">第%d页</string>
-    <string name="generate_icon">生成应用图标</string>
     <string name="circular_rectangular">圆形+矩形</string>
-    <string name="icon_generated">图标已生成: %s</string>
-    <string name="icon_generation_failed">生成图标失败: %s</string>
-    <string name="adaptive_icon_regenerated">自适应图标XML文件已重新生成，与Canvas效果一致</string>
-    <string name="adaptive_icon_generation_failed">生成自适应图标失败: %s</string>
     <string name="document_open_failed">打开文档失败</string>
     <string name="close">关闭</string>
 </resources>

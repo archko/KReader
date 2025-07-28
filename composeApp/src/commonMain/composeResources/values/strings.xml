@@ -22,12 +22,6 @@
     <string name="no_outline">No Outline</string>
     <string name="page_number">Page %d</string>
     <string name="current_page">Page %d</string>
-    <string name="generate_icon">Generate App Icon</string>
-    <string name="circular_rectangular">Circular + Rectangular</string>
-    <string name="icon_generated">Icon generated: %s</string>
-    <string name="icon_generation_failed">Icon generation failed: %s</string>
-    <string name="adaptive_icon_regenerated">Adaptive icon XML file regenerated, consistent with Canvas effect</string>
-    <string name="adaptive_icon_generation_failed">Adaptive icon generation failed: %s</string>
     <string name="document_open_failed">Failed to open document</string>
     <string name="close">Close</string>
 </resources>
