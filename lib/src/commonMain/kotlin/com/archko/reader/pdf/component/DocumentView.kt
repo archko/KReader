@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
-import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -456,7 +455,7 @@ public fun DocumentView(
                 )
             }
             // 添加鼠标滚轮支持（支持多种模式）
-            .onPointerEvent(PointerEventType.Scroll) { event ->
+            /*.onPointerEvent(PointerEventType.Scroll) { event ->
                 val scrollAmount = event.changes.firstOrNull()?.scrollDelta ?: return@onPointerEvent
                 // 暂时简化，只支持普通滚动，后续可以添加键盘修饰符检测
                 val isCtrlPressed = false
@@ -528,7 +527,7 @@ public fun DocumentView(
                         pdfViewState.updateOffset(offset)
                     }
                 }
-            }
+            }*/
             // 添加键盘支持
             .focusRequester(focusRequester)
             .focusable()
