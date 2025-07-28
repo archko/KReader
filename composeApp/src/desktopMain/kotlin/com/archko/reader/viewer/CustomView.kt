@@ -201,10 +201,6 @@ fun CustomView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
-                            // 只有在文档加载成功时才保存进度
-                            if (decoder != null && list.isNotEmpty()) {
-                                onDocumentClosed?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
-                            }
                             // 然后关闭文档
                             onCloseDocument?.invoke()
                         }) {
