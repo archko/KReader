@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.archko.reader.pdf.component.DocumentView
+import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.PdfDecoder
@@ -159,7 +159,7 @@ fun CustomView(
                 .onSizeChanged { viewportSize = it }
         ) {
             // 文档视图（最底层）
-            DocumentView(
+            DesktopDocumentView(
                 list = list,
                 state = decoder!!,
                 jumpToPage = if (jumpToPage >= 0) jumpToPage else null,

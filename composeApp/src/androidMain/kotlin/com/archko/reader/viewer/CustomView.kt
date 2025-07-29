@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -24,8 +25,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
+import com.archko.reader.pdf.component.MobileDocumentView
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -35,10 +36,7 @@ import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import kreader.composeapp.generated.resources.Res
-import org.jetbrains.compose.resources.getString
 import java.io.File
-import androidx.compose.ui.text.style.TextAlign
 
 /**
  * @author: archko 2025/7/23 :09:09
@@ -216,7 +214,7 @@ fun CustomView(
         ) {
             val context = LocalContext.current
             // 文档视图（最底层）
-            DocumentView(
+            MobileDocumentView(
                 list = list,
                 state = decoder!!,
                 jumpToPage = if (jumpToPage >= 0) jumpToPage else null,
