@@ -259,7 +259,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
      * 优先尝试从ImageCache/BitmapPool复用Bitmap
      */
     private fun acquireReusableBitmap(width: Int, height: Int): Bitmap {
-        // 先尝试从BitmapPool获取
+        // 优先从BitmapPool获取，这样可以复用已回收的bitmap
         return BitmapPool.acquire(width, height)
     }
 }

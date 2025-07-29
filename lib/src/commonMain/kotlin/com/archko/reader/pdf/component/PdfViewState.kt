@@ -80,6 +80,14 @@ public class PdfViewState(
     public fun shutdown() {
         isShutdown = true
         decodeScope.cancel()
+        
+        // 清理所有页面的缓存
+        pages.forEach { page ->
+            page.recycle()
+        }
+        
+        // 清理ImageCache
+        com.archko.reader.pdf.cache.ImageCache.clear()
     }
     
     public fun isShutdown(): Boolean = isShutdown
