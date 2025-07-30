@@ -38,7 +38,6 @@ kotlin {
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)
                 implementation(libs.androidx.room.runtime)
-                implementation(libs.sqlite.bundled)
             }
         }
 
@@ -46,6 +45,7 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 api(libs.mupdf.fitz)
+                implementation(libs.sqlite.bundled)
             }
         }
     }
