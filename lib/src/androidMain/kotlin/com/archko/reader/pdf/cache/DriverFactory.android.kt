@@ -2,7 +2,7 @@ package com.archko.reader.pdf.cache
 
 import android.content.Context
 import androidx.room.Room
-import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+//import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.Dispatchers
 
 /**
@@ -18,7 +18,7 @@ public actual class DriverFactory(
                 context = app,
                 name = dbFile.absolutePath,
             )
-            .setDriver(BundledSQLiteDriver())
+            //.setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(Dispatchers.IO)
             .build()
     }

@@ -5,7 +5,6 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -16,17 +15,20 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -93,7 +95,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
 
         setContent {
             val isDarkTheme = isSystemInDarkTheme()
-            
+
             // 根据系统主题切换应用主题
             LaunchedEffect(isDarkTheme) {
                 activity?.let {
@@ -146,15 +148,19 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
     //========================================
 
     private fun checkForExternalPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11 (API 30) 及以上版本，只需要申请"管理所有文件访问权限"
+            if (!Environment.isExternalStorageManager()) {
+                requestAllFilesAccess(this)
+            } else {
+                loadView()
+            }
+        } else { // Android 6.0 (API 23) 到 Android 10 (API 29)，需要申请 WRITE_EXTERNAL_STORAGE 权限
             if (!checkStoragePermission()) {
                 requestStoragePermission(this, true)
+            } else {
+                loadView()
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                requestAllFilesAccess(this)
-            }
-        } else {
-            loadView()
         }
     }
 
@@ -162,8 +168,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         return (ActivityCompat.checkSelfPermission(
             this,
             Manifest.permission.WRITE_EXTERNAL_STORAGE
-        )
-                == PackageManager.PERMISSION_GRANTED)
+        ) == PackageManager.PERMISSION_GRANTED)
     }
 
     open fun requestStoragePermission(
@@ -201,40 +206,38 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     open fun requestAllFilesAccess(onPermissionGranted: OnPermissionGranted) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-            val builder: AlertDialog.Builder = AlertDialog.Builder(this)
-            builder.setTitle(getString(R.string.grant_all_files_permission))
-                .setMessage(getString(R.string.grant_all_files_permission))
-                .setPositiveButton(getString(R.string.grant_cancel)) { _, _ ->
-                    finish()
+        // 调用此方法时已经确认是 Android 11 及以上版本且没有管理权限
+        val builder: AlertDialog.Builder = AlertDialog.Builder(this)
+        builder.setTitle(getString(R.string.grant_all_files_permission))
+            .setMessage(getString(R.string.grant_all_files_permission))
+            .setPositiveButton(getString(R.string.grant_cancel)) { _, _ ->
+                finish()
+            }
+            .setNegativeButton(getString(R.string.grant_ok)) { _, _ ->
+                permissionCallbacks[ALL_FILES_PERMISSION] = onPermissionGranted
+                try {
+                    val intent =
+                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                            .setData("package:$packageName".toUri())
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e(
+                        TAG,
+                        "Failed to initial activity to grant all files access",
+                        e
+                    )
+                    Toast.makeText(
+                        this,
+                        getString(R.string.no_sdcard_permission),
+                        Toast.LENGTH_LONG
+                    )
+                        .show()
                 }
-                .setNegativeButton(getString(R.string.grant_ok)) { _, _ ->
-                    permissionCallbacks[ALL_FILES_PERMISSION] = onPermissionGranted
-                    try {
-                        val intent =
-                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                                .setData(Uri.parse("package:$packageName"))
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        Log.e(
-                            TAG,
-                            "Failed to initial activity to grant all files access",
-                            e
-                        )
-                        Toast.makeText(
-                            this,
-                            getString(R.string.no_sdcard_permission),
-                            Toast.LENGTH_LONG
-                        )
-                            .show()
-                    }
-                }
-            builder.setCancelable(false)
-            builder.create().show()
-        } else {
-            loadView()
-        }
+            }
+        builder.setCancelable(false)
+        builder.create().show()
     }
 
     private fun isGranted(grantResults: IntArray): Boolean {
@@ -266,6 +269,17 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
 
     override fun onPermissionGranted() {
         loadView()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 检查用户是否从设置页面返回并授予了权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager() && permissionCallbacks[ALL_FILES_PERMISSION] != null) {
+                permissionCallbacks[ALL_FILES_PERMISSION]!!.onPermissionGranted()
+                permissionCallbacks[ALL_FILES_PERMISSION] = null
+            }
+        }
     }
 
     companion object {
