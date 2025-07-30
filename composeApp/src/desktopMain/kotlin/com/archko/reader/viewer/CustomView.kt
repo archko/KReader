@@ -137,7 +137,7 @@ fun CustomView(
             createList(decoder!!)
         }
         // 工具栏显示状态
-        var showToolbar by remember { mutableStateOf(false) }
+        var showToolbar by remember { mutableStateOf(true) }
         // 大纲弹窗状态
         var showOutlineDialog by remember { mutableStateOf(false) }
         // 横竖切换、重排等按钮内部状态
