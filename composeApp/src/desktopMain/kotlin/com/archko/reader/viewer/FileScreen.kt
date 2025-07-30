@@ -2,13 +2,39 @@ package com.archko.reader.viewer
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,7 +47,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
-import com.archko.reader.pdf.state.LocalPdfState
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
@@ -34,7 +59,6 @@ import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
 data class OpenDocRequest(val path: String, val page: Int?)
@@ -83,7 +107,8 @@ fun FileScreen(
                                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                                     viewModel.getProgress(file.file.absolutePath)
                                     val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                    openDocRequest = OpenDocRequest(file.file.absolutePath, startPage)
+                                    openDocRequest =
+                                        OpenDocRequest(file.file.absolutePath, startPage)
                                 }
                             }
                         }
@@ -110,7 +135,7 @@ fun FileScreen(
 
                     if (recentList.isNotEmpty()) {
                         val gridState = rememberLazyGridState()
-                        
+
                         // 监听滚动到底部自动加载更多
                         LaunchedEffect(gridState) {
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo }
@@ -118,7 +143,7 @@ fun FileScreen(
                                     if (visibleItems.isNotEmpty()) {
                                         val lastVisibleItem = visibleItems.last()
                                         val totalItems = recentList.size
-                                        
+
                                         // 当滚动到最后几个项目时，自动加载更多
                                         if (lastVisibleItem.index >= totalItems - 3 && hasMoreData && !isLoading) {
                                             viewModel.loadMoreRecents()
@@ -126,7 +151,7 @@ fun FileScreen(
                                     }
                                 }
                         }
-                        
+
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.Adaptive(180.dp),
@@ -149,7 +174,8 @@ fun FileScreen(
                                         val page = it.page?.toInt()
                                         scope.launch {
                                             viewModel.getProgress(file.file.absolutePath)
-                                            openDocRequest = OpenDocRequest(file.file.absolutePath, page)
+                                            openDocRequest =
+                                                OpenDocRequest(file.file.absolutePath, page)
                                         }
                                     },
                                     onDelete = {
@@ -266,29 +292,30 @@ private fun RecentItem(
                     Image(
                         painter = painterResource(Res.drawable.components_thumbnail_corner),
                         contentDescription = null,
-                    modifier = Modifier
+                        modifier = Modifier
                             .width(leftBorder)
                             .height(topBorder)
-                            .offset(x = 0.7.dp)
                     )
                     Image(
                         painter = painterResource(Res.drawable.components_thumbnail_top),
                         contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
                         modifier = Modifier
                             .width(itemWidth - leftBorder)
                             .height(topBorder)
-                        )
+                    )
                 }
                 // 左侧装饰条图片
                 Image(
                     painter = painterResource(Res.drawable.components_thumbnail_left),
                     contentDescription = null,
+                    contentScale = ContentScale.FillHeight,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .width(leftBorder)
                         .height(itemHeight - topBorder)
                         .offset(y = topBorder)
-                    )
+                )
                 // 封面图片
                 AsyncImage(
                     model = recent.path?.let {
@@ -301,9 +328,9 @@ private fun RecentItem(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .width(itemWidth - leftBorder)
+                        .width(itemWidth - leftBorder - 2.dp)
                         .height(itemHeight - topBorder)
-                        .offset(x = leftBorder - 1.dp, y = topBorder),
+                        .offset(x = leftBorder, y = topBorder),
                     alignment = Alignment.Center
                 )
                 // 页码进度
