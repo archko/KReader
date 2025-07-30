@@ -2,39 +2,13 @@ package com.archko.reader.viewer
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -55,10 +29,15 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.clear_history
 import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.delete_history
+import kreader.composeapp.generated.resources.load_more
+import kreader.composeapp.generated.resources.select_pdf
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
 data class OpenDocRequest(val path: String, val page: Int?)
@@ -86,7 +65,7 @@ fun FileScreen(
             modifier = modifier
                 .statusBarsPadding()
                 .fillMaxSize(),
-            color = Color(0xFFF5F5F5)
+            color = MaterialTheme.colorScheme.background
         ) {
             if (openDocRequest == null) {
                 onShowBottomBarChanged(true)
@@ -122,14 +101,14 @@ fun FileScreen(
                                 onClick = { viewModel.clear() },
                                 modifier = Modifier.align(Alignment.CenterStart)
                             ) {
-                                Text("Clear")
+                                Text(stringResource(Res.string.clear_history), color = MaterialTheme.colorScheme.onBackground)
                             }
                         }
                         Button(
                             onClick = pickerLauncher::launch,
                             modifier = Modifier.align(Alignment.Center)
                         ) {
-                            Text("Select PDF")
+                            Text(stringResource(Res.string.select_pdf), color = MaterialTheme.colorScheme.onBackground)
                         }
                     }
 
@@ -154,9 +133,9 @@ fun FileScreen(
 
                         LazyVerticalGrid(
                             state = gridState,
-                            columns = GridCells.Adaptive(180.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            columns = GridCells.Adaptive(160.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             // 顶部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -204,8 +183,8 @@ fun FileScreen(
                                                 modifier = Modifier.padding(horizontal = 16.dp)
                                             ) {
                                                 Text(
-                                                    text = "Load More",
-                                                    color = Color.Black
+                                                    text = stringResource(Res.string.load_more),
+                                                    color = MaterialTheme.colorScheme.onBackground
                                                 )
                                             }
                                         }
@@ -349,7 +328,7 @@ private fun RecentItem(
 
         Text(
             modifier = Modifier.padding(2.dp),
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             text = "${recent.path?.inferName()}",
             fontSize = 13.sp,
@@ -362,7 +341,7 @@ private fun RecentItem(
             onDismissRequest = { showMenu = false }
         ) {
             DropdownMenuItem(
-                text = { Text("删除历史记录") },
+                text = { Text(stringResource(Res.string.delete_history)) },
                 onClick = {
                     showMenu = false
                     onDelete(recent)

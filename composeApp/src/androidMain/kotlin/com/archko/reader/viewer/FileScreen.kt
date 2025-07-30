@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -133,7 +134,7 @@ fun FileScreen(
                                 onClick = { viewModel.clear() },
                                 modifier = Modifier.align(Alignment.CenterStart)
                             ) {
-                                Text(stringResource(Res.string.clear), color = MaterialTheme.colorScheme.onBackground)
+                                Text(stringResource(Res.string.clear_history), color = MaterialTheme.colorScheme.onBackground)
                             }
                         }
                         Button(
@@ -316,6 +317,7 @@ private fun RecentItem(
                     Image(
                         painter = painterResource(Res.drawable.components_thumbnail_top),
                         contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
                         modifier = Modifier
                             .width(itemWidth - leftBorder)
                             .height(topBorder)
@@ -325,6 +327,7 @@ private fun RecentItem(
                 Image(
                     painter = painterResource(Res.drawable.components_thumbnail_left),
                     contentDescription = null,
+                    contentScale = ContentScale.FillHeight,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .width(leftBorder)
