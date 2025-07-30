@@ -36,7 +36,7 @@ public class PdfViewState(
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     private var lastPageKeys: Set<String> = emptySet()
-    
+
     // 添加关闭标志
     private var isShutdown = false
 
@@ -80,16 +80,8 @@ public class PdfViewState(
     public fun shutdown() {
         isShutdown = true
         decodeScope.cancel()
-        
-        // 清理所有页面的缓存
-        pages.forEach { page ->
-            page.recycle()
-        }
-        
-        // 清理ImageCache
-        com.archko.reader.pdf.cache.ImageCache.clear()
     }
-    
+
     public fun isShutdown(): Boolean = isShutdown
 
     public fun invalidatePageSizes() {
@@ -176,7 +168,11 @@ public class PdfViewState(
         return list
     }
 
-    public fun updateViewSize(viewSize: IntSize, vZoom: Float, orientation: Int = this.orientation) {
+    public fun updateViewSize(
+        viewSize: IntSize,
+        vZoom: Float,
+        orientation: Int = this.orientation
+    ) {
         val isViewSizeChanged = this.viewSize != viewSize
         val isZoomChanged = this.vZoom != vZoom
         val isOrientationChanged = this.orientation != orientation

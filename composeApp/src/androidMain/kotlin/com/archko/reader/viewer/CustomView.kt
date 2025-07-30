@@ -25,8 +25,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
-import com.archko.reader.pdf.component.MobileDocumentView
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -214,7 +214,7 @@ fun CustomView(
         ) {
             val context = LocalContext.current
             // 文档视图（最底层）
-            MobileDocumentView(
+            DocumentView(
                 list = list,
                 state = decoder!!,
                 jumpToPage = if (jumpToPage >= 0) jumpToPage else null,

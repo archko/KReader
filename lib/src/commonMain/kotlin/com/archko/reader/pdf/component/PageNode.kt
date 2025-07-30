@@ -42,11 +42,6 @@ public class PageNode(
     private var decodeJob: Job? = null
 
     public fun recycle() {
-        // 回收bitmap到缓存池
-        imageBitmap?.let { bitmap ->
-            // 从ImageCache中移除，这会触发bitmap回收
-            ImageCache.remove(cacheKey)
-        }
         imageBitmap = null
         // TODO: 如果有Bitmap缓存池，可以在这里回收bitmap
         isDecoding = false
@@ -155,6 +150,10 @@ public class PageNode(
                     }
                     if (pdfViewState.isShutdown()) {
                         println("[PageNode.decodeScope] page=解码后PdfViewState已关闭")
+                        isDecoding = false
+                        return@launch
+                    }
+                    if (!pdfViewState.isTileVisible(tileSpec)) {
                         isDecoding = false
                         return@launch
                     }

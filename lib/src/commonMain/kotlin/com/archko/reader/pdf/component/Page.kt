@@ -38,47 +38,25 @@ public class Page(
     private var thumbBitmap by mutableStateOf<ImageBitmap?>(null)
     private var thumbDecoding = false
     private var thumbJob: Job? = null
-    
-    // 缓存缩略图的cacheKey，避免重复计算
-    private var thumbCacheKey: String? = null
 
     public fun recycleThumb() {
-        // 回收缩略图bitmap到缓存池
-        thumbBitmap?.let { bitmap ->
-            val cacheKey = thumbCacheKey ?: run {
-                val w = (width / 3).toInt().coerceAtLeast(1)
-                val h = (height / 3).toInt().coerceAtLeast(1)
-                "thumb-${aPage.index}-${w}x${h}"
-            }
-            
-            // 直接从ImageCache中移除，这会触发bitmap回收
-            ImageCache.remove(cacheKey)
-        }
         thumbBitmap = null
         thumbDecoding = false
         thumbJob?.cancel()
         thumbJob = null
-        thumbCacheKey = null
     }
 
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {
         if (thumbDecoding) return
-
         val w = (width / 3).toInt().coerceAtLeast(1)
         val h = (height / 3).toInt().coerceAtLeast(1)
-        // 计算并缓存cacheKey
-        if (thumbCacheKey == null) {
-            thumbCacheKey = "thumb-${aPage.index}-${w}x${h}"
-        }
-        
-        val cacheKey = thumbCacheKey!!
+        val cacheKey = "thumb-${aPage.index}-${w}x${h}"
         val cached = ImageCache.get(cacheKey)
         if (cached != null) {
             thumbBitmap = cached
             return
         }
-        
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
             // 可见性判断（Page始终可见，或可加自定义判断）
@@ -189,10 +167,7 @@ public class Page(
     }
 
     public fun recycle() {
-        //println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
-        // 回收缩略图
-        recycleThumb()
-        // 回收所有节点
+        println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
         nodes.forEach { it.recycle() }
     }
 
