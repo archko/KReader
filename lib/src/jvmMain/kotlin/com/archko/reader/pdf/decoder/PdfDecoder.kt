@@ -168,46 +168,6 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return document.loadOutlineItems()
     }
 
-    public fun renderPage(
-        index: Int,
-        viewWidth: Int,
-        viewHeight: Int
-    ): ImageBitmap {
-        val page = document.loadPage(index)
-        val bounds = page.bounds
-        val scale: Float
-        if (viewWidth > 0) {
-            scale = (1f * viewWidth / (bounds.x1 - bounds.x0))
-        } else {
-            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
-        }
-        println("renderPage:index:$index, scale:$scale, $viewWidth-$viewHeight, bounds:${page.bounds}")
-        val ctm: Matrix = Matrix.Scale(scale)
-
-        /* Render page to an RGB pixmap without transparency. */
-        val bmp: ImageBitmap?
-        try {
-            val bbox: Rect = Rect(bounds).transform(ctm)
-            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
-            pixmap.clear(255)
-            val dev = DrawDevice(pixmap)
-            page.run(dev, ctm, Cookie())
-            dev.close()
-            dev.destroy()
-
-            val pixmapWidth = pixmap.width
-            val pixmapHeight = pixmap.height
-            val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
-            image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-            bmp = image.toComposeImageBitmap()
-            return (bmp)
-        } catch (e: Exception) {
-            System.err.println(("Error loading page " + (index + 1)) + ": " + e)
-        }
-
-        return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
-    }
-
     public override fun renderPageRegion(
         region: androidx.compose.ui.geometry.Rect,
         index: Int,

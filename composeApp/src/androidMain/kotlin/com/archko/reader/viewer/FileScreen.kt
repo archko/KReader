@@ -15,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -258,7 +257,8 @@ fun FileScreen(
                     },
                     initialScrollX = viewModel.progress?.scrollX ?: 0L,
                     initialScrollY = viewModel.progress?.scrollY ?: 0L,
-                    initialZoom = viewModel.progress?.zoom ?: 1.0
+                    initialZoom = viewModel.progress?.zoom ?: 1.0,
+                    scrollOri = viewModel.progress?.scrollOri ?: 0
                 )
             }
         }

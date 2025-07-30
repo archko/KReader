@@ -5,23 +5,10 @@ import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -88,7 +75,7 @@ public fun DocumentView(
     // 标记是否已经应用了初始偏移量
     var hasAppliedInitialOffset by remember { mutableStateOf(false) }
 
-    val pdfViewState = remember(list, orientation) {
+    val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PdfViewState(list, state, orientation)
     }
@@ -97,7 +84,6 @@ public fun DocumentView(
     LaunchedEffect(list, orientation) {
         if (viewSize != IntSize.Zero) {
             println("DocumentView: 更新ViewSize:$viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-            // 当orientation改变时，重置offset和zoom
             if (orientation != lastOrientation) {
                 println("DocumentView: orientation改变，重置offset和zoom: $lastOrientation -> $orientation")
                 offset = Offset.Zero
@@ -105,6 +91,7 @@ public fun DocumentView(
                 lastOrientation = orientation
                 // 重置初始偏移量应用标志，允许在新的orientation下重新应用
                 hasAppliedInitialOffset = false
+                //jumpToPage = firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
             }
             pdfViewState.updateViewSize(viewSize, vZoom, orientation)
         }
@@ -184,25 +171,7 @@ public fun DocumentView(
 
     // 监听页面变化并回调
     LaunchedEffect(offset, viewSize, orientation) {
-        val pages = pdfViewState.pages
-        if (pages.isNotEmpty()) {
-            val offsetY = offset.y
-            val offsetX = offset.x
-            val firstVisible = pages.indexOfFirst { page ->
-                if (orientation == Vertical) {
-                    val top = -offsetY
-                    val bottom = top + viewSize.height
-                    page.bounds.bottom > top && page.bounds.top < bottom
-                } else {
-                    val left = -offsetX
-                    val right = left + viewSize.width
-                    page.bounds.right > left && page.bounds.left < right
-                }
-            }
-            if (firstVisible != -1) {
-                onPageChanged?.invoke(firstVisible)
-            }
-        }
+        firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
     }
 
     DisposableEffect(Unit) {
@@ -532,6 +501,36 @@ public fun DocumentView(
             }
         }
     }
+}
+
+private fun firstPage(
+    pdfViewState: PdfViewState,
+    offset: Offset,
+    orientation: Int,
+    viewSize: IntSize,
+    onPageChanged: ((Int) -> Unit)?
+): Int {
+    var firstVisible = 0
+    val pages = pdfViewState.pages
+    if (pages.isNotEmpty()) {
+        val offsetY = offset.y
+        val offsetX = offset.x
+        firstVisible = pages.indexOfFirst { page ->
+            if (orientation == Vertical) {
+                val top = -offsetY
+                val bottom = top + viewSize.height
+                page.bounds.bottom > top && page.bounds.top < bottom
+            } else {
+                val left = -offsetX
+                val right = left + viewSize.width
+                page.bounds.right > left && page.bounds.left < right
+            }
+        }
+        if (firstVisible != -1) {
+            onPageChanged?.invoke(firstVisible)
+        }
+    }
+    return firstVisible
 }
 
 /**

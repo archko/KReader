@@ -166,10 +166,10 @@ public class PdfViewModel : ViewModel() {
                     System.currentTimeMillis(),
                     1,
                     crop,
-                    scrollX,
+                    scrollOri,
                     zoom,
+                    scrollX,
                     scrollY,
-                    scrollOri
                 )
                 database?.recentDao()?.addRecent(newProgress)
                 progress = database?.recentDao()?.getRecent(path!!)

@@ -50,11 +50,12 @@ fun CustomView(
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
+    scrollOri: Long = 0,
 ) {
     // 在打开文档时隐藏状态栏
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
-    
+
     LaunchedEffect(Unit) {
         val activity = context as? ComponentActivity
         activity?.window?.let { window ->
@@ -86,7 +87,7 @@ fun CustomView(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
-    
+
     LaunchedEffect(path) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, $path")
@@ -192,7 +193,7 @@ fun CustomView(
         // 大纲列表滚动位置状态
         var outlineScrollPosition by remember { mutableIntStateOf(0) }
         // 横竖切换、重排等按钮内部状态
-        var isVertical by remember { mutableStateOf(true) }
+        var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
         var isReflow by remember { mutableStateOf(false) }
         // 当前页与总页数
         var currentPage by remember { mutableIntStateOf(0) }
@@ -203,7 +204,7 @@ fun CustomView(
         var isUserJump by remember { mutableStateOf(false) }
         // 大纲列表
         val outlineList = decoder?.outlineItems ?: emptyList()
-        
+
         // 获取字符串资源
         val currentPageString = stringResource(Res.string.current_page)
 
@@ -281,7 +282,9 @@ fun CustomView(
                         IconButton(onClick = { isVertical = !isVertical }) {
                             Icon(
                                 painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(Res.string.horizontal),
+                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                    Res.string.horizontal
+                                ),
                                 tint = Color.White
                             )
                         }

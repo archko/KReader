@@ -180,13 +180,12 @@ public class PdfViewState(
         this.viewSize = viewSize
         this.vZoom = vZoom
         if (isOrientationChanged) {
-            // 当方向改变时，更新orientation
             this.orientation = orientation
-            println("PdfViewState.updateViewSize: 方向改变 - $orientation")
+            this.vZoom = 1f
         }
 
         if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
-            println("PdfViewState.updateViewSize: 重新计算页面布局 - orientation: $orientation")
+            println("PdfViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
             invalidatePageSizes()
         } else {
             println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
