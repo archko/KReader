@@ -222,7 +222,7 @@
 //}
 //
 //@Composable
-//fun Dp.toIntPx(): Int {
+//private fun Dp.toIntPx(): Int {
 //    return with(LocalDensity.current) { this@toIntPx.roundToPx() }
 //}
 //
@@ -352,24 +352,24 @@
 //        val observer = LifecycleEventObserver { _, event ->
 //            //println("event:$event")
 //            if (event == Lifecycle.Event.ON_PAUSE) {
-//                viewModel.updateProgress(
+//                /*viewModel.updateProgress(
 //                    lazyListState.firstVisibleItemIndex.toLong(),
 //                    pdf.pageCount.toLong(),
 //                    1.0,
 //                    1
-//                )
+//                )*/
 //            }
 //        }
 //
 //        lifecycleOwner.lifecycle.addObserver(observer)
 //        onDispose {
 //            //println("onDispose")
-//            viewModel.updateProgress(
+//            /*viewModel.updateProgress(
 //                lazyListState.firstVisibleItemIndex.toLong(),
 //                pdf.pageCount.toLong(),
 //                1.0,
 //                1
-//            )
+//            )*/
 //            lifecycleOwner.lifecycle.removeObserver(observer)
 //            ImageCache.clear()
 //        }

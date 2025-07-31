@@ -228,7 +228,7 @@ fun FileScreen(
 }
 
 @Composable
-fun Dp.toIntPx(): Int {
+private fun Dp.toIntPx(): Int {
     return with(LocalDensity.current) { this@toIntPx.roundToPx() }
 }
 

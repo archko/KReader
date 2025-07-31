@@ -93,8 +93,8 @@ public class PdfViewState(
         } else {
             if (orientation == Vertical) {
                 var currentY = 0f
+                val scaledPageWidth = viewSize.width * vZoom
                 list.zip(pages).forEach { (aPage, page) ->
-                    val scaledPageWidth = viewSize.width * vZoom
                     val pageScale = scaledPageWidth / aPage.width
                     val scaledPageHeight = aPage.height * pageScale
                     val bounds = Rect(
@@ -112,8 +112,8 @@ public class PdfViewState(
                 totalWidth = viewSize.width * vZoom
             } else {
                 var currentX = 0f
+                val scaledPageHeight = viewSize.height * vZoom
                 list.zip(pages).forEach { (aPage, page) ->
-                    val scaledPageHeight = viewSize.height * vZoom
                     val pageScale = scaledPageHeight / aPage.height
                     val scaledPageWidth = aPage.width * pageScale
                     val bounds = Rect(

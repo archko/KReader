@@ -34,7 +34,7 @@ public class PageNode(
     }
 
     public val cacheKey: String
-        get() = "${aPage.index}-${bounds}-${pdfViewState.vZoom}"
+        get() = "${aPage.index}-${bounds}-${pdfViewState.vZoom}-${pdfViewState.orientation}"
 
     // 每个PageNode持有自己的图片state
     private var imageBitmap by mutableStateOf<ImageBitmap?>(null)

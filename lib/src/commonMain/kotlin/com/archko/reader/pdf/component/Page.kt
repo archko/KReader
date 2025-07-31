@@ -168,6 +168,7 @@ public class Page(
 
     public fun recycle() {
         println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
+        recycleThumb()
         nodes.forEach { it.recycle() }
     }
 
