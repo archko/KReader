@@ -83,6 +83,7 @@ public fun DocumentView(
     val density = LocalDensity.current
     val keepPx = with(density) { 6.dp.toPx() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
+    var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
@@ -102,6 +103,7 @@ public fun DocumentView(
         println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pdfViewState.init}")
 
         if (initialOrientation != orientation && pdfViewState.init) {
+            isJumping = true // 设置跳转标志
             val firstPageIndex =
                 firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
             println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$firstPageIndex")
@@ -137,8 +139,9 @@ public fun DocumentView(
                 println("DocumentView: orientation改变，跳转: $offset, $firstPageIndex, page:$page")
                 flingJob?.cancel()
                 pdfViewState.updateOffset(offset)
-                return@LaunchedEffect
             }
+            isJumping = false // 清除跳转标志
+            return@LaunchedEffect
         }
 
         // 只有在以下情况才执行页面跳转：
@@ -146,6 +149,7 @@ public fun DocumentView(
         // 2. PdfViewState已初始化
         // 3. 是用户主动跳转（如进度条拖动）或者没有初始偏移量
         if (null != jumpToPage && toPage != jumpToPage && pdfViewState.init) {
+            isJumping = true // 设置跳转标志
             toPage = jumpToPage
             val page = pdfViewState.pages.getOrNull(toPage)
             println("DocumentView: 执行跳转到第${jumpToPage}页, offset:$offset, page:$page")
@@ -176,12 +180,16 @@ public fun DocumentView(
                 flingJob?.cancel()
                 pdfViewState.updateOffset(offset)
             }
+            isJumping = false // 清除跳转标志
         }
     }
 
     // 监听页面变化并回调
     LaunchedEffect(offset) {
-        firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
+        // 只有在非跳转状态下才处理页面变化回调
+        if (!isJumping) {
+            firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
+        }
     }
 
     DisposableEffect(Unit) {
