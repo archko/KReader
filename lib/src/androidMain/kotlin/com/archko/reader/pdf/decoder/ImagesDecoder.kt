@@ -1,16 +1,14 @@
 package com.archko.reader.pdf.decoder
 
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
-import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
+import com.archko.reader.pdf.entity.Item
 import java.io.File
 import java.io.FileInputStream
 
@@ -27,22 +25,10 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
     // 对外提供的缩放后页面尺寸
     public override var pageSizes: List<Size> = listOf()
-        get() = field
-        set(value) {
-            field = value
-        }
 
     public override var outlineItems: List<Item>? = emptyList()
-        get() = field
-        set(value) {
-            field = value
-        }
 
     public override var imageSize: IntSize = IntSize.Zero
-        get() = field
-        set(value) {
-            field = value
-        }
 
     public var viewSize: IntSize = IntSize.Zero
     
@@ -142,44 +128,6 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         return list
     }
 
-    public fun renderPage(
-        index: Int,
-        viewWidth: Int,
-        viewHeight: Int
-    ): ImageBitmap {
-        if (viewWidth <= 0 || index >= files.size) {
-            return ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565)
-        }
-        
-        val file = files[index]
-        val originalSize = originalPageSizes[index]
-        val scale = 1f * viewWidth / originalSize.width
-        
-        return try {
-            // 使用BitmapRegionDecoder解码整个图片
-            val regionDecoder = getRegionDecoder(index)
-            if (regionDecoder != null) {
-                // 解码整个图片区域
-                val fullRegion = android.graphics.Rect(0, 0, regionDecoder.width, regionDecoder.height)
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = calculateInSampleSize(file, viewWidth, viewHeight)
-                }
-                
-                val bitmap = regionDecoder.decodeRegion(fullRegion, options)
-                println("ImagesDecoder.renderPage - 整张图片解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 目标=${viewWidth}x${viewHeight}, 缩放=$scale, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
-                bitmap.asImageBitmap()
-            } else {
-                // 回退到传统方式
-                val bitmap = loadAndScaleBitmap(file, scale, viewWidth, viewHeight)
-                println("ImagesDecoder.renderPage - 传统方式解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 目标=${viewWidth}x${viewHeight}, 缩放=$scale, 结果=${bitmap.width}x${bitmap.height}")
-                bitmap.asImageBitmap()
-            }
-        } catch (e: Exception) {
-            println("renderPage error for file ${file.absolutePath}: $e")
-            ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565)
-        }
-    }
-
     public override fun renderPageRegion(
         region: androidx.compose.ui.geometry.Rect,
         index: Int,
@@ -260,20 +208,6 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-    }
-
-    /**
-     * 加载图片
-     */
-    private fun loadAndScaleBitmap(file: File, scale: Float, targetWidth: Int, targetHeight: Int): Bitmap {
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = calculateInSampleSize(file, targetWidth, targetHeight)
-        }
-        
-        val originalBitmap = BitmapFactory.decodeFile(file.absolutePath, options)
-            ?: throw RuntimeException("无法解码图片文件: ${file.absolutePath}")
-        
-        return originalBitmap
     }
 
     /**

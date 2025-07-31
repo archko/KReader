@@ -1,15 +1,14 @@
 package com.archko.reader.pdf.decoder
 
 import android.graphics.Bitmap
-import android.graphics.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
-import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
+import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -30,22 +29,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     // 对外提供的缩放后页面尺寸
     public override var pageSizes: List<Size> = listOf()
-        get() = field
-        set(value) {
-            field = value
-        }
 
     public override var outlineItems: List<Item>? = listOf()
-        get() = field
-        set(value) {
-            field = value
-        }
 
     public override var imageSize: IntSize = IntSize.Zero
-        get() = field
-        set(value) {
-            field = value
-        }
 
     public var viewSize: IntSize = IntSize.Zero
 
@@ -168,8 +155,8 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val page = document.loadPage(index)
         val bounds = page.bounds
         val scale = (1f * viewWidth / (bounds.x1 - bounds.x0))
-        var w = viewWidth
-        var h = ((bounds.y1 - bounds.y0) * scale).toInt()
+        val w = viewWidth
+        val h = ((bounds.y1 - bounds.y0) * scale).toInt()
 
         println("renderPage:index:$index, scale:$scale, $viewWidth-$viewHeight, bounds:${page.bounds}")
         val ctm = Matrix()
