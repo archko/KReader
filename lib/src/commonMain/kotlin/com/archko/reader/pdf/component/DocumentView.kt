@@ -112,8 +112,30 @@ public fun DocumentView(
 
             //如果方向变化,不需要通过页码定位,通过偏移量就行.
             if (firstPageIndex < pdfViewState.pages.size - 1) {
-                val firstPage = pdfViewState.pages.get(firstPageIndex)
-                offset = Offset(firstPage.xOffset, firstPage.yOffset)
+                val page = pdfViewState.pages.get(firstPageIndex)
+                if (orientation == Vertical) {
+                    val targetOffsetY = when (align) {
+                        PdfViewState.Align.Top -> page.bounds.top
+                        PdfViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
+                        PdfViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
+                    }
+                    val maxOffsetY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
+                    val clampedY = -clampedTargetY
+                    offset = Offset(offset.x, clampedY)
+                } else {
+                    val targetOffsetX = when (align) {
+                        PdfViewState.Align.Top -> page.bounds.left
+                        PdfViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
+                        PdfViewState.Align.Bottom -> page.bounds.right - viewSize.width
+                    }
+                    val maxOffsetX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
+                    val clampedX = -clampedTargetX
+                    offset = Offset(clampedX, offset.y)
+                }
+                println("DocumentView: orientation改变，跳转: $offset, $firstPageIndex, page:$page")
+                flingJob?.cancel()
                 pdfViewState.updateOffset(offset)
                 return@LaunchedEffect
             }
@@ -151,6 +173,7 @@ public fun DocumentView(
                 }
                 // 同步到PdfViewState
                 println("DocumentView: 执行跳转到:$offset, top:${page.bounds.top}, toPage:$toPage")
+                flingJob?.cancel()
                 pdfViewState.updateOffset(offset)
             }
         }
