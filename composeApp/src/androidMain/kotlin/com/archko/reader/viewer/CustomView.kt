@@ -63,7 +63,8 @@ fun CustomView(
             WindowCompat.getInsetsController(window, window.decorView).apply {
                 hide(WindowInsetsCompat.Type.statusBars())
                 hide(WindowInsetsCompat.Type.navigationBars())
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
     }
@@ -195,13 +196,14 @@ fun CustomView(
         // 横竖切换、重排等按钮内部状态
         var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
         var isReflow by remember { mutableStateOf(false) }
+
+        // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
+        val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
         // 当前页与总页数
         var currentPage by remember { mutableIntStateOf(0) }
         val pageCount: Int = list.size
         // 跳转页面状态
         var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
-        // 标记是否为用户主动跳转
-        var isUserJump by remember { mutableStateOf(false) }
         // 大纲列表
         val outlineList = decoder?.outlineItems ?: emptyList()
 
@@ -218,9 +220,9 @@ fun CustomView(
             DocumentView(
                 list = list,
                 state = decoder!!,
-                jumpToPage = if (jumpToPage >= 0) jumpToPage else null,
-                orientation = if (isVertical) Vertical else Horizontal,
-                onDocumentClosed = if (decoder != null && list.isNotEmpty()) onDocumentClosed else null,
+                jumpToPage = jumpToPage,
+                initialOrientation = orientation,
+                onDocumentClosed = if (list.isNotEmpty()) onDocumentClosed else null,
                 onDoubleTapToolbar = { showToolbar = !showToolbar },
                 onPageChanged = { page -> currentPage = page },
                 onTapNonPageArea = { clickedPageIndex ->
@@ -234,18 +236,7 @@ fun CustomView(
                 initialScrollX = initialScrollX,
                 initialScrollY = initialScrollY,
                 initialZoom = initialZoom,
-                isUserJump = isUserJump // 使用内部状态
             )
-
-            // 重置跳转页面状态 - 延迟重置，确保DocumentView能接收到跳转指令
-            LaunchedEffect(jumpToPage) {
-                if (jumpToPage >= 0) {
-                    println("CustomView: 设置跳转到第 $jumpToPage 页, isUserJump: $isUserJump")
-                    jumpToPage = -1
-                    // 重置用户跳转标志
-                    isUserJump = false
-                }
-            }
 
             AnimatedVisibility(
                 visible = showToolbar,
@@ -255,7 +246,6 @@ fun CustomView(
                     color = Color(0xCC222222),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
                 ) {
                     Row(
                         modifier = Modifier
@@ -315,8 +305,12 @@ fun CustomView(
 
             // 大纲弹窗（最上层）
             if (showOutlineDialog) {
-                Dialog(onDismissRequest = { showOutlineDialog = false }) {
+                Dialog(onDismissRequest = {
+                    showOutlineDialog = false
+                }) {
                     val hasOutline = outlineList.isNotEmpty()
+                    val lazyListState =
+                        rememberLazyListState(initialFirstVisibleItemIndex = outlineScrollPosition)
                     Surface(
                         modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
                         color = Color.White.copy(alpha = 0.8f),
@@ -325,6 +319,7 @@ fun CustomView(
                         Column(
                             modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize()
                         ) {
+
                             Box(
                                 Modifier.fillMaxWidth(),
                                 contentAlignment = Alignment.CenterStart
@@ -333,7 +328,11 @@ fun CustomView(
                                     Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(onClick = { showOutlineDialog = false }) {
+                                    IconButton(onClick = {
+                                        // 关闭弹窗时记录当前滚动位置
+                                        outlineScrollPosition = lazyListState.firstVisibleItemIndex
+                                        showOutlineDialog = false
+                                    }) {
                                         Icon(
                                             painter = painterResource(Res.drawable.ic_back),
                                             contentDescription = stringResource(Res.string.back),
@@ -361,12 +360,12 @@ fun CustomView(
                                     Text(stringResource(Res.string.no_outline), color = Color.Gray)
                                 }
                             } else {
-                                val lazyListState =
-                                    rememberLazyListState(initialFirstVisibleItemIndex = outlineScrollPosition)
-
-                                // 监听滚动位置变化并保存
-                                LaunchedEffect(lazyListState.firstVisibleItemIndex) {
-                                    outlineScrollPosition = lazyListState.firstVisibleItemIndex
+                                // 在弹窗关闭时记录滚动位置
+                                LaunchedEffect(showOutlineDialog) {
+                                    if (!showOutlineDialog) {
+                                        // 弹窗关闭时记录当前滚动位置
+                                        outlineScrollPosition = lazyListState.firstVisibleItemIndex
+                                    }
                                 }
 
                                 LazyColumn(
@@ -379,7 +378,9 @@ fun CustomView(
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     jumpToPage = item.page
-                                                    isUserJump = true // 大纲点击是用户主动跳转
+                                                    // 点击项目时记录当前滚动位置
+                                                    outlineScrollPosition =
+                                                        lazyListState.firstVisibleItemIndex
                                                     showOutlineDialog = false
                                                 }
                                                 .padding(vertical = 6.dp, horizontal = 16.dp),
@@ -394,7 +395,9 @@ fun CustomView(
                                             )
                                             Spacer(Modifier.weight(1f))
                                             Text(
-                                                text = stringResource(Res.string.page_number).format(item.page + 1),
+                                                text = stringResource(Res.string.page_number).format(
+                                                    item.page + 1
+                                                ),
                                                 color = Color.Gray,
                                                 fontSize = 12.sp
                                             )
@@ -416,7 +419,6 @@ fun CustomView(
                     color = Color(0xCC222222),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
                 ) {
                     var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
                     // 当currentPage变化时更新sliderValue
@@ -443,7 +445,6 @@ fun CustomView(
                                 val targetPage = sliderValue.toInt() - 1
                                 if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
                                     jumpToPage = targetPage
-                                    isUserJump = true // 进度条拖动是用户主动跳转
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
