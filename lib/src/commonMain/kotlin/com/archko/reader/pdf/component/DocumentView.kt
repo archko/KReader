@@ -34,11 +34,14 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -192,43 +195,53 @@ public fun DocumentView(
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            val pages = pdfViewState.pages
-            var currentPage = 0
-            if (pages.isNotEmpty()) {
-                val offsetY = offset.y
-                val offsetX = offset.x
-                val firstVisible = pages.indexOfFirst { page ->
-                    if (orientation == Vertical) {
-                        val top = -offsetY
-                        val bottom = top + viewSize.height
-                        page.bounds.bottom > top && page.bounds.top < bottom
-                    } else {
-                        val left = -offsetX
-                        val right = left + viewSize.width
-                        page.bounds.right > left && page.bounds.left < right
+    // 获取生命周期所有者
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 监听生命周期事件，在onPause时保存记录
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                val pages = pdfViewState.pages
+                var currentPage = 0
+                if (pages.isNotEmpty()) {
+                    val offsetY = offset.y
+                    val offsetX = offset.x
+                    val firstVisible = pages.indexOfFirst { page ->
+                        if (orientation == Vertical) {
+                            val top = -offsetY
+                            val bottom = top + viewSize.height
+                            page.bounds.bottom > top && page.bounds.top < bottom
+                        } else {
+                            val left = -offsetX
+                            val right = left + viewSize.width
+                            page.bounds.right > left && page.bounds.left < right
+                        }
+                    }
+                    if (firstVisible != -1) {
+                        currentPage = firstVisible
                     }
                 }
-                if (firstVisible != -1) {
-                    currentPage = firstVisible
+                val pageCount = list.size
+                val zoom = vZoom.toDouble()
+                println("DocumentView: onPause保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
+
+                if (!list.isEmpty()) {
+                    onDocumentClosed?.invoke(
+                        currentPage,
+                        pageCount,
+                        zoom,
+                        offset.x.toLong(),
+                        offset.y.toLong(),
+                        orientation.toLong()
+                    )
                 }
             }
-            val pageCount = list.size
-            val zoom = vZoom.toDouble()
-            println("DocumentView: shutdown:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $initialOrientation")
+        }
 
-            if (!list.isEmpty()) {
-                onDocumentClosed?.invoke(
-                    currentPage,
-                    pageCount,
-                    zoom,
-                    offset.x.toLong(),
-                    offset.y.toLong(),
-                    orientation.toLong()
-                )
-            }
-
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             pdfViewState.shutdown()
             ImageCache.clear()
         }

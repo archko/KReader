@@ -122,16 +122,6 @@ public class PdfDecoder(file: File) : ImageDecoder {
         }
     }
 
-    public fun getSize(viewportSize: IntSize): IntSize {
-        if ((imageSize == IntSize.Zero || viewSize != viewportSize)
-            && viewportSize.width > 0 && viewportSize.height > 0
-        ) {
-            viewSize = viewportSize
-            caculateSize(viewportSize)
-        }
-        return imageSize
-    }
-
     /**
      * 获取原始页面尺寸
      */

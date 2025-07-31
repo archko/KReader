@@ -28,9 +28,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
+import com.archko.reader.pdf.decoder.ImagesDecoder
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.util.FileTypeUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
@@ -43,7 +45,7 @@ import java.io.File
  */
 @Composable
 fun CustomView(
-    path: String,
+    paths: List<String>,
     progressPage: Int? = null,
     onDocumentClosed: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -89,31 +91,47 @@ fun CustomView(
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(path) {
+    // 多文件支持
+    val currentPath = paths.getOrNull(0) ?: paths.first()
+
+    LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
-            println("init:$viewportSize, $path")
+            println("init:$viewportSize, $currentPath")
             try {
-                val pdfDecoder = if (viewportSize == IntSize.Zero) {
+                val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                     null
                 } else {
-                    PdfDecoder(File(path))
+                    if (paths.size > 1) {
+                        // 多文件模式：创建ImagesDecoder
+                        val files = paths.map { File(it) }
+                        ImagesDecoder(files)
+                    } else {
+                        // 单文件模式：检查文件类型
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            // 文档文件：创建PdfDecoder
+                            PdfDecoder(File(currentPath))
+                        } else {
+                            // 图片文件：创建ImagesDecoder（单文件图片也使用ImagesDecoder）
+                            ImagesDecoder(listOf(File(currentPath)))
+                        }
+                    }
                 }
-                if (pdfDecoder != null) {
-                    pdfDecoder.getSize(viewportSize)
-                    println("init.size:${pdfDecoder.imageSize.width}-${pdfDecoder.imageSize.height}")
-                    decoder = pdfDecoder
+                if (newDecoder != null) {
+                    newDecoder.size(viewportSize)
+                    println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
+                    decoder = newDecoder
                     loadingError = null // 清除之前的错误
                 }
             } catch (e: Exception) {
-                println("文档加载失败: $path, 错误: ${e.message}")
+                println("文档加载失败: $currentPath, 错误: ${e.message}")
                 loadingError = "document_open_failed"
                 decoder = null
             }
         }
     }
-    DisposableEffect(path) {
+    DisposableEffect(currentPath) {
         onDispose {
-            println("onDispose:$path, $decoder")
+            println("onDispose:$currentPath, $decoder")
             decoder?.close()
         }
     }
@@ -143,7 +161,7 @@ fun CustomView(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = path,
+                        text = currentPath,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -255,8 +273,11 @@ fun CustomView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
-                            // 只有在文档加载成功时才保存进度
-                            if (decoder != null && list.isNotEmpty()) {
+                            // 只有在文档加载成功且应该保存进度时才保存
+                            val shouldSaveProgress = decoder != null && list.isNotEmpty() &&
+                                    FileTypeUtils.shouldSaveProgress(paths)
+
+                            if (shouldSaveProgress) {
                                 onDocumentClosed?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
                             }
                             // 然后关闭文档
@@ -278,12 +299,15 @@ fun CustomView(
                                 tint = Color.White
                             )
                         }
-                        IconButton(onClick = { showOutlineDialog = true }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_toc),
-                                contentDescription = stringResource(Res.string.outline),
-                                tint = Color.White
-                            )
+                        // 只有单文档文件才显示大纲按钮
+                        if (FileTypeUtils.shouldShowOutline(paths)) {
+                            IconButton(onClick = { showOutlineDialog = true }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_toc),
+                                    contentDescription = stringResource(Res.string.outline),
+                                    tint = Color.White
+                                )
+                            }
                         }
                         IconButton(onClick = { isReflow = !isReflow }) {
                             Icon(
@@ -303,8 +327,8 @@ fun CustomView(
                 }
             }
 
-            // 大纲弹窗（最上层）
-            if (showOutlineDialog) {
+            // 大纲弹窗（最上层）- 只有单文档文件才显示
+            if (showOutlineDialog && FileTypeUtils.shouldShowOutline(paths)) {
                 Dialog(onDismissRequest = {
                     showOutlineDialog = false
                 }) {

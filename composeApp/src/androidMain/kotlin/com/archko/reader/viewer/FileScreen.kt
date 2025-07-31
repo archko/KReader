@@ -28,6 +28,7 @@ import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -41,7 +42,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
-data class OpenDocRequest(val path: String, val page: Int?)
+data class OpenDocRequest(val paths: List<String>, val page: Int?)
 
 @Composable
 fun FileScreen(
@@ -69,9 +70,14 @@ fun FileScreen(
                 scope.launch {
                     val file = File(path)
                     if (file.exists()) {
-                        viewModel.getProgress(file.absolutePath)
-                        val startPage = viewModel.progress?.page?.toInt() ?: 0
-                        openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                        val paths = listOf(file.absolutePath)
+                        if (FileTypeUtils.shouldSaveProgress(paths)) {
+                            viewModel.getProgress(file.absolutePath)
+                            val startPage = viewModel.progress?.page?.toInt() ?: 0
+                            openDocRequest = OpenDocRequest(paths, startPage)
+                        } else {
+                            openDocRequest = OpenDocRequest(paths, 0)
+                        }
                     }
                 }
             }
@@ -110,16 +116,48 @@ fun FileScreen(
                 ) {
                     val pickerLauncher = rememberFilePickerLauncher(
                         type = FilePickerFileType.All,
-                        selectionMode = FilePickerSelectionMode.Single
+                        selectionMode = FilePickerSelectionMode.Multiple
                     ) { files ->
                         scope.launch {
-                            files.singleOrNull()?.let { kmpFile ->
-                                val path = IntentFile.getPath(PdfApp.app!!, kmpFile.uri) ?: kmpFile.uri.toString()
-                                val file = File(path)
-                                if (file.exists()) {
-                                    viewModel.getProgress(file.absolutePath)
-                                    val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                    openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                            if (files.isNotEmpty()) {
+                                val firstFile = files.first()
+                                val firstPath =
+                                    IntentFile.getPath(PdfApp.app!!, firstFile.uri) ?: firstFile.uri.toString()
+                                val firstFileObj = File(firstPath)
+
+                                if (firstFileObj.exists()) {
+                                    val isFirstImage = FileTypeUtils.isImageFile(firstPath)
+                                    val isFirstDocument = FileTypeUtils.isDocumentFile(firstPath)
+
+                                    val filteredPaths = if (isFirstImage) {
+                                        // 如果是图片，过滤出所有图片文件并限制大小
+                                        val imageFiles = files.mapNotNull { kmpFile ->
+                                            val path =
+                                                IntentFile.getPath(PdfApp.app!!, kmpFile.uri) ?: kmpFile.uri.toString()
+                                            val file = File(path)
+                                            if (file.exists() && FileTypeUtils.isImageFile(path)) {
+                                                file
+                                            } else null
+                                        }
+                                        // 过滤掉大于10MB的文件
+                                        FileTypeUtils.filterFilesBySize(imageFiles, 10).map { it.absolutePath }
+                                    } else if (isFirstDocument) {
+                                        // 如果是文档文件，只取第一个
+                                        listOf(firstPath)
+                                    } else {
+                                        // 其他类型文件，只取第一个
+                                        listOf(firstPath)
+                                    }
+
+                                    if (filteredPaths.isNotEmpty()) {
+                                        if (FileTypeUtils.shouldSaveProgress(filteredPaths)) {
+                                            viewModel.getProgress(filteredPaths.first())
+                                            val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                            openDocRequest = OpenDocRequest(filteredPaths, startPage)
+                                        } else {
+                                            openDocRequest = OpenDocRequest(filteredPaths, 0)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -131,22 +169,30 @@ fun FileScreen(
                         if (recentList.isNotEmpty()) {
                             Button(
                                 onClick = { viewModel.clear() },
-                                modifier = Modifier.align(Alignment.CenterStart)
+                                modifier = Modifier.align(Alignment.CenterStart),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
                             ) {
-                                Text(stringResource(Res.string.clear_history), color = MaterialTheme.colorScheme.onBackground)
+                                Text(stringResource(Res.string.clear_history))
                             }
                         }
                         Button(
                             onClick = pickerLauncher::launch,
-                            modifier = Modifier.align(Alignment.Center)
+                            modifier = Modifier.align(Alignment.Center),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
-                            Text(stringResource(Res.string.select_pdf), color = MaterialTheme.colorScheme.onBackground)
+                            Text(stringResource(Res.string.select_pdf))
                         }
                     }
 
                     if (recentList.isNotEmpty()) {
                         val gridState = rememberLazyGridState()
-                        
+
                         // 监听滚动到底部自动加载更多
                         LaunchedEffect(gridState) {
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo }
@@ -154,7 +200,7 @@ fun FileScreen(
                                     if (visibleItems.isNotEmpty()) {
                                         val lastVisibleItem = visibleItems.last()
                                         val totalItems = recentList.size
-                                        
+
                                         // 当滚动到最后几个项目时，自动加载更多
                                         if (lastVisibleItem.index >= totalItems - 3 && hasMoreData && !isLoading) {
                                             viewModel.loadMoreRecents()
@@ -162,7 +208,7 @@ fun FileScreen(
                                     }
                                 }
                         }
-                        
+
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.Adaptive(100.dp),
@@ -188,9 +234,14 @@ fun FileScreen(
                                         val file = File(path)
                                         if (file.exists()) {
                                             scope.launch {
-                                                viewModel.getProgress(file.absolutePath)
-                                                val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                                openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                                                val paths = listOf(file.absolutePath)
+                                                if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                                    viewModel.getProgress(file.absolutePath)
+                                                    val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                                    openDocRequest = OpenDocRequest(paths, startPage)
+                                                } else {
+                                                    openDocRequest = OpenDocRequest(paths, 0)
+                                                }
                                             }
                                         }
                                     },
@@ -239,7 +290,7 @@ fun FileScreen(
             } else {
                 onShowBottomBarChanged(false)
                 CustomView(
-                    path = openDocRequest!!.path,
+                    paths = openDocRequest!!.paths,
                     progressPage = openDocRequest!!.page,
                     onDocumentClosed = { page, pageCount, zoom, scrollX, scrollY, scrollOri ->
                         viewModel.updateProgress(
