@@ -243,7 +243,11 @@ fun CustomView(
                     decoder = decoder!!,
                     pageCount = pageCount,
                     onPageChanged = { page -> currentPage = page },
-                    jumpToPage = jumpToPage
+                    jumpToPage = jumpToPage,
+                    initialScrollX = initialScrollX,
+                    initialScrollY = initialScrollY,
+                    initialZoom = initialZoom,
+                    initialOrientation = orientation,
                 )
             } else {
                 // 文档视图（最底层）
