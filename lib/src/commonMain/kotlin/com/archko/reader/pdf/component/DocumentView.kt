@@ -198,50 +198,57 @@ public fun DocumentView(
     // 获取生命周期所有者
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // 保存文档状态的公共方法
+    fun saveDocumentState() {
+        val pages = pdfViewState.pages
+        var currentPage = 0
+        if (pages.isNotEmpty()) {
+            val offsetY = offset.y
+            val offsetX = offset.x
+            val firstVisible = pages.indexOfFirst { page ->
+                if (orientation == Vertical) {
+                    val top = -offsetY
+                    val bottom = top + viewSize.height
+                    page.bounds.bottom > top && page.bounds.top < bottom
+                } else {
+                    val left = -offsetX
+                    val right = left + viewSize.width
+                    page.bounds.right > left && page.bounds.left < right
+                }
+            }
+            if (firstVisible != -1) {
+                currentPage = firstVisible
+            }
+        }
+        val pageCount = list.size
+        val zoom = vZoom.toDouble()
+        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
+
+        if (!list.isEmpty()) {
+            onDocumentClosed?.invoke(
+                currentPage,
+                pageCount,
+                zoom,
+                offset.x.toLong(),
+                offset.y.toLong(),
+                orientation.toLong()
+            )
+        }
+    }
+
     // 监听生命周期事件，在onPause时保存记录
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
-                val pages = pdfViewState.pages
-                var currentPage = 0
-                if (pages.isNotEmpty()) {
-                    val offsetY = offset.y
-                    val offsetX = offset.x
-                    val firstVisible = pages.indexOfFirst { page ->
-                        if (orientation == Vertical) {
-                            val top = -offsetY
-                            val bottom = top + viewSize.height
-                            page.bounds.bottom > top && page.bounds.top < bottom
-                        } else {
-                            val left = -offsetX
-                            val right = left + viewSize.width
-                            page.bounds.right > left && page.bounds.left < right
-                        }
-                    }
-                    if (firstVisible != -1) {
-                        currentPage = firstVisible
-                    }
-                }
-                val pageCount = list.size
-                val zoom = vZoom.toDouble()
-                println("DocumentView: onPause保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-
-                if (!list.isEmpty()) {
-                    onDocumentClosed?.invoke(
-                        currentPage,
-                        pageCount,
-                        zoom,
-                        offset.x.toLong(),
-                        offset.y.toLong(),
-                        orientation.toLong()
-                    )
-                }
+                saveDocumentState()
             }
         }
 
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            // 在组件销毁时也保存一次状态
+            saveDocumentState()
             pdfViewState.shutdown()
             ImageCache.clear()
         }
