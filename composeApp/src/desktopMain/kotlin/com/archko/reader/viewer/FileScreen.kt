@@ -204,7 +204,7 @@ fun FileScreen(
                 CustomView(
                     path = openDocRequest!!.path,
                     progressPage = openDocRequest!!.page,
-                    onDocumentClosed = { page, pageCount, zoom, scrollX, scrollY, scrollOri ->
+                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri ->
                         viewModel.updateProgress(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),

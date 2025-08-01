@@ -61,7 +61,8 @@ public fun DocumentView(
     jumpToPage: Int? = null,
     align: PdfViewState.Align = PdfViewState.Align.Top,
     initialOrientation: Int,
-    onDocumentClosed: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
+    onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
     onPageChanged: ((page: Int) -> Unit)? = null, // 新增页面变化回调
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null, // 新增：点击非翻页区域回调，传递页面索引
@@ -225,7 +226,7 @@ public fun DocumentView(
         println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
 
         if (!list.isEmpty()) {
-            onDocumentClosed?.invoke(
+            onSaveDocument?.invoke(
                 currentPage,
                 pageCount,
                 zoom,
@@ -249,6 +250,7 @@ public fun DocumentView(
             lifecycleOwner.lifecycle.removeObserver(observer)
             // 在组件销毁时也保存一次状态
             saveDocumentState()
+            onCloseDocument?.invoke()
             pdfViewState.shutdown()
             ImageCache.clear()
         }

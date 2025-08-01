@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -26,18 +27,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
-import java.io.File
-import androidx.compose.ui.text.style.TextAlign
 import org.jetbrains.compose.resources.stringResource
+import java.io.File
 
 /**
  * @author: archko 2025/7/23 :09:09
  */
 @Composable
 fun CustomView(
-    path: String, 
+    path: String,
     progressPage: Int? = null,
-    onDocumentClosed: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
+    onSaveDocument: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
@@ -46,7 +46,7 @@ fun CustomView(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
-    
+
     LaunchedEffect(path) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, $path")
@@ -164,7 +164,8 @@ fun CustomView(
                 state = decoder!!,
                 jumpToPage = if (jumpToPage >= 0) jumpToPage else null,
                 orientation = if (isVertical) Vertical else Horizontal,
-                onDocumentClosed = if (decoder != null && list.isNotEmpty()) onDocumentClosed else null,
+                onSaveDocument = if (decoder is PdfDecoder && list.isNotEmpty()) onSaveDocument else null,
+                onCloseDocument = onCloseDocument,
                 onDoubleTapToolbar = { showToolbar = !showToolbar },
                 onPageChanged = { page -> currentPage = page },
                 initialScrollX = initialScrollX,
@@ -237,7 +238,7 @@ fun CustomView(
                                 painter = painterResource(Res.drawable.ic_search),
                                 contentDescription = "搜索",
                                 tint = Color.White
-            )
+                            )
                         }
                     }
                 }
@@ -279,7 +280,10 @@ fun CustomView(
                             }
                             // 内容区充满剩余空间
                             if (!hasOutline) {
-                                Box(Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    Modifier.fillMaxWidth().height(250.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text("无大纲", color = Color.Gray)
                                 }
                             } else {

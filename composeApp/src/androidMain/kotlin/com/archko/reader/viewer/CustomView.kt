@@ -33,7 +33,6 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
-import com.archko.reader.viewer.ReflowView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
@@ -48,7 +47,7 @@ import java.io.File
 fun CustomView(
     paths: List<String>,
     progressPage: Int? = null,
-    onDocumentClosed: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
+    onSaveDocument: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
@@ -235,7 +234,7 @@ fun CustomView(
                 .onSizeChanged { viewportSize = it }
         ) {
             val context = LocalContext.current
-            
+
             // 根据reflow状态选择显示模式
             if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
                 // Reflow视图
@@ -256,7 +255,8 @@ fun CustomView(
                     state = decoder!!,
                     jumpToPage = jumpToPage,
                     initialOrientation = orientation,
-                    onDocumentClosed = if (list.isNotEmpty()) onDocumentClosed else null,
+                    onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder) onSaveDocument else null,
+                    onCloseDocument = onCloseDocument,
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page -> currentPage = page },
                     onTapNonPageArea = { clickedPageIndex ->
@@ -295,7 +295,7 @@ fun CustomView(
                                     FileTypeUtils.shouldSaveProgress(paths)
 
                             if (shouldSaveProgress) {
-                                onDocumentClosed?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
+                                onSaveDocument?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
                             }
                             // 然后关闭文档
                             onCloseDocument?.invoke()
@@ -307,7 +307,7 @@ fun CustomView(
                             )
                         }
                         Spacer(Modifier.weight(1f))
-                        
+
                         // 方向按钮 - 文档和图片都显示
                         IconButton(onClick = { isVertical = !isVertical }) {
                             Icon(
@@ -318,7 +318,7 @@ fun CustomView(
                                 tint = Color.White
                             )
                         }
-                        
+
                         // 只有文档文件才显示其他按钮
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
                             // 只有单文档文件才显示大纲按钮

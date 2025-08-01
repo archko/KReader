@@ -149,7 +149,9 @@ public class PdfViewModel : ViewModel() {
         scrollOri: Long
     ) {
         println("PdfViewModel.updateProgress:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, old:$progress")
-
+        if (path == null) {
+            return
+        }
         viewModelScope.launch {
             // 如果progress为空但path不为空，则新建一个记录
             if (progress == null && path != null) {
