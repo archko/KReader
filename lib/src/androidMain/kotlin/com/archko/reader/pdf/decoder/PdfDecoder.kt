@@ -41,6 +41,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
     // 密码相关状态
     public var needsPassword: Boolean = false
     public var isAuthenticated: Boolean = false
+    
+    // 页面缓存，最多缓存8页
+    private val pageCache = mutableMapOf<Int, com.artifex.mupdf.fitz.Page>()
+    private val maxPageCache = 8
 
     init {
         // 检查文件是否存在
@@ -158,6 +162,16 @@ public class PdfDecoder(file: File) : ImageDecoder {
     }
 
     override fun close() {
+        // 清理页面缓存
+        pageCache.values.forEach { page ->
+            try {
+                page.destroy()
+            } catch (e: Exception) {
+                println("Error destroying cached page: $e")
+            }
+        }
+        pageCache.clear()
+        
         document?.destroy()
     }
 
@@ -195,7 +209,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         if (viewWidth <= 0 || document == null || (!isAuthenticated && needsPassword)) {
             return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
         }
-        val page = document!!.loadPage(index)
+        val page = getPage(index)
         val bounds = page.bounds
         val scale = (1f * viewWidth / (bounds.x1 - bounds.x0))
         val w = viewWidth
@@ -236,7 +250,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
             val ctm = Matrix(scale)
             val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, outWidth, outHeight)
 
-            val page = document!!.loadPage(index)
+            val page = getPage(index)
             page.run(dev, ctm, null)
 
             dev.close()
@@ -273,9 +287,9 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, tileX, tileY, 0, 0, tileWidth, tileHeight)
 
-        val page = document!!.loadPage(index)
+        val page = getPage(index)
         page.run(dev, ctm, null)
-        page.destroy()
+        // 注意：这里不调用page.destroy()，因为页面被缓存了
 
         dev.close()
         dev.destroy()
@@ -295,7 +309,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         }
 
         try {
-            val page = document!!.loadPage(pageIndex)
+            val page = getPage(pageIndex)
 
             // 提取文本内容
             val result = page.textAsText("preserve-whitespace,inhibit-spaces,preserve-images")
@@ -307,7 +321,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
                 reflowBeans.addAll(text)
             }
 
-            page.destroy()
+            // 注意：这里不调用page.destroy()，因为页面被缓存了
         } catch (e: Exception) {
             println("decodeReflow error for page $pageIndex: $e")
             // 如果解析失败，返回空列表
@@ -316,6 +330,23 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return reflowBeans
     }
 
+    /**
+     * 获取或创建页面，支持缓存
+     */
+    private fun getPage(index: Int): com.artifex.mupdf.fitz.Page {
+        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
+        if (pageCache.size >= maxPageCache && !pageCache.containsKey(index)) {
+            val oldestIndex = pageCache.keys.first()
+            val oldestPage = pageCache.remove(oldestIndex)
+            oldestPage?.destroy()
+            println("Removed page $oldestIndex from cache to make room for page $index")
+        }
+        
+        return pageCache.getOrPut(index) {
+            document!!.loadPage(index)
+        }
+    }
+    
     /**
      * 优先尝试从ImageCache/BitmapPool复用Bitmap
      */

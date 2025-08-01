@@ -304,7 +304,7 @@ public object ParseTextMain {
                 }
             }
             if (isLetterDigitOrChinese(end)) {
-                println("isLetterDigitOrChinese:$end")
+                //println("isLetterDigitOrChinese:$end")
                 line.append(LINE_END)
             }
             thisLine.text = line.toString()

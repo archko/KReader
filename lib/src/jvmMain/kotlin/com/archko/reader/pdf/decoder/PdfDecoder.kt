@@ -53,6 +53,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
     // 密码相关状态
     public var needsPassword: Boolean = false
     public var isAuthenticated: Boolean = false
+    
+    // 页面缓存，最多缓存8页
+    private val pageCache = mutableMapOf<Int, com.artifex.mupdf.fitz.Page>()
+    private val maxPageCache = 8
 
     init {
         // 检查文件是否存在
@@ -179,7 +183,34 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return originalPageSizes[index]
     }
 
+    /**
+     * 获取或创建页面，支持缓存
+     */
+    private fun getPage(index: Int): com.artifex.mupdf.fitz.Page {
+        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
+        if (pageCache.size >= maxPageCache && !pageCache.containsKey(index)) {
+            val oldestIndex = pageCache.keys.first()
+            val oldestPage = pageCache.remove(oldestIndex)
+            oldestPage?.destroy()
+            println("Removed page $oldestIndex from cache to make room for page $index")
+        }
+        
+        return pageCache.getOrPut(index) {
+            document!!.loadPage(index)
+        }
+    }
+
     override fun close() {
+        // 清理页面缓存
+        pageCache.values.forEach { page ->
+            try {
+                page.destroy()
+            } catch (e: Exception) {
+                println("Error destroying cached page: $e")
+            }
+        }
+        pageCache.clear()
+        
         document?.destroy()
     }
 
@@ -246,8 +277,8 @@ public class PdfDecoder(file: File) : ImageDecoder {
                 ctm.translate(-patchX.toFloat(), -patchY.toFloat())
 
                 val dev = DrawDevice(pixmap)
-                val page = document!!.loadPage(index)
-                page.run(dev, ctm, null)
+                            val page = getPage(index)
+            page.run(dev, ctm, null)
                 dev.close()
                 dev.destroy()
 

@@ -283,7 +283,7 @@ fun FileScreen(
                         ) {
                             // 顶部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(0.dp))
                             }
 
                             items(
