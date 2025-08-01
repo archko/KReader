@@ -59,6 +59,8 @@ fun FileScreen(
         val hasMoreData by viewModel.hasMoreData.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
+        var showDirectoryDialog by remember { mutableStateOf(false) }
+        var pendingImagePath by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
@@ -70,13 +72,20 @@ fun FileScreen(
                 scope.launch {
                     val file = File(path)
                     if (file.exists()) {
-                        val paths = listOf(file.absolutePath)
-                        if (FileTypeUtils.shouldSaveProgress(paths)) {
-                            viewModel.getProgress(file.absolutePath)
-                            val startPage = viewModel.progress?.page?.toInt() ?: 0
-                            openDocRequest = OpenDocRequest(paths, startPage)
+                        if (FileTypeUtils.isImageFile(path)) {
+                            // 如果是图片文件，显示确认对话框
+                            pendingImagePath = path
+                            showDirectoryDialog = true
                         } else {
-                            openDocRequest = OpenDocRequest(paths, 0)
+                            // 非图片文件，直接打开
+                            val paths = listOf(file.absolutePath)
+                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                viewModel.getProgress(file.absolutePath)
+                                val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                openDocRequest = OpenDocRequest(paths, startPage)
+                            } else {
+                                openDocRequest = OpenDocRequest(paths, 0)
+                            }
                         }
                     }
                 }
@@ -99,6 +108,73 @@ fun FileScreen(
                     isAppearanceLightStatusBars = !isDarkTheme
                 }
             }
+        }
+
+        // 确认对话框
+        if (showDirectoryDialog) {
+            AlertDialog(
+                onDismissRequest = { 
+                    showDirectoryDialog = false
+                    pendingImagePath = null
+                },
+                title = { Text(stringResource(Res.string.browse_directory_title)) },
+                text = { Text(stringResource(Res.string.browse_directory_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDirectoryDialog = false
+                            pendingImagePath?.let { imagePath ->
+                                scope.launch {
+                                    // 异步加载父目录下的所有图片
+                                    val imageFile = File(imagePath)
+                                    val parentDir = imageFile.parentFile
+                                    if (parentDir != null && parentDir.exists()) {
+                                        val allImageFiles = mutableListOf<File>()
+                                        
+                                        // 只扫描当前目录层级，不递归子目录
+                                        parentDir.listFiles()?.forEach { file ->
+                                            if (file.isFile && FileTypeUtils.isImageFile(file.absolutePath)) {
+                                                allImageFiles.add(file)
+                                            }
+                                        }
+                                        
+                                        // 过滤掉大于10MB的文件
+                                        val filteredFiles = FileTypeUtils.filterFilesBySize(allImageFiles, 10)
+                                        
+                                        if (filteredFiles.isNotEmpty()) {
+                                            val paths = filteredFiles.map { it.absolutePath }
+                                            openDocRequest = OpenDocRequest(paths, 0)
+                                        } else {
+                                            // 如果没有找到合适的图片，只打开当前图片
+                                            openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                                        }
+                                    } else {
+                                        // 如果父目录不存在，只打开当前图片
+                                        openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                                    }
+                                }
+                            }
+                            pendingImagePath = null
+                        }
+                    ) {
+                        Text(stringResource(Res.string.confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showDirectoryDialog = false
+                            pendingImagePath?.let { imagePath ->
+                                // 只打开当前图片
+                                openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                            }
+                            pendingImagePath = null
+                        }
+                    ) {
+                        Text(stringResource(Res.string.cancel))
+                    }
+                }
+            )
         }
 
         Surface(
@@ -129,34 +205,23 @@ fun FileScreen(
                                     val isFirstImage = FileTypeUtils.isImageFile(firstPath)
                                     val isFirstDocument = FileTypeUtils.isDocumentFile(firstPath)
 
-                                    val filteredPaths = if (isFirstImage) {
-                                        // 如果是图片，过滤出所有图片文件并限制大小
-                                        val imageFiles = files.mapNotNull { kmpFile ->
-                                            val path =
-                                                IntentFile.getPath(PdfApp.app!!, kmpFile.uri) ?: kmpFile.uri.toString()
-                                            val file = File(path)
-                                            if (file.exists() && FileTypeUtils.isImageFile(path)) {
-                                                file
-                                            } else null
-                                        }
-                                        // 过滤掉大于10MB的文件
-                                        FileTypeUtils.filterFilesBySize(imageFiles, 10).map { it.absolutePath }
+                                    if (isFirstImage) {
+                                        // 如果第一个是图片，显示目录选择对话框（与外部传入图片的处理方式一样）
+                                        pendingImagePath = firstPath
+                                        showDirectoryDialog = true
                                     } else if (isFirstDocument) {
                                         // 如果是文档文件，只取第一个
-                                        listOf(firstPath)
+                                        val paths = listOf(firstPath)
+                                        if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                            viewModel.getProgress(paths.first())
+                                            val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                            openDocRequest = OpenDocRequest(paths, startPage)
+                                        } else {
+                                            openDocRequest = OpenDocRequest(paths, 0)
+                                        }
                                     } else {
                                         // 其他类型文件，只取第一个
-                                        listOf(firstPath)
-                                    }
-
-                                    if (filteredPaths.isNotEmpty()) {
-                                        if (FileTypeUtils.shouldSaveProgress(filteredPaths)) {
-                                            viewModel.getProgress(filteredPaths.first())
-                                            val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                            openDocRequest = OpenDocRequest(filteredPaths, startPage)
-                                        } else {
-                                            openDocRequest = OpenDocRequest(filteredPaths, 0)
-                                        }
+                                        openDocRequest = OpenDocRequest(listOf(firstPath), 0)
                                     }
                                 }
                             }

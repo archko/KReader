@@ -5,11 +5,12 @@
     <string name="about">关于</string>
     <string name="about_kreader">关于KReader</string>
     <string name="confirm">确定</string>
+    <string name="cancel">取消</string>
     <string name="home">首页</string>
     <string name="setting">设置</string>
     <string name="loading">加载中</string>
     <string name="clear_history">清除</string>
-    <string name="select_pdf">选择PDF</string>
+    <string name="select_pdf">选择PDF,epub,图片</string>
     <string name="delete_history">删除历史记录</string>
     <string name="load_more">加载更多</string>
     <string name="back">返回</string>
@@ -25,4 +26,6 @@
     <string name="circular_rectangular">圆形+矩形</string>
     <string name="document_open_failed">打开文档失败</string>
     <string name="close">关闭</string>
+    <string name="browse_directory_title">浏览目录</string>
+    <string name="browse_directory_message">是否浏览整个目录？</string>
 </resources>

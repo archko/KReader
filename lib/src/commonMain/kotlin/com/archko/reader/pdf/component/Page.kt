@@ -49,9 +49,17 @@ public class Page(
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {
         if (thumbDecoding) return
-        val w = (width / 3).toInt().coerceAtLeast(1)
-        val h = (height / 3).toInt().coerceAtLeast(1)
-        val cacheKey = "thumb-${aPage.index}-${w}x${h}"
+        
+        // 缩略图宽度为当前view宽度的1/3
+        val thumbWidth = (pdfViewState.viewSize.width / 3).coerceAtLeast(1)
+        // 根据原始宽高比计算缩略图高度
+        val thumbHeight = if (aPage.width > 0) {
+            (thumbWidth * aPage.height / aPage.width).toInt().coerceAtLeast(1)
+        } else {
+            (height / 3).toInt().coerceAtLeast(1)
+        }
+        
+        val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}"
         val cached = ImageCache.get(cacheKey)
         if (cached != null) {
             thumbBitmap = cached
@@ -74,13 +82,20 @@ public class Page(
             
             try {
                 val region = Rect(0f, 0f, 1f, 1f)
+                // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
+                val thumbScale = if (aPage.width > 0) {
+                    thumbWidth.toFloat() / aPage.width
+                } else {
+                    totalScale / 3
+                }
+                
                 val bitmap = pdfViewState.state.renderPageRegion(
                     region,
                     aPage.index,
-                    totalScale / 3,
+                    thumbScale,
                     pdfViewState.viewSize,
-                    w,
-                    h
+                    thumbWidth,
+                    thumbHeight
                 )
                 if (!isActive) {
                     thumbDecoding = false

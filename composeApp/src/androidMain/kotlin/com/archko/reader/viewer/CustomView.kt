@@ -290,6 +290,8 @@ fun CustomView(
                             )
                         }
                         Spacer(Modifier.weight(1f))
+                        
+                        // 方向按钮 - 文档和图片都显示
                         IconButton(onClick = { isVertical = !isVertical }) {
                             Icon(
                                 painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
@@ -299,29 +301,33 @@ fun CustomView(
                                 tint = Color.White
                             )
                         }
-                        // 只有单文档文件才显示大纲按钮
-                        if (FileTypeUtils.shouldShowOutline(paths)) {
-                            IconButton(onClick = { showOutlineDialog = true }) {
+                        
+                        // 只有文档文件才显示其他按钮
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            // 只有单文档文件才显示大纲按钮
+                            if (FileTypeUtils.shouldShowOutline(paths)) {
+                                IconButton(onClick = { showOutlineDialog = true }) {
+                                    Icon(
+                                        painter = painterResource(Res.drawable.ic_toc),
+                                        contentDescription = stringResource(Res.string.outline),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                            IconButton(onClick = { isReflow = !isReflow }) {
                                 Icon(
-                                    painter = painterResource(Res.drawable.ic_toc),
-                                    contentDescription = stringResource(Res.string.outline),
+                                    painter = painterResource(Res.drawable.ic_reflow),
+                                    contentDescription = stringResource(Res.string.reflow),
+                                    tint = if (isReflow) Color.Green else Color.White
+                                )
+                            }
+                            IconButton(onClick = { /* TODO: 搜索功能 */ }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_search),
+                                    contentDescription = stringResource(Res.string.search),
                                     tint = Color.White
                                 )
                             }
-                        }
-                        IconButton(onClick = { isReflow = !isReflow }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_reflow),
-                                contentDescription = stringResource(Res.string.reflow),
-                                tint = if (isReflow) Color.Green else Color.White
-                            )
-                        }
-                        IconButton(onClick = { /* TODO: 搜索功能 */ }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_search),
-                                contentDescription = stringResource(Res.string.search),
-                                tint = Color.White
-                            )
                         }
                     }
                 }

@@ -147,16 +147,12 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             val isFullImage = region.width <= 1 && region.height <= 1
             
             if (isFullImage) {
-                // 整张图片：保持宽高比进行等比例缩放
+                // 整张图片：使用传入的scale参数，就像PdfDecoder一样
                 val originalSize = originalPageSizes[index]
                 
-                // 计算等比例缩放后的尺寸
-                val scaleX = outWidth.toFloat() / originalSize.width
-                val scaleY = outHeight.toFloat() / originalSize.height
-                val finalScale = minOf(scaleX, scaleY) // 取较小的缩放比例，保持宽高比
-                
-                val targetWidth = (originalSize.width * finalScale).toInt()
-                val targetHeight = (originalSize.height * finalScale).toInt()
+                // 使用传入的scale参数计算目标尺寸
+                val targetWidth = (originalSize.width * scale).toInt()
+                val targetHeight = (originalSize.height * scale).toInt()
                 
                 val options = BitmapFactory.Options().apply {
                     inSampleSize = calculateInSampleSize(file, targetWidth, targetHeight)
@@ -164,7 +160,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 
                 val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
                 if (bitmap != null) {
-                    println("ImagesDecoder.renderPageRegion - 整张图片解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=($scaleX,$scaleY,$finalScale), 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
+                    println("ImagesDecoder.renderPageRegion - 整张图片解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
                     bitmap.asImageBitmap()
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
