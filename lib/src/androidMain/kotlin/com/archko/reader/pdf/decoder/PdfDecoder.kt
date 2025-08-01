@@ -23,7 +23,7 @@ import java.io.File
  */
 public class PdfDecoder(file: File) : ImageDecoder {
 
-    private val document: Document
+    private var document: Document? = null
     public override var pageCount: Int = 0
 
     // 私有变量存储原始页面尺寸
@@ -38,6 +38,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     public var viewSize: IntSize = IntSize.Zero
 
+    // 密码相关状态
+    public var needsPassword: Boolean = false
+    public var isAuthenticated: Boolean = false
+
     init {
         // 检查文件是否存在
         if (!file.exists()) {
@@ -51,13 +55,46 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
         try {
             document = Document.openDocument(file.absolutePath)
-            val fontSize = 54f
-            document.layout(1280f, 2160f, fontSize)
-            pageCount = document.countPages()
-            originalPageSizes = prepareSizes()
-            outlineItems = prepareOutlines()
+            // 检查是否需要密码
+            needsPassword = document?.needsPassword() == true
+            if (!needsPassword) {
+                initializeDocument()
+            }
         } catch (e: Exception) {
             throw RuntimeException("无法打开文档: ${file.absolutePath}, 错误: ${e.message}", e)
+        }
+    }
+
+    /**
+     * 使用密码认证文档
+     * @param password 密码
+     * @return 认证是否成功
+     */
+    public fun authenticatePassword(password: String): Boolean {
+        return try {
+            val success = document?.authenticatePassword(password) == true
+            if (success) {
+                isAuthenticated = true
+                needsPassword = false
+                initializeDocument()
+            }
+            success
+        } catch (e: Exception) {
+            println("密码认证失败: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * 初始化文档（在认证成功后调用）
+     */
+    private fun initializeDocument() {
+        document?.let { doc ->
+            val fontSize = 54f
+            doc.layout(1280f, 2160f, fontSize)
+            pageCount = doc.countPages()
+            originalPageSizes = prepareSizes()
+            outlineItems = prepareOutlines()
         }
     }
 
@@ -72,6 +109,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     override fun size(viewportSize: IntSize): IntSize {
         if ((imageSize == IntSize.Zero || viewSize != viewportSize)
             && viewportSize.width > 0 && viewportSize.height > 0
+            && document != null && isAuthenticated
         ) {
             viewSize = viewportSize
             caculateSize(viewportSize)
@@ -119,31 +157,33 @@ public class PdfDecoder(file: File) : ImageDecoder {
     }
 
     override fun close() {
-        document.destroy()
+        document?.destroy()
     }
 
     private fun prepareSizes(): List<Size> {
         val list = mutableListOf<Size>()
         var totalHeight = 0
-        for (i in 0 until pageCount) {
-            val page = document.loadPage(i)
-            val bounds = page.bounds
-            val size = Size(
-                bounds.x1.toInt() - bounds.x0.toInt(),
-                bounds.y1.toInt() - bounds.y0.toInt(),
-                i,
-                scale = 1.0f,
-                totalHeight,
-            )
-            totalHeight += size.height
-            page.destroy()
-            list.add(size)
+        document?.let { doc ->
+            for (i in 0 until pageCount) {
+                val page = doc.loadPage(i)
+                val bounds = page.bounds
+                val size = Size(
+                    bounds.x1.toInt() - bounds.x0.toInt(),
+                    bounds.y1.toInt() - bounds.y0.toInt(),
+                    i,
+                    scale = 1.0f,
+                    totalHeight,
+                )
+                totalHeight += size.height
+                page.destroy()
+                list.add(size)
+            }
         }
         return list
     }
 
     private fun prepareOutlines(): List<Item> {
-        return document.loadOutlineItems()
+        return document?.loadOutlineItems() ?: emptyList()
     }
 
     public fun renderPage(
@@ -151,10 +191,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
         viewWidth: Int,
         viewHeight: Int
     ): ImageBitmap {
-        if (viewWidth <= 0) {
+        if (viewWidth <= 0 || document == null || !isAuthenticated) {
             return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
         }
-        val page = document.loadPage(index)
+        val page = document!!.loadPage(index)
         val bounds = page.bounds
         val scale = (1f * viewWidth / (bounds.x1 - bounds.x0))
         val w = viewWidth
@@ -182,6 +222,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
+        if (document == null || !isAuthenticated) {
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
+        
         val patchX = region.left.toInt()
         val patchY = region.top.toInt()
         println("renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
@@ -191,7 +235,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
             val ctm = Matrix(scale)
             val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, outWidth, outHeight)
 
-            val page = document.loadPage(index)
+            val page = document!!.loadPage(index)
             page.run(dev, ctm, null)
 
             dev.close()
@@ -212,6 +256,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
         tileWidth: Int,
         tileHeight: Int
     ): ImageBitmap {
+        if (document == null || !isAuthenticated) {
+            return ImageBitmap(tileWidth, tileHeight, ImageBitmapConfig.Rgb565)
+        }
+        
         // 计算tile在页面中的实际位置（rect已经是相对于页面的坐标）
         val tileX = rect.left.toInt()
         val tileY = rect.top.toInt()
@@ -224,7 +272,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, tileX, tileY, 0, 0, tileWidth, tileHeight)
 
-        val page = document.loadPage(index)
+        val page = document!!.loadPage(index)
         page.run(dev, ctm, null)
         page.destroy()
 
@@ -241,8 +289,12 @@ public class PdfDecoder(file: File) : ImageDecoder {
     public fun decodeReflow(pageIndex: Int): List<ReflowBean> {
         val reflowBeans = mutableListOf<ReflowBean>()
 
+        if (document == null || !isAuthenticated) {
+            return reflowBeans
+        }
+
         try {
-            val page = document.loadPage(pageIndex)
+            val page = document!!.loadPage(pageIndex)
 
             // 提取文本内容
             val result = page.textAsText("preserve-whitespace,inhibit-spaces,preserve-images")

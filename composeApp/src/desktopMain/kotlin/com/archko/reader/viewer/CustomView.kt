@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,6 +47,12 @@ fun CustomView(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
+    
+    // 密码相关状态
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var currentPdfDecoder by remember { mutableStateOf<PdfDecoder?>(null) }
+    var isPasswordError by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(path) {
         withContext(Dispatchers.IO) {
@@ -54,7 +61,17 @@ fun CustomView(
                 val pdfDecoder = if (viewportSize == IntSize.Zero) {
                     null
                 } else {
-                    PdfDecoder(File(path))
+                    val decoder = PdfDecoder(File(path))
+                    currentPdfDecoder = decoder
+                    
+                    // 检查是否需要密码
+                    if (decoder.needsPassword) {
+                        showPasswordDialog = true
+                        isPasswordError = false
+                        return@withContext
+                    }
+                    
+                    decoder
                 }
                 if (pdfDecoder != null) {
                     pdfDecoder.getSize(viewportSize)
@@ -73,7 +90,38 @@ fun CustomView(
         onDispose {
             println("onDispose:$path, $decoder")
             decoder?.close()
+            currentPdfDecoder?.close()
         }
+    }
+
+    // 处理密码输入
+    fun handlePasswordEntered(password: String) {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                currentPdfDecoder?.let { pdfDecoder ->
+                    val success = pdfDecoder.authenticatePassword(password)
+                    if (success) {
+                        // 密码正确，初始化文档
+                        pdfDecoder.getSize(viewportSize)
+                        decoder = pdfDecoder
+                        loadingError = null
+                        showPasswordDialog = false
+                        isPasswordError = false
+                    } else {
+                        // 密码错误，重新显示对话框并显示错误信息
+                        showPasswordDialog = true
+                        isPasswordError = true
+                    }
+                }
+            }
+        }
+    }
+
+    // 处理密码对话框取消
+    fun handlePasswordDialogDismiss() {
+        showPasswordDialog = false
+        isPasswordError = false
+        onCloseDocument?.invoke()
     }
 
     if (null == decoder) {
@@ -121,6 +169,20 @@ fun CustomView(
                     )
                 }
             }
+        }
+        
+        // 显示密码输入对话框
+        if (showPasswordDialog) {
+            PasswordDialog(
+                fileName = File(path).name,
+                onPasswordEntered = { password ->
+                    handlePasswordEntered(password)
+                },
+                onDismiss = {
+                    handlePasswordDialogDismiss()
+                },
+                isPasswordError = isPasswordError
+            )
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {

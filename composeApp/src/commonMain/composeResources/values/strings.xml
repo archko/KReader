@@ -27,4 +27,9 @@
     <string name="close">Close</string>
     <string name="browse_directory_title">Browse Directory</string>
     <string name="browse_directory_message">Do you want to browse the entire directory?</string>
+    <string name="password_required">Password Required</string>
+    <string name="document_requires_password">This document requires a password to open.</string>
+    <string name="password">Password</string>
+    <string name="incorrect_password">Incorrect password. Please try again.</string>
+    <string name="ok">OK</string>
 </resources>

@@ -34,6 +34,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
@@ -91,6 +92,12 @@ fun CustomView(
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
 
+    // 密码相关状态
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var currentPdfDecoder by remember { mutableStateOf<PdfDecoder?>(null) }
+    var isPasswordError by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
 
@@ -109,7 +116,17 @@ fun CustomView(
                         // 单文件模式：检查文件类型
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
                             // 文档文件：创建PdfDecoder
-                            PdfDecoder(File(currentPath))
+                            val pdfDecoder = PdfDecoder(File(currentPath))
+                            currentPdfDecoder = pdfDecoder
+
+                            // 检查是否需要密码
+                            if (pdfDecoder.needsPassword) {
+                                showPasswordDialog = true
+                                isPasswordError = false
+                                return@withContext
+                            }
+
+                            pdfDecoder
                         } else {
                             // 图片文件：创建ImagesDecoder（单文件图片也使用ImagesDecoder）
                             ImagesDecoder(listOf(File(currentPath)))
@@ -133,7 +150,38 @@ fun CustomView(
         onDispose {
             println("onDispose:$currentPath, $decoder")
             decoder?.close()
+            currentPdfDecoder?.close()
         }
+    }
+
+    // 处理密码输入
+    fun handlePasswordEntered(password: String) {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                currentPdfDecoder?.let { pdfDecoder ->
+                    val success = pdfDecoder.authenticatePassword(password)
+                    if (success) {
+                        // 密码正确，初始化文档
+                        pdfDecoder.size(viewportSize)
+                        decoder = pdfDecoder
+                        loadingError = null
+                        showPasswordDialog = false
+                        isPasswordError = false
+                    } else {
+                        // 密码错误，重新显示对话框并显示错误信息
+                        showPasswordDialog = true
+                        isPasswordError = true
+                    }
+                }
+            }
+        }
+    }
+
+    // 处理密码对话框取消
+    fun handlePasswordDialogDismiss() {
+        showPasswordDialog = false
+        isPasswordError = false
+        onCloseDocument?.invoke()
     }
 
     if (null == decoder) {
@@ -190,6 +238,20 @@ fun CustomView(
                     )
                 }
             }
+        }
+
+        // 显示密码输入对话框
+        if (showPasswordDialog) {
+            PasswordDialog(
+                fileName = File(currentPath).name,
+                onPasswordEntered = { password ->
+                    handlePasswordEntered(password)
+                },
+                onDismiss = {
+                    handlePasswordDialogDismiss()
+                },
+                isPasswordError = isPasswordError
+            )
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {
