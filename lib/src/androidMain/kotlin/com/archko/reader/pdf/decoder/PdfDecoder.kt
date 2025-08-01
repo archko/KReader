@@ -58,6 +58,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
             // 检查是否需要密码
             needsPassword = document?.needsPassword() == true
             if (!needsPassword) {
+                isAuthenticated = true // 不需要密码的文档直接设置为已认证
                 initializeDocument()
             }
         } catch (e: Exception) {
@@ -109,7 +110,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     override fun size(viewportSize: IntSize): IntSize {
         if ((imageSize == IntSize.Zero || viewSize != viewportSize)
             && viewportSize.width > 0 && viewportSize.height > 0
-            && document != null && isAuthenticated
+            && document != null && (isAuthenticated || !needsPassword)
         ) {
             viewSize = viewportSize
             caculateSize(viewportSize)
@@ -164,19 +165,19 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val list = mutableListOf<Size>()
         var totalHeight = 0
         document?.let { doc ->
-            for (i in 0 until pageCount) {
+        for (i in 0 until pageCount) {
                 val page = doc.loadPage(i)
-                val bounds = page.bounds
-                val size = Size(
-                    bounds.x1.toInt() - bounds.x0.toInt(),
-                    bounds.y1.toInt() - bounds.y0.toInt(),
-                    i,
-                    scale = 1.0f,
-                    totalHeight,
-                )
-                totalHeight += size.height
-                page.destroy()
-                list.add(size)
+            val bounds = page.bounds
+            val size = Size(
+                bounds.x1.toInt() - bounds.x0.toInt(),
+                bounds.y1.toInt() - bounds.y0.toInt(),
+                i,
+                scale = 1.0f,
+                totalHeight,
+            )
+            totalHeight += size.height
+            page.destroy()
+            list.add(size)
             }
         }
         return list
@@ -191,7 +192,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         viewWidth: Int,
         viewHeight: Int
     ): ImageBitmap {
-        if (viewWidth <= 0 || document == null || !isAuthenticated) {
+        if (viewWidth <= 0 || document == null || (!isAuthenticated && needsPassword)) {
             return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
         }
         val page = document!!.loadPage(index)
@@ -222,7 +223,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
-        if (document == null || !isAuthenticated) {
+        if (document == null || (!isAuthenticated && needsPassword)) {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
         
@@ -256,7 +257,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         tileWidth: Int,
         tileHeight: Int
     ): ImageBitmap {
-        if (document == null || !isAuthenticated) {
+        if (document == null || (!isAuthenticated && needsPassword)) {
             return ImageBitmap(tileWidth, tileHeight, ImageBitmapConfig.Rgb565)
         }
         
@@ -289,7 +290,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     public fun decodeReflow(pageIndex: Int): List<ReflowBean> {
         val reflowBeans = mutableListOf<ReflowBean>()
 
-        if (document == null || !isAuthenticated) {
+        if (document == null || (!isAuthenticated && needsPassword)) {
             return reflowBeans
         }
 

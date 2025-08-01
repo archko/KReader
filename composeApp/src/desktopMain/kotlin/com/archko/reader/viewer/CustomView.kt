@@ -21,6 +21,7 @@ import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
+import com.archko.reader.viewer.PasswordDialog
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage

@@ -35,7 +35,7 @@ import kreader.composeapp.generated.resources.password_required
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-public fun PasswordDialog(
+fun PasswordDialog(
     fileName: String,
     onPasswordEntered: (String) -> Unit,
     onDismiss: () -> Unit,
