@@ -9,7 +9,9 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.loadOutlineItems
+import com.archko.reader.pdf.decoder.ParseTextMain
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
@@ -41,12 +43,12 @@ public class PdfDecoder(file: File) : ImageDecoder {
         if (!file.exists()) {
             throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
         }
-        
+
         // 检查文件是否可读
         if (!file.canRead()) {
             throw SecurityException("无法读取文档文件: ${file.absolutePath}")
         }
-        
+
         try {
             document = Document.openDocument(file.absolutePath)
             val fontSize = 54f
@@ -230,6 +232,35 @@ public class PdfDecoder(file: File) : ImageDecoder {
         dev.destroy()
 
         return (bitmap.asImageBitmap())
+    }
+
+    /**
+     * 解析PDF页面为reflow内容（文本和图片）
+     * 注意：此方法必须在主线程调用，MuPDF不支持多线程
+     */
+    public fun decodeReflow(pageIndex: Int): List<ReflowBean> {
+        val reflowBeans = mutableListOf<ReflowBean>()
+
+        try {
+            val page = document.loadPage(pageIndex)
+
+            // 提取文本内容
+            val result = page.textAsText("preserve-whitespace,inhibit-spaces,preserve-images")
+            val text = if (null != result) {
+                ParseTextMain.parseAsHtmlList(result, pageIndex)
+            } else null
+            
+            if (text != null && text.isNotEmpty()) {
+                reflowBeans.addAll(text)
+            }
+
+            page.destroy()
+        } catch (e: Exception) {
+            println("decodeReflow error for page $pageIndex: $e")
+            // 如果解析失败，返回空列表
+        }
+
+        return reflowBeans
     }
 
     /**

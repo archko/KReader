@@ -33,6 +33,7 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.viewer.ReflowView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
@@ -234,27 +235,39 @@ fun CustomView(
                 .onSizeChanged { viewportSize = it }
         ) {
             val context = LocalContext.current
-            // 文档视图（最底层）
-            DocumentView(
-                list = list,
-                state = decoder!!,
-                jumpToPage = jumpToPage,
-                initialOrientation = orientation,
-                onDocumentClosed = if (list.isNotEmpty()) onDocumentClosed else null,
-                onDoubleTapToolbar = { showToolbar = !showToolbar },
-                onPageChanged = { page -> currentPage = page },
-                onTapNonPageArea = { clickedPageIndex ->
-                    // 点击非翻页区域时隐藏工具栏
-                    if (showToolbar) {
-                        showToolbar = false
-                    }
-                    val pageText = currentPageString.format(clickedPageIndex + 1)
-                    Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
-                },
-                initialScrollX = initialScrollX,
-                initialScrollY = initialScrollY,
-                initialZoom = initialZoom,
-            )
+            
+            // 根据reflow状态选择显示模式
+            if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
+                // Reflow视图
+                ReflowView(
+                    decoder = decoder!!,
+                    pageCount = pageCount,
+                    onPageChanged = { page -> currentPage = page },
+                    jumpToPage = jumpToPage
+                )
+            } else {
+                // 文档视图（最底层）
+                DocumentView(
+                    list = list,
+                    state = decoder!!,
+                    jumpToPage = jumpToPage,
+                    initialOrientation = orientation,
+                    onDocumentClosed = if (list.isNotEmpty()) onDocumentClosed else null,
+                    onDoubleTapToolbar = { showToolbar = !showToolbar },
+                    onPageChanged = { page -> currentPage = page },
+                    onTapNonPageArea = { clickedPageIndex ->
+                        // 点击非翻页区域时隐藏工具栏
+                        if (showToolbar) {
+                            showToolbar = false
+                        }
+                        val pageText = currentPageString.format(clickedPageIndex + 1)
+                        Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                    },
+                    initialScrollX = initialScrollX,
+                    initialScrollY = initialScrollY,
+                    initialZoom = initialZoom,
+                )
+            }
 
             AnimatedVisibility(
                 visible = showToolbar,
