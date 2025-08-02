@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,11 +20,11 @@ import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
-import com.archko.reader.viewer.PasswordDialog
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
@@ -39,7 +38,7 @@ import java.io.File
 fun CustomView(
     path: String,
     progressPage: Int? = null,
-    onSaveDocument: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
@@ -48,7 +47,7 @@ fun CustomView(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
-    
+
     // 密码相关状态
     var showPasswordDialog by remember { mutableStateOf(false) }
     var currentPdfDecoder by remember { mutableStateOf<PdfDecoder?>(null) }
@@ -64,14 +63,14 @@ fun CustomView(
                 } else {
                     val decoder = PdfDecoder(File(path))
                     currentPdfDecoder = decoder
-                    
+
                     // 检查是否需要密码
                     if (decoder.needsPassword) {
                         showPasswordDialog = true
                         isPasswordError = false
                         return@withContext
                     }
-                    
+
                     decoder
                 }
                 if (pdfDecoder != null) {
@@ -171,7 +170,7 @@ fun CustomView(
                 }
             }
         }
-        
+
         // 显示密码输入对话框
         if (showPasswordDialog) {
             PasswordDialog(

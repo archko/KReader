@@ -213,6 +213,7 @@ fun FileScreen(
                             scrollX,
                             scrollY,
                             scrollOri,
+                            0L
                         )
                     },
                     onCloseDocument = {

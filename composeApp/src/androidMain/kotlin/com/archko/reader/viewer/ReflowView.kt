@@ -5,17 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -34,6 +32,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -44,6 +43,8 @@ import com.archko.reader.pdf.decoder.ParseTextMain
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.util.Dispatcher
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ReflowView(
@@ -51,21 +52,20 @@ fun ReflowView(
     pageCount: Int,
     onPageChanged: ((page: Int) -> Unit)? = null,
     jumpToPage: Int? = null,
-    onDocumentClosed: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
+    onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null,
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
     initialOrientation: Int,
+    reflow: Long = 0,
 ) {
     val lazyListState = rememberLazyListState()
 
     // 使用独立的状态来跟踪当前页面，避免频繁访问 firstVisibleItemIndex
     var currentPage by remember { mutableIntStateOf(0) }
-
-    // 页面内容缓存
-    var pageContents by remember { mutableStateOf<Map<Int, List<ReflowBean>>>(emptyMap()) }
 
     var toPage by remember { mutableIntStateOf(-1) }
     var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
@@ -102,15 +102,16 @@ fun ReflowView(
 
     // 保存文档状态的公共方法
     fun saveDocumentState() {
-        println("ReflowView: 保存记录:page:$currentPage, pc:$pageCount, zoom:$initialZoom")
+        println("ReflowView: 保存记录:page:$currentPage, pc:$pageCount, reflow:$reflow")
 
-        onDocumentClosed?.invoke(
+        onSaveDocument?.invoke(
             currentPage,
             pageCount,
             initialZoom,
             initialScrollX,
             initialScrollY,
-            initialOrientation.toLong()
+            initialOrientation.toLong(),
+            reflow
         )
     }
 
@@ -128,6 +129,7 @@ fun ReflowView(
             lifecycleOwner.lifecycle.removeObserver(observer)
             // 在组件销毁时也保存一次状态
             saveDocumentState()
+            onCloseDocument?.invoke()
         }
     }
 
@@ -155,15 +157,10 @@ fun ReflowView(
                     }
                 )
             },
-        contentPadding = PaddingValues(16.dp)
     ) {
         itemsIndexed((0 until pageCount).toList()) { index, pageIndex ->
             ReflowPageItem(
                 pageIndex = pageIndex,
-                content = pageContents[pageIndex] ?: emptyList(),
-                onContentLoaded = { content ->
-                    pageContents = pageContents + (pageIndex to content)
-                },
                 decoder = decoder
             )
         }
@@ -173,32 +170,23 @@ fun ReflowView(
 @Composable
 private fun ReflowPageItem(
     pageIndex: Int,
-    content: List<ReflowBean>,
-    onContentLoaded: (List<ReflowBean>) -> Unit,
     decoder: ImageDecoder
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    var pageContents by remember { mutableStateOf<List<ReflowBean>>(emptyList()) }
 
-    // 单线程加载页面内容（MuPDF不支持多线程）
     LaunchedEffect(pageIndex) {
-        if (content.isEmpty()) {
-            try {
-                // 这里需要根据实际的decoder类型调用decodeReflow方法
-                // 由于ImageDecoder接口没有decodeReflow方法，我们需要类型转换
-                val loadedContent = when (decoder) {
-                    is PdfDecoder -> {
-                        decoder.decodeReflow(pageIndex)
-                    }
-
-                    else -> {
-                        // 对于其他类型的decoder，返回空内容
-                        emptyList()
-                    }
+        withContext(Dispatcher.DECODE) {
+            pageContents = when (decoder) {
+                is PdfDecoder -> {
+                    decoder.decodeReflow(pageIndex)
                 }
-                onContentLoaded(loadedContent)
-            } catch (e: Exception) {
-                println("Failed to decode reflow content for page $pageIndex: $e")
-                onContentLoaded(emptyList())
+
+                else -> {
+                    // 对于其他类型的decoder，返回空内容
+                    emptyList()
+                }
             }
         }
     }
@@ -206,22 +194,22 @@ private fun ReflowPageItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
-        // 页面内容
-        if (content.isEmpty()) {
-            // 加载中状态
+        if (pageContents.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight(),
+                    .height(180.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                Text(
+                    text = "Loading...",
+                    fontSize = 18.sp,
+                )
             }
         } else {
-            // 显示内容
-            content.forEach { item ->
+            pageContents.forEach { item ->
                 when (item.type) {
                     ReflowBean.TYPE_STRING -> {
                         Text(
@@ -231,7 +219,6 @@ private fun ReflowPageItem(
                     }
 
                     ReflowBean.TYPE_IMAGE -> {
-                        // 使用BitmapBean处理图片
                         val bitmapBean = ParseTextMain.decodeBitmap(
                             item.data ?: "",
                             1.0f, // systemScale
@@ -245,21 +232,21 @@ private fun ReflowPageItem(
                                 bitmap = bitmapBean.bitmap.asImageBitmap(),
                                 contentDescription = "图片",
                                 modifier = Modifier
-                                    .width(bitmapBean.width.dp)
-                                    .height(bitmapBean.height.dp),
+                                    .width(with(density) { bitmapBean.width.toDp() })
+                                    .height(with(density) { bitmapBean.height.toDp() })
+                                    .padding(vertical = 2.dp),
                                 contentScale = ContentScale.Fit
                             )
                         } else {
-                            // 图片解码失败时的占位符
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(160.dp)
+                                    .height(180.dp)
                                     .background(Color.LightGray),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "[图片解码失败]",
+                                    text = "[Error]",
                                     color = Color.Gray,
                                     textAlign = TextAlign.Center
                                 )
@@ -269,6 +256,12 @@ private fun ReflowPageItem(
                 }
             }
         }
+        HorizontalDivider(
+            color = Color(0xff666666),
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .width(100.dp)
+        )
     }
 }
 

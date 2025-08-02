@@ -82,7 +82,7 @@ public class PdfViewModel : ViewModel() {
         }
     }
 
-    public suspend fun insertOrUpdateAndWait(path: String, pageCount: Long) {
+    public suspend fun insertOrUpdateAndWait(path: String, pageCount: Long, reflow: Long) {
         this.path = path
         val deferred = CompletableDeferred<Unit>()
         viewModelScope.launch {
@@ -96,7 +96,7 @@ public class PdfViewModel : ViewModel() {
                         System.currentTimeMillis(),
                         System.currentTimeMillis(),
                         1,
-                        0,
+                        reflow,
                         0,
                         1.0,
                         0,
@@ -146,9 +146,10 @@ public class PdfViewModel : ViewModel() {
         crop: Long,
         scrollX: Long,
         scrollY: Long,
-        scrollOri: Long
+        scrollOri: Long,
+        reflow: Long,
     ) {
-        println("PdfViewModel.updateProgress:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, old:$progress")
+        println("PdfViewModel.updateProgress:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, old:$progress")
         if (path == null) {
             return
         }
@@ -166,8 +167,8 @@ public class PdfViewModel : ViewModel() {
                     pageCount,
                     System.currentTimeMillis(),
                     System.currentTimeMillis(),
-                    1,
                     crop,
+                    reflow,
                     scrollOri,
                     zoom,
                     scrollX,
@@ -184,6 +185,7 @@ public class PdfViewModel : ViewModel() {
                         this.pageCount = pageCount
                         updateAt = System.currentTimeMillis()
                         this.crop = crop
+                        this.reflow = reflow
                         this.zoom = zoom
                         this.scrollX = scrollX
                         this.scrollY = scrollY

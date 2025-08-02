@@ -48,12 +48,13 @@ import java.io.File
 fun CustomView(
     paths: List<String>,
     progressPage: Int? = null,
-    onSaveDocument: ((Int, Int, Double, Long, Long, Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
     scrollOri: Long = 0,
+    reflow: Long = 0,
 ) {
     // 在打开文档时隐藏状态栏
     val context = LocalContext.current
@@ -103,7 +104,7 @@ fun CustomView(
 
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
-            println("init:$viewportSize, $currentPath")
+            println("init:$viewportSize, reflow:$reflow, $currentPath")
             try {
                 val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                     null
@@ -148,7 +149,7 @@ fun CustomView(
     }
     DisposableEffect(currentPath) {
         onDispose {
-            println("onDispose:$currentPath, $decoder")
+            println("CustomView.onDispose:$currentPath, $decoder")
             decoder?.close()
             currentPdfDecoder?.close()
         }
@@ -275,7 +276,7 @@ fun CustomView(
         var outlineScrollPosition by remember { mutableIntStateOf(0) }
         // 横竖切换、重排等按钮内部状态
         var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
-        var isReflow by remember { mutableStateOf(false) }
+        var isReflow by remember { mutableStateOf(reflow == 1L) }
 
         // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
         val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
@@ -303,12 +304,29 @@ fun CustomView(
                 ReflowView(
                     decoder = decoder!!,
                     pageCount = pageCount,
+                    onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder) onSaveDocument else null,
+                    onCloseDocument = {
+                        println("onCloseDocument.isReflow:$isReflow")
+                        if (!isReflow) {
+                            onCloseDocument?.invoke()
+                        }
+                    }, // 只在非重排模式下传递关闭回调
+                    onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page -> currentPage = page },
+                    onTapNonPageArea = { clickedPageIndex ->
+                        // 点击非翻页区域时隐藏工具栏
+                        if (showToolbar) {
+                            showToolbar = false
+                        }
+                        val pageText = currentPageString.format(clickedPageIndex + 1)
+                        Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                    },
                     jumpToPage = jumpToPage,
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
                     initialOrientation = orientation,
+                    reflow = 1L,
                 )
             } else {
                 // 文档视图（最底层）
@@ -318,7 +336,12 @@ fun CustomView(
                     jumpToPage = jumpToPage,
                     initialOrientation = orientation,
                     onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder) onSaveDocument else null,
-                    onCloseDocument = onCloseDocument,
+                    onCloseDocument = {
+                        println("onCloseDocument.isReflow:$isReflow")
+                        if (!isReflow) {
+                            onCloseDocument?.invoke()
+                        }
+                    }, // 只在非重排模式下传递关闭回调
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page -> currentPage = page },
                     onTapNonPageArea = { clickedPageIndex ->
@@ -352,14 +375,6 @@ fun CustomView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
-                            // 只有在文档加载成功且应该保存进度时才保存
-                            val shouldSaveProgress = decoder != null && list.isNotEmpty() &&
-                                    FileTypeUtils.shouldSaveProgress(paths)
-
-                            if (shouldSaveProgress) {
-                                onSaveDocument?.invoke(currentPage, pageCount, 1.0, 0, 0, 0)
-                            }
-                            // 然后关闭文档
                             onCloseDocument?.invoke()
                         }) {
                             Icon(

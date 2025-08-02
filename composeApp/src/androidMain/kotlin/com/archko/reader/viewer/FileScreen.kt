@@ -357,7 +357,7 @@ fun FileScreen(
                 CustomView(
                     paths = openDocRequest!!.paths,
                     progressPage = openDocRequest!!.page,
-                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri ->
+                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow ->
                         viewModel.updateProgress(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
@@ -366,6 +366,7 @@ fun FileScreen(
                             scrollX,
                             scrollY,
                             scrollOri,
+                            reflow,
                         )
                     },
                     onCloseDocument = {
@@ -374,7 +375,8 @@ fun FileScreen(
                     initialScrollX = viewModel.progress?.scrollX ?: 0L,
                     initialScrollY = viewModel.progress?.scrollY ?: 0L,
                     initialZoom = viewModel.progress?.zoom ?: 1.0,
-                    scrollOri = viewModel.progress?.scrollOri ?: 0
+                    scrollOri = viewModel.progress?.scrollOri ?: 0,
+                    reflow = viewModel.progress?.reflow ?: 0L
                 )
             }
         }

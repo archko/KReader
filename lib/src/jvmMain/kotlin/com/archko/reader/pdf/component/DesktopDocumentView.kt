@@ -14,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -40,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
-import kotlinx.coroutines.Job
 
 /**
  * 桌面端文档视图，专注于鼠标滚轮和键盘事件
@@ -74,10 +72,8 @@ public fun DesktopDocumentView(
         )
     }
     var vZoom by remember { mutableFloatStateOf(initialZoom.toFloat()) }
-    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val keepPx = with(density) { 6.dp.toPx() }
-    var flingJob by remember { mutableStateOf<Job?>(null) }
 
     // 焦点请求器，用于键盘操作
     val focusRequester = remember { FocusRequester() }
@@ -377,7 +373,7 @@ public fun DesktopDocumentView(
                     zoom,
                     offset.x.toLong(),
                     offset.y.toLong(),
-                    lastOrientation.toLong()
+                    lastOrientation.toLong(),
                 )
             }
 

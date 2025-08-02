@@ -61,7 +61,7 @@ public fun DocumentView(
     jumpToPage: Int? = null,
     align: PdfViewState.Align = PdfViewState.Align.Top,
     initialOrientation: Int,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
     onPageChanged: ((page: Int) -> Unit)? = null, // 新增页面变化回调
@@ -69,6 +69,7 @@ public fun DocumentView(
     initialScrollX: Long = 0L, // 新增：初始X偏移量
     initialScrollY: Long = 0L, // 新增：初始Y偏移量
     initialZoom: Double = 1.0, // 新增：初始缩放比例
+    reflow: Long = 0, // 新增：初始缩放比例
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -232,7 +233,8 @@ public fun DocumentView(
                 zoom,
                 offset.x.toLong(),
                 offset.y.toLong(),
-                orientation.toLong()
+                orientation.toLong(),
+                reflow.toLong()
             )
         }
     }

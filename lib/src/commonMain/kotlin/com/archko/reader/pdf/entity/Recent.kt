@@ -87,6 +87,7 @@ public class Recent {
                 ", pageCount=" + pageCount +
                 ", createAt=" + createAt +
                 ", crop=" + crop +
+                ", reflow=" + reflow +
                 ", scrollOri=" + scrollOri +
                 ", zoom=" + zoom +
                 ", scrollX=" + scrollX +
