@@ -201,34 +201,6 @@ public class PdfDecoder(file: File) : ImageDecoder {
         return document?.loadOutlineItems() ?: emptyList()
     }
 
-    public fun renderPage(
-        index: Int,
-        viewWidth: Int,
-        viewHeight: Int
-    ): ImageBitmap {
-        if (viewWidth <= 0 || document == null || (!isAuthenticated && needsPassword)) {
-            return (ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565))
-        }
-        val page = getPage(index)
-        val bounds = page.bounds
-        val scale = (1f * viewWidth / (bounds.x1 - bounds.x0))
-        val w = viewWidth
-        val h = ((bounds.y1 - bounds.y0) * scale).toInt()
-
-        println("renderPage:index:$index, scale:$scale, $viewWidth-$viewHeight, bounds:${page.bounds}")
-        val ctm = Matrix()
-        ctm.scale(scale, scale)
-        // 优先尝试复用缓存池中的Bitmap
-        val bitmap = acquireReusableBitmap(w, h)
-        val dev =
-            AndroidDrawDevice(bitmap, 0, 0, 0, 0, bitmap.getWidth(), bitmap.getHeight())
-        page.run(dev, ctm, null as Cookie?)
-        dev.close()
-        dev.destroy()
-
-        return (bitmap.asImageBitmap())
-    }
-
     public override fun renderPageRegion(
         region: androidx.compose.ui.geometry.Rect,
         index: Int,

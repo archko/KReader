@@ -18,14 +18,22 @@ internal fun Document.loadOutline(core: Document): List<OutlineLink> {
     return links
 }
 
+internal fun Document.pageNumberFromLocation(node: Outline?): Int {
+    return pageNumberFromLocation(resolveLink(node))
+}
+
 internal fun Document.downOutline(outlines: Array<Outline>, links: MutableList<OutlineLink>) {
     for (outline in outlines) {
-        val link = OutlineLink(outline.title, outline.uri, 0)
-        if (outline.down != null) {
-            val child: Array<Outline> = outline.down
-            downOutline(child, links)
+        if (outline.title != null) {
+            val page = pageNumberFromLocation(outline)
+            val link = OutlineLink(outline.title, outline.uri, 0)
+            link.targetPage = page
+            if (outline.down != null) {
+                val child: Array<Outline> = outline.down
+                downOutline(child, links)
+            }
+            links.add(link)
         }
-        links.add(link)
     }
 }
 
