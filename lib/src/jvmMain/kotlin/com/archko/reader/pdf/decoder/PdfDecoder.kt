@@ -5,11 +5,11 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.component.Size
-import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
+import com.archko.reader.pdf.entity.Hyperlink
+import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.ColorSpace
-import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.DrawDevice
 import com.artifex.mupdf.fitz.Matrix
@@ -53,22 +53,25 @@ public class PdfDecoder(file: File) : ImageDecoder {
     // 密码相关状态
     public var needsPassword: Boolean = false
     public var isAuthenticated: Boolean = false
-    
+
     // 页面缓存，最多缓存8页
     private val pageCache = mutableMapOf<Int, com.artifex.mupdf.fitz.Page>()
     private val maxPageCache = 8
+
+    // 链接缓存，避免重复解析
+    private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
 
     init {
         // 检查文件是否存在
         if (!file.exists()) {
             throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
         }
-        
+
         // 检查文件是否可读
         if (!file.canRead()) {
             throw SecurityException("无法读取文档文件: ${file.absolutePath}")
         }
-        
+
         try {
             document = Document.openDocument(file.absolutePath)
             // 检查是否需要密码
@@ -194,7 +197,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
             oldestPage?.destroy()
             println("Removed page $oldestIndex from cache to make room for page $index")
         }
-        
+
         return pageCache.getOrPut(index) {
             document!!.loadPage(index)
         }
@@ -210,7 +213,10 @@ public class PdfDecoder(file: File) : ImageDecoder {
             }
         }
         pageCache.clear()
-        
+
+        // 清理链接缓存
+        linksCache.clear()
+
         document?.destroy()
     }
 
@@ -218,19 +224,19 @@ public class PdfDecoder(file: File) : ImageDecoder {
         val list = mutableListOf<Size>()
         var totalHeight = 0
         document?.let { doc ->
-        for (i in 0 until pageCount) {
+            for (i in 0 until pageCount) {
                 val page = doc.loadPage(i)
-            val bounds = page.bounds
-            val size = Size(
-                bounds.x1.toInt() - bounds.x0.toInt(),
-                bounds.y1.toInt() - bounds.y0.toInt(),
-                i,
-                scale = 1.0f,
-                totalHeight,
-            )
-            totalHeight += size.height
-            page.destroy()
-            list.add(size)
+                val bounds = page.bounds
+                val size = Size(
+                    bounds.x1.toInt() - bounds.x0.toInt(),
+                    bounds.y1.toInt() - bounds.y0.toInt(),
+                    i,
+                    scale = 1.0f,
+                    totalHeight,
+                )
+                totalHeight += size.height
+                page.destroy()
+                list.add(size)
             }
         }
         return list
@@ -238,6 +244,78 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
     private fun prepareOutlines(): List<Item> {
         return document?.loadOutlineItems() ?: emptyList()
+    }
+
+    /**
+     * 获取页面上的链接
+     * @param pageIndex 页面索引
+     * @return 链接列表
+     */
+    public override fun getPageLinks(pageIndex: Int): List<Hyperlink> {
+        // 先检查缓存
+        if (linksCache.containsKey(pageIndex)) {
+            return linksCache[pageIndex]!!
+        }
+
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return emptyList()
+        }
+
+        return try {
+            val page = getPage(pageIndex)
+            val links = page.links ?: return emptyList()
+
+            val hyperlinks = mutableListOf<Hyperlink>()
+
+            for (link in links) {
+                val hyperlink = Hyperlink()
+                hyperlink.bbox = androidx.compose.ui.geometry.Rect(
+                    link.bounds.x0,
+                    link.bounds.y0,
+                    link.bounds.x1,
+                    link.bounds.y1
+                )
+
+                val location = document!!.resolveLink(link)
+                val targetPage = document!!.pageNumberFromLocation(location)
+
+                if (targetPage >= 0) {
+                    // 页面链接
+                    hyperlink.linkType = Hyperlink.LINKTYPE_PAGE
+                    hyperlink.page = targetPage
+                    hyperlink.url = null
+                } else {
+                    // URL链接
+                    hyperlink.linkType = Hyperlink.LINKTYPE_URL
+                    hyperlink.url = link.uri
+                    hyperlink.page = -1
+                }
+
+                hyperlinks.add(hyperlink)
+            }
+
+            // 缓存结果
+            linksCache[pageIndex] = hyperlinks
+            println("PdfDecoder.getPageLinks: page=$pageIndex, links=${hyperlinks.size}")
+
+            hyperlinks
+        } catch (e: Exception) {
+            println("获取页面链接失败: $e")
+            emptyList()
+        }
+    }
+
+    /**
+     * 在解码缩略图时同时解析链接
+     * @param pageIndex 页面索引
+     * @param forceParse 是否强制解析（即使已缓存）
+     */
+    private fun parseLinksIfNeeded(pageIndex: Int, forceParse: Boolean = false) {
+        if (!forceParse && linksCache.containsKey(pageIndex)) {
+            return
+        }
+
+        getPageLinks(pageIndex)
     }
 
     public override fun renderPageRegion(
@@ -251,7 +329,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-        
+
         val patchX = region.left.toInt()
         val patchY = region.top.toInt()
         println("renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
@@ -277,10 +355,13 @@ public class PdfDecoder(file: File) : ImageDecoder {
                 ctm.translate(-patchX.toFloat(), -patchY.toFloat())
 
                 val dev = DrawDevice(pixmap)
-                            val page = getPage(index)
-            page.run(dev, ctm, null)
+                val page = getPage(index)
+                page.run(dev, ctm, null)
                 dev.close()
                 dev.destroy()
+
+                // 在解码缩略图时同时解析链接
+                parseLinksIfNeeded(index)
 
                 val pixmapWidth = pixmap.width
                 val pixmapHeight = pixmap.height

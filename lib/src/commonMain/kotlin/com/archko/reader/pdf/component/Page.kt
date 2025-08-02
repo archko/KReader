@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.Hyperlink
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -39,6 +40,10 @@ public class Page(
     private var thumbDecoding = false
     private var thumbJob: Job? = null
 
+    // 页面链接
+    public var links: List<Hyperlink> = emptyList()
+    private var linksLoaded = false
+
     public fun recycleThumb() {
         thumbBitmap = null
         thumbDecoding = false
@@ -46,19 +51,65 @@ public class Page(
         thumbJob = null
     }
 
+    /**
+     * 加载页面链接
+     */
+    public fun loadLinks() {
+        if (linksLoaded) return
+
+        //println("Page.loadLinks: 开始加载页面 ${aPage.index} 的链接")
+        links = pdfViewState.state.getPageLinks(aPage.index)
+        linksLoaded = true
+        //println("Page.loadLinks: 页面 ${aPage.index} 加载完成，链接数量: ${links.size}")
+        
+        // 打印每个链接的详细信息
+        //links.forEachIndexed { index, link ->
+        //    println("Page.loadLinks: 链接 $index - 类型: ${if (link.linkType == Hyperlink.LINKTYPE_PAGE) "页面链接" else "URL链接"}, bbox: ${link.bbox}, 目标: ${if (link.linkType == Hyperlink.LINKTYPE_PAGE) "页面${link.page + 1}" else link.url}")
+        //}
+    }
+
+    /**
+     * 查找点击位置的链接
+     */
+    public fun findLinkAtPoint(x: Float, y: Float): Hyperlink? {
+        if (links.isEmpty()) {
+            //println("Page.findLinkAtPoint: 页面 ${aPage.index} 没有链接")
+            return null
+        }
+
+        // 将点击坐标转换为页面相对坐标
+        val pageX = x - bounds.left
+        val pageY = y - bounds.top
+
+        // 转换为原始PDF坐标
+        val pdfX = pageX / totalScale
+        val pdfY = pageY / totalScale
+
+        //println("Page.findLinkAtPoint: 页面 ${aPage.index}, 点击坐标($x, $y), 页面坐标($pageX, $pageY), PDF坐标($pdfX, $pdfY), 链接数量: ${links.size}")
+
+        val foundLink = Hyperlink.findLinkAtPoint(links, pdfX, pdfY)
+        //if (foundLink != null) {
+        //    println("Page.findLinkAtPoint: 找到链接 - 类型: ${if (foundLink.linkType == Hyperlink.LINKTYPE_PAGE) "页面链接" else "URL链接"}, 目标: ${if (foundLink.linkType == Hyperlink.LINKTYPE_PAGE) "页面${foundLink.page + 1}" else foundLink.url}")
+        //} else {
+        //    println("Page.findLinkAtPoint: 未找到链接")
+        //}
+
+        return foundLink
+    }
+
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {
         if (thumbDecoding) return
-        
+
         // 缩略图宽度为当前view宽度的1/3
         val thumbWidth = (pdfViewState.viewSize.width / 3).coerceAtLeast(1)
         // 根据原始宽高比计算缩略图高度
         val thumbHeight = if (aPage.width > 0) {
-            (thumbWidth * aPage.height / aPage.width).toInt().coerceAtLeast(1)
+            (thumbWidth * aPage.height / aPage.width).coerceAtLeast(1)
         } else {
             (height / 3).toInt().coerceAtLeast(1)
         }
-        
+
         val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}"
         val cached = ImageCache.get(cacheKey)
         if (cached != null) {
@@ -72,14 +123,14 @@ public class Page(
                 thumbDecoding = false
                 return@launch
             }
-            
+
             // 检查 PdfViewState 是否已关闭
             if (pdfViewState.isShutdown()) {
                 println("[Page.loadThumbnail] page=PdfViewState已关闭")
                 thumbDecoding = false
                 return@launch
             }
-            
+
             try {
                 val region = Rect(0f, 0f, 1f, 1f)
                 // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
@@ -88,7 +139,7 @@ public class Page(
                 } else {
                     totalScale / 3
                 }
-                
+
                 val bitmap = pdfViewState.state.renderPageRegion(
                     region,
                     aPage.index,
@@ -115,12 +166,6 @@ public class Page(
         }
     }
 
-    /**
-     * @param viewSize view size
-     * @param scale view zoom,not the page zoom,default=1f
-     * @param yOffset page.top
-     * @param xOffset page.left
-     */
     public fun update(width: Float, height: Float, rect: Rect) {
         this.width = width
         this.height = height
@@ -166,11 +211,19 @@ public class Page(
                     totalScale * scaleRatio
                 )
             }
+
+            // 加载链接（在缩略图加载完成后）
+            if (!linksLoaded) {
+                loadLinks()
+            }
         } else {
             if (!thumbDecoding) {
                 loadThumbnail()
             }
         }
+
+        // 绘制链接区域（调试用，可以注释掉）
+        drawLinks(drawScope, currentBounds, scaleRatio)
 
         // 占位框
         /*drawScope.drawRect(
@@ -179,6 +232,38 @@ public class Page(
             size = Size(currentBounds.width, currentBounds.height),
             style = Stroke(width = 6f)
         )*/
+    }
+
+    /**
+     * 绘制链接区域
+     */
+    private fun drawLinks(drawScope: DrawScope, currentBounds: Rect, scaleRatio: Float) {
+        if (links.isEmpty()) return
+
+        for (link in links) {
+            val bbox = link.bbox ?: continue
+
+            // 将PDF坐标转换为屏幕坐标
+            val linkRect = Rect(
+                left = currentBounds.left + bbox.left * totalScale * scaleRatio,
+                top = currentBounds.top + bbox.top * totalScale * scaleRatio,
+                right = currentBounds.left + bbox.right * totalScale * scaleRatio,
+                bottom = currentBounds.top + bbox.bottom * totalScale * scaleRatio
+            )
+
+            // 根据链接类型选择颜色
+            val linkColor = if (link.linkType == Hyperlink.LINKTYPE_PAGE) {
+                androidx.compose.ui.graphics.Color(0x40FFD700) // 半透明淡黄色
+            } else {
+                androidx.compose.ui.graphics.Color(0x40FFA500) // 半透明橙色
+            }
+
+            drawScope.drawRect(
+                color = linkColor,
+                topLeft = Offset(linkRect.left, linkRect.top),
+                size = androidx.compose.ui.geometry.Size(linkRect.width, linkRect.height)
+            )
+        }
     }
 
     public fun recycle() {

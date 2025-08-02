@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.Hyperlink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -39,6 +40,10 @@ public class PdfViewState(
 
     // 添加关闭标志
     private var isShutdown = false
+
+    // 链接处理回调
+    public var onPageLinkClick: ((pageIndex: Int) -> Unit)? = null
+    public var onUrlLinkClick: ((url: String) -> Unit)? = null
 
     public fun isTileVisible(spec: TileSpec): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
@@ -357,6 +362,69 @@ public class PdfViewState(
         updateVisiblePages(offset, viewSize, vZoom)
         pageToRender.forEach { page ->
             page.draw(drawScope, offset, vZoom)
+        }
+    }
+
+    /**
+     * 处理点击事件，查找并处理链接
+     * @param x 点击的X坐标
+     * @param y 点击的Y坐标
+     * @return 如果找到链接并处理成功返回true，否则返回false
+     */
+    public fun handleClick(x: Float, y: Float): Boolean {
+        for (page in pageToRender) {
+            //println("PdfViewState.handleClick: 检查页面 ${page.aPage.index}")
+            val link = page.findLinkAtPoint(x, y)
+            if (link != null) {
+                //println("PdfViewState.handleClick: 在页面 ${page.aPage.index} 找到链接，开始处理")
+                return handleLink(link)
+            }
+        }
+
+        //println("PdfViewState.handleClick: 在所有可见页面中都没有找到链接")
+        return false
+    }
+
+    /**
+     * 处理链接
+     * @param link 找到的链接
+     * @return 处理是否成功
+     */
+    private fun handleLink(link: Hyperlink): Boolean {
+        //println("PdfViewState.handleLink: 处理链接 - 类型: ${if (link.linkType == Hyperlink.LINKTYPE_PAGE) "页面链接" else "URL链接"}")
+
+        return when (link.linkType) {
+                        Hyperlink.LINKTYPE_PAGE -> {
+                // 页面链接，跳转到指定页面
+                if (link.page >= 0 && link.page < pages.size) {
+                    val targetPage = pages[link.page]
+                    println("PdfViewState.handleLink: 调用页面链接回调，目标页面: ${link.page + 1}, 目标页面top: ${targetPage.bounds.top}, 当前缩放: $vZoom")
+                    
+                    // 调用外部回调处理页面跳转
+                    onPageLinkClick?.invoke(link.page)
+                    true
+                } else {
+                    println("PdfViewState.handleLink: 页面链接无效，目标页面: ${link.page + 1}, 总页面数: ${pages.size}")
+                    false
+                }
+            }
+
+            Hyperlink.LINKTYPE_URL -> {
+                // URL链接，打开外部链接
+                if (!link.url.isNullOrEmpty()) {
+                    println("PdfViewState.handleLink: 调用URL链接回调，URL: ${link.url}")
+                    onUrlLinkClick?.invoke(link.url!!)
+                    true
+                } else {
+                    println("PdfViewState.handleLink: URL链接无效，URL为空")
+                    false
+                }
+            }
+
+            else -> {
+                println("PdfViewState.handleLink: 未知链接类型: ${link.linkType}")
+                false
+            }
         }
     }
 }

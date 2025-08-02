@@ -394,23 +394,33 @@ public fun DesktopDocumentView(
             .pointerInput(viewSize, keepPx, orientation) {
                 detectTapGestures(
                     onTap = { offsetTap ->
-                        // 单击翻页逻辑 - 提取公共方法避免重复代码
-                        val isPageTurned = handleTapGesture(
-                            offsetTap,
-                            viewSize,
-                            offset,
-                            orientation,
-                            pdfViewState,
-                            keepPx
-                        ) { newOffset ->
-                            offset = newOffset
-                            pdfViewState.updateOffset(offset)
-                        }
-                        // 如果不是翻页区域，计算点击的页面并触发回调
-                        if (!isPageTurned) {
-                            val clickedPage =
-                                calculateClickedPage(offsetTap, offset, orientation, pdfViewState)
-                            onTapNonPageArea?.invoke(clickedPage)
+                        // 将点击坐标转换为相对于内容的位置
+                        val contentX = offsetTap.x - offset.x
+                        val contentY = offsetTap.y - offset.y
+                        
+                        // 首先尝试处理链接点击
+                        val linkHandled = pdfViewState.handleClick(contentX, contentY)
+                        
+                        // 如果没有处理链接，再处理翻页逻辑
+                        if (!linkHandled) {
+                            val isPageTurned = handleTapGesture(
+                                offsetTap,
+                                viewSize,
+                                offset,
+                                orientation,
+                                pdfViewState,
+                                keepPx
+                            ) { newOffset ->
+                                offset = newOffset
+                                pdfViewState.updateOffset(offset)
+                            }
+                            
+                            // 如果不是翻页区域，触发非页面区域点击回调
+                            if (!isPageTurned) {
+                                val clickedPage =
+                                    calculateClickedPage(offsetTap, offset, orientation, pdfViewState)
+                                onTapNonPageArea?.invoke(clickedPage)
+                            }
                         }
                     },
                     onDoubleTap = { offsetTap ->

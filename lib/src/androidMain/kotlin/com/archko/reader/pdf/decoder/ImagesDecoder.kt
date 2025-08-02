@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
+import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import java.io.File
 import java.io.FileInputStream
@@ -63,6 +64,10 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             calculateSize(viewportSize)
         }
         return imageSize
+    }
+
+    override fun getPageLinks(pageIndex: Int): List<Hyperlink> {
+        return emptyList()
     }
 
     private fun calculateSize(viewportSize: IntSize) {

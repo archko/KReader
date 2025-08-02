@@ -95,6 +95,23 @@ public fun DocumentView(
         PdfViewState(list, state, orientation)
     }
 
+    // 设置页面跳转回调
+    LaunchedEffect(pdfViewState) {
+        pdfViewState.onPageLinkClick = { pageIndex ->
+            isJumping = true // 设置跳转标志
+            val targetPage = pdfViewState.pages[pageIndex]
+            val newOffset = Offset(offset.x, -targetPage.bounds.top)
+            offset = newOffset
+            pdfViewState.updateOffset(offset)
+            isJumping = false
+        }
+        
+        pdfViewState.onUrlLinkClick = { url ->
+            println("DocumentView: URL链接点击，URL: $url")
+            // 这里可以添加打开URL的逻辑，比如调用系统浏览器
+        }
+    }
+
     // 确保在 list 变化时重新计算总高度
     LaunchedEffect(list) {
         if (viewSize != IntSize.Zero) {
@@ -234,7 +251,7 @@ public fun DocumentView(
                 offset.x.toLong(),
                 offset.y.toLong(),
                 orientation.toLong(),
-                reflow.toLong()
+                reflow
             )
         }
     }
@@ -272,28 +289,40 @@ public fun DocumentView(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { offsetTap ->
-                        // 单击翻页逻辑 - 提取公共方法避免重复代码
-                        val isPageTurned = handleTapGesture(
-                            offsetTap,
-                            viewSize,
-                            offset,
-                            orientation,
-                            pdfViewState,
-                            keepPx
-                        ) { newOffset ->
-                            offset = newOffset
-                            pdfViewState.updateOffset(offset)
-                        }
-                        // 如果不是翻页区域，计算点击的页面并触发回调
-                        if (!isPageTurned) {
-                            val clickedPage =
-                                calculateClickedPage(
-                                    offsetTap,
-                                    offset,
-                                    orientation,
-                                    pdfViewState
-                                )
-                            onTapNonPageArea?.invoke(clickedPage)
+                        // 将点击坐标转换为相对于内容的位置
+                        val contentX = offsetTap.x - offset.x
+                        val contentY = offsetTap.y - offset.y
+
+                        // 首先尝试处理链接点击
+                        println("DocumentView.onTap: 尝试处理链接点击，坐标($contentX, $contentY)")
+                        val linkHandled = pdfViewState.handleClick(contentX, contentY)
+                        println("DocumentView.onTap: 链接处理结果: $linkHandled")
+
+                        // 如果没有处理链接，再处理翻页逻辑
+                        if (!linkHandled) {
+                            val isPageTurned = handleTapGesture(
+                                offsetTap,
+                                viewSize,
+                                offset,
+                                orientation,
+                                pdfViewState,
+                                keepPx
+                            ) { newOffset ->
+                                offset = newOffset
+                                pdfViewState.updateOffset(offset)
+                            }
+
+                            // 如果不是翻页区域，触发非页面区域点击回调
+                            if (!isPageTurned) {
+                                val clickedPage =
+                                    calculateClickedPage(
+                                        offsetTap,
+                                        offset,
+                                        orientation,
+                                        pdfViewState
+                                    )
+                                onTapNonPageArea?.invoke(clickedPage)
+                            }
                         }
                     },
                     onDoubleTap = { offsetTap ->
