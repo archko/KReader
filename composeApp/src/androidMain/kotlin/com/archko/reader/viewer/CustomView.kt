@@ -105,6 +105,11 @@ fun CustomView(
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, reflow:$reflow, $currentPath")
+            if (!FileTypeUtils.isDocumentFile(currentPath) && !FileTypeUtils.isImageFile(currentPath)) {
+                loadingError = "document_open_failed"
+                decoder = null
+                return@withContext
+            }
             try {
                 val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                     null
@@ -213,9 +218,16 @@ fun CustomView(
                         text = currentPath,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(Res.string.support_format),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(

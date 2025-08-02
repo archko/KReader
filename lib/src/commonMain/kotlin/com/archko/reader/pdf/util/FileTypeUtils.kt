@@ -26,7 +26,8 @@ public object FileTypeUtils {
         return path.lowercase().let { filePath ->
             filePath.endsWith(".pdf") || filePath.endsWith(".epub") || 
             filePath.endsWith(".mobi") || filePath.endsWith(".xps") || 
-            filePath.endsWith(".fb") || filePath.endsWith(".fb2")
+            filePath.endsWith(".fb") || filePath.endsWith(".fb2")||
+            filePath.endsWith(".pptx") || filePath.endsWith(".docx")
         }
     }
     

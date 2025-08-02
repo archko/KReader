@@ -32,6 +32,7 @@ import kreader.composeapp.generated.resources.about_content
 import kreader.composeapp.generated.resources.about_kreader
 import kreader.composeapp.generated.resources.app_author
 import kreader.composeapp.generated.resources.confirm
+import kreader.composeapp.generated.resources.support_format
 import kreader.composeapp.generated.resources.version
 import org.jetbrains.compose.resources.stringResource
 
@@ -455,6 +456,16 @@ fun AboutDialog(
                     .verticalScroll(rememberScrollState())
                     .padding(vertical = 8.dp)
             ) {
+                Text(
+                    text = stringResource(Res.string.support_format),
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp
+                    ),
+                    textAlign = TextAlign.Start
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(Res.string.about_content),
                     style = TextStyle(
