@@ -1,6 +1,5 @@
 package com.archko.reader.pdf.util
 
-import com.archko.reader.pdf.util.FileTypeUtils.maxSizeMB
 import java.io.File
 
 /**
@@ -9,31 +8,34 @@ import java.io.File
  */
 public object FileTypeUtils {
 
-    private const val maxSizeMB = 10 * 1024 * 1024L
+    private const val MAX_SIZE_MB = 10 * 1024 * 1024L
 
     /**
      * 判断是否为图片文件
+     * Android支持的图片格式：JPEG, PNG, GIF, BMP, WebP, HEIF, HEIC
      */
     public fun isImageFile(path: String): Boolean {
         return path.lowercase().let { filePath ->
             filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")
                     || filePath.endsWith(".png") || filePath.endsWith(".gif")
                     || filePath.endsWith(".bmp") || filePath.endsWith(".webp")
-                    || filePath.endsWith(".heic")
+                    || filePath.endsWith(".heif") || filePath.endsWith(".heic")
+                    || filePath.endsWith(".jfif") || filePath.endsWith(".tiff")
+                    || filePath.endsWith(".tif")
         }
     }
 
     /**
      * 判断是否为有效的图片文件（包括大小判断）
      * @param file 文件对象
-     * @param maxSizeMB 最大文件大小（MB），默认10MB
+     * @param MAX_SIZE_MB 最大文件大小（MB），默认10MB
      * @return 是否为有效的图片文件
      */
     public fun isValidImageFile(file: File): Boolean {
         return file.exists()
                 && file.isFile
                 && isImageFile(file.absolutePath)
-                && file.length() <= maxSizeMB
+                && file.length() <= MAX_SIZE_MB
     }
 
     /**
@@ -67,11 +69,11 @@ public object FileTypeUtils {
     /**
      * 过滤文件列表，移除大于指定大小的文件
      * @param files 文件列表
-     * @param maxSizeMB 最大文件大小（MB）
+     * @param MAX_SIZE_MB 最大文件大小（MB）
      * @return 过滤后的文件列表
      */
     public fun filterFilesBySize(files: List<File>): List<File> {
-        val maxSizeBytes = maxSizeMB
+        val maxSizeBytes = MAX_SIZE_MB
         return files.filter { file ->
             file.exists() && file.length() <= maxSizeBytes
         }
