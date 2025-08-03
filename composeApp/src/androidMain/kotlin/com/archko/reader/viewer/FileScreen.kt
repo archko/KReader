@@ -61,6 +61,7 @@ fun FileScreen(
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
         var showDirectoryDialog by remember { mutableStateOf(false) }
         var pendingImagePath by remember { mutableStateOf<String?>(null) }
+        var pendingFiles by remember { mutableStateOf<List<File>?>(null) }
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
@@ -76,8 +77,8 @@ fun FileScreen(
                             // 如果是图片文件，显示确认对话框
                             pendingImagePath = path
                             showDirectoryDialog = true
-                        } else {
-                            // 非图片文件，直接打开
+                        } else if (FileTypeUtils.isDocumentFile(path)) {
+                            // 如果是支持的文档文件，直接打开
                             val paths = listOf(file.absolutePath)
                             if (FileTypeUtils.shouldSaveProgress(paths)) {
                                 viewModel.getProgress(file.absolutePath)
@@ -86,6 +87,9 @@ fun FileScreen(
                             } else {
                                 openDocRequest = OpenDocRequest(paths, 0)
                             }
+                        } else {
+                            // 如果既不是图片也不是支持的文档，则不打开
+                            // 这里不执行任何操作
                         }
                     }
                 }
@@ -113,9 +117,10 @@ fun FileScreen(
         // 确认对话框
         if (showDirectoryDialog) {
             AlertDialog(
-                onDismissRequest = { 
+                onDismissRequest = {
                     showDirectoryDialog = false
                     pendingImagePath = null
+                    pendingFiles = null
                 },
                 title = { Text(stringResource(Res.string.browse_directory_title)) },
                 text = { Text(stringResource(Res.string.browse_directory_message)) },
@@ -125,28 +130,22 @@ fun FileScreen(
                             showDirectoryDialog = false
                             pendingImagePath?.let { imagePath ->
                                 scope.launch {
-                                    // 异步加载父目录下的所有图片
+                                    // 扫描整个目录
                                     val imageFile = File(imagePath)
                                     val parentDir = imageFile.parentFile
                                     if (parentDir != null && parentDir.exists()) {
                                         val allImageFiles = mutableListOf<File>()
-                                        
+
                                         // 只扫描当前目录层级，不递归子目录
                                         parentDir.listFiles()?.forEach { file ->
-                                            if (file.isFile && FileTypeUtils.isImageFile(file.absolutePath)) {
+                                            if (FileTypeUtils.isValidImageFile(file)) {
                                                 allImageFiles.add(file)
                                             }
                                         }
-                                        
-                                        // 过滤掉大于10MB的文件
-                                        val filteredFiles = FileTypeUtils.filterFilesBySize(allImageFiles, 10)
-                                        
-                                        if (filteredFiles.isNotEmpty()) {
-                                            val paths = filteredFiles.map { it.absolutePath }
+
+                                        if (allImageFiles.isNotEmpty()) {
+                                            val paths = allImageFiles.map { it.absolutePath }
                                             openDocRequest = OpenDocRequest(paths, 0)
-                                        } else {
-                                            // 如果没有找到合适的图片，只打开当前图片
-                                            openDocRequest = OpenDocRequest(listOf(imagePath), 0)
                                         }
                                     } else {
                                         // 如果父目录不存在，只打开当前图片
@@ -155,6 +154,7 @@ fun FileScreen(
                                 }
                             }
                             pendingImagePath = null
+                            pendingFiles = null
                         }
                     ) {
                         Text(stringResource(Res.string.confirm))
@@ -164,11 +164,14 @@ fun FileScreen(
                     TextButton(
                         onClick = {
                             showDirectoryDialog = false
-                            pendingImagePath?.let { imagePath ->
-                                // 只打开当前图片
-                                openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                            pendingFiles?.let { images ->
+                                if (images.isNotEmpty()) {
+                                    val paths = images.map { it.absolutePath }
+                                    openDocRequest = OpenDocRequest(paths, 0)
+                                }
                             }
                             pendingImagePath = null
+                            pendingFiles = null
                         }
                     ) {
                         Text(stringResource(Res.string.cancel))
@@ -196,34 +199,37 @@ fun FileScreen(
                     ) { files ->
                         scope.launch {
                             if (files.isNotEmpty()) {
-                                val firstFile = files.first()
-                                val firstPath =
-                                    IntentFile.getPath(PdfApp.app!!, firstFile.uri) ?: firstFile.uri.toString()
-                                val firstFileObj = File(firstPath)
+                                // 先判断所有文件，得到图片列表和文档列表
+                                val imageFiles = mutableListOf<File>()
+                                val documentFiles = mutableListOf<File>()
 
-                                if (firstFileObj.exists()) {
-                                    val isFirstImage = FileTypeUtils.isImageFile(firstPath)
-                                    val isFirstDocument = FileTypeUtils.isDocumentFile(firstPath)
-
-                                    if (isFirstImage) {
-                                        // 如果第一个是图片，显示目录选择对话框（与外部传入图片的处理方式一样）
-                                        pendingImagePath = firstPath
-                                        showDirectoryDialog = true
-                                    } else if (isFirstDocument) {
-                                        // 如果是文档文件，只取第一个
-                                        val paths = listOf(firstPath)
-                                        if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                            viewModel.getProgress(paths.first())
-                                            val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                            openDocRequest = OpenDocRequest(paths, startPage)
-                                        } else {
-                                            openDocRequest = OpenDocRequest(paths, 0)
-                                        }
-                                    } else {
-                                        // 其他类型文件，只取第一个
-                                        openDocRequest = OpenDocRequest(listOf(firstPath), 0)
+                                files.forEach { file ->
+                                    val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
+                                    val fileObj = File(path)
+                                    if (FileTypeUtils.isValidImageFile(fileObj)) {
+                                        imageFiles.add(fileObj)
+                                    } else if (FileTypeUtils.isDocumentFile(path)) {
+                                        documentFiles.add(fileObj)
                                     }
                                 }
+
+                                if (imageFiles.isNotEmpty()) {
+                                    // 有图片，弹出对话框选择
+                                    val firstImagePath = imageFiles.first().absolutePath
+                                    pendingImagePath = firstImagePath
+                                    pendingFiles = imageFiles // 直接设置为图片列表
+                                    showDirectoryDialog = true
+                                } else if (documentFiles.isNotEmpty()) {
+                                    // 没有图片但有文档，直接打开第一个文档
+                                    val firstDocumentPath = documentFiles.first().absolutePath
+                                    val paths = listOf(firstDocumentPath)
+                                    if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                        viewModel.getProgress(paths.first())
+                                        val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                        openDocRequest = OpenDocRequest(paths, startPage)
+                                    }
+                                }
+                                // 如果都没有，什么都不做
                             }
                         }
                     }
