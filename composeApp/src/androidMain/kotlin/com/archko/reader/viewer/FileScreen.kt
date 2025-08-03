@@ -74,9 +74,7 @@ fun FileScreen(
                     val file = File(path)
                     if (file.exists()) {
                         if (FileTypeUtils.isImageFile(path)) {
-                            // 如果是图片文件，显示确认对话框
-                            pendingImagePath = path
-                            showDirectoryDialog = true
+                            openDocRequest = OpenDocRequest(listOf(path), 0)
                         } else if (FileTypeUtils.isDocumentFile(path)) {
                             // 如果是支持的文档文件，直接打开
                             val paths = listOf(file.absolutePath)
@@ -87,9 +85,6 @@ fun FileScreen(
                             } else {
                                 openDocRequest = OpenDocRequest(paths, 0)
                             }
-                        } else {
-                            // 如果既不是图片也不是支持的文档，则不打开
-                            // 这里不执行任何操作
                         }
                     }
                 }

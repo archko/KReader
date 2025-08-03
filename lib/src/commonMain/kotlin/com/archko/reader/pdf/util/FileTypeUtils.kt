@@ -35,7 +35,7 @@ public object FileTypeUtils {
         return file.exists()
                 && file.isFile
                 && isImageFile(file.absolutePath)
-                && file.length() <= MAX_SIZE_MB
+                //&& file.length() <= MAX_SIZE_MB
     }
 
     /**
@@ -73,9 +73,9 @@ public object FileTypeUtils {
      * @return 过滤后的文件列表
      */
     public fun filterFilesBySize(files: List<File>): List<File> {
-        val maxSizeBytes = MAX_SIZE_MB
         return files.filter { file ->
-            file.exists() && file.length() <= maxSizeBytes
+            file.exists()
+                    //&& file.length() <= MAX_SIZE_MB
         }
     }
 } 
