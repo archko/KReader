@@ -1,4 +1,4 @@
-# KReader
+# KReader https://www.pgyer.com/kreader-android
 
 基于 Kotlin Multiplatform 和 Jetpack Compose 构建的现代 PDF 阅读器，为多平台提供流畅的阅读体验。
 
