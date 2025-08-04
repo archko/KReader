@@ -1,6 +1,6 @@
 # KReader https://www.pgyer.com/kreader-android
 
-A modern PDF reader built with Kotlin Multiplatform and Jetpack Compose, providing a smooth reading experience across multiple platforms.
+A modern PDF reader built with Kotlin Multiplatform and Jetpack Compose, providing a smooth reading experience across multiple platforms.Support pdf, epub, mobi, xps, fb, cb, images, (docx, pptx)
 
 ## About
 
