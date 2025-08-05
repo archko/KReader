@@ -294,7 +294,7 @@ public fun DocumentView(
                         val contentY = offsetTap.y - offset.y
 
                         // 首先尝试处理链接点击
-                        println("DocumentView.onTap: 尝试处理链接点击，坐标($contentX, $contentY)")
+                        //println("DocumentView.onTap: 尝试处理链接点击，坐标($contentX, $contentY)")
                         val linkHandled = pdfViewState.handleClick(contentX, contentY)
                         println("DocumentView.onTap: 链接处理结果: $linkHandled")
 
@@ -474,11 +474,11 @@ public fun DocumentView(
                             flingJob?.cancel()
                             //if (velocitySquared > velocityThreshold) {
                             val decayAnimationSpec =
-                                exponentialDecay<Float>(frictionMultiplier = 0.35f)
+                                exponentialDecay<Float>(frictionMultiplier = 0.2f)
                             flingJob = scope.launch {
                                 if (orientation == Vertical) {
                                     // X方向
-                                    if (abs(velocity.x) > 50f) {
+                                    if (abs(velocity.x) > 30f) {
                                         val animX = AnimationState(
                                             initialValue = offset.x,
                                             initialVelocity = velocity.x
@@ -495,7 +495,7 @@ public fun DocumentView(
                                         }
                                     }
                                     // Y方向
-                                    if (abs(velocity.y) > 50f) {
+                                    if (abs(velocity.y) > 30f) {
                                         val animY = AnimationState(
                                             initialValue = offset.y,
                                             initialVelocity = velocity.y
@@ -519,7 +519,7 @@ public fun DocumentView(
                                     }
                                 } else {
                                     // X方向
-                                    if (abs(velocity.x) > 50f) {
+                                    if (abs(velocity.x) > 30f) {
                                         val animX = AnimationState(
                                             initialValue = offset.x,
                                             initialVelocity = velocity.x
@@ -542,7 +542,7 @@ public fun DocumentView(
                                         }
                                     }
                                     // Y方向
-                                    if (abs(velocity.y) > 50f) {
+                                    if (abs(velocity.y) > 30f) {
                                         val animY = AnimationState(
                                             initialValue = offset.y,
                                             initialVelocity = velocity.y
@@ -717,4 +717,3 @@ private fun handleTapGesture(
         }
     }
 }
-

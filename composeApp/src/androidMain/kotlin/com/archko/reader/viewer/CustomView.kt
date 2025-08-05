@@ -294,6 +294,8 @@ fun CustomView(
         val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
         // 当前页与总页数
         var currentPage by remember { mutableIntStateOf(0) }
+        // 添加标志位以跟踪是否为外部更改
+        var isExternalChange by remember { mutableStateOf(false) }
         val pageCount: Int = list.size
         // 跳转页面状态
         var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
@@ -559,7 +561,9 @@ fun CustomView(
                     var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
                     // 当currentPage变化时更新sliderValue
                     LaunchedEffect(currentPage) {
+                        isExternalChange = true
                         sliderValue = (currentPage + 1).toFloat()
+                        isExternalChange = false
                     }
                     Column(
                         modifier = Modifier
@@ -578,9 +582,11 @@ fun CustomView(
                             valueRange = 1f..pageCount.toFloat(),
                             steps = (pageCount - 2).coerceAtLeast(0),
                             onValueChangeFinished = {
-                                val targetPage = sliderValue.toInt() - 1
-                                if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                    jumpToPage = targetPage
+                                if (!isExternalChange) {
+                                    val targetPage = sliderValue.toInt() - 1
+                                    if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                        jumpToPage = targetPage
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
