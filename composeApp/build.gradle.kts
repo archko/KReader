@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.implementation
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -62,8 +61,8 @@ android {
         applicationId = "com.archko.reader.viewer"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = libs.versions.versionCode.get().toInt()
+        versionName = libs.versions.versionName.get().toString()
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -101,7 +100,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     android.applicationVariants.all {
-        val buildType = this.buildType.name
         val variant = this
         outputs.all {
             if (this is com.android.build.gradle.internal.api.ApkVariantOutputImpl) {
