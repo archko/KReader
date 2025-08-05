@@ -26,6 +26,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
+import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
@@ -312,7 +313,13 @@ fun FileScreen(
                                         }
                                     },
                                     onDelete = {
+                                        // 删除历史记录
                                         viewModel.deleteRecent(recentList[i])
+                                        
+                                        // 异步删除缓存文件
+                                        scope.launch {
+                                            CustomImageFetcher.deleteCache(recentList[i].path)
+                                        }
                                     }
                                 )
                             }

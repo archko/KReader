@@ -29,27 +29,46 @@ public class CustomImageFetcher(
     private val options: Options
 ) : Fetcher {
 
-    private fun cacheBitmap(bitmap: Bitmap?) {
-        if (null == bitmap) {
-            return
+    public companion object {
+        public fun cacheBitmap(bitmap: Bitmap?, path: String) {
+            if (null == bitmap) {
+                return
+            }
+            BitmapCache.addBitmap(path, bitmap)
+            val dir = PdfApp.app!!.externalCacheDir
+            val cacheDir = File(dir, "image")
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs()
+            }
+            val filePath = "${cacheDir.absolutePath}/${path.hashCode()}"
+            val bmp = Bitmap.createBitmap(
+                bitmap.width,
+                bitmap.height,
+                bitmap.config!!
+            )
+            val buffer = ByteBuffer.allocate(bitmap.getByteCount())
+            bitmap.copyPixelsToBuffer(buffer)
+            buffer.position(0)
+            bmp.copyPixelsFromBuffer(buffer)
+            BitmapUtils.saveBitmapToFile(bmp, File(filePath))
         }
-        BitmapCache.addBitmap(data.path, bitmap)
-        val dir = PdfApp.app!!.externalCacheDir
-        val cacheDir = File(dir, "image")
-        if (!cacheDir.exists()) {
-            cacheDir.mkdirs()
+        
+        public fun deleteCache(path: String?) {
+            if (path==null){
+                return
+            }
+            // 删除内存缓存
+            BitmapCache.remove(path)
+            
+            // 删除磁盘缓存
+            val dir = PdfApp.app!!.externalCacheDir
+            val cacheDir = File(dir, "image")
+            val filePath = "${cacheDir.absolutePath}/${path.hashCode()}"
+            val cacheFile = File(filePath)
+            if (cacheFile.exists()) {
+                cacheFile.delete()
+            }
         }
-        val path = "${cacheDir.absolutePath}/${data.path.hashCode()}"
-        val bmp = Bitmap.createBitmap(
-            bitmap.width,
-            bitmap.height,
-            bitmap.config!!
-        )
-        val buffer = ByteBuffer.allocate(bitmap.getByteCount())
-        bitmap.copyPixelsToBuffer(buffer)
-        buffer.position(0)
-        bmp.copyPixelsFromBuffer(buffer)
-        BitmapUtils.saveBitmapToFile(bmp, File(path))
     }
 
     private fun loadBitmapFromCache(): Bitmap? {
@@ -74,7 +93,7 @@ public class CustomImageFetcher(
         if (bitmap == null) {
             bitmap = Bitmap.createBitmap(data.width, data.height, Bitmap.Config.RGB_565)
         } else {
-            cacheBitmap(bitmap)
+            cacheBitmap(bitmap, data.path)
         }
 
         val imageBitmap: BitmapImage = bitmap.asImage()
@@ -87,7 +106,7 @@ public class CustomImageFetcher(
     }
 
     private fun decodeMuPdf(): Bitmap? {
-        var document: Document = Document.openDocument(data.path)
+        val document: Document = Document.openDocument(data.path)
 
         val bitmap = if (document.countPages() > 0)
             renderPdfPage(
@@ -101,25 +120,42 @@ public class CustomImageFetcher(
     private fun renderPdfPage(page: Page, width: Int, height: Int): Bitmap {
         val pWidth = page.bounds.x1 - page.bounds.x0
         val pHeight = page.bounds.y1 - page.bounds.y0
-        val ctm = Matrix()
         val xscale = 1f * width / pWidth
         val yscale = 1f * height / pHeight
-        var w: Int = width
-        var h: Int = height
-        if (xscale > yscale) {
-            h = (pHeight * xscale).toInt()
+        
+        // For images with aspect ratio less than 1 (taller than wide), we crop from top-left
+        return if (pWidth / pHeight < 1f) {
+            // Crop to width x width from top-left
+            val cropWidth = minOf(pWidth, pHeight)
+            val cropHeight = cropWidth
+            val cropBitmap = BitmapPool.acquire(cropWidth.toInt(), cropHeight.toInt())
+            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth.toInt(), cropHeight.toInt())
+            val cropCtm = Matrix()
+            cropCtm.scale(1f, 1f)
+            page.run(cropDev, cropCtm, null as Cookie?)
+            cropDev.close()
+            cropDev.destroy()
+            cropBitmap
         } else {
-            w = (pWidth * yscale).toInt()
-        }
+            // Original scaling logic for other images
+            var w: Int = width
+            var h: Int = height
+            if (xscale > yscale) {
+                h = (pHeight * xscale).toInt()
+            } else {
+                w = (pWidth * yscale).toInt()
+            }
 
-        ctm.scale(xscale, yscale)
-        val bitmap = BitmapPool.acquire(w, h)
-        val dev =
-            AndroidDrawDevice(bitmap, 0, 0, 0, 0, bitmap.getWidth(), bitmap.getHeight())
-        page.run(dev, ctm, null as Cookie?)
-        dev.close()
-        dev.destroy()
-        return bitmap
+            val ctm = Matrix()
+            ctm.scale(xscale, yscale)
+            val scaledBitmap = BitmapPool.acquire(w, h)
+            val dev =
+                AndroidDrawDevice(scaledBitmap, 0, 0, 0, 0, scaledBitmap.getWidth(), scaledBitmap.getHeight())
+            page.run(dev, ctm, null as Cookie?)
+            dev.close()
+            dev.destroy()
+            scaledBitmap
+        }
     }
 
     private fun decodePdfSys(): Bitmap? {

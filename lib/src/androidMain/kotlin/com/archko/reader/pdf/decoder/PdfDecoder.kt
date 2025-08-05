@@ -6,7 +6,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.BitmapCache
 import com.archko.reader.pdf.cache.BitmapPool
+import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.Hyperlink
@@ -15,13 +17,14 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
+import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
 
 /**
  * @author: archko 2025/4/11 :11:26
  */
-public class PdfDecoder(file: File) : ImageDecoder {
+public class PdfDecoder(public val file: File) : ImageDecoder {
 
     private var document: Document? = null
     public override var pageCount: Int = 0
@@ -43,7 +46,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     public var isAuthenticated: Boolean = false
 
     // 页面缓存，最多缓存8页
-    private val pageCache = mutableMapOf<Int, com.artifex.mupdf.fitz.Page>()
+    private val pageCache = mutableMapOf<Int, Page>()
     private val maxPageCache = 8
 
     // 链接缓存，避免重复解析
@@ -103,6 +106,106 @@ public class PdfDecoder(file: File) : ImageDecoder {
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
+
+            cacheCoverIfNeeded()
+        }
+    }
+
+    /**
+     * 检查并缓存封面图片
+     */
+    private fun cacheCoverIfNeeded() {
+        try {
+            if (null != BitmapCache.getBitmap(file.absolutePath)) {
+                return
+            }
+            val page = getPage(0)
+            val bitmap = renderCoverPage(page)
+
+            CustomImageFetcher.cacheBitmap(bitmap, file.absolutePath)
+        } catch (e: Exception) {
+            println("缓存封面失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 渲染封面页面，根据高宽比进行特殊处理
+     */
+    private fun renderCoverPage(page: Page): Bitmap {
+        val pWidth = page.bounds.x1 - page.bounds.x0
+        val pHeight = page.bounds.y1 - page.bounds.y0
+
+        // 目标尺寸
+        val targetWidth = 160
+        val targetHeight = 200
+
+        // 检查是否为极端长宽比的图片（某边大于8000）
+        return if (pWidth > 8000 || pHeight > 8000) {
+            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
+            val scale = if (pWidth > pHeight) {
+                targetWidth.toFloat() / pWidth
+            } else {
+                targetHeight.toFloat() / pHeight
+            }
+
+            val scaledWidth = (pWidth * scale).toInt()
+            val scaledHeight = (pHeight * scale).toInt()
+
+            val cropWidth = maxOf(targetWidth, scaledWidth)
+            val cropHeight = maxOf(targetHeight, scaledHeight)
+            println("large.width-height:$cropWidth-$cropHeight")
+            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
+            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
+            val cropCtm = Matrix()
+            cropCtm.scale(scale, scale)
+            page.run(cropDev, cropCtm, null)
+            cropDev.close()
+            cropDev.destroy()
+            cropBitmap
+        } else if (pWidth > pHeight) {
+            // 对于宽大于高的页面，按最大比例缩放后截取
+            val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
+
+            val scaledWidth = (pWidth * scale).toInt()
+            val scaledHeight = (pHeight * scale).toInt()
+
+            // 确保裁剪区域不超过目标尺寸
+            val cropWidth = maxOf(targetWidth, scaledWidth)
+            val cropHeight = maxOf(targetHeight, scaledHeight)
+
+            println("wide.width-height:$cropWidth-$cropHeight")
+            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
+            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
+            val cropCtm = Matrix()
+            cropCtm.scale(scale, scale)
+            page.run(cropDev, cropCtm, null)
+            cropDev.close()
+            cropDev.destroy()
+            cropBitmap
+        } else {
+            // 原始逻辑处理其他情况
+            val xscale = targetWidth.toFloat() / pWidth
+            val yscale = targetHeight.toFloat() / pHeight
+
+            // 使用最大比例以确保填充整个目标区域
+            val scale = maxOf(xscale, yscale)
+
+            val scaledWidth = (pWidth * scale).toInt()
+            val scaledHeight = (pHeight * scale).toInt()
+
+            // 确保裁剪区域不超过目标尺寸
+            val cropWidth = maxOf(targetWidth, scaledWidth)
+            val cropHeight = maxOf(targetHeight, scaledHeight)
+
+            println("width-height:$cropWidth-$cropHeight")
+            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
+            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
+            val cropCtm = Matrix()
+            cropCtm.scale(scale, scale)
+            page.run(cropDev, cropCtm, null)
+            cropDev.close()
+            cropDev.destroy()
+            cropBitmap
         }
     }
 
@@ -158,7 +261,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
     }
 
     /**
-     * 获取原始页面尺寸
+     * 取原始页面尺寸
      */
     public fun getOriginalPageSize(index: Int): Size {
         return originalPageSizes[index]

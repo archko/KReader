@@ -36,7 +36,6 @@ public class Page(
     //page bound, should be caculate after view measured
     internal var bounds = Rect(0f, 0f, 1f, 1f)
 
-    // 缩略图缓存，响应式
     private var thumbBitmap by mutableStateOf<ImageBitmap?>(null)
     private var thumbDecoding = false
     private var thumbJob: Job? = null
@@ -207,6 +206,9 @@ public class Page(
                 loadThumbnail()
             }
         }
+
+        // 绘制分割线
+        drawSeparator(drawScope, currentBounds)
     }
 
     /**
@@ -237,6 +239,41 @@ public class Page(
                 color = linkColor,
                 topLeft = Offset(linkRect.left, linkRect.top),
                 size = androidx.compose.ui.geometry.Size(linkRect.width, linkRect.height)
+            )
+        }
+    }
+
+    /**
+     * 绘制分割线
+     */
+    private fun drawSeparator(drawScope: DrawScope, currentBounds: Rect) {
+        val separatorColor = Color(0xFF999999) // 浅灰色
+
+        if (pdfViewState.orientation == Vertical) {
+            // 垂直滚动，从左侧开始绘制1/4宽度的水平分割线
+            val separatorWidth = (currentBounds.width / 4).coerceAtLeast(1f)
+            val separatorHeight = 2f
+
+            drawScope.drawRect(
+                color = separatorColor,
+                topLeft = Offset(
+                    currentBounds.left,
+                    currentBounds.bottom - separatorHeight
+                ),
+                size = androidx.compose.ui.geometry.Size(separatorWidth, separatorHeight)
+            )
+        } else {
+            // 横向滚动，从顶部开始绘1/4高度的垂直分割线
+            val separatorWidth = 2f
+            val separatorHeight = (currentBounds.height / 4).coerceAtLeast(1f)
+
+            drawScope.drawRect(
+                color = separatorColor,
+                topLeft = Offset(
+                    currentBounds.right - separatorWidth,
+                    currentBounds.top
+                ),
+                size = androidx.compose.ui.geometry.Size(separatorWidth, separatorHeight)
             )
         }
     }
