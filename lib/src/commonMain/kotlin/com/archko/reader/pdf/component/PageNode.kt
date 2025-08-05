@@ -24,19 +24,32 @@ public class PageNode(
     public val aPage: APage
 ) {
     // 逻辑rect转实际像素，直接用Page的width/height
-    public fun toPixelRect(pageWidth: Float, pageHeight: Float, yOffset: Float): Rect {
-        return Rect(
-            left = bounds.left * pageWidth,
-            top = bounds.top * pageHeight + yOffset,
-            right = bounds.right * pageWidth,
-            bottom = bounds.bottom * pageHeight + yOffset
-        )
+    public fun toPixelRect(
+        pageWidth: Float,
+        pageHeight: Float,
+        xOffset: Float,
+        yOffset: Float
+    ): Rect {
+        return if (pdfViewState.orientation == Vertical) {
+            Rect(
+                left = bounds.left * pageWidth,
+                top = bounds.top * pageHeight + yOffset,
+                right = bounds.right * pageWidth,
+                bottom = bounds.bottom * pageHeight + yOffset
+            )
+        } else {
+            Rect(
+                left = bounds.left * pageWidth + xOffset,
+                top = bounds.top * pageHeight,
+                right = bounds.right * pageWidth + xOffset,
+                bottom = bounds.bottom * pageHeight
+            )
+        }
     }
 
     public val cacheKey: String
-        get() = "${aPage.index}-${bounds}-${pdfViewState.vZoom}-${pdfViewState.orientation}"
+        get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pdfViewState.vZoom}-${pdfViewState.orientation}"
 
-    // 每个PageNode持有自己的图片state
     private var imageBitmap by mutableStateOf<ImageBitmap?>(null)
     private var isDecoding = false
     private var decodeJob: Job? = null
@@ -54,10 +67,11 @@ public class PageNode(
         offset: Offset,
         pageWidth: Float,
         pageHeight: Float,
+        xOffset: Float,
         yOffset: Float,
         totalScale: Float
     ) {
-        val pixelRect = toPixelRect(pageWidth, pageHeight, yOffset)
+        val pixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset)
         // 页码合法性判断，防止越界
         if (aPage.index < 0 || aPage.index >= pdfViewState.list.size) {
             recycle()
@@ -69,7 +83,7 @@ public class PageNode(
             return
         }
 
-        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, pageWidth-Height=$pageWidth-$pageHeight, yOffset=$yOffset, offset=$offset, totalScale=$totalScale, pixelRect=$pixelRect, bitmapSize=${imageBitmap?.width}x${imageBitmap?.height}")
+        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${imageBitmap?.width}x${imageBitmap?.height}")
         if (imageBitmap != null) {
             drawScope.drawImage(
                 imageBitmap!!,
@@ -81,19 +95,12 @@ public class PageNode(
                 isDecoding = true
                 decodeJob = pdfViewState.decodeScope.launch {
                     // 解码前判断可见性和协程活跃性
-                    if (!isActive) {
-                        println("[PageNode.decodeScope] page=!isActive")
-                        isDecoding = false
-                        return@launch
-                    }
-                    
-                    // 检查 PdfViewState 是否已关闭
-                    if (pdfViewState.isShutdown()) {
+                    if (!isActive || pdfViewState.isShutdown()) {
                         println("[PageNode.decodeScope] page=PdfViewState已关闭")
                         isDecoding = false
                         return@launch
                     }
-                    
+
                     // 先查缓存
                     val cacheBitmap = ImageCache.get(cacheKey)
                     if (cacheBitmap != null) {
@@ -127,13 +134,6 @@ public class PageNode(
                     val outWidth = ((srcRect.right - srcRect.left)).toInt()
                     val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
 
-                    // 再次检查 PdfViewState 是否已关闭
-                    if (pdfViewState.isShutdown()) {
-                        println("[PageNode.decodeScope] page=渲染前PdfViewState已关闭")
-                        isDecoding = false
-                        return@launch
-                    }
-
                     val bitmap = pdfViewState.state.renderPageRegion(
                         srcRect,
                         aPage.index,
@@ -143,12 +143,10 @@ public class PageNode(
                         outHeight
                     )
 
+                    ImageCache.put(cacheKey, bitmap)
+
                     // 解码后再次判断可见性和协程活跃性
-                    if (!isActive) {
-                        isDecoding = false
-                        return@launch
-                    }
-                    if (pdfViewState.isShutdown()) {
+                    if (!isActive || pdfViewState.isShutdown()) {
                         println("[PageNode.decodeScope] page=解码后PdfViewState已关闭")
                         isDecoding = false
                         return@launch
@@ -159,8 +157,6 @@ public class PageNode(
                     }
 
                     imageBitmap = bitmap
-                    // 放入缓存
-                    ImageCache.put(cacheKey, bitmap)
                     isDecoding = false
                 }
             }

@@ -122,7 +122,7 @@ public fun DocumentView(
 
     // 监听外部参数的变化
     LaunchedEffect(jumpToPage, initialOrientation, pdfViewState.init) {
-        println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pdfViewState.init}")
+        //println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pdfViewState.init}")
 
         if (initialOrientation != orientation && pdfViewState.init) {
             isJumping = true // 设置跳转标志
@@ -174,7 +174,7 @@ public fun DocumentView(
             isJumping = true // 设置跳转标志
             toPage = jumpToPage
             val page = pdfViewState.pages.getOrNull(toPage)
-            println("DocumentView: 执行跳转到第${jumpToPage}页, offset:$offset, page:$page")
+            //println("DocumentView: 执行跳转到第${jumpToPage}页, offset:$offset, page:$page")
             if (page != null) {
                 if (orientation == Vertical) {
                     val targetOffsetY = when (align) {

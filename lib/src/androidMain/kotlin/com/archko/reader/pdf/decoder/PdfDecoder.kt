@@ -222,6 +222,19 @@ public class PdfDecoder(file: File) : ImageDecoder {
             return emptyList()
         }
 
+        return emptyList()
+    }
+
+    private fun decodePageLinks(pageIndex: Int): List<Hyperlink> {
+        // 先检查缓存
+        if (linksCache.containsKey(pageIndex)) {
+            return linksCache[pageIndex]!!
+        }
+
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return emptyList()
+        }
+
         return try {
             val page = getPage(pageIndex)
             val links = page.links ?: return emptyList()
@@ -230,7 +243,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
 
             for (link in links) {
                 val hyperlink = Hyperlink()
-                hyperlink.bbox = androidx.compose.ui.geometry.Rect(
+                hyperlink.bbox = Rect(
                     link.bounds.x0,
                     link.bounds.y0,
                     link.bounds.x1,
@@ -276,7 +289,7 @@ public class PdfDecoder(file: File) : ImageDecoder {
             return
         }
 
-        getPageLinks(pageIndex)
+        decodePageLinks(pageIndex)
     }
 
     public override fun renderPageRegion(

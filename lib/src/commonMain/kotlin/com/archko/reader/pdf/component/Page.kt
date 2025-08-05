@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
@@ -40,6 +41,9 @@ public class Page(
     private var thumbDecoding = false
     private var thumbJob: Job? = null
 
+    // 缓存的cacheKey，只在viewSize有值时计算一次
+    private var cachedCacheKey: String? = null
+
     // 页面链接
     public var links: List<Hyperlink> = emptyList()
     private var linksLoaded = false
@@ -57,15 +61,8 @@ public class Page(
     public fun loadLinks() {
         if (linksLoaded) return
 
-        //println("Page.loadLinks: 开始加载页面 ${aPage.index} 的链接")
         links = pdfViewState.state.getPageLinks(aPage.index)
         linksLoaded = true
-        //println("Page.loadLinks: 页面 ${aPage.index} 加载完成，链接数量: ${links.size}")
-        
-        // 打印每个链接的详细信息
-        //links.forEachIndexed { index, link ->
-        //    println("Page.loadLinks: 链接 $index - 类型: ${if (link.linkType == Hyperlink.LINKTYPE_PAGE) "页面链接" else "URL链接"}, bbox: ${link.bbox}, 目标: ${if (link.linkType == Hyperlink.LINKTYPE_PAGE) "页面${link.page + 1}" else link.url}")
-        //}
     }
 
     /**
@@ -73,7 +70,6 @@ public class Page(
      */
     public fun findLinkAtPoint(x: Float, y: Float): Hyperlink? {
         if (links.isEmpty()) {
-            //println("Page.findLinkAtPoint: 页面 ${aPage.index} 没有链接")
             return null
         }
 
@@ -85,15 +81,7 @@ public class Page(
         val pdfX = pageX / totalScale
         val pdfY = pageY / totalScale
 
-        //println("Page.findLinkAtPoint: 页面 ${aPage.index}, 点击坐标($x, $y), 页面坐标($pageX, $pageY), PDF坐标($pdfX, $pdfY), 链接数量: ${links.size}")
-
         val foundLink = Hyperlink.findLinkAtPoint(links, pdfX, pdfY)
-        //if (foundLink != null) {
-        //    println("Page.findLinkAtPoint: 找到链接 - 类型: ${if (foundLink.linkType == Hyperlink.LINKTYPE_PAGE) "页面链接" else "URL链接"}, 目标: ${if (foundLink.linkType == Hyperlink.LINKTYPE_PAGE) "页面${foundLink.page + 1}" else foundLink.url}")
-        //} else {
-        //    println("Page.findLinkAtPoint: 未找到链接")
-        //}
-
         return foundLink
     }
 
@@ -102,15 +90,19 @@ public class Page(
         if (thumbDecoding) return
 
         // 缩略图宽度为当前view宽度的1/3
-        val thumbWidth = (pdfViewState.viewSize.width / 3).coerceAtLeast(1)
+        val thumbWidth = (pdfViewState.viewSize.width / THUMB_RATIO).coerceAtLeast(1)
         // 根据原始宽高比计算缩略图高度
         val thumbHeight = if (aPage.width > 0) {
             (thumbWidth * aPage.height / aPage.width).coerceAtLeast(1)
         } else {
-            (height / 3).toInt().coerceAtLeast(1)
+            (height / THUMB_RATIO).toInt().coerceAtLeast(1)
         }
 
-        val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}"
+        val cacheKey = cachedCacheKey ?: run {
+            val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}"
+            cachedCacheKey = cacheKey
+            cacheKey
+        }
         val cached = ImageCache.get(cacheKey)
         if (cached != null) {
             thumbBitmap = cached
@@ -118,14 +110,7 @@ public class Page(
         }
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
-            // 可见性判断（Page始终可见，或可加自定义判断）
-            if (!isActive) {
-                thumbDecoding = false
-                return@launch
-            }
-
-            // 检查 PdfViewState 是否已关闭
-            if (pdfViewState.isShutdown()) {
+            if (!isActive || pdfViewState.isShutdown()) {
                 println("[Page.loadThumbnail] page=PdfViewState已关闭")
                 thumbDecoding = false
                 return@launch
@@ -137,7 +122,7 @@ public class Page(
                 val thumbScale = if (aPage.width > 0) {
                     thumbWidth.toFloat() / aPage.width
                 } else {
-                    totalScale / 3
+                    1f / THUMB_RATIO
                 }
 
                 val bitmap = pdfViewState.state.renderPageRegion(
@@ -148,17 +133,14 @@ public class Page(
                     thumbWidth,
                     thumbHeight
                 )
-                if (!isActive) {
-                    thumbDecoding = false
-                    return@launch
-                }
-                if (pdfViewState.isShutdown()) {
+
+                ImageCache.put(cacheKey, bitmap)
+                if (!isActive || pdfViewState.isShutdown()) {
                     println("[Page.loadThumbnail] page=解码后PdfViewState已关闭")
                     thumbDecoding = false
                     return@launch
                 }
                 thumbBitmap = bitmap
-                ImageCache.put(cacheKey, bitmap)
             } catch (_: Exception) {
             } finally {
                 thumbDecoding = false
@@ -180,8 +162,6 @@ public class Page(
         // 计算当前缩放下的实际显示尺寸和位置
         // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变
         val scaleRatio = vZoom / pdfViewState.vZoom
-        val currentWidth = width * scaleRatio
-        val currentHeight = height * scaleRatio
         val currentBounds = Rect(
             bounds.left * scaleRatio,
             bounds.top * scaleRatio,
@@ -195,6 +175,8 @@ public class Page(
 
         // 优先绘制缩略图
         if (null != thumbBitmap) {
+            val currentWidth = width * scaleRatio
+            val currentHeight = height * scaleRatio
             drawScope.drawImage(
                 image = thumbBitmap!!,
                 dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
@@ -207,6 +189,7 @@ public class Page(
                     offset,
                     currentWidth,
                     currentHeight,
+                    currentBounds.left,
                     currentBounds.top,
                     totalScale * scaleRatio
                 )
@@ -216,22 +199,14 @@ public class Page(
             if (!linksLoaded) {
                 loadLinks()
             }
+
+            // 绘制链接区域（调试用，可以注释掉）
+            drawLinks(drawScope, currentBounds, scaleRatio)
         } else {
             if (!thumbDecoding) {
                 loadThumbnail()
             }
         }
-
-        // 绘制链接区域（调试用，可以注释掉）
-        drawLinks(drawScope, currentBounds, scaleRatio)
-
-        // 占位框
-        /*drawScope.drawRect(
-            color = Color.Green,
-            topLeft = Offset(0f, currentBounds.top),
-            size = Size(currentBounds.width, currentBounds.height),
-            style = Stroke(width = 6f)
-        )*/
     }
 
     /**
@@ -253,9 +228,9 @@ public class Page(
 
             // 根据链接类型选择颜色
             val linkColor = if (link.linkType == Hyperlink.LINKTYPE_PAGE) {
-                androidx.compose.ui.graphics.Color(0x40FFD700) // 半透明淡黄色
+                Color(0x40FFD700) // 半透明淡黄色
             } else {
-                androidx.compose.ui.graphics.Color(0x40FFA500) // 半透明橙色
+                Color(0x40FFA500) // 半透明橙色
             }
 
             drawScope.drawRect(
@@ -274,15 +249,15 @@ public class Page(
 
     // 计算分块数的通用函数
     private fun calcBlockCount(length: Float): Int {
-        if (length <= minBlockSize) {
+        if (length <= MIN_BLOCK_SIZE) {
             return 1
         }
-        val blockCount = ceil(length / maxBlockSize).toInt()
+        val blockCount = ceil(length / MAX_BLOCK_SIZE).toInt()
         val actualBlockSize = length / blockCount
-        if (actualBlockSize >= minBlockSize && actualBlockSize <= maxBlockSize) {
+        if (actualBlockSize >= MIN_BLOCK_SIZE && actualBlockSize <= MAX_BLOCK_SIZE) {
             return blockCount
         } else {
-            return ceil(length / minBlockSize).toInt()
+            return ceil(length / MIN_BLOCK_SIZE).toInt()
         }
     }
 
@@ -295,7 +270,7 @@ public class Page(
 
     private fun calculateTileConfig(width: Float, height: Float): TileConfig {
         // 如果页面的宽或高都小于最大块大小，则不分块
-        if (width <= maxBlockSize && height <= maxBlockSize) {
+        if (width <= MAX_BLOCK_SIZE && height <= MAX_BLOCK_SIZE) {
             return TileConfig(1, 1)
         }
 
@@ -307,7 +282,7 @@ public class Page(
 
     private fun invalidateNodes() {
         val config = calculateTileConfig(width, height)
-        println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
+        //println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
         if (config == currentTileConfig) {
             return
         }
@@ -332,6 +307,7 @@ public class Page(
                 newNodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
             }
         }
+        nodes.forEach { it -> it.recycle() }
         nodes = newNodes
     }
 
@@ -364,8 +340,9 @@ public class Page(
     }
 
     public companion object {
-        private val minBlockSize = 256f * 3f // 768
-        private val maxBlockSize = 256f * 4f // 1024
+        private const val MIN_BLOCK_SIZE = 256f * 3f // 768
+        private const val MAX_BLOCK_SIZE = 256f * 4f // 1024
+        private const val THUMB_RATIO = 4 //
     }
 }
 
@@ -380,7 +357,6 @@ public fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: I
 
     // 检查页面是否与可视区域相交
     val visible = bounds.overlaps(visibleRect)
-    //println("page.draw.isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
+    //println("page.draw.page:$page, isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect")
     return visible
 }
-

@@ -286,7 +286,7 @@ public fun DesktopDocumentView(
         // 2. PdfViewState已初始化
         // 3. 是用户主动跳转（如进度条拖动）或者没有初始偏移量
         if (jumpToPage != null && pdfViewState.init && (isUserJump || !hasAppliedInitialOffset)) {
-            println("DocumentView: 执行跳转到第 $jumpToPage 页, $offset")
+            //println("DocumentView: 执行跳转到第 $jumpToPage 页, $offset")
             val page = pdfViewState.pages.getOrNull(jumpToPage)
             if (page != null) {
                 if (orientation == Vertical) {
