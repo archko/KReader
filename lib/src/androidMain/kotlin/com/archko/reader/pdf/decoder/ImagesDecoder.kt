@@ -2,12 +2,14 @@ package com.archko.reader.pdf.decoder
 
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
+import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import java.io.File
@@ -36,6 +38,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     // 缓存BitmapRegionDecoder，避免重复创建，限制数量为10个
     private val regionDecoders = mutableMapOf<Int, BitmapRegionDecoder>()
     private val maxRegionDecoders = 10
+    public override var pageCropBounds: MutableMap<Int, Rect> = mutableMapOf()
 
     init {
         if (files.isEmpty()) {
@@ -210,6 +213,20 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
+    }
+
+    override fun renderPage(
+        aPage: APage,
+        viewSize: IntSize,
+        outWidth: Int,
+        outHeight: Int,
+        crop: Boolean
+    ): ImageBitmap {
+        return ImageBitmap(1, 1, ImageBitmapConfig.Rgb565)
+    }
+
+    override fun getPageCropBounds(pageIndex: Int): Rect? {
+        return null
     }
 
     /**

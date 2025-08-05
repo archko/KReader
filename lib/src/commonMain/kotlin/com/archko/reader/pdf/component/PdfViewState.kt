@@ -45,6 +45,26 @@ public class PdfViewState(
     public var onPageLinkClick: ((pageIndex: Int) -> Unit)? = null
     public var onUrlLinkClick: ((url: String) -> Unit)? = null
 
+    // 切边控制
+    private var cropEnabled: Boolean = false
+
+    /**
+     * 设置切边参数
+     * @param enabled 是否启用切边
+     */
+    public fun setCropEnabled(enabled: Boolean) {
+        if (cropEnabled != enabled) {
+            cropEnabled = enabled
+            println("PdfViewState.setCropEnabled: $enabled")
+        }
+    }
+
+    /**
+     * 获取当前切边状态
+     * @return 是否启用切边
+     */
+    public fun isCropEnabled(): Boolean = cropEnabled
+
     public fun isTileVisible(spec: TileSpec): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
@@ -100,8 +120,21 @@ public class PdfViewState(
                 var currentY = 0f
                 val scaledPageWidth = viewSize.width * vZoom
                 list.zip(pages).forEach { (aPage, page) ->
-                    val pageScale = scaledPageWidth / aPage.width
-                    val scaledPageHeight = aPage.height * pageScale
+                    // 根据是否有切边选择不同的尺寸计算方式
+                    val pageScale = if (aPage.hasCrop()) {
+                        // 有切边：使用切边后的尺寸
+                        scaledPageWidth / aPage.getWidth(true)
+                    } else {
+                        // 无切边：使用原始尺寸
+                        scaledPageWidth / aPage.getWidth(false)
+                    }
+
+                    val scaledPageHeight = if (aPage.hasCrop()) {
+                        aPage.getHeight(true) * pageScale
+                    } else {
+                        aPage.getHeight(false) * pageScale
+                    }
+
                     val bounds = Rect(
                         0f,
                         currentY,
@@ -111,7 +144,7 @@ public class PdfViewState(
                     // 直接用最终宽高初始化Page
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
                     currentY += scaledPageHeight
-                    //println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage")
+                    //println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }
                 totalHeight = currentY
                 totalWidth = viewSize.width * vZoom
@@ -119,8 +152,21 @@ public class PdfViewState(
                 var currentX = 0f
                 val scaledPageHeight = viewSize.height * vZoom
                 list.zip(pages).forEach { (aPage, page) ->
-                    val pageScale = scaledPageHeight / aPage.height
-                    val scaledPageWidth = aPage.width * pageScale
+                    // 根据是否有切边选择不同的尺寸计算方式
+                    val pageScale = if (aPage.hasCrop()) {
+                        // 有切边：使用切边后的尺寸
+                        scaledPageHeight / aPage.getHeight(true)
+                    } else {
+                        // 无切边：使用原始尺寸
+                        scaledPageHeight / aPage.getHeight(false)
+                    }
+
+                    val scaledPageWidth = if (aPage.hasCrop()) {
+                        aPage.getWidth(true) * pageScale
+                    } else {
+                        aPage.getWidth(false) * pageScale
+                    }
+
                     val bounds = Rect(
                         currentX,
                         0f,
@@ -130,7 +176,7 @@ public class PdfViewState(
                     // 直接用最终宽高初始化Page
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
                     currentX += scaledPageWidth
-                    //println("PdfViewState.pageScale:$pageScale, x:$currentX, bounds:$bounds, aPage:$aPage")
+                    //println("PdfViewState.pageScale:$pageScale, x:$currentX, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }
                 totalWidth = currentX
                 totalHeight = viewSize.height * vZoom
@@ -373,15 +419,12 @@ public class PdfViewState(
      */
     public fun handleClick(x: Float, y: Float): Boolean {
         for (page in pageToRender) {
-            //println("PdfViewState.handleClick: 检查页面 ${page.aPage.index}")
             val link = page.findLinkAtPoint(x, y)
             if (link != null) {
-                //println("PdfViewState.handleClick: 在页面 ${page.aPage.index} 找到链接，开始处理")
                 return handleLink(link)
             }
         }
 
-        //println("PdfViewState.handleClick: 在所有可见页面中都没有找到链接")
         return false
     }
 
@@ -391,32 +434,22 @@ public class PdfViewState(
      * @return 处理是否成功
      */
     private fun handleLink(link: Hyperlink): Boolean {
-        //println("PdfViewState.handleLink: 处理链接 - 类型: ${if (link.linkType == Hyperlink.LINKTYPE_PAGE) "页面链接" else "URL链接"}")
-
         return when (link.linkType) {
-                        Hyperlink.LINKTYPE_PAGE -> {
+            Hyperlink.LINKTYPE_PAGE -> {
                 // 页面链接，跳转到指定页面
                 if (link.page >= 0 && link.page < pages.size) {
-                    val targetPage = pages[link.page]
-                    println("PdfViewState.handleLink: 调用页面链接回调，目标页面: ${link.page + 1}, 目标页面top: ${targetPage.bounds.top}, 当前缩放: $vZoom")
-                    
-                    // 调用外部回调处理页面跳转
                     onPageLinkClick?.invoke(link.page)
                     true
                 } else {
-                    println("PdfViewState.handleLink: 页面链接无效，目标页面: ${link.page + 1}, 总页面数: ${pages.size}")
                     false
                 }
             }
 
             Hyperlink.LINKTYPE_URL -> {
-                // URL链接，打开外部链接
                 if (!link.url.isNullOrEmpty()) {
-                    println("PdfViewState.handleLink: 调用URL链接回调，URL: ${link.url}")
                     onUrlLinkClick?.invoke(link.url!!)
                     true
                 } else {
-                    println("PdfViewState.handleLink: URL链接无效，URL为空")
                     false
                 }
             }

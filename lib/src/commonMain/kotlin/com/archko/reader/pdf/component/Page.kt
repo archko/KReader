@@ -13,9 +13,11 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.ceil
 
 /**
@@ -39,6 +41,7 @@ public class Page(
     private var thumbBitmap by mutableStateOf<ImageBitmap?>(null)
     private var thumbDecoding = false
     private var thumbJob: Job? = null
+    private var aspectRatio = 0f
 
     // 缓存的cacheKey，只在viewSize有值时计算一次
     private var cachedCacheKey: String? = null
@@ -77,8 +80,21 @@ public class Page(
         val pageY = y - bounds.top
 
         // 转换为原始PDF坐标
-        val pdfX = pageX / totalScale
-        val pdfY = pageY / totalScale
+        val pdfX: Float
+        val pdfY: Float
+
+        if (aPage.cropBounds != null) {
+            // 有切边：需要考虑切边偏移
+            val cropBounds = aPage.cropBounds!!
+            pdfX = pageX / totalScale + cropBounds.left
+            pdfY = pageY / totalScale + cropBounds.top
+        } else {
+            // 无切边：直接转换
+            pdfX = pageX / totalScale
+            pdfY = pageY / totalScale
+        }
+
+        //println("Page.findLinkAtPoint: 页面 ${aPage.index}, 点击坐标($x, $y), 页面坐标($pageX, $pageY), PDF坐标($pdfX, $pdfY), 链接数量: ${links.size}, hasCrop:${aPage.hasCrop()}")
 
         val foundLink = Hyperlink.findLinkAtPoint(links, pdfX, pdfY)
         return foundLink
@@ -88,17 +104,15 @@ public class Page(
     public fun loadThumbnail() {
         if (thumbDecoding) return
 
-        // 缩略图宽度为当前view宽度的1/3
-        val thumbWidth = (pdfViewState.viewSize.width / THUMB_RATIO).coerceAtLeast(1)
-        // 根据原始宽高比计算缩略图高度
-        val thumbHeight = if (aPage.width > 0) {
-            (thumbWidth * aPage.height / aPage.width).coerceAtLeast(1)
-        } else {
-            (height / THUMB_RATIO).toInt().coerceAtLeast(1)
+        val ratio: Float = 1f * aPage.width / width
+        val thumbWidth = 300
+        val thumbHeight = (aPage.height / ratio).toInt()
+        if (aspectRatio == 0f) {
+            aspectRatio = 1f * thumbWidth / thumbHeight
         }
 
         val cacheKey = cachedCacheKey ?: run {
-            val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}"
+            val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
             cacheKey
         }
@@ -109,40 +123,54 @@ public class Page(
         }
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
-            if (!isActive || pdfViewState.isShutdown()) {
-                println("[Page.loadThumbnail] page=PdfViewState已关闭")
-                thumbDecoding = false
+            if (!isScopeActive()) {
                 return@launch
             }
 
             try {
-                val region = Rect(0f, 0f, 1f, 1f)
-                // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
-                val thumbScale = if (aPage.width > 0) {
-                    thumbWidth.toFloat() / aPage.width
-                } else {
-                    1f / THUMB_RATIO
-                }
-
-                val bitmap = pdfViewState.state.renderPageRegion(
-                    region,
-                    aPage.index,
-                    thumbScale,
+                val bitmap = pdfViewState.state.renderPage(
+                    aPage,
                     pdfViewState.viewSize,
                     thumbWidth,
-                    thumbHeight
+                    thumbHeight,
+                    pdfViewState.isCropEnabled()
                 )
 
                 ImageCache.put(cacheKey, bitmap)
-                if (!isActive || pdfViewState.isShutdown()) {
-                    println("[Page.loadThumbnail] page=解码后PdfViewState已关闭")
-                    thumbDecoding = false
+                if (!isScopeActive()) {
                     return@launch
                 }
                 thumbBitmap = bitmap
+
+                setAspectRatio(bitmap.width, bitmap.height)
             } catch (_: Exception) {
             } finally {
                 thumbDecoding = false
+            }
+        }
+    }
+
+    private fun CoroutineScope.isScopeActive(): Boolean {
+        if (!isActive || pdfViewState.isShutdown()) {
+            println("[Page.loadThumbnail] page=PdfViewState已关闭")
+            thumbDecoding = false
+            return false
+        }
+        return true
+    }
+
+    private fun setAspectRatio(width: Int, height: Int) {
+        setAspectRatio(width * 1.0f / height)
+    }
+
+    private fun setAspectRatio(aspectRatio: Float) {
+        if (this.aspectRatio != aspectRatio) {
+            val abs: Float = abs(aspectRatio - this.aspectRatio)
+            val changed = this.aspectRatio != 0f && abs > 0.008
+            println("Page.loadThumbnail: 页面${aPage.index}检测到切边，${abs}, bounds=${aPage.cropBounds}")
+            this.aspectRatio = aspectRatio
+            if (changed) {
+                pdfViewState.invalidatePageSizes()
             }
         }
     }
@@ -181,8 +209,9 @@ public class Page(
                 dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
                 dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
             )
+
             // 再绘制高清块
-            nodes.forEach { node ->
+            /*nodes.forEach { node ->
                 node.draw(
                     drawScope,
                     offset,
@@ -192,7 +221,7 @@ public class Page(
                     currentBounds.top,
                     totalScale * scaleRatio
                 )
-            }
+            }*/
 
             // 加载链接（在缩略图加载完成后）
             if (!linksLoaded) {
@@ -221,12 +250,24 @@ public class Page(
             val bbox = link.bbox ?: continue
 
             // 将PDF坐标转换为屏幕坐标
-            val linkRect = Rect(
-                left = currentBounds.left + bbox.left * totalScale * scaleRatio,
-                top = currentBounds.top + bbox.top * totalScale * scaleRatio,
-                right = currentBounds.left + bbox.right * totalScale * scaleRatio,
-                bottom = currentBounds.top + bbox.bottom * totalScale * scaleRatio
-            )
+            val linkRect = if (aPage.hasCrop()) {
+                // 有切边：需要考虑切边偏移
+                val cropBounds = aPage.cropBounds!!
+                Rect(
+                    left = currentBounds.left + (bbox.left - cropBounds.left) * totalScale * scaleRatio,
+                    top = currentBounds.top + (bbox.top - cropBounds.top) * totalScale * scaleRatio,
+                    right = currentBounds.left + (bbox.right - cropBounds.left) * totalScale * scaleRatio,
+                    bottom = currentBounds.top + (bbox.bottom - cropBounds.top) * totalScale * scaleRatio
+                )
+            } else {
+                // 无切边：直接转换
+                Rect(
+                    left = currentBounds.left + bbox.left * totalScale * scaleRatio,
+                    top = currentBounds.top + bbox.top * totalScale * scaleRatio,
+                    right = currentBounds.left + bbox.right * totalScale * scaleRatio,
+                    bottom = currentBounds.top + bbox.bottom * totalScale * scaleRatio
+                )
+            }
 
             // 根据链接类型选择颜色
             val linkColor = if (link.linkType == Hyperlink.LINKTYPE_PAGE) {

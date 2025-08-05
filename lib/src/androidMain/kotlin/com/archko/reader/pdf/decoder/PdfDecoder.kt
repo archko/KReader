@@ -1,9 +1,14 @@
 package com.archko.reader.pdf.decoder
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.os.Environment
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapCache
@@ -11,9 +16,12 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
+import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.util.BitmapUtils
+import com.archko.reader.pdf.util.CropUtils
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
@@ -51,6 +59,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
+
+    // 切边相关
+    public override var pageCropBounds: MutableMap<Int, Rect> = mutableMapOf()
 
     init {
         // 检查文件是否存在
@@ -209,14 +220,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
-    /*override fun decodeRegion(
-        region: IntRect,
-        tile: ImageTile
-    ): ImageBitmap? {
-        val bitmap = renderPageRegion(region, tile)
-        return bitmap
-    }*/
-
     override fun size(viewportSize: IntSize): IntSize {
         if ((imageSize == IntSize.Zero || viewSize != viewportSize)
             && viewportSize.width > 0 && viewportSize.height > 0
@@ -261,7 +264,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     /**
-     * 取原始页面尺寸
+     * 获取原始页面尺寸
      */
     public fun getOriginalPageSize(index: Int): Size {
         return originalPageSizes[index]
@@ -280,6 +283,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         // 清理链接缓存
         linksCache.clear()
+
+        // 清理切边缓存
+        pageCropBounds.clear()
 
         document?.destroy()
     }
@@ -382,6 +388,89 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
+    public override fun renderPage(
+        aPage: APage,
+        viewSize: IntSize,
+        outWidth: Int,
+        outHeight: Int,
+        crop: Boolean
+    ): ImageBitmap {
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
+
+        try {
+            val index = aPage.index
+            val cropBounds =
+                if (aPage.cropBounds != null) aPage.cropBounds!!
+                else Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
+
+            val patchX = cropBounds.left.toInt()
+            val patchY = cropBounds.top.toInt()
+            // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
+            val scale = if (aPage.width > 0) {
+                outWidth.toFloat() / aPage.getWidth(crop)
+            } else {
+                1f
+            }
+            val height = scale * aPage.getHeight(crop)
+            val bitmap = acquireReusableBitmap(outWidth, height.toInt())
+
+            val ctm = Matrix(scale)
+            val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, bitmap.width, bitmap.height)
+
+            val page = getPage(index)
+            page.run(dev, ctm, null)
+            println("PdfDecoder.renderPage:index:$index scale:$scale, w-h:$outWidth-$outHeight-$height, offset:$patchX-$patchY, page.w-h:${page.bounds.x1 - page.bounds.x0}-${page.bounds.y1 - page.bounds.y0} bounds:$cropBounds, crop:$crop")
+
+            // 在解码缩略图时同时解析链接
+            parseLinksIfNeeded(index, false)
+
+            dev.close()
+            dev.destroy()
+
+            val imageBitmap = bitmap.asImageBitmap()
+
+            // 如果启用了切边功能但没有cropBounds，检测并设置
+            if (crop && aPage.cropBounds == null) {
+                val cropBounds = CropUtils.detectCropBounds(imageBitmap)
+                if (cropBounds != null) {
+                    // 将缩略图坐标转换为原始PDF坐标
+                    val originalPage = originalPageSizes[index]
+                    val ratio = originalPage.width.toFloat() / outWidth
+
+                    // 使用宽度比例转换左右边界，使用高度比例转换上下边界
+                    val leftBound = (cropBounds.left * ratio)
+                    val topBound = (cropBounds.top * ratio)
+                    val rightBound = (cropBounds.right * ratio)
+                    val bottomBound = (cropBounds.bottom * ratio)
+                    val pdfCropBounds = Rect(
+                        leftBound,
+                        topBound,
+                        rightBound,
+                        bottomBound
+                    )
+
+                    aPage.cropBounds = pdfCropBounds
+                    pageCropBounds[aPage.index] = pdfCropBounds
+
+                    // 在图片上绘制cropBounds矩形并保存（仅在第一次检测时）
+                    //drawCropBoundsOnBitmap(imageBitmap, cropBounds, index)
+
+                    // 真正对图片进行切边处理
+                    val croppedBitmap = cropImageBitmap(imageBitmap, cropBounds)
+                    return croppedBitmap
+                }
+            }
+
+            return imageBitmap
+        } catch (e: Exception) {
+            println("PdfDecoder.renderPage error: $e")
+            // 返回一个空的位图，避免崩溃
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
+    }
+
     /**
      * 在解码缩略图时同时解析链接
      * @param pageIndex 页面索引
@@ -393,6 +482,38 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
 
         decodePageLinks(pageIndex)
+    }
+
+    /**
+     * 对图片进行切边处理
+     */
+    private fun cropImageBitmap(originalBitmap: ImageBitmap, cropBounds: Rect): ImageBitmap {
+        val cropX = cropBounds.left.toInt()
+        val cropY = cropBounds.top.toInt()
+        val cropWidth = (cropBounds.right - cropX).toInt()
+        val cropHeight = (cropBounds.bottom - cropY).toInt()
+
+        // 确保切边区域在图片范围内
+        val safeX = cropX.coerceIn(0, originalBitmap.width - 1)
+        val safeY = cropY.coerceIn(0, originalBitmap.height - 1)
+        val safeWidth = cropWidth.coerceIn(1, originalBitmap.width - safeX)
+        val safeHeight = cropHeight.coerceIn(1, originalBitmap.height - safeY)
+
+        // 创建切边后的图片 - 使用Android Bitmap进行切边，然后转换回ImageBitmap
+        val androidBitmap = originalBitmap.asAndroidBitmap()
+        val croppedAndroidBitmap = Bitmap.createBitmap(
+            androidBitmap,
+            safeX,
+            safeY,
+            safeWidth,
+            safeHeight
+        )
+
+        val croppedImageBitmap = croppedAndroidBitmap.asImageBitmap()
+
+        println("PdfDecoder.cropImageBitmap: 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight), 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
+
+        return croppedImageBitmap
     }
 
     public override fun renderPageRegion(
@@ -407,11 +528,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
 
-        val patchX = region.left.toInt()
-        val patchY = region.top.toInt()
-        println("renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
-
         try {
+            val patchX = region.left.toInt()
+            val patchY = region.top.toInt()
+            println("PdfDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
+
             val bitmap = acquireReusableBitmap(outWidth, outHeight)
             val ctm = Matrix(scale)
             val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, outWidth, outHeight)
@@ -425,9 +546,15 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 在解码缩略图时同时解析链接
             parseLinksIfNeeded(index)
 
+            /*val file = File(
+                Environment.getExternalStorageDirectory(),
+                "/Download/$index-${region.left}-${region.top}-${region.right}-${region.bottom}.png"
+            )
+            println("PdfDecoder.renderPageRegion.path:${file.absolutePath}")
+            BitmapUtils.saveBitmapToFile(bitmap, file)*/
             return (bitmap.asImageBitmap())
         } catch (e: Exception) {
-            println("renderPageRegion error: $e")
+            println("PdfDecoder.renderPageRegion error: $e")
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
@@ -450,7 +577,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         val tileWidth = rect.width.toInt()
         val tileHeight = rect.height.toInt()
 
-        println("decode.renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
+        println("PdfDecoder.renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
 
         val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
         val ctm = Matrix(scale)
@@ -502,7 +629,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 获取或创建页面，支持缓存
      */
-    private fun getPage(index: Int): com.artifex.mupdf.fitz.Page {
+    private fun getPage(index: Int): Page {
         // 如果缓存已满且当前索引不在缓存中，移除最旧的项
         if (pageCache.size >= maxPageCache && !pageCache.containsKey(index)) {
             val oldestIndex = pageCache.keys.first()
@@ -522,5 +649,71 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private fun acquireReusableBitmap(width: Int, height: Int): Bitmap {
         // 优先从BitmapPool获取，这样可以复用已回收的bitmap
         return BitmapPool.acquire(width, height)
+    }
+
+    // ========== 切边相关方法 ==========
+
+    /**
+     * 获取页面切边信息
+     * @param pageIndex 页面索引
+     * @return 切边区域，如果未切边则返回null
+     */
+    override fun getPageCropBounds(pageIndex: Int): Rect? {
+        return pageCropBounds[pageIndex]
+    }
+
+    /**
+     * 在ImageBitmap上绘制cropBounds矩形
+     * @param imageBitmap 原始图片
+     * @param cropBounds 切边区域
+     * @return 绘制了cropBounds的Bitmap
+     */
+    private fun drawCropBoundsOnBitmap(imageBitmap: ImageBitmap, cropBounds: Rect, index: Int): Bitmap {
+        val androidBitmap = imageBitmap.asAndroidBitmap()
+
+        // 创建可变的bitmap副本用于绘制
+        val mutableBitmap = androidBitmap.copy(androidBitmap.config!!, true)
+        val canvas = Canvas(mutableBitmap)
+
+        // 创建画笔
+        val paint = Paint().apply {
+            color = android.graphics.Color.RED
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+            isAntiAlias = true
+        }
+
+        // 绘制cropBounds矩形
+        val rect = RectF(
+            cropBounds.left,
+            cropBounds.top,
+            cropBounds.right,
+            cropBounds.bottom
+        )
+        canvas.drawRect(rect, paint)
+
+        // 在矩形四角绘制小圆圈
+        val circlePaint = Paint().apply {
+            color = android.graphics.Color.BLUE
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val circleRadius = 4f
+        canvas.drawCircle(cropBounds.left, cropBounds.top, circleRadius, circlePaint) // 左上角
+        canvas.drawCircle(cropBounds.right, cropBounds.top, circleRadius, circlePaint) // 右上角
+        canvas.drawCircle(cropBounds.left, cropBounds.bottom, circleRadius, circlePaint) // 左下角
+        canvas.drawCircle(cropBounds.right, cropBounds.bottom, circleRadius, circlePaint) // 右下角
+
+        println("PdfDecoder.drawCropBoundsOnBitmap: 在图片上绘制了cropBounds矩形，区域=$cropBounds")
+
+        val file = File(
+            Environment.getExternalStorageDirectory(),
+            "/Download/$index-${imageBitmap.width}-${imageBitmap.height}-${cropBounds.left}-${cropBounds.top}-${cropBounds.right}-${cropBounds.bottom}.png"
+        )
+        println("PdfDecoder.save.path:${file.absolutePath}")
+        BitmapUtils.saveBitmapToFile(mutableBitmap, file)
+
+        return mutableBitmap
     }
 }
