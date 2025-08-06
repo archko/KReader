@@ -95,7 +95,6 @@ fun CustomView(
 
     // 密码相关状态
     var showPasswordDialog by remember { mutableStateOf(false) }
-    var currentPdfDecoder by remember { mutableStateOf<PdfDecoder?>(null) }
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -123,7 +122,6 @@ fun CustomView(
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
                             // 文档文件：创建PdfDecoder
                             val pdfDecoder = PdfDecoder(File(currentPath))
-                            currentPdfDecoder = pdfDecoder
 
                             // 检查是否需要密码
                             if (pdfDecoder.needsPassword) {
@@ -156,7 +154,6 @@ fun CustomView(
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
             decoder?.close()
-            currentPdfDecoder?.close()
         }
     }
 
@@ -164,8 +161,8 @@ fun CustomView(
     fun handlePasswordEntered(password: String) {
         scope.launch {
             withContext(Dispatchers.IO) {
-                currentPdfDecoder?.let { pdfDecoder ->
-                    val success = pdfDecoder.authenticatePassword(password)
+                decoder?.let { pdfDecoder ->
+                    val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
                     if (success) {
                         // 密码正确，初始化文档
                         pdfDecoder.size(viewportSize)
@@ -268,6 +265,9 @@ fun CustomView(
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {
+            if (!decoder.aPageList.isNullOrEmpty()) {
+                return decoder.aPageList!!
+            }
             val list = mutableListOf<APage>()
             for (i in 0 until decoder.originalPageSizes.size) {
                 val page = decoder.originalPageSizes[i]

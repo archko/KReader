@@ -34,11 +34,11 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     public override var imageSize: IntSize = IntSize.Zero
 
     public var viewSize: IntSize = IntSize.Zero
+    public override val aPageList: MutableList<APage>? = ArrayList()
 
     // 缓存BitmapRegionDecoder，避免重复创建，限制数量为10个
     private val regionDecoders = mutableMapOf<Int, BitmapRegionDecoder>()
     private val maxRegionDecoders = 10
-    public override var pageCropBounds: MutableMap<Int, Rect> = mutableMapOf()
 
     init {
         if (files.isEmpty()) {
@@ -137,7 +137,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     }
 
     public override fun renderPageRegion(
-        region: androidx.compose.ui.geometry.Rect,
+        region: Rect,
         index: Int,
         scale: Float,
         viewSize: IntSize,
@@ -223,10 +223,6 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         crop: Boolean
     ): ImageBitmap {
         return ImageBitmap(1, 1, ImageBitmapConfig.Rgb565)
-    }
-
-    override fun getPageCropBounds(pageIndex: Int): Rect? {
-        return null
     }
 
     /**

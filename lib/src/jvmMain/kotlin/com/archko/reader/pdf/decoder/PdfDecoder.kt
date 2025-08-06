@@ -10,7 +10,13 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.util.loadOutlineItems
-import com.artifex.mupdf.fitz.*
+import com.artifex.mupdf.fitz.ColorSpace
+import com.artifex.mupdf.fitz.Document
+import com.artifex.mupdf.fitz.DrawDevice
+import com.artifex.mupdf.fitz.Matrix
+import com.artifex.mupdf.fitz.Page
+import com.artifex.mupdf.fitz.Pixmap
+import com.artifex.mupdf.fitz.Rect
 import java.awt.image.BufferedImage
 import java.io.File
 
@@ -45,8 +51,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
 
-    // 切边相关
-    public override var pageCropBounds: MutableMap<Int, androidx.compose.ui.geometry.Rect> = mutableMapOf()
+    public override val aPageList: MutableList<APage>? = ArrayList()
 
     init {
         // 检查文件是否存在
@@ -582,16 +587,5 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-    }
-
-    // ========== 切边相关方法 ==========
-
-    /**
-     * 获取页面切边信息
-     * @param pageIndex 页面索引
-     * @return 切边区域，如果未切边则返回null
-     */
-    override fun getPageCropBounds(pageIndex: Int): androidx.compose.ui.geometry.Rect? {
-        return pageCropBounds[pageIndex]
     }
 }

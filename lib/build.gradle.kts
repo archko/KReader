@@ -31,7 +31,6 @@ kotlin {
                 implementation(compose.components.resources)
                 implementation(compose.foundation)
                 implementation(compose.runtime)
-                implementation(libs.mmkv)
                 implementation(compose.material3)
                 implementation(libs.jetbrains.lifecycle.viewmodel)
                 api(libs.coil.kt)

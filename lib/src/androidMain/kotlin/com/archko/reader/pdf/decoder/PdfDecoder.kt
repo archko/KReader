@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.APageSizeLoader
+import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
 import com.archko.reader.pdf.cache.BitmapCache
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
@@ -57,11 +59,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private val pageCache = mutableMapOf<Int, Page>()
     private val maxPageCache = 8
 
+    public override val aPageList: MutableList<APage>? = ArrayList()
+    private var pageSizeBean: PageSizeBean? = null
+    private var cachePage = true
+
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
-
-    // 切边相关
-    public override var pageCropBounds: MutableMap<Int, Rect> = mutableMapOf()
 
     init {
         // 检查文件是否存在
@@ -118,7 +121,34 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
 
+            //initPageSizeBean()
             cacheCoverIfNeeded()
+        }
+    }
+
+    private fun initPageSizeBean() {
+        try {
+            val count: Int = originalPageSizes.size
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
+            println("PdfDecoder.initPageSizeBean:$psb")
+            if (null != psb) {
+                pageSizeBean = psb
+                aPageList!!.addAll(psb.list as MutableList)
+                return
+            } else {
+                pageSizeBean = PageSizeBean()
+                pageSizeBean!!.list = aPageList
+            }
+            for (i in 0..<count) {
+                val aPage = APage(i, originalPageSizes[i].width, originalPageSizes[i].height, 1f)
+                aPageList!!.add(aPage)
+            }
+
+            if (cachePage) {
+                APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+            }
+        } catch (_: Exception) {
+            aPageList!!.clear()
         }
     }
 
@@ -271,6 +301,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun close() {
+        if (cachePage && aPageList != null && !aPageList.isEmpty()) {
+            println("PdfDecoder.close:$aPageList")
+            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+        }
+
         // 清理页面缓存
         pageCache.values.forEach { page ->
             try {
@@ -283,9 +318,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         // 清理链接缓存
         linksCache.clear()
-
-        // 清理切边缓存
-        pageCropBounds.clear()
 
         document?.destroy()
     }
@@ -452,7 +484,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                     )
 
                     aPage.cropBounds = pdfCropBounds
-                    pageCropBounds[aPage.index] = pdfCropBounds
 
                     // 在图片上绘制cropBounds矩形并保存（仅在第一次检测时）
                     //drawCropBoundsOnBitmap(imageBitmap, cropBounds, index)
@@ -654,21 +685,16 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     // ========== 切边相关方法 ==========
 
     /**
-     * 获取页面切边信息
-     * @param pageIndex 页面索引
-     * @return 切边区域，如果未切边则返回null
-     */
-    override fun getPageCropBounds(pageIndex: Int): Rect? {
-        return pageCropBounds[pageIndex]
-    }
-
-    /**
      * 在ImageBitmap上绘制cropBounds矩形
      * @param imageBitmap 原始图片
      * @param cropBounds 切边区域
      * @return 绘制了cropBounds的Bitmap
      */
-    private fun drawCropBoundsOnBitmap(imageBitmap: ImageBitmap, cropBounds: Rect, index: Int): Bitmap {
+    private fun drawCropBoundsOnBitmap(
+        imageBitmap: ImageBitmap,
+        cropBounds: Rect,
+        index: Int
+    ): Bitmap {
         val androidBitmap = imageBitmap.asAndroidBitmap()
 
         // 创建可变的bitmap副本用于绘制

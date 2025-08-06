@@ -47,8 +47,9 @@ public class PageNode(
         }
     }
 
+    //不能用bounds.toString(),切边切换,key变化
     public val cacheKey: String
-        get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pdfViewState.vZoom}-${pdfViewState.orientation}"
+        get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pdfViewState.vZoom}-${pdfViewState.orientation}-${pdfViewState.isCropEnabled()}"
 
     private var imageBitmap by mutableStateOf<ImageBitmap?>(null)
     private var isDecoding = false
@@ -62,6 +63,11 @@ public class PageNode(
         decodeJob = null
     }
 
+    /**
+     * @param pageWidth page的缩放后的宽
+     * @param pageHeight page的缩放后的高
+     * @param totalScale page当前显示的宽/页面原始的宽,包含了view的缩放值
+     */
     public fun draw(
         drawScope: DrawScope,
         offset: Offset,
@@ -108,9 +114,11 @@ public class PageNode(
                         isDecoding = false
                         return@launch
                     }
+
+                    var scale = totalScale
                     val tileSpec = TileSpec(
                         aPage.index,
-                        totalScale, // totalScale
+                        scale,
                         bounds,
                         pageWidth.toInt(), // 原始宽高
                         pageHeight.toInt(),
@@ -137,7 +145,7 @@ public class PageNode(
                     val bitmap = pdfViewState.state.renderPageRegion(
                         srcRect,
                         aPage.index,
-                        totalScale, // totalScale
+                        scale,
                         pdfViewState.viewSize,
                         outWidth,
                         outHeight

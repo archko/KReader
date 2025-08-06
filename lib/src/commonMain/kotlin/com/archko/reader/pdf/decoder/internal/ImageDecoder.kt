@@ -17,12 +17,10 @@ public interface ImageDecoder {
     public var pageSizes: List<Size>
     public var originalPageSizes: List<Size>
     public var outlineItems: List<Item>?
+    public val aPageList: MutableList<APage>?
 
     /** Size of the full image, without any scaling applied. */
     public var imageSize: IntSize
-
-    /** 页面切边信息缓存 */
-    public var pageCropBounds: MutableMap<Int, Rect>
 
     //public fun decodeRegion(rect: IntRect, tile: ImageTile): ImageBitmap?
     public fun size(viewportSize: IntSize): IntSize
@@ -55,12 +53,6 @@ public interface ImageDecoder {
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap
-    /**
-     * 获取页面切边信息
-     * @param pageIndex 页面索引
-     * @return 切边区域，如果未切边则返回null
-     */
-    public fun getPageCropBounds(pageIndex: Int): Rect?
 
     public fun close()
 }

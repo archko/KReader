@@ -219,7 +219,7 @@ public class Page(
                     currentHeight,
                     currentBounds.left,
                     currentBounds.top,
-                    totalScale * scaleRatio
+                    totalScale
                 )
             }*/
 

@@ -65,6 +65,7 @@ public class PdfViewState(
      */
     public fun isCropEnabled(): Boolean = cropEnabled
 
+    //todo cropEnabled
     public fun isTileVisible(spec: TileSpec): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
