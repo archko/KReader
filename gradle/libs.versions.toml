@@ -19,7 +19,7 @@ ksp = "2.1.20-2.0.0"
 calf = "0.8.0"
 mupdfFitz = "1.25.1"
 mupdfFitzAar = "1.25.0"
-mmkv = "1.3.4"
+mmkv-kotlin = "1.2.16"
 core = "1.16.0"
 lifecycleViewmodelComposeAndroid = "2.9.2"
 
@@ -51,7 +51,10 @@ androidx-lifecycle-viewmodel-compose-android = { group = "androidx.lifecycle", n
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-immutableCollections = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-immutableCollections" }
 
-mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
+mmkv-kotlin = { module = "com.ctrip.flight.mmkv:mmkv-kotlin", version.ref = "mmkv-kotlin" }
+mmkv-kotlin-android = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-android", version.ref = "mmkv-kotlin" }
+mmkv-kotlin-macosx64 = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-macosx64", version.ref = "mmkv-kotlin" }
+mmkv-kotlin-macosarm64 = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-android", version.ref = "mmkv-kotlin" }
 
 coil-kt = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
 coil-kt-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
