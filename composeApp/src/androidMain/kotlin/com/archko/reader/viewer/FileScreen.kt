@@ -33,6 +33,7 @@ import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.pdf.cache.APageSizeLoader
 import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
@@ -319,6 +320,7 @@ fun FileScreen(
                                         // 异步删除缓存文件
                                         scope.launch {
                                             CustomImageFetcher.deleteCache(recentList[i].path)
+                                            APageSizeLoader.deletePageSizeFromFile(recentList[i].path)
                                         }
                                     }
                                 )

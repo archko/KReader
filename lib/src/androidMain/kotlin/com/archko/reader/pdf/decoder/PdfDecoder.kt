@@ -121,7 +121,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
 
-            //initPageSizeBean()
+            initPageSizeBean()
             cacheCoverIfNeeded()
         }
     }
@@ -434,7 +434,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         try {
             val index = aPage.index
             val cropBounds =
-                if (aPage.cropBounds != null) aPage.cropBounds!!
+                if (aPage.cropBounds != null && crop) aPage.cropBounds!!
                 else Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
 
             val patchX = cropBounds.left.toInt()

@@ -141,7 +141,8 @@ public object APageSizeLoader {
         return jsonArray
     }
 
-    public fun deletePageSizeFromFile(path: String) {
+    public fun deletePageSizeFromFile(path: String?) {
+        path?.run {
         val file = File(path)
         val saveFile = File(
             FileUtils.getStorageDirPath() + "/amupdf"
@@ -149,6 +150,7 @@ public object APageSizeLoader {
         )
         if (saveFile.exists()) {
             saveFile.delete()
+        }
         }
     }
 
@@ -158,7 +160,7 @@ public object APageSizeLoader {
         public var fileSize: Long = 0L
 
         override fun toString(): String {
-            return "PageSizeBean(crop=$crop, fileSize=$fileSize, list=${list?.size})"
+            return "PageSizeBean(crop=$crop, fileSize=$fileSize, list=${list?.size},$list)"
         }
     }
 
