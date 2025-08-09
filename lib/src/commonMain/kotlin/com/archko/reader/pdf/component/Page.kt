@@ -211,7 +211,7 @@ public class Page(
             )
 
             // 再绘制高清块
-            /*nodes.forEach { node ->
+            nodes.forEach { node ->
                 node.draw(
                     drawScope,
                     offset,
@@ -221,7 +221,7 @@ public class Page(
                     currentBounds.top,
                     totalScale
                 )
-            }*/
+            }
 
             // 加载链接（在缩略图加载完成后）
             if (!linksLoaded) {

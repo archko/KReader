@@ -160,7 +160,7 @@ public object APageSizeLoader {
         public var fileSize: Long = 0L
 
         override fun toString(): String {
-            return "PageSizeBean(crop=$crop, fileSize=$fileSize, list=${list?.size},$list)"
+            return "PageSizeBean(crop=$crop, fileSize=$fileSize, list=${list?.size})"
         }
     }
 
