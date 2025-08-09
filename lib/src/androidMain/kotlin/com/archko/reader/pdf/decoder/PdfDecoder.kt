@@ -574,9 +574,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             dev.close()
             dev.destroy()
 
-            // 在解码缩略图时同时解析链接
-            parseLinksIfNeeded(index)
-
             /*val file = File(
                 Environment.getExternalStorageDirectory(),
                 "/Download/$index-${region.left}-${region.top}-${region.right}-${region.bottom}.png"

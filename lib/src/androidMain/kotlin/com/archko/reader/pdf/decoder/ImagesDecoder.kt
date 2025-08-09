@@ -151,63 +151,39 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         val file = files[index]
 
         return try {
-            // 检查是否是整张图片（region宽高为1表示不划分，即整张图片）
-            val isFullImage = region.width <= 1 && region.height <= 1
+            // 部分区域：使用BitmapRegionDecoder
+            val regionDecoder = getRegionDecoder(index)
+            if (regionDecoder != null) {
+                // 计算偏移量（基于缩放后尺寸）
+                val patchX = region.left.toInt()
+                val patchY = region.top.toInt()
 
-            if (isFullImage) {
-                // 整张图片：使用传入的scale参数，就像PdfDecoder一样
+                // 计算原始图片中的区域（需要转换为原始坐标）
                 val originalSize = originalPageSizes[index]
+                val scaledRegion = android.graphics.Rect(
+                    (patchX / scale).toInt().coerceIn(0, originalSize.width),
+                    (patchY / scale).toInt().coerceIn(0, originalSize.height),
+                    ((patchX + outWidth) / scale).toInt().coerceIn(0, originalSize.width),
+                    ((patchY + outHeight) / scale).toInt().coerceIn(0, originalSize.height)
+                )
 
-                // 使用传入的scale参数计算目标尺寸
-                val targetWidth = (originalSize.width * scale).toInt()
-                val targetHeight = (originalSize.height * scale).toInt()
+                // 确保区域有效
+                if (scaledRegion.width() > 0 && scaledRegion.height() > 0) {
+                    // 解码区域
+                    val options = BitmapFactory.Options().apply {
+                        inSampleSize =
+                            calculateInSampleSizeForRegion(scaledRegion, outWidth, outHeight)
+                    }
 
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = calculateInSampleSize(file, targetWidth, targetHeight)
-                }
-
-                val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
-                if (bitmap != null) {
-                    println("ImagesDecoder.renderPageRegion - 整张图片解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
-                    bitmap.asImageBitmap()
+                    val regionBitmap = regionDecoder.decodeRegion(scaledRegion, options)
+                    println("ImagesDecoder.renderPageRegion - 部分区域解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 偏移=($patchX,$patchY), 区域=${scaledRegion.width()}x${scaledRegion.height()}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 采样=${options.inSampleSize}, 结果=${regionBitmap.width}x${regionBitmap.height}")
+                    regionBitmap.asImageBitmap()
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 }
             } else {
-                // 部分区域：使用BitmapRegionDecoder
-                val regionDecoder = getRegionDecoder(index)
-                if (regionDecoder != null) {
-                    // 计算偏移量（基于缩放后尺寸）
-                    val patchX = region.left.toInt()
-                    val patchY = region.top.toInt()
-
-                    // 计算原始图片中的区域（需要转换为原始坐标）
-                    val originalSize = originalPageSizes[index]
-                    val scaledRegion = android.graphics.Rect(
-                        (patchX / scale).toInt().coerceIn(0, originalSize.width),
-                        (patchY / scale).toInt().coerceIn(0, originalSize.height),
-                        ((patchX + outWidth) / scale).toInt().coerceIn(0, originalSize.width),
-                        ((patchY + outHeight) / scale).toInt().coerceIn(0, originalSize.height)
-                    )
-
-                    // 确保区域有效
-                    if (scaledRegion.width() > 0 && scaledRegion.height() > 0) {
-                        // 解码区域
-                        val options = BitmapFactory.Options().apply {
-                            inSampleSize =
-                                calculateInSampleSizeForRegion(scaledRegion, outWidth, outHeight)
-                        }
-
-                        val regionBitmap = regionDecoder.decodeRegion(scaledRegion, options)
-                        println("ImagesDecoder.renderPageRegion - 部分区域解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 偏移=($patchX,$patchY), 区域=${scaledRegion.width()}x${scaledRegion.height()}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 采样=${options.inSampleSize}, 结果=${regionBitmap.width}x${regionBitmap.height}")
-                        regionBitmap.asImageBitmap()
-                    } else {
-                        ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
-                    }
-                } else {
-                    // 如果无法创建region decoder，返回默认图片
-                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
-                }
+                // 如果无法创建region decoder，返回默认图片
+                ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
             }
         } catch (e: Exception) {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
@@ -222,7 +198,29 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         outHeight: Int,
         crop: Boolean
     ): ImageBitmap {
-        return ImageBitmap(1, 1, ImageBitmapConfig.Rgb565)
+        // 整张图片：使用传入的scale参数，就像PdfDecoder一样
+        val originalSize = originalPageSizes[aPage.index]
+        val scale = if (aPage.width > 0) {
+            outWidth.toFloat() / aPage.getWidth(crop)
+        } else {
+            1f
+        }
+
+        // 使用传入的scale参数计算目标尺寸
+        val targetWidth = (originalSize.width * scale).toInt()
+        val targetHeight = (originalSize.height * scale).toInt()
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(files[aPage.index], targetWidth, targetHeight)
+        }
+
+        val bitmap = BitmapFactory.decodeFile(files[aPage.index].absolutePath, options)
+        if (bitmap != null) {
+            println("ImagesDecoder.renderPageRegion - 整张图片解码: 文件=${files[aPage.index].name}, 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
+            return bitmap.asImageBitmap()
+        } else {
+            return ImageBitmap(targetWidth, targetHeight, ImageBitmapConfig.Rgb565)
+        }
     }
 
     /**

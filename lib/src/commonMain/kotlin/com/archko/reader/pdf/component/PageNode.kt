@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -96,14 +97,20 @@ public class PageNode(
                 dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),
                 dstSize = IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
             )
+
+            // 绘制PageNode框架用于调试
+            /*drawScope.drawRect(
+                color = Color.Red,
+                topLeft = Offset(pixelRect.left, pixelRect.top),
+                size = androidx.compose.ui.geometry.Size(pixelRect.width, pixelRect.height),
+                style = Stroke(width = 2f)
+            )*/
         } else {
             if (!isDecoding) {
                 isDecoding = true
                 decodeJob = pdfViewState.decodeScope.launch {
                     // 解码前判断可见性和协程活跃性
-                    if (!isActive || pdfViewState.isShutdown()) {
-                        println("[PageNode.decodeScope] page=PdfViewState已关闭")
-                        isDecoding = false
+                    if (!isScopeActive()) {
                         return@launch
                     }
 
@@ -154,9 +161,7 @@ public class PageNode(
                     ImageCache.put(cacheKey, bitmap)
 
                     // 解码后再次判断可见性和协程活跃性
-                    if (!isActive || pdfViewState.isShutdown()) {
-                        println("[PageNode.decodeScope] page=解码后PdfViewState已关闭")
-                        isDecoding = false
+                    if (!isScopeActive()) {
                         return@launch
                     }
                     if (!pdfViewState.isTileVisible(tileSpec)) {
@@ -175,5 +180,14 @@ public class PageNode(
                 style = Stroke(width = 4f)
             )*/
         }
+    }
+
+    private fun CoroutineScope.isScopeActive(): Boolean {
+        if (!isActive || pdfViewState.isShutdown()) {
+            println("[PageNode.decodeScope] page=PdfViewState已关闭")
+            isDecoding = false
+            return false
+        }
+        return true
     }
 }
