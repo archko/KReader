@@ -335,6 +335,7 @@ public fun DocumentView(
                         val panVelocityTracker = VelocityTracker()
                         var pan: Offset
                         try {
+                            val down = awaitFirstDown(requireUnconsumed = true)
                             pan = Offset.Zero
                             panVelocityTracker.resetTracking()
                             flingJob?.cancel()
