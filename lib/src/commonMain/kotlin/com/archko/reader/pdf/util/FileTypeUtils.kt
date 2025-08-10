@@ -9,7 +9,7 @@ import java.io.File
  */
 public object FileTypeUtils {
 
-    private const val MAX_SIZE_MB = 10 * 1024 * 1024L
+    private const val MAX_SIZE_MB = 300 * 1024 * 1024L
 
     /**
      * 判断是否为图片文件
@@ -21,8 +21,6 @@ public object FileTypeUtils {
                     || filePath.endsWith(".png") || filePath.endsWith(".gif")
                     || filePath.endsWith(".bmp") || filePath.endsWith(".webp")
                     || filePath.endsWith(".heif") || filePath.endsWith(".heic")
-            //|| filePath.endsWith(".jfif") || filePath.endsWith(".tiff")
-            //|| filePath.endsWith(".tif")
         }
     }
 
@@ -36,7 +34,7 @@ public object FileTypeUtils {
         return file.exists()
                 && file.isFile
                 && isImageFile(file.absolutePath)
-        //&& file.length() <= MAX_SIZE_MB
+                && file.length() <= MAX_SIZE_MB
     }
 
     /**
@@ -48,7 +46,12 @@ public object FileTypeUtils {
                     filePath.endsWith(".mobi") || filePath.endsWith(".xps") ||
                     filePath.endsWith(".fb") || filePath.endsWith(".fb2") ||
                     filePath.endsWith(".pptx") || filePath.endsWith(".docx")
-                    || filePath.endsWith(".jfif") || filePath.endsWith(".tiff")
+        }
+    }
+
+    public fun isTiffFile(path: String): Boolean {
+        return path.lowercase().let { filePath ->
+            filePath.endsWith(".jfif") || filePath.endsWith(".tiff")
                     || filePath.endsWith(".tif")
         }
     }
@@ -78,7 +81,7 @@ public object FileTypeUtils {
     public fun filterFilesBySize(files: List<File>): List<File> {
         return files.filter { file ->
             file.exists()
-            //&& file.length() <= MAX_SIZE_MB
+            && file.length() <= MAX_SIZE_MB
         }
     }
 } 

@@ -176,7 +176,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                     }
 
                     val regionBitmap = regionDecoder.decodeRegion(scaledRegion, options)
-                    println("ImagesDecoder.renderPageRegion - 部分区域解码: 文件=${file.name}, 原始=${originalSize.width}x${originalSize.height}, 偏移=($patchX,$patchY), 区域=${scaledRegion.width()}x${scaledRegion.height()}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 采样=${options.inSampleSize}, 结果=${regionBitmap.width}x${regionBitmap.height}")
+                    //println("ImagesDecoder.renderPageRegion:原始=${originalSize.width}x${originalSize.height}, 偏移=($patchX,$patchY), 区域=${scaledRegion.width()}x${scaledRegion.height()}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 采样=${options.inSampleSize}, 结果=${regionBitmap.width}x${regionBitmap.height}")
                     regionBitmap.asImageBitmap()
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
@@ -216,7 +216,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
         val bitmap = BitmapFactory.decodeFile(files[aPage.index].absolutePath, options)
         if (bitmap != null) {
-            println("ImagesDecoder.renderPageRegion - 整张图片解码: 文件=${files[aPage.index].name}, 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
+            //println("ImagesDecoder.renderPage:原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
             return bitmap.asImageBitmap()
         } else {
             return ImageBitmap(targetWidth, targetHeight, ImageBitmapConfig.Rgb565)

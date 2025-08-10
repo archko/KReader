@@ -30,6 +30,7 @@ import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.ImagesDecoder
 import com.archko.reader.pdf.decoder.PdfDecoder
+import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
@@ -104,7 +105,9 @@ fun CustomView(
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, reflow:$reflow, $currentPath")
-            if (!FileTypeUtils.isDocumentFile(currentPath) && !FileTypeUtils.isImageFile(currentPath)) {
+            if (!FileTypeUtils.isDocumentFile(currentPath)
+                && !FileTypeUtils.isImageFile(currentPath)
+                && !FileTypeUtils.isTiffFile(currentPath)) {
                 loadingError = "document_open_failed"
                 decoder = null
                 return@withContext
@@ -131,6 +134,9 @@ fun CustomView(
                             }
 
                             pdfDecoder
+                        } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                            val tiffDecoder = TiffDecoder(File(currentPath))
+                            tiffDecoder
                         } else {
                             // 图片文件：创建ImagesDecoder（单文件图片也使用ImagesDecoder）
                             ImagesDecoder(listOf(File(currentPath)))

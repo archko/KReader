@@ -33,6 +33,7 @@ import kreader.composeapp.generated.resources.clear_history
 import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.delete_cache
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
@@ -159,6 +160,13 @@ fun FileScreen(
                                     },
                                     onDelete = {
                                         viewModel.deleteRecent(recentList[i])
+                                    },
+                                    onDeleteCache = {
+                                        // 异步删除缓存文件
+                                        scope.launch {
+                                            //CustomImageFetcher.deleteCache(recentList[i].path)
+                                            //APageSizeLoader.deletePageSizeFromFile(recentList[i].path)
+                                        }
                                     }
                                 )
                             }
@@ -237,7 +245,8 @@ private fun Dp.toIntPx(): Int {
 private fun RecentItem(
     recent: Recent,
     onClick: (Recent) -> Unit,
-    onDelete: (Recent) -> Unit
+    onDelete: (Recent) -> Unit,
+    onDeleteCache: (Recent) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     Column(
@@ -348,6 +357,13 @@ private fun RecentItem(
                     onDelete(recent)
                 }
             )
+            /*DropdownMenuItem(
+                text = { Text(stringResource(Res.string.delete_cache)) },
+                onClick = {
+                    showMenu = false
+                    onDeleteCache(recent)
+                }
+            )*/
         }
     }
 }

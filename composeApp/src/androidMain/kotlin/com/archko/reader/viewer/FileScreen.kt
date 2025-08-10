@@ -87,6 +87,10 @@ fun FileScreen(
                             } else {
                                 openDocRequest = OpenDocRequest(paths, 0)
                             }
+                        } else if (FileTypeUtils.isTiffFile(path)) {
+                            // 如果是tiff
+                            val paths = listOf(file.absolutePath)
+                            openDocRequest = OpenDocRequest(paths, 0)
                         }
                     }
                 }
@@ -199,6 +203,7 @@ fun FileScreen(
                                 // 先判断所有文件，得到图片列表和文档列表
                                 val imageFiles = mutableListOf<File>()
                                 val documentFiles = mutableListOf<File>()
+                                val tifFiles = mutableListOf<File>()
 
                                 files.forEach { file ->
                                     val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
@@ -207,6 +212,8 @@ fun FileScreen(
                                         imageFiles.add(fileObj)
                                     } else if (FileTypeUtils.isDocumentFile(path)) {
                                         documentFiles.add(fileObj)
+                                    } else if (FileTypeUtils.isTiffFile(path)) {
+                                        tifFiles.add(fileObj)
                                     }
                                 }
 
@@ -225,6 +232,11 @@ fun FileScreen(
                                         val startPage = viewModel.progress?.page?.toInt() ?: 0
                                         openDocRequest = OpenDocRequest(paths, startPage)
                                     }
+                                } else if (tifFiles.isNotEmpty()) {
+                                    // tiff
+                                    val firstDocumentPath = tifFiles.first().absolutePath
+                                    val paths = listOf(firstDocumentPath)
+                                    openDocRequest = OpenDocRequest(paths, 0)
                                 }
                                 // 如果都没有，什么都不做
                             }
@@ -316,7 +328,8 @@ fun FileScreen(
                                     onDelete = {
                                         // 删除历史记录
                                         viewModel.deleteRecent(recentList[i])
-                                        
+                                    },
+                                    onDeleteCache = {
                                         // 异步删除缓存文件
                                         scope.launch {
                                             CustomImageFetcher.deleteCache(recentList[i].path)
@@ -402,7 +415,8 @@ fun Dp.toIntPx(): Int {
 private fun RecentItem(
     recent: Recent,
     onClick: (Recent) -> Unit,
-    onDelete: (Recent) -> Unit
+    onDelete: (Recent) -> Unit,
+    onDeleteCache: (Recent) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     Column(
@@ -512,6 +526,13 @@ private fun RecentItem(
                 onClick = {
                     showMenu = false
                     onDelete(recent)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.delete_cache)) },
+                onClick = {
+                    showMenu = false
+                    onDeleteCache(recent)
                 }
             )
         }
