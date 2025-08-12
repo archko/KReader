@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
@@ -106,13 +107,19 @@ fun FileScreen(
                     ) { files ->
                         scope.launch {
                             files.singleOrNull()?.let { file ->
-                                scope.launch {
-                                    // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
-                                    viewModel.getProgress(file.file.absolutePath)
-                                    val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                    openDocRequest =
-                                        OpenDocRequest(file.file.absolutePath, startPage)
+                                val fileObj = file.file
+                                if (!FileTypeUtils.isValidImageFile(fileObj)
+                                    && !FileTypeUtils.isDocumentFile(fileObj.absolutePath)
+                                    && !FileTypeUtils.isTiffFile(fileObj.absolutePath)
+                                ) {
+                                    return@launch
                                 }
+
+                                // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
+                                viewModel.getProgress(file.file.absolutePath)
+                                val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                openDocRequest =
+                                    OpenDocRequest(file.file.absolutePath, startPage)
                             }
                         }
                     }
