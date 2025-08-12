@@ -105,8 +105,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            val fontSize = 54f
-            doc.layout(1280f, 2160f, fontSize)
+            val fontSize = 32f
+            doc.layout(1280f, 1024f, fontSize)
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
