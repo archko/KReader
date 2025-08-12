@@ -2,16 +2,42 @@ package com.archko.reader.viewer
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,7 +59,6 @@ import kreader.composeapp.generated.resources.clear_history
 import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
-import kreader.composeapp.generated.resources.delete_cache
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
@@ -64,7 +89,6 @@ fun FileScreen(
 
         Surface(
             modifier = modifier
-                .statusBarsPadding()
                 .fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
@@ -82,7 +106,6 @@ fun FileScreen(
                     ) { files ->
                         scope.launch {
                             files.singleOrNull()?.let { file ->
-                                val pdf = LocalPdfState(file)
                                 scope.launch {
                                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                                     viewModel.getProgress(file.file.absolutePath)
@@ -95,21 +118,29 @@ fun FileScreen(
                     }
 
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
                                 onClick = { viewModel.clear() },
-                                modifier = Modifier.align(Alignment.CenterStart)
+                                modifier = Modifier.align(Alignment.CenterStart),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
                             ) {
-                                Text(stringResource(Res.string.clear_history), color = MaterialTheme.colorScheme.onBackground)
+                                Text(stringResource(Res.string.clear_history))
                             }
                         }
                         Button(
                             onClick = pickerLauncher::launch,
-                            modifier = Modifier.align(Alignment.Center)
+                            modifier = Modifier.align(Alignment.Center),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
-                            Text(stringResource(Res.string.select_pdf), color = MaterialTheme.colorScheme.onBackground)
+                            Text(stringResource(Res.string.select_pdf))
                         }
                     }
 
@@ -135,12 +166,12 @@ fun FileScreen(
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.Adaptive(160.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             // 顶部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(0.dp))
                             }
 
                             items(
@@ -210,9 +241,9 @@ fun FileScreen(
             } else {
                 onShowBottomBarChanged(false)
                 CustomView(
-                    path = openDocRequest!!.path,
+                    currentPath = openDocRequest!!.path,
                     progressPage = openDocRequest!!.page,
-                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri ->
+                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow ->
                         viewModel.updateProgress(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
@@ -221,7 +252,7 @@ fun FileScreen(
                             scrollX,
                             scrollY,
                             scrollOri,
-                            0L
+                            reflow,
                         )
                     },
                     onCloseDocument = {
@@ -229,7 +260,9 @@ fun FileScreen(
                     },
                     initialScrollX = viewModel.progress?.scrollX ?: 0L,
                     initialScrollY = viewModel.progress?.scrollY ?: 0L,
-                    initialZoom = viewModel.progress?.zoom ?: 1.0
+                    initialZoom = viewModel.progress?.zoom ?: 1.0,
+                    scrollOri = viewModel.progress?.scrollOri ?: 0,
+                    reflow = viewModel.progress?.reflow ?: 0L
                 )
             }
         }
@@ -327,7 +360,7 @@ private fun RecentItem(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(2.dp),
-                    color = Color(0xFF444444).copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                     maxLines = 1,
                     text = "${recent.page?.plus(1)}/${recent.pageCount}",
                     fontSize = 12.sp,

@@ -11,6 +11,7 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.ColorSpace
+import com.artifex.mupdf.fitz.Context
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.DrawDevice
 import com.artifex.mupdf.fitz.Matrix
@@ -48,10 +49,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private val pageCache = mutableMapOf<Int, Page>()
     private val maxPageCache = 8
 
+    public override val aPageList: MutableList<APage>? = ArrayList()
+    //private var pageSizeBean: PageSizeBean? = null
+    private var cachePage = true
+
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
-
-    public override val aPageList: MutableList<APage>? = ArrayList()
 
     init {
         // 检查文件是否存在
@@ -549,8 +552,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val patchY = region.top.toInt()
             println("PdfDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
-            val bmp: ImageBitmap?
-            // 创建子页面大小的 pixmap
             val bbox = Rect(
                 0f,
                 0f,
@@ -559,13 +560,15 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             )
             val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
             pixmap.clear(255)
+            Context.disableICC();
 
             // 创建变换矩阵，包含缩放和偏移
             val ctm = Matrix()
             ctm.scale(scale, scale)
             // 添加偏移，使渲染区域正确
             // patchX 和 patchY 是基于缩放后尺寸的，需要转换为原始PDF坐标
-            ctm.translate(-patchX.toFloat(), -patchY.toFloat())
+            //ctm.translate(-patchX.toFloat(), -patchY.toFloat())
+            ctm.translate(-(patchX / scale), -(patchY / scale))
 
             val dev = DrawDevice(pixmap)
             val page = getPage(index)
@@ -580,10 +583,18 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val pixmapHeight = pixmap.height
             val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
             image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-            bmp = image.toComposeImageBitmap()
-            return (bmp)
+
+            /*// 保存图片到文件
+            val fileName = "rendered_page_$index-${region}.png"
+            val file = File("/Users/archko/$fileName")
+            javax.imageio.ImageIO.write(image, "png", file)
+            
+            // 打印文件存储路径
+            println("图片已保存到: ${file.absolutePath}")*/
+            
+            return image.toComposeImageBitmap()
         } catch (e: Exception) {
-            println("renderPageRegion error: $e")
+            println("PdfDecoder.renderPageRegion error: $e")
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }

@@ -97,14 +97,6 @@ public class PageNode(
                 dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),
                 dstSize = IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
             )
-
-            // 绘制PageNode框架用于调试
-            /*drawScope.drawRect(
-                color = Color.Red,
-                topLeft = Offset(pixelRect.left, pixelRect.top),
-                size = androidx.compose.ui.geometry.Size(pixelRect.width, pixelRect.height),
-                style = Stroke(width = 2f)
-            )*/
         } else {
             if (!isDecoding) {
                 isDecoding = true
@@ -180,6 +172,14 @@ public class PageNode(
                 style = Stroke(width = 4f)
             )*/
         }
+
+        // 绘制PageNode框架用于调试
+        /*drawScope.drawRect(
+            color = Color.Red,
+            topLeft = Offset(pixelRect.left, pixelRect.top),
+            size = androidx.compose.ui.geometry.Size(pixelRect.width, pixelRect.height),
+            style = Stroke(width = 2f)
+        )*/
     }
 
     private fun CoroutineScope.isScopeActive(): Boolean {
