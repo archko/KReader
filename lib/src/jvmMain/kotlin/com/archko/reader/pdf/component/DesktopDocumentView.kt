@@ -591,7 +591,7 @@ public fun DesktopDocumentView(
                             offset = Offset(offset.x, newY)
                         } else {
                             val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                            val newX = (offset.x + scrollAmount.y * 50f).coerceIn(-maxX, 0f)
+                            val newX = (offset.x + scrollAmount.x * 50f).coerceIn(-maxX, 0f)
                             offset = Offset(newX, offset.y)
                         }
                         pdfViewState.updateOffset(offset)
