@@ -22,6 +22,7 @@ import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.PdfDecoder
+import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
@@ -61,22 +62,29 @@ fun CustomView(
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, $currentPath")
             try {
-                val newDecoder = if (viewportSize == IntSize.Zero) {
+                val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                     null
                 } else {
-                    val pdfDecoder = PdfDecoder(File(currentPath))
+                    if (FileTypeUtils.isDocumentFile(currentPath)) {
+                        val pdfDecoder = PdfDecoder(File(currentPath))
 
-                    // 检查是否需要密码
-                    if (pdfDecoder.needsPassword) {
-                        showPasswordDialog = true
-                        isPasswordError = false
-                        return@withContext
+                        // 检查是否需要密码
+                        if (pdfDecoder.needsPassword) {
+                            showPasswordDialog = true
+                            isPasswordError = false
+                            return@withContext
+                        }
+
+                        pdfDecoder
+                    } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                        val tiffDecoder = TiffDecoder(File(currentPath))
+                        tiffDecoder
+                    } else {
+                        null
                     }
-
-                    pdfDecoder
                 }
                 if (newDecoder != null) {
-                    newDecoder.getSize(viewportSize)
+                    newDecoder.size(viewportSize)
                     println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
                     decoder = newDecoder
                     loadingError = null // 清除之前的错误
