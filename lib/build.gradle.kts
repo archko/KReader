@@ -24,8 +24,6 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.androidx.core)
-            api(libs.mupdf.fitz.aar)
-            api(libs.tiff.loader)
         }
         commonMain {
             dependencies {
@@ -38,13 +36,14 @@ kotlin {
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)
                 implementation(libs.androidx.room.runtime)
+                api(libs.mupdf.fitz.aar)
+                api(libs.tiff.loader)
             }
         }
 
         jvmMain {
             dependencies {
                 implementation(compose.desktop.currentOs)
-                api(libs.mupdf.fitz)
                 implementation(libs.sqlite.bundled)
             }
         }
