@@ -107,7 +107,7 @@ fun CustomView(
 
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
-            println("init:$viewportSize, reflow:$reflow, $currentPath")
+            println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
             if (!FileTypeUtils.isDocumentFile(currentPath)
                 && !FileTypeUtils.isImageFile(currentPath)
                 && !FileTypeUtils.isTiffFile(currentPath)
@@ -418,6 +418,16 @@ fun CustomView(
                                 painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
                                 contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
                                     Res.string.horizontal
+                                ),
+                                tint = Color.White
+                            )
+                        }
+
+                        IconButton(onClick = { isCrop = !isCrop }) {
+                            Icon(
+                                painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                    Res.string.no_crop
                                 ),
                                 tint = Color.White
                             )

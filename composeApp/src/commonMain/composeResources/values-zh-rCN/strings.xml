@@ -19,6 +19,8 @@
     <string name="vertical">竖向</string>
     <string name="horizontal">横向</string>
     <string name="outline">大纲</string>
+    <string name="crop">切边</string>
+    <string name="no_crop">不切边</string>
     <string name="reflow">重排</string>
     <string name="search">搜索</string>
     <string name="document_outline">文档大纲</string>

@@ -20,7 +20,8 @@ import kotlinx.coroutines.cancel
 public class PdfViewState(
     public val list: List<APage>,
     public val state: ImageDecoder,
-    public var orientation: Int = Vertical
+    public var orientation: Int = Vertical,
+    crop: Boolean
 ) {
     public var viewOffset: Offset = Offset.Zero
     public var init: Boolean by mutableStateOf(false)
@@ -46,7 +47,7 @@ public class PdfViewState(
     public var onUrlLinkClick: ((url: String) -> Unit)? = null
 
     // 切边控制
-    private var cropEnabled: Boolean = false
+    private var cropEnabled: Boolean = crop
 
     /**
      * 设置切边参数
@@ -55,7 +56,6 @@ public class PdfViewState(
     public fun setCropEnabled(enabled: Boolean) {
         if (cropEnabled != enabled) {
             cropEnabled = enabled
-            println("PdfViewState.setCropEnabled: $enabled")
         }
     }
 
@@ -185,7 +185,7 @@ public class PdfViewState(
             }
             init = true
         }
-        println("PdfViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth, zoom:$vZoom, orientation:$orientation")
+        println("PdfViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth, zoom:$vZoom, orientation:$orientation, crop:$cropEnabled")
     }
 
     private fun createPages(): List<Page> {

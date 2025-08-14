@@ -81,7 +81,7 @@ public fun DocumentView(
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PdfViewState(list, state, orientation)
+        PdfViewState(list, state, orientation, crop)
     }
 
     // 设置页面跳转回调
@@ -99,8 +99,6 @@ public fun DocumentView(
             println("DocumentView: URL链接点击，URL: $url")
             // 这里可以添加打开URL的逻辑，比如调用系统浏览器
         }
-
-        pdfViewState.setCropEnabled(crop)
     }
 
     // 确保在 list 变化时重新计算总高度
@@ -197,6 +195,16 @@ public fun DocumentView(
         }
     }
 
+    LaunchedEffect(crop) {
+        val old = pdfViewState.isCropEnabled()
+        if (old != crop) {
+            println("DocumentView: 切边变化:$crop")
+            pdfViewState.setCropEnabled(crop)
+            pdfViewState.invalidatePageSizes()
+            pdfViewState.updateOffset(offset)
+        }
+    }
+
     // 监听页面变化并回调
     LaunchedEffect(offset) {
         // 只有在非跳转状态下才处理页面变化回调
@@ -232,7 +240,7 @@ public fun DocumentView(
         }
         val pageCount = list.size
         val zoom = vZoom.toDouble()
-        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
+        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation, crop: $crop,${pdfViewState.isCropEnabled()}")
 
         if (!list.isEmpty()) {
             onSaveDocument?.invoke(
@@ -243,7 +251,7 @@ public fun DocumentView(
                 offset.y.toLong(),
                 orientation.toLong(),
                 reflow,
-                if (crop) 0L else 1L
+                if (pdfViewState.isCropEnabled()) 0L else 1L
             )
         }
     }
@@ -450,7 +458,7 @@ public fun DocumentView(
                                     Velocity.Zero
                                 )
                             val velocitySquared = velocity.x * velocity.x + velocity.y * velocity.y
-                            val velocityThreshold = with(density) { 50.dp.toPx() * 50.dp.toPx() }
+                            val velocityThreshold = with(density) { 64.dp.toPx() * 64.dp.toPx() }
                             flingJob?.cancel()
                             if (velocitySquared > velocityThreshold) {
                                 val decayAnimationSpec =

@@ -18,6 +18,8 @@
     <string name="back">Back</string>
     <string name="vertical">Vertical</string>
     <string name="horizontal">Horizontal</string>
+    <string name="crop">Crop</string>
+    <string name="no_crop">No Crop</string>
     <string name="outline">Outline</string>
     <string name="reflow">Reflow</string>
     <string name="search">Search</string>

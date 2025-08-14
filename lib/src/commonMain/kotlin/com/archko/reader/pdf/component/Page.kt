@@ -107,9 +107,6 @@ public class Page(
         val ratio: Float = 1f * aPage.width / width
         val thumbWidth = 300
         val thumbHeight = (aPage.height / ratio).toInt()
-        if (aspectRatio == 0f) {
-            aspectRatio = 1f * thumbWidth / thumbHeight
-        }
 
         val cacheKey = cachedCacheKey ?: run {
             val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
@@ -167,9 +164,9 @@ public class Page(
         if (pdfViewState.isCropEnabled() && this.aspectRatio != aspectRatio) {
             val abs: Float = abs(aspectRatio - this.aspectRatio)
             val changed = this.aspectRatio != 0f && abs > 0.008
-            println("Page.loadThumbnail: 页面${aPage.index}检测到切边，${abs}, bounds=${aPage.cropBounds}")
             this.aspectRatio = aspectRatio
             if (changed) {
+                println("Page.loadThumbnail: 页面${aPage.index}检测到切边，${abs}, bounds=${aPage.cropBounds}")
                 pdfViewState.invalidatePageSizes()
             }
         }
