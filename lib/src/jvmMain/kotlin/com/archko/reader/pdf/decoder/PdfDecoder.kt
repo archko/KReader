@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -50,6 +51,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private val maxPageCache = 8
 
     public override val aPageList: MutableList<APage>? = ArrayList()
+
     //private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
 
@@ -305,6 +307,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         linksCache.clear()
 
         document?.destroy()
+        document = null
+
+        ImageCache.clear()
     }
 
     private fun prepareSizes(): List<Size> {
@@ -505,7 +510,10 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 对图片进行切边处理
      */
-    private fun cropImageBitmap(originalBitmap: ImageBitmap, cropBounds: androidx.compose.ui.geometry.Rect): ImageBitmap {
+    private fun cropImageBitmap(
+        originalBitmap: ImageBitmap,
+        cropBounds: androidx.compose.ui.geometry.Rect
+    ): ImageBitmap {
         val cropX = cropBounds.left.toInt()
         val cropY = cropBounds.top.toInt()
         val cropWidth = (cropBounds.right - cropX).toInt()
@@ -591,7 +599,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             
             // 打印文件存储路径
             println("图片已保存到: ${file.absolutePath}")*/
-            
+
             return image.toComposeImageBitmap()
         } catch (e: Exception) {
             println("PdfDecoder.renderPageRegion error: $e")

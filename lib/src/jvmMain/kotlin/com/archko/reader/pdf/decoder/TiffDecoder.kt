@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -216,5 +217,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
 
     override fun close() {
         tiffLoader?.close()
+
+        ImageCache.clear()
     }
 }

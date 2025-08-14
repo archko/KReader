@@ -16,6 +16,7 @@ import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
 import com.archko.reader.pdf.cache.BitmapCache
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -320,6 +321,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         linksCache.clear()
 
         document?.destroy()
+        document = null
+
+        ImageCache.clear()
     }
 
     private fun prepareSizes(): List<Size> {

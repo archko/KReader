@@ -52,7 +52,7 @@ fun ReflowView(
     pageCount: Int,
     onPageChanged: ((page: Int) -> Unit)? = null,
     jumpToPage: Int? = null,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null,
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null,
@@ -111,7 +111,8 @@ fun ReflowView(
             initialScrollX,
             initialScrollY,
             initialOrientation.toLong(),
-            reflow
+            reflow,
+            1L
         )
     }
 

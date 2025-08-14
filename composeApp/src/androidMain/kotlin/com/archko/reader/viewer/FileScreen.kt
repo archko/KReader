@@ -6,13 +6,42 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -26,6 +55,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
+import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
@@ -33,13 +63,24 @@ import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.viewmodel.PdfViewModel
-import com.archko.reader.pdf.cache.APageSizeLoader
 import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.browse_directory_message
+import kreader.composeapp.generated.resources.browse_directory_title
+import kreader.composeapp.generated.resources.cancel
+import kreader.composeapp.generated.resources.clear_history
+import kreader.composeapp.generated.resources.components_thumbnail_corner
+import kreader.composeapp.generated.resources.components_thumbnail_left
+import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.confirm
+import kreader.composeapp.generated.resources.delete_cache
+import kreader.composeapp.generated.resources.delete_history
+import kreader.composeapp.generated.resources.load_more
+import kreader.composeapp.generated.resources.select_pdf
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -206,7 +247,8 @@ fun FileScreen(
                                 val tifFiles = mutableListOf<File>()
 
                                 files.forEach { file ->
-                                    val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
+                                    val path = IntentFile.getPath(PdfApp.app!!, file.uri)
+                                        ?: file.uri.toString()
                                     val fileObj = File(path)
                                     if (FileTypeUtils.isValidImageFile(fileObj)) {
                                         imageFiles.add(fileObj)
@@ -244,7 +286,9 @@ fun FileScreen(
                     }
 
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
@@ -310,15 +354,18 @@ fun FileScreen(
                                     onClick = {
                                         val kmpFile = KmpFile(Uri.parse(it.path))
                                         val path =
-                                            IntentFile.getPath(PdfApp.app!!, kmpFile.uri) ?: kmpFile.uri.toString()
+                                            IntentFile.getPath(PdfApp.app!!, kmpFile.uri)
+                                                ?: kmpFile.uri.toString()
                                         val file = File(path)
                                         if (file.exists()) {
                                             scope.launch {
                                                 val paths = listOf(file.absolutePath)
                                                 if (FileTypeUtils.shouldSaveProgress(paths)) {
                                                     viewModel.getProgress(file.absolutePath)
-                                                    val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                                    openDocRequest = OpenDocRequest(paths, startPage)
+                                                    val startPage =
+                                                        viewModel.progress?.page?.toInt() ?: 0
+                                                    openDocRequest =
+                                                        OpenDocRequest(paths, startPage)
                                                 } else {
                                                     openDocRequest = OpenDocRequest(paths, 0)
                                                 }
@@ -380,12 +427,12 @@ fun FileScreen(
                 CustomView(
                     paths = openDocRequest!!.paths,
                     progressPage = openDocRequest!!.page,
-                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow ->
+                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
                         viewModel.updateProgress(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
                             zoom = zoom,
-                            crop = 0L,
+                            crop = crop,
                             scrollX,
                             scrollY,
                             scrollOri,
@@ -399,7 +446,8 @@ fun FileScreen(
                     initialScrollY = viewModel.progress?.scrollY ?: 0L,
                     initialZoom = viewModel.progress?.zoom ?: 1.0,
                     scrollOri = viewModel.progress?.scrollOri ?: 0,
-                    reflow = viewModel.progress?.reflow ?: 0L
+                    reflow = viewModel.progress?.reflow ?: 0L,
+                    crop = 0L == viewModel.progress?.crop
                 )
             }
         }

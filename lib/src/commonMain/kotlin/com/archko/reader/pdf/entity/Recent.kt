@@ -28,7 +28,7 @@ public class Recent {
 
     @ColumnInfo(name = "crop")
     //0:autocrop,1:no crop, 2:manunal crop
-    public var crop: Long? = 0
+    public var crop: Long? = 1
 
     @ColumnInfo(name = "reflow")
     //0,no reflow mode,1,reflow mode

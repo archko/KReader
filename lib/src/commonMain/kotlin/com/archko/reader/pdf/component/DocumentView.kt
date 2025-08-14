@@ -49,15 +49,16 @@ public fun DocumentView(
     jumpToPage: Int? = null,
     align: PdfViewState.Align = PdfViewState.Align.Top,
     initialOrientation: Int,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
     onPageChanged: ((page: Int) -> Unit)? = null, // 新增页面变化回调
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null, // 新增：点击非翻页区域回调，传递页面索引
-    initialScrollX: Long = 0L, // 新增：初始X偏移量
-    initialScrollY: Long = 0L, // 新增：初始Y偏移量
-    initialZoom: Double = 1.0, // 新增：初始缩放比例
-    reflow: Long = 0, // 新增：初始缩放比例
+    initialScrollX: Long = 0L, // 初始X偏移量
+    initialScrollY: Long = 0L, // 初始Y偏移量
+    initialZoom: Double = 1.0, // 初始缩放比例
+    reflow: Long = 0, // 初始缩放比例
+    crop: Boolean = false, // 是否切边
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -98,6 +99,8 @@ public fun DocumentView(
             println("DocumentView: URL链接点击，URL: $url")
             // 这里可以添加打开URL的逻辑，比如调用系统浏览器
         }
+
+        pdfViewState.setCropEnabled(crop)
     }
 
     // 确保在 list 变化时重新计算总高度
@@ -239,7 +242,8 @@ public fun DocumentView(
                 offset.x.toLong(),
                 offset.y.toLong(),
                 orientation.toLong(),
-                reflow
+                reflow,
+                if (crop) 0L else 1L
             )
         }
     }
@@ -441,14 +445,16 @@ public fun DocumentView(
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
                             // 计算pan velocity
-                            val velocity = runCatching { panVelocityTracker.calculateVelocity() }.getOrDefault(
-                                Velocity.Zero
-                            )
+                            val velocity =
+                                runCatching { panVelocityTracker.calculateVelocity() }.getOrDefault(
+                                    Velocity.Zero
+                                )
                             val velocitySquared = velocity.x * velocity.x + velocity.y * velocity.y
                             val velocityThreshold = with(density) { 50.dp.toPx() * 50.dp.toPx() }
                             flingJob?.cancel()
                             if (velocitySquared > velocityThreshold) {
-                                val decayAnimationSpec = exponentialDecay<Float>(frictionMultiplier = 0.2f)
+                                val decayAnimationSpec =
+                                    exponentialDecay<Float>(frictionMultiplier = 0.2f)
                                 flingJob = scope.launch {
                                     if (orientation == Vertical) {
                                         // X方向
@@ -460,7 +466,8 @@ public fun DocumentView(
                                             launch {
                                                 animX.animateDecay(decayAnimationSpec) {
                                                     val scaledWidth = viewSize.width * vZoom
-                                                    val minX = minOf(0f, viewSize.width - scaledWidth)
+                                                    val minX =
+                                                        minOf(0f, viewSize.width - scaledWidth)
                                                     val maxX = 0f
                                                     val newX = value.coerceIn(minX, maxX)
                                                     offset = Offset(newX, offset.y)
@@ -524,7 +531,8 @@ public fun DocumentView(
                                             launch {
                                                 animY.animateDecay(decayAnimationSpec) {
                                                     val scaledHeight = viewSize.height * vZoom
-                                                    val minY = minOf(0f, viewSize.height - scaledHeight)
+                                                    val minY =
+                                                        minOf(0f, viewSize.height - scaledHeight)
                                                     val maxY = 0f
                                                     val newY = value.coerceIn(minY, maxY)
                                                     offset = Offset(offset.x, newY)

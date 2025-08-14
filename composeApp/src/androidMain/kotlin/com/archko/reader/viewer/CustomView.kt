@@ -50,13 +50,14 @@ import java.io.File
 fun CustomView(
     paths: List<String>,
     progressPage: Int? = null,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
     scrollOri: Long = 0,
     reflow: Long = 0,
+    crop: Boolean? = null,
 ) {
     // 在打开文档时隐藏状态栏
     val context = LocalContext.current
@@ -99,6 +100,7 @@ fun CustomView(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var isCrop by remember { mutableStateOf(crop == true) }
 
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
@@ -119,6 +121,7 @@ fun CustomView(
                     null
                 } else {
                     if (paths.size > 1) {
+                        isCrop = false
                         // 多文件模式：创建ImagesDecoder
                         val files = paths.map { File(it) }
                         ImagesDecoder(files)
@@ -137,9 +140,11 @@ fun CustomView(
 
                             pdfDecoder
                         } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                            isCrop = false
                             val tiffDecoder = TiffDecoder(File(currentPath))
                             tiffDecoder
                         } else {
+                            isCrop = false
                             // 图片文件：创建ImagesDecoder（单文件图片也使用ImagesDecoder）
                             ImagesDecoder(listOf(File(currentPath)))
                         }
@@ -376,6 +381,7 @@ fun CustomView(
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
+                    crop = isCrop,
                 )
             }
 
@@ -459,7 +465,11 @@ fun CustomView(
                         .takeIf { it != -1 } ?: outlineList.indexOfLast { it.page <= currentPage }
                         .takeIf { it != -1 } ?: 0
                     val lazyListState =
-                        rememberLazyListState(initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(0))
+                        rememberLazyListState(
+                            initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(
+                                0
+                            )
+                        )
                     Surface(
                         modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
                         color = Color.White.copy(alpha = 0.8f),
@@ -511,7 +521,9 @@ fun CustomView(
                                     modifier = Modifier.fillMaxSize(),
                                     state = lazyListState
                                 ) {
-                                    itemsIndexed(outlineList, key = { index, item -> index }) { index, item ->
+                                    itemsIndexed(
+                                        outlineList,
+                                        key = { index, item -> index }) { index, item ->
                                         val isSelected = index == initialOutlineIndex
                                         Row(
                                             modifier = Modifier
