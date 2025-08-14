@@ -1,6 +1,7 @@
 package com.archko.reader.viewer
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -230,8 +231,7 @@ fun CustomView(
         var showToolbar by remember { mutableStateOf(true) }
         // 大纲弹窗状态
         var showOutlineDialog by remember { mutableStateOf(false) }
-        // 大纲列表滚动位置状态
-        var outlineScrollPosition by remember { mutableIntStateOf(0) }
+
         // 横竖切换、重排等按钮内部状态
         var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
         var isReflow by remember { mutableStateOf(reflow == 1L) }
@@ -396,8 +396,12 @@ fun CustomView(
                     showOutlineDialog = false
                 }) {
                     val hasOutline = outlineList.isNotEmpty()
+                    // 根据当前页码找到最接近的大纲项位置
+                    val initialOutlineIndex = outlineList.indexOfFirst { it.page >= currentPage }
+                        .takeIf { it != -1 } ?: outlineList.indexOfLast { it.page <= currentPage }
+                        .takeIf { it != -1 } ?: 0
                     val lazyListState =
-                        rememberLazyListState(initialFirstVisibleItemIndex = outlineScrollPosition)
+                        rememberLazyListState(initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(0))
                     Surface(
                         modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
                         color = Color.White.copy(alpha = 0.8f),
@@ -416,8 +420,6 @@ fun CustomView(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     IconButton(onClick = {
-                                        // 关闭弹窗时记录当前滚动位置
-                                        outlineScrollPosition = lazyListState.firstVisibleItemIndex
                                         showOutlineDialog = false
                                     }) {
                                         Icon(
@@ -447,30 +449,25 @@ fun CustomView(
                                     Text(stringResource(Res.string.no_outline), color = Color.Gray)
                                 }
                             } else {
-                                // 在弹窗关闭时记录滚动位置
-                                LaunchedEffect(showOutlineDialog) {
-                                    if (!showOutlineDialog) {
-                                        // 弹窗关闭时记录当前滚动位置
-                                        outlineScrollPosition = lazyListState.firstVisibleItemIndex
-                                    }
-                                }
-
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     state = lazyListState
                                 ) {
-                                    itemsIndexed(outlineList) { index, item ->
+                                    itemsIndexed(outlineList, key = { index, item -> index }) { index, item ->
+                                        val isSelected = index == initialOutlineIndex
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.surfaceVariant
+                                                    else Color.Transparent
+                                                )
                                                 .clickable {
                                                     jumpToPage = item.page
-                                                    // 点击项目时记录当前滚动位置
-                                                    outlineScrollPosition =
-                                                        lazyListState.firstVisibleItemIndex
                                                     showOutlineDialog = false
+                                                    showToolbar = false
                                                 }
-                                                .padding(vertical = 6.dp, horizontal = 16.dp),
+                                                .padding(vertical = 8.dp, horizontal = 16.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
