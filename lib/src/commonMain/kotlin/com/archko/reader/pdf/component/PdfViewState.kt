@@ -46,7 +46,7 @@ public class PdfViewState(
     public var onUrlLinkClick: ((url: String) -> Unit)? = null
 
     // 切边控制
-    private var cropEnabled: Boolean = false
+    private var cropEnabled: Boolean = true
 
     /**
      * 设置切边参数

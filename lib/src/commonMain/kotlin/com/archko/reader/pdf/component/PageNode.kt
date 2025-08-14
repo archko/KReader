@@ -98,79 +98,7 @@ public class PageNode(
                 dstSize = IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
             )
         } else {
-            if (!isDecoding) {
-                isDecoding = true
-                decodeJob = pdfViewState.decodeScope.launch {
-                    // 解码前判断可见性和协程活跃性
-                    if (!isScopeActive()) {
-                        return@launch
-                    }
-
-                    // 先查缓存
-                    val cacheBitmap = ImageCache.get(cacheKey)
-                    if (cacheBitmap != null) {
-                        imageBitmap = cacheBitmap
-                        isDecoding = false
-                        return@launch
-                    }
-
-                    var scale = totalScale
-                    val tileSpec = TileSpec(
-                        aPage.index,
-                        scale,
-                        bounds,
-                        pageWidth.toInt(), // 原始宽高
-                        pageHeight.toInt(),
-                        pdfViewState.viewSize,
-                        cacheKey,
-                        null
-                    )
-
-                    if (!pdfViewState.isTileVisible(tileSpec)) {
-                        //println("[PageNode.decodeScope] page=!isTileVisible")
-                        isDecoding = false
-                        return@launch
-                    }
-
-                    val srcRect = Rect(
-                        left = bounds.left * pageWidth,
-                        top = bounds.top * pageHeight,
-                        right = bounds.right * pageWidth,
-                        bottom = bounds.bottom * pageHeight
-                    )
-                    val outWidth = ((srcRect.right - srcRect.left)).toInt()
-                    val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
-
-                    val bitmap = pdfViewState.state.renderPageRegion(
-                        srcRect,
-                        aPage.index,
-                        scale,
-                        pdfViewState.viewSize,
-                        outWidth,
-                        outHeight
-                    )
-
-                    ImageCache.put(cacheKey, bitmap)
-
-                    // 解码后再次判断可见性和协程活跃性
-                    if (!isScopeActive()) {
-                        return@launch
-                    }
-                    if (!pdfViewState.isTileVisible(tileSpec)) {
-                        isDecoding = false
-                        return@launch
-                    }
-
-                    imageBitmap = bitmap
-                    isDecoding = false
-                }
-            }
-            /*drawScope.drawRect(
-                color = Color.Magenta,
-                topLeft = Offset(pixelRect.left, pixelRect.top),
-                size = pixelRect.size,
-                style = Stroke(width = 4f)
-            )*/
+            decode(totalScale, pageWidth, pageHeight)
         }
 
         // 绘制PageNode框架用于调试
@@ -180,6 +108,85 @@ public class PageNode(
             size = androidx.compose.ui.geometry.Size(pixelRect.width, pixelRect.height),
             style = Stroke(width = 2f)
         )*/
+    }
+
+    private fun decode(totalScale: Float, pageWidth: Float, pageHeight: Float) {
+        if (!isDecoding) {
+            isDecoding = true
+            decodeJob = pdfViewState.decodeScope.launch {
+                // 解码前判断可见性和协程活跃性
+                if (!isScopeActive()) {
+                    return@launch
+                }
+
+                // 先查缓存
+                val cacheBitmap = ImageCache.get(cacheKey)
+                if (cacheBitmap != null) {
+                    imageBitmap = cacheBitmap
+                    isDecoding = false
+                    return@launch
+                }
+
+                val width = aPage.getWidth(pdfViewState.isCropEnabled())
+                val height = aPage.getHeight(pdfViewState.isCropEnabled())
+                var scale = pageWidth / width
+                val tileSpec = TileSpec(
+                    aPage.index,
+                    scale,
+                    bounds,
+                    pageWidth.toInt(), // 原始宽高
+                    pageHeight.toInt(),
+                    pdfViewState.viewSize,
+                    cacheKey,
+                    null
+                )
+
+                if (!pdfViewState.isTileVisible(tileSpec)) {
+                    //println("[PageNode.decodeScope] page=!isTileVisible")
+                    isDecoding = false
+                    return@launch
+                }
+
+                val left =
+                    (if (null != aPage.cropBounds && pdfViewState.isCropEnabled()) aPage.cropBounds!!.left
+                    else 0f) * pageWidth / width
+                val top =
+                    (if (null != aPage.cropBounds && pdfViewState.isCropEnabled()) aPage.cropBounds!!.top
+                    else 0f) * pageHeight / height
+                val srcRect = Rect(
+                    left = bounds.left * pageWidth + left,
+                    top = bounds.top * pageHeight + top,
+                    right = bounds.right * pageWidth + left,
+                    bottom = bounds.bottom * pageHeight + top
+                )
+                //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
+                val outWidth = ((srcRect.right - srcRect.left)).toInt()
+                val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
+
+                val bitmap = pdfViewState.state.renderPageRegion(
+                    srcRect,
+                    aPage.index,
+                    scale,
+                    pdfViewState.viewSize,
+                    outWidth,
+                    outHeight
+                )
+
+                ImageCache.put(cacheKey, bitmap)
+
+                // 解码后再次判断可见性和协程活跃性
+                if (!isScopeActive()) {
+                    return@launch
+                }
+                if (!pdfViewState.isTileVisible(tileSpec)) {
+                    isDecoding = false
+                    return@launch
+                }
+
+                imageBitmap = bitmap
+                isDecoding = false
+            }
+        }
     }
 
     private fun CoroutineScope.isScopeActive(): Boolean {
