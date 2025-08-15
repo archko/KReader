@@ -58,10 +58,19 @@ fun CustomView(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var isNeedPass by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
-            println("init:$viewportSize, $currentPath")
+            println("init:$viewportSize, reflow:$reflow, $currentPath")
+            if (!FileTypeUtils.isDocumentFile(currentPath)
+                && !FileTypeUtils.isImageFile(currentPath)
+                && !FileTypeUtils.isTiffFile(currentPath)
+            ) {
+                loadingError = "document_open_failed"
+                decoder = null
+                return@withContext
+            }
             try {
                 val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                     null
@@ -73,6 +82,8 @@ fun CustomView(
                         if (pdfDecoder.needsPassword) {
                             showPasswordDialog = true
                             isPasswordError = false
+                            decoder = pdfDecoder
+                            isNeedPass = true
                             return@withContext
                         }
 
@@ -113,10 +124,10 @@ fun CustomView(
                     if (success) {
                         // 密码正确，初始化文档
                         pdfDecoder.getSize(viewportSize)
-                        decoder = pdfDecoder
                         loadingError = null
                         showPasswordDialog = false
                         isPasswordError = false
+                        isNeedPass = false
                     } else {
                         // 密码错误，重新显示对话框并显示错误信息
                         showPasswordDialog = true
@@ -134,7 +145,22 @@ fun CustomView(
         onCloseDocument?.invoke()
     }
 
-    if (null == decoder) {
+    // 显示密码输入对话框
+    if (showPasswordDialog) {
+        PasswordDialog(
+            fileName = File(currentPath).name,
+            onPasswordEntered = { password ->
+                handlePasswordEntered(password)
+            },
+            onDismiss = {
+                handlePasswordDialogDismiss()
+            },
+            isPasswordError = isPasswordError
+        )
+    }
+
+    if (isNeedPass) {
+    } else if (null == decoder) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -195,20 +221,6 @@ fun CustomView(
                     )
                 }
             }
-        }
-
-        // 显示密码输入对话框
-        if (showPasswordDialog) {
-            PasswordDialog(
-                fileName = File(currentPath).name,
-                onPasswordEntered = { password ->
-                    handlePasswordEntered(password)
-                },
-                onDismiss = {
-                    handlePasswordDialogDismiss()
-                },
-                isPasswordError = isPasswordError
-            )
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {
@@ -401,7 +413,11 @@ fun CustomView(
                         .takeIf { it != -1 } ?: outlineList.indexOfLast { it.page <= currentPage }
                         .takeIf { it != -1 } ?: 0
                     val lazyListState =
-                        rememberLazyListState(initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(0))
+                        rememberLazyListState(
+                            initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(
+                                0
+                            )
+                        )
                     Surface(
                         modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
                         color = Color.White.copy(alpha = 0.8f),
@@ -453,7 +469,9 @@ fun CustomView(
                                     modifier = Modifier.fillMaxSize(),
                                     state = lazyListState
                                 ) {
-                                    itemsIndexed(outlineList, key = { index, item -> index }) { index, item ->
+                                    itemsIndexed(
+                                        outlineList,
+                                        key = { index, item -> index }) { index, item ->
                                         val isSelected = index == initialOutlineIndex
                                         Row(
                                             modifier = Modifier

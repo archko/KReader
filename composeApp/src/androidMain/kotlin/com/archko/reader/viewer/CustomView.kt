@@ -101,6 +101,7 @@ fun CustomView(
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var isCrop by remember { mutableStateOf(crop == true) }
+    var isNeedPass by remember { mutableStateOf(false) }
 
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
@@ -135,6 +136,8 @@ fun CustomView(
                             if (pdfDecoder.needsPassword) {
                                 showPasswordDialog = true
                                 isPasswordError = false
+                                decoder = pdfDecoder
+                                isNeedPass = true
                                 return@withContext
                             }
 
@@ -179,10 +182,10 @@ fun CustomView(
                     if (success) {
                         // 密码正确，初始化文档
                         pdfDecoder.size(viewportSize)
-                        decoder = pdfDecoder
                         loadingError = null
                         showPasswordDialog = false
                         isPasswordError = false
+                        isNeedPass = false
                     } else {
                         // 密码错误，重新显示对话框并显示错误信息
                         showPasswordDialog = true
@@ -200,7 +203,22 @@ fun CustomView(
         onCloseDocument?.invoke()
     }
 
-    if (null == decoder) {
+    // 显示密码输入对话框
+    if (showPasswordDialog) {
+        PasswordDialog(
+            fileName = File(currentPath).name,
+            onPasswordEntered = { password ->
+                handlePasswordEntered(password)
+            },
+            onDismiss = {
+                handlePasswordDialogDismiss()
+            },
+            isPasswordError = isPasswordError
+        )
+    }
+
+    if (isNeedPass) {
+    } else if (null == decoder) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -261,20 +279,6 @@ fun CustomView(
                     )
                 }
             }
-        }
-
-        // 显示密码输入对话框
-        if (showPasswordDialog) {
-            PasswordDialog(
-                fileName = File(currentPath).name,
-                onPasswordEntered = { password ->
-                    handlePasswordEntered(password)
-                },
-                onDismiss = {
-                    handlePasswordDialogDismiss()
-                },
-                isPasswordError = isPasswordError
-            )
         }
     } else {
         fun createList(decoder: ImageDecoder): MutableList<APage> {
@@ -423,18 +427,17 @@ fun CustomView(
                             )
                         }
 
-                        IconButton(onClick = { isCrop = !isCrop }) {
-                            Icon(
-                                painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                    Res.string.no_crop
-                                ),
-                                tint = Color.White
-                            )
-                        }
-
                         // 只有文档文件才显示其他按钮
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            IconButton(onClick = { isCrop = !isCrop }) {
+                                Icon(
+                                    painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                    contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                        Res.string.no_crop
+                                    ),
+                                    tint = Color.White
+                                )
+                            }
                             // 只有单文档文件才显示大纲按钮
                             if (FileTypeUtils.shouldShowOutline(paths)) {
                                 IconButton(onClick = { showOutlineDialog = true }) {

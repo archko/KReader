@@ -16,7 +16,7 @@ import coil3.compose.setSingletonImageLoaderFactory
 import coil3.util.DebugLogger
 import coil3.util.Logger
 import com.archko.reader.pdf.cache.DriverFactory
-import com.archko.reader.pdf.util.CustomImageFetcher
+import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import org.jetbrains.skiko.setSystemLookAndFeel
 

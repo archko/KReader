@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -121,8 +122,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        /*try {
-            if (null != BitmapCache.getBitmap(file.absolutePath)) {
+        try {
+            if (null != ImageCache.get(file.absolutePath)) {
                 return
             }
             val page = getPage(0)
@@ -131,13 +132,13 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             CustomImageFetcher.cacheBitmap(bitmap, file.absolutePath)
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
-        }*/
+        }
     }
 
     /**
      * 渲染封面页面，根据高宽比进行特殊处理
      */
-    /*private fun renderCoverPage(page: Page): Bitmap {
+    private fun renderCoverPage(page: Page): ImageBitmap {
         val pWidth = page.bounds.x1 - page.bounds.x0
         val pHeight = page.bounds.y1 - page.bounds.y0
 
@@ -160,14 +161,26 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val cropWidth = maxOf(targetWidth, scaledWidth)
             val cropHeight = maxOf(targetHeight, scaledHeight)
             println("large.width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
+            val bbox = Rect(
+                0f,
+                0f,
+                cropWidth.toFloat(),
+                cropHeight.toFloat()
+            )
+            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
+            pixmap.clear(255)
+            Context.disableICC();
+            val cropDev = DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
             page.run(cropDev, cropCtm, null)
             cropDev.close()
             cropDev.destroy()
-            cropBitmap
+            val pixmapWidth = pixmap.width
+            val pixmapHeight = pixmap.height
+            val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
+            image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+            image.toComposeImageBitmap()
         } else if (pWidth > pHeight) {
             // 对于宽大于高的页面，按最大比例缩放后截取
             val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
@@ -180,14 +193,26 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val cropHeight = maxOf(targetHeight, scaledHeight)
 
             println("wide.width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
+            val bbox = Rect(
+                0f,
+                0f,
+                cropWidth.toFloat(),
+                cropHeight.toFloat()
+            )
+            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
+            pixmap.clear(255)
+            Context.disableICC();
+            val cropDev = DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
             page.run(cropDev, cropCtm, null)
             cropDev.close()
             cropDev.destroy()
-            cropBitmap
+            val pixmapWidth = pixmap.width
+            val pixmapHeight = pixmap.height
+            val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
+            image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+            image.toComposeImageBitmap()
         } else {
             // 原始逻辑处理其他情况
             val xscale = targetWidth.toFloat() / pWidth
@@ -204,16 +229,28 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val cropHeight = maxOf(targetHeight, scaledHeight)
 
             println("width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
+            val bbox = Rect(
+                0f,
+                0f,
+                cropWidth.toFloat(),
+                cropHeight.toFloat()
+            )
+            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
+            pixmap.clear(255)
+            Context.disableICC();
+            val cropDev = DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
             page.run(cropDev, cropCtm, null)
             cropDev.close()
             cropDev.destroy()
-            cropBitmap
+            val pixmapWidth = pixmap.width
+            val pixmapHeight = pixmap.height
+            val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
+            image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+            image.toComposeImageBitmap()
         }
-    }*/
+    }
 
     override fun size(viewportSize: IntSize): IntSize {
         if ((imageSize == IntSize.Zero || viewSize != viewportSize)

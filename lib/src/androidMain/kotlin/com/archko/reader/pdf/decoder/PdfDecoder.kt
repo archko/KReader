@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
-import com.archko.reader.pdf.cache.BitmapCache
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
@@ -158,7 +157,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun cacheCoverIfNeeded() {
         try {
-            if (null != BitmapCache.getBitmap(file.absolutePath)) {
+            if (null != ImageCache.get(file.absolutePath)) {
                 return
             }
             val page = getPage(0)

@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import coil3.BitmapImage
 import coil3.ImageLoader
 import coil3.asImage
@@ -34,7 +36,7 @@ public class CustomImageFetcher(
             if (null == bitmap) {
                 return
             }
-            BitmapCache.addBitmap(path, bitmap)
+            ImageCache.put(path, bitmap.asImageBitmap())
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
             if (!cacheDir.exists()) {
@@ -58,7 +60,7 @@ public class CustomImageFetcher(
                 return
             }
             // 删除内存缓存
-            BitmapCache.remove(path)
+            ImageCache.remove(path)
             
             // 删除磁盘缓存
             val dir = PdfApp.app!!.externalCacheDir
@@ -69,31 +71,32 @@ public class CustomImageFetcher(
                 cacheFile.delete()
             }
         }
-    }
 
-    private fun loadBitmapFromCache(): Bitmap? {
-        var bmp = BitmapCache.getBitmap(data.path)
-        if (null != bmp) {
-            return bmp
+        private fun loadBitmapFromCache(data: CustomImageData): Bitmap? {
+            val bmp = ImageCache.get(data.path)
+            if (null != bmp) {
+                return bmp.asAndroidBitmap()
+            }
+            val dir = PdfApp.app!!.externalCacheDir
+            val cacheDir = File(dir, "image")
+            val key = "${cacheDir.absolutePath}/${data.path.hashCode()}"
+            val bitmap = BitmapFactory.decodeFile(key)
+            return bitmap
         }
-        val dir = PdfApp.app!!.externalCacheDir
-        val cacheDir = File(dir, "image")
-        val key = "${cacheDir.absolutePath}/${data.path.hashCode()}"
-        bmp = BitmapFactory.decodeFile(key)
-        return bmp
     }
 
     override suspend fun fetch(): FetchResult {
-        var bitmap = loadBitmapFromCache()
+        var bitmap = loadBitmapFromCache(data)
         if (bitmap == null) {
             //bitmap = decodePdfSys()
             bitmap = decodeMuPdf()
+            if (bitmap != null) {
+                cacheBitmap(bitmap, data.path)
+            }
         }
 
         if (bitmap == null) {
             bitmap = Bitmap.createBitmap(data.width, data.height, Bitmap.Config.RGB_565)
-        } else {
-            cacheBitmap(bitmap, data.path)
         }
 
         val imageBitmap: BitmapImage = bitmap.asImage()

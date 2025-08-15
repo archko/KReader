@@ -92,7 +92,7 @@ public fun DesktopDocumentView(
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PdfViewState(list, state, orientation, crop)
+        PdfViewState(list, state, orientation, false)
     }
 
     // 处理键盘和鼠标滚轮事件的函数
