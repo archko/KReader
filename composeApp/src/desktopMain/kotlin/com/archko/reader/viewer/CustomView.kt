@@ -91,6 +91,9 @@ fun CustomView(
                     } else if (FileTypeUtils.isTiffFile(currentPath)) {
                         val tiffDecoder = TiffDecoder(File(currentPath))
                         tiffDecoder
+                    } else if (FileTypeUtils.isImageFile(currentPath)) {
+                        val tiffDecoder = PdfDecoder(File(currentPath))
+                        tiffDecoder
                     } else {
                         null
                     }
