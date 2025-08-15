@@ -46,7 +46,6 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.sqlite.bundled)
                 api(libs.mupdf.fitz)
-                api(libs.tiff.loader.jar)
             }
         }
     }
