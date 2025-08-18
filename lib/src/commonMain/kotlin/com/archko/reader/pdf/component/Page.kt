@@ -371,14 +371,23 @@ public class Page(
             return
         }
 
-        // 创建分块节点
+        // 创建分块节点，确保边界重叠以避免间隙
         val newNodes = mutableListOf<PageNode>()
         for (y in 0 until config.yBlocks) {
             for (x in 0 until config.xBlocks) {
-                val left = x / config.xBlocks.toFloat()
-                val top = y / config.yBlocks.toFloat()
-                val right = (x + 1) / config.xBlocks.toFloat()
-                val bottom = (y + 1) / config.yBlocks.toFloat()
+                // 计算基础边界
+                val baseLeft = x / config.xBlocks.toFloat()
+                val baseTop = y / config.yBlocks.toFloat()
+                val baseRight = (x + 1) / config.xBlocks.toFloat()
+                val baseBottom = (y + 1) / config.yBlocks.toFloat()
+                
+                // 添加微小的重叠以避免间隙（除了边缘块）
+                val overlap = 0.001f // 0.1% 的重叠
+                val left = if (x == 0) baseLeft else baseLeft - overlap
+                val top = if (y == 0) baseTop else baseTop - overlap
+                val right = if (x == config.xBlocks - 1) baseRight else baseRight + overlap
+                val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom + overlap
+                
                 newNodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
             }
         }

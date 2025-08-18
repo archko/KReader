@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * @author: archko 2025/7/24 :08:19
@@ -32,19 +34,18 @@ public class PageNode(
         yOffset: Float
     ): Rect {
         return if (pdfViewState.orientation == Vertical) {
-            Rect(
-                left = bounds.left * pageWidth,
-                top = bounds.top * pageHeight + yOffset,
-                right = bounds.right * pageWidth,
-                bottom = bounds.bottom * pageHeight + yOffset
-            )
+            // 使用向下取整和向上取整来避免间隙
+            val left = kotlin.math.floor(bounds.left * pageWidth).toFloat()
+            val top = kotlin.math.floor(bounds.top * pageHeight + yOffset).toFloat()
+            val right = kotlin.math.ceil(bounds.right * pageWidth).toFloat()
+            val bottom = kotlin.math.ceil(bounds.bottom * pageHeight + yOffset).toFloat()
+            Rect(left, top, right, bottom)
         } else {
-            Rect(
-                left = bounds.left * pageWidth + xOffset,
-                top = bounds.top * pageHeight,
-                right = bounds.right * pageWidth + xOffset,
-                bottom = bounds.bottom * pageHeight
-            )
+            val left = kotlin.math.floor(bounds.left * pageWidth + xOffset).toFloat()
+            val top = kotlin.math.floor(bounds.top * pageHeight).toFloat()
+            val right = kotlin.math.ceil(bounds.right * pageWidth + xOffset).toFloat()
+            val bottom = kotlin.math.ceil(bounds.bottom * pageHeight).toFloat()
+            Rect(left, top, right, bottom)
         }
     }
 
@@ -92,10 +93,16 @@ public class PageNode(
 
         //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${imageBitmap?.width}x${imageBitmap?.height}")
         if (imageBitmap != null) {
+            // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
+            val dstLeft = kotlin.math.floor(pixelRect.left).toInt()
+            val dstTop = kotlin.math.floor(pixelRect.top).toInt()
+            val dstWidth = kotlin.math.ceil(pixelRect.width).toInt()
+            val dstHeight = kotlin.math.ceil(pixelRect.height).toInt()
+            
             drawScope.drawImage(
                 imageBitmap!!,
-                dstOffset = IntOffset(pixelRect.left.toInt(), pixelRect.top.toInt()),
-                dstSize = IntSize(pixelRect.width.toInt(), pixelRect.height.toInt())
+                dstOffset = IntOffset(dstLeft, dstTop),
+                dstSize = IntSize(dstWidth, dstHeight)
             )
         } else {
             decode(totalScale, pageWidth, pageHeight)
