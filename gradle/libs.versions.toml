@@ -22,7 +22,7 @@ mupdfFitzAar = "1.25.0"
 mmkv-kotlin = "1.2.16"
 core = "1.16.0"
 lifecycleViewmodelComposeAndroid = "2.9.2"
-tiff-loader = "1.0.0"
+tiff-loader = "1.1.1"
 tiff-loader-jar = "1.0.1"
 
 android-compileSdk = "36"
@@ -63,7 +63,7 @@ coil-kt-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.r
 coil-kt-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 coil-kt-ktor3 = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
 androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
-tiff-loader = { module = "com.archko.reader.image:tiff-loader", version.ref = "tiff-loader" }
+tiff-loader = { module = "com.archko.reader.image:library-android", version.ref = "tiff-loader" }
 tiff-loader-jar = { module = "com.archko.reader.image:tiff-loader", version.ref = "tiff-loader-jar" }
 
 [plugins]

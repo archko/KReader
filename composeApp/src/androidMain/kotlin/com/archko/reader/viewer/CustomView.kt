@@ -417,7 +417,10 @@ fun CustomView(
                         Spacer(Modifier.weight(1f))
 
                         // 方向按钮 - 文档和图片都显示
-                        IconButton(onClick = { isVertical = !isVertical }) {
+                        IconButton(onClick = {
+                            isVertical = !isVertical
+                            showToolbar = false
+                        }) {
                             Icon(
                                 painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
                                 contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(

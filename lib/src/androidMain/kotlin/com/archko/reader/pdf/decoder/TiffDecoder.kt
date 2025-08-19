@@ -107,7 +107,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
 
         tiffLoader!!.openTiff(file.absolutePath)
         val tiffInfo = tiffLoader!!.tiffInfo
-        val width = tiffInfo.width
+        val width = tiffInfo!!.width
         val height = tiffInfo.height
 
         val size = Size(

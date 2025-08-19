@@ -555,7 +555,12 @@ public fun DocumentView(
                     }
                 }
         ) {
-            translate(left = offset.x, top = offset.y) {
+            val translateY = if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
+                (viewSize.height - pdfViewState.totalHeight) / 2
+            } else {
+                0f
+            }
+            translate(left = offset.x, top = offset.y + translateY) {
                 //只绘制可见区域.
                 /*val visibleRect = Rect(
                     left = -offset.x,
