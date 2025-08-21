@@ -1,7 +1,5 @@
 package com.archko.reader.pdf.decoder
 
-import android.graphics.Bitmap
-import android.graphics.Bitmap.createBitmap
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -16,7 +14,6 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import java.io.File
-import kotlin.math.pow
 
 /**
  * @author: archko 2025/8/9 :6:26
@@ -134,38 +131,20 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
             val pageHeight = (region.height / scale).toInt()
             val patchX = (region.left / scale).toInt()
             val patchY = (region.top / scale).toInt()
-            val bitmapWidth = (pageWidth * scale).toInt()
-            val bitmapHeight = (pageHeight * scale).toInt()
             //精度的问题,jni那边不支持小数进位四舍五入,所以这里的高宽要修正一下.
-            val bitmap = createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
-
-            //println("TiffDecoder.renderPageRegion: region=${region}, 原始=${originalSize.width}x${originalSize.height}, offset:$patchX-$patchY, 截取=${bitmapWidth}x${bitmapHeight}, ${pageWidth}x${pageHeight}, 缩放=$scale")
-
-            tiffLoader!!.decodeRegionToBitmapDirect(
+            val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 patchX,
                 patchY,
                 pageWidth,
                 pageHeight,
                 scale,
-                bitmap
             )
 
-            bitmap.asImageBitmap()
+            bitmap?.asImageBitmap()?:ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-    }
-
-    /**
-     * 计算最接近的2的n次方缩放比例的倒数
-     */
-    private fun calculatePowerOfTwoScale(scale: Float): Float {
-        if (scale <= 0) return 1f
-
-        // 计算最接近的2的n次方，然后取倒数
-        val power = kotlin.math.round(kotlin.math.log2(1f / scale))
-        return 1f / 2f.pow(power.coerceAtLeast(0f))
     }
 
     override fun renderPage(
