@@ -6,7 +6,6 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
-import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -140,7 +139,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
                 scale,
             )
 
-            bitmap?.asImageBitmap()?:ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
@@ -167,19 +166,15 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
             val targetHeight = (originalSize.height * scale).toInt()
             println("TiffDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}")
 
-            val bitmap = BitmapPool.acquire(targetWidth, targetHeight)
-
-            // 解码整个页面
-            tiffLoader!!.decodeRegionToBitmapDirect(
+            val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 0,
                 0,
                 originalSize.width,
                 originalSize.height,
                 scale,
-                bitmap
             )
 
-            return bitmap.asImageBitmap()
+            return bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
             println("renderPage error: $e")
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
