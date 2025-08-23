@@ -197,6 +197,21 @@ public class Page(
             return
         }
 
+        val ratio: Float = 1f * aPage.width / width
+        val thumbWidth = 300
+        val thumbHeight = (aPage.height / ratio).toInt()
+        val cacheKey = cachedCacheKey ?: run {
+            val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
+            cachedCacheKey = cacheKey
+            cacheKey
+        }
+
+        if (thumbBitmap == null) {
+            thumbBitmap = ImageCache.get(cacheKey)
+        }
+
+        //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmap")
+
         // 优先绘制缩略图
         if (null != thumbBitmap) {
             val currentWidth = width * scaleRatio
@@ -380,14 +395,14 @@ public class Page(
                 val baseTop = y / config.yBlocks.toFloat()
                 val baseRight = (x + 1) / config.xBlocks.toFloat()
                 val baseBottom = (y + 1) / config.yBlocks.toFloat()
-                
+
                 // 添加微小的重叠以避免间隙（除了边缘块）
                 val overlap = 0.001f // 0.1% 的重叠
                 val left = if (x == 0) baseLeft else baseLeft - overlap
                 val top = if (y == 0) baseTop else baseTop - overlap
                 val right = if (x == config.xBlocks - 1) baseRight else baseRight + overlap
                 val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom + overlap
-                
+
                 newNodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
             }
         }
