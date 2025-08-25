@@ -23,7 +23,7 @@ mmkv-kotlin = "1.2.16"
 core = "1.16.0"
 lifecycleViewmodelComposeAndroid = "2.9.2"
 tiff-loader = "1.1.2"
-tiff-loader-jar = "1.0.1"
+tiff-loader-jar = "1.1.2"
 
 android-compileSdk = "36"
 android-minSdk = "24"
