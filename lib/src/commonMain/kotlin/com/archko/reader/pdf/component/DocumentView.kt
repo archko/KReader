@@ -200,6 +200,10 @@ public fun DocumentView(
         if (old != crop) {
             println("DocumentView: 切边变化:$crop")
             pdfViewState.setCropEnabled(crop)
+            // 清理所有页面的缓存图像
+            pdfViewState.pages.forEach { page ->
+                page.recycle()
+            }
             pdfViewState.invalidatePageSizes()
             pdfViewState.updateOffset(offset)
         }
@@ -462,7 +466,7 @@ public fun DocumentView(
                             flingJob?.cancel()
                             if (velocitySquared > velocityThreshold) {
                                 val decayAnimationSpec =
-                                    exponentialDecay<Float>(frictionMultiplier = 0.2f)
+                                    exponentialDecay<Float>(frictionMultiplier = 0.35f, absVelocityThreshold = 0.45f)
                                 flingJob = scope.launch {
                                     if (orientation == Vertical) {
                                         // X方向

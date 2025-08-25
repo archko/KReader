@@ -111,7 +111,13 @@ public class TiffLoader {
      * @param scale  缩放比例
      * @return Bitmap对象，失败时返回null
      */
-    public fun decodeRegionToBitmap(x: Int, y: Int, width: Int, height: Int, scale: Float): BufferedImage? {
+    public fun decodeRegionToBitmap(
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        scale: Float
+    ): BufferedImage? {
         val region: DecodedRegion? = decodeRegion(x, y, width, height, scale)
         if (region == null || !region.isValid()) {
             return null
@@ -120,44 +126,76 @@ public class TiffLoader {
         try {
             var bitmap: BufferedImage
 
-            if (region.bytesPerPixel == 4) {
-                // 4字节ARGB数据，直接使用
-                bitmap = BufferedImage(region.width, region.height, BufferedImage.TYPE_INT_ARGB)
-                val raster = bitmap.raster
-                val dataBuffer = raster.dataBuffer as java.awt.image.DataBufferInt
-                val pixels = dataBuffer.data
-                
-                val buffer = java.nio.ByteBuffer.wrap(region.data)
-                buffer.asIntBuffer().get(pixels)
-            } else if (region.bytesPerPixel == 3) {
-                bitmap = BufferedImage(region.width, region.height, BufferedImage.TYPE_INT_ARGB)
+            when (region.bytesPerPixel) {
+                1 -> { // GRAY8 - 1字节灰度数据
+                    bitmap =
+                        BufferedImage(region.width, region.height, BufferedImage.TYPE_BYTE_GRAY)
+                    val raster = bitmap.raster
+                    val dataBuffer = raster.dataBuffer as java.awt.image.DataBufferByte
+                    val pixels = dataBuffer.data
 
-                val pixelCount = region.width * region.height
-                val argbPixels = IntArray(pixelCount)
-
-                for (i in 0 until pixelCount) {
-                    val rgbIndex = i * 3
-                    val r = region.data!![rgbIndex].toInt() and 0xFF
-                    val g = region.data!![rgbIndex + 1].toInt() and 0xFF
-                    val b = region.data!![rgbIndex + 2].toInt() and 0xFF
-
-                    argbPixels[i] = 0xFF shl 24 or (r shl 16) or (g shl 8) or b
+                    System.arraycopy(region.data, 0, pixels, 0, region.data!!.size)
                 }
 
-                bitmap.setRGB(0, 0, region.width, region.height, argbPixels, 0, region.width)
-            } else if (region.bytesPerPixel == 1) {
-                // 1字节灰度数据
-                bitmap = BufferedImage(region.width, region.height, BufferedImage.TYPE_BYTE_GRAY)
-                val raster = bitmap.raster
-                val dataBuffer = raster.dataBuffer as java.awt.image.DataBufferByte
-                val pixels = dataBuffer.data
-                
-                System.arraycopy(region.data, 0, pixels, 0, region.data!!.size)
-            } else {
-                println(
-                    "Unsupported bytes per pixel: " + region.bytesPerPixel
-                )
-                return null
+                2 -> { // RGB565 - 转换为ARGB
+                    bitmap = BufferedImage(region.width, region.height, BufferedImage.TYPE_INT_ARGB)
+                    val pixelCount = region.width * region.height
+                    val argbPixels = IntArray(pixelCount)
+
+                    for (i in 0 until pixelCount) {
+                        val rgb565Index = i * 2
+                        val rgb565 = ((region.data!![rgb565Index + 1].toInt() and 0xFF) shl 8) or
+                                (region.data!![rgb565Index].toInt() and 0xFF)
+
+                        val r = ((rgb565 shr 11) and 0x1F) * 255 / 31
+                        val g = ((rgb565 shr 5) and 0x3F) * 255 / 63
+                        val b = (rgb565 and 0x1F) * 255 / 31
+
+                        argbPixels[i] = 0xFF shl 24 or (r shl 16) or (g shl 8) or b
+                    }
+
+                    bitmap.setRGB(0, 0, region.width, region.height, argbPixels, 0, region.width)
+                }
+
+                3 -> { // RGB888 - 转换为ARGB
+                    bitmap = BufferedImage(region.width, region.height, BufferedImage.TYPE_INT_ARGB)
+                    val pixelCount = region.width * region.height
+                    val argbPixels = IntArray(pixelCount)
+
+                    for (i in 0 until pixelCount) {
+                        val rgbIndex = i * 3
+                        val r = region.data!![rgbIndex].toInt() and 0xFF
+                        val g = region.data!![rgbIndex + 1].toInt() and 0xFF
+                        val b = region.data!![rgbIndex + 2].toInt() and 0xFF
+
+                        argbPixels[i] = 0xFF shl 24 or (r shl 16) or (g shl 8) or b
+                    }
+
+                    bitmap.setRGB(0, 0, region.width, region.height, argbPixels, 0, region.width)
+                }
+
+                4 -> { // ARGB8888 - 直接使用
+                    bitmap = BufferedImage(region.width, region.height, BufferedImage.TYPE_INT_ARGB)
+                    val pixelCount = region.width * region.height
+                    val argbPixels = IntArray(pixelCount)
+
+                    for (i in 0 until pixelCount) {
+                        val argbIndex = i * 4
+                        val r = region.data!![argbIndex].toInt() and 0xFF
+                        val g = region.data!![argbIndex + 1].toInt() and 0xFF
+                        val b = region.data!![argbIndex + 2].toInt() and 0xFF
+                        val a = region.data!![argbIndex + 3].toInt() and 0xFF
+
+                        argbPixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+                    }
+
+                    bitmap.setRGB(0, 0, region.width, region.height, argbPixels, 0, region.width)
+                }
+
+                else -> {
+                    println("Unsupported bytes per pixel: ${region.bytesPerPixel}")
+                    return null
+                }
             }
 
             return bitmap
