@@ -163,10 +163,10 @@ public class Page(
     private fun setAspectRatio(aspectRatio: Float) {
         if (pdfViewState.isCropEnabled() && this.aspectRatio != aspectRatio) {
             val abs: Float = abs(aspectRatio - this.aspectRatio)
-            val changed = this.aspectRatio != 0f && abs > 0.008
+            val changed = abs > 0.008
             this.aspectRatio = aspectRatio
             if (changed) {
-                println("Page.loadThumbnail: 页面${aPage.index}检测到切边，${abs}, bounds=${aPage.cropBounds}")
+                //println("Page.loadThumbnail: 页面${aPage.index}检测到切边，${abs}, bounds=${aPage.cropBounds}")
                 pdfViewState.invalidatePageSizes()
             }
         }
@@ -179,6 +179,10 @@ public class Page(
         this.yOffset = bounds.top
         this.xOffset = bounds.left
         this.totalScale = if (aPage.width == 0) 1f else width / aPage.width
+
+        if (aspectRatio == 0f) {
+            aspectRatio = width * 1.0f / height
+        }
         invalidateNodes()
     }
 
