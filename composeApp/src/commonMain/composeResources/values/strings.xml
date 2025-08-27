@@ -26,7 +26,7 @@
     <string name="document_outline">Document Outline</string>
     <string name="no_outline">No Outline</string>
     <string name="page_number">Page %d</string>
-    <string name="current_page">Page %d</string>
+    <string name="current_page">%d/%d</string>
     <string name="document_open_failed">Failed to open document</string>
     <string name="close">Close</string>
     <string name="browse_directory_title">Browse Directory</string>

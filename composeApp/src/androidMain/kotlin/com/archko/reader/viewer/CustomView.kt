@@ -378,9 +378,10 @@ fun CustomView(
                         // 点击非翻页区域时隐藏工具栏
                         if (showToolbar) {
                             showToolbar = false
+                        } else {
+                            val pageText = currentPageString.format(clickedPageIndex + 1, pageCount)
+                            Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
                         }
-                        val pageText = currentPageString.format(clickedPageIndex + 1)
-                        Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
                     },
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,

@@ -78,6 +78,9 @@ public fun DocumentView(
     val keepPx = with(density) { 6.dp.toPx() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
     var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
+    var isFlingActive by remember { mutableStateOf(false) } // 滚动动画状态
+    var lastTapTime by remember { mutableLongStateOf(0L) } // 上次点击时间
+    var tapDelayJob by remember { mutableStateOf<Job?>(null) } // 延迟处理点击的Job
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
@@ -271,6 +274,8 @@ public fun DocumentView(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            // 取消延迟的点击处理
+            tapDelayJob?.cancel()
             // 在组件销毁时也保存一次状态
             saveDocumentState()
             onCloseDocument?.invoke()
@@ -289,54 +294,6 @@ public fun DocumentView(
                 viewSize = size
                 println("DocumentView: onSizeChanged:$viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offsetTap ->
-                        // 将点击坐标转换为相对于内容的位置
-                        val contentX = offsetTap.x - offset.x
-                        val contentY = offsetTap.y - offset.y
-
-                        // 首先尝试处理链接点击
-                        //println("DocumentView.onTap: 尝试处理链接点击，坐标($contentX, $contentY)")
-                        val linkHandled = pdfViewState.handleClick(contentX, contentY)
-                        println("DocumentView.onTap: 链接处理结果: $linkHandled")
-
-                        // 如果没有处理链接，再处理翻页逻辑
-                        if (!linkHandled) {
-                            val isPageTurned = handleTapGesture(
-                                offsetTap,
-                                viewSize,
-                                offset,
-                                orientation,
-                                pdfViewState,
-                                keepPx
-                            ) { newOffset ->
-                                offset = newOffset
-                                pdfViewState.updateOffset(offset)
-                            }
-
-                            // 如果不是翻页区域，触发非页面区域点击回调
-                            if (!isPageTurned) {
-                                val clickedPage =
-                                    calculateClickedPage(
-                                        offsetTap,
-                                        offset,
-                                        orientation,
-                                        pdfViewState
-                                    )
-                                onTapNonPageArea?.invoke(clickedPage)
-                            }
-                        }
-                    },
-                    onDoubleTap = { offsetTap ->
-                        val y = offsetTap.y
-                        val height = viewSize.height.toFloat()
-                        if (y >= height / 4 && y <= height * 3 / 4) {
-                            onDoubleTapToolbar?.invoke()
-                        }
-                    }
-                )
             },
         contentAlignment = Alignment.TopStart
     ) {
@@ -347,14 +304,19 @@ public fun DocumentView(
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         var zooming = false
+                        var dragging = false
                         // pan惯性
                         val panVelocityTracker = VelocityTracker()
                         var pan: Offset
+                        var totalDrag = Offset.Zero
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val wasFlingActive = flingJob?.isActive == true // 记录按下时是否有fling动画
                         try {
-                            val down = awaitFirstDown(requireUnconsumed = true)
                             pan = Offset.Zero
+                            totalDrag = Offset.Zero
                             panVelocityTracker.resetTracking()
                             flingJob?.cancel()
+                            isFlingActive = false
                             do {
                                 val event = awaitPointerEvent()
                                 val pointerCount = event.changes.size
@@ -366,7 +328,13 @@ public fun DocumentView(
                                     event.changes.maxByOrNull { it.uptimeMillis }?.uptimeMillis
                                         ?: 0L
                                 pan += panChange
+                                totalDrag += panChange
                                 panVelocityTracker.addPosition(uptime, pan)
+                                
+                                // 检测是否开始拖拽
+                                if (totalDrag.getDistance() > 10f) {
+                                    dragging = true
+                                }
                                 if (pointerCount > 1) {
                                     zooming = true
                                     val newZoom = (zoomChange * vZoom).coerceIn(1f, 10f)
@@ -456,6 +424,70 @@ public fun DocumentView(
                             if (zooming) {
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
+                            
+                            // 如果没有拖拽和缩放，且按下时没有fling动画，处理点击事件
+                            if (!dragging && !zooming && !wasFlingActive && totalDrag.getDistance() < 10f) {
+                                val tapOffset = down.position
+                                val currentTime = System.currentTimeMillis()
+                                
+                                // 检查是否是双击（简化检测，只检查时间间隔）
+                                val isDoubleTap = currentTime - lastTapTime < 300
+                                
+                                if (isDoubleTap) {
+                                    // 取消延迟的单击处理
+                                    tapDelayJob?.cancel()
+                                    
+                                    // 处理双击
+                                    val y = tapOffset.y
+                                    val height = viewSize.height.toFloat()
+                                    if (y >= height / 4 && y <= height * 3 / 4) {
+                                        onDoubleTapToolbar?.invoke()
+                                    }
+                                } else {
+                                    // 延迟处理单击，等待可能的第二次点击
+                                    tapDelayJob?.cancel()
+                                    tapDelayJob = scope.launch {
+                                        kotlinx.coroutines.delay(300) // 等待300ms
+                                        
+                                        // 将点击坐标转换为相对于内容的位置
+                                        val contentX = tapOffset.x - offset.x
+                                        val contentY = tapOffset.y - offset.y
+
+                                        // 首先尝试处理链接点击
+                                        val linkHandled = pdfViewState.handleClick(contentX, contentY)
+                                        println("DocumentView.onTap: 链接处理结果: $linkHandled")
+
+                                        // 如果没有处理链接，再处理翻页逻辑
+                                        if (!linkHandled) {
+                                            val isPageTurned = handleTapGesture(
+                                                tapOffset,
+                                                viewSize,
+                                                offset,
+                                                orientation,
+                                                pdfViewState,
+                                                keepPx
+                                            ) { newOffset ->
+                                                offset = newOffset
+                                                pdfViewState.updateOffset(offset)
+                                            }
+
+                                            // 如果不是翻页区域，触发非页面区域点击回调
+                                            if (!isPageTurned) {
+                                                val clickedPage =
+                                                    calculateClickedPage(
+                                                        tapOffset,
+                                                        offset,
+                                                        orientation,
+                                                        pdfViewState
+                                                    )
+                                                onTapNonPageArea?.invoke(clickedPage)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                lastTapTime = currentTime
+                            }
                             // 计算pan velocity
                             val velocity =
                                 runCatching { panVelocityTracker.calculateVelocity() }.getOrDefault(
@@ -467,7 +499,9 @@ public fun DocumentView(
                             if (velocitySquared > velocityThreshold) {
                                 val decayAnimationSpec =
                                     exponentialDecay<Float>(frictionMultiplier = 0.35f, absVelocityThreshold = 0.45f)
+                                isFlingActive = true
                                 flingJob = scope.launch {
+                                    try {
                                     if (orientation == Vertical) {
                                         // X方向
                                         if (abs(velocity.x) > velocityDistance) {
@@ -552,6 +586,9 @@ public fun DocumentView(
                                                 }
                                             }
                                         }
+                                    }
+                                    } finally {
+                                        isFlingActive = false
                                     }
                                 }
                             }

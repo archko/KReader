@@ -26,7 +26,7 @@
     <string name="document_outline">文档大纲</string>
     <string name="no_outline">无大纲</string>
     <string name="page_number">第%d页</string>
-    <string name="current_page">第%d页</string>
+    <string name="current_page">%d/%d</string>
     <string name="circular_rectangular">圆形+矩形</string>
     <string name="document_open_failed">打开文档失败</string>
     <string name="close">关闭</string>

@@ -83,15 +83,21 @@ public class Page(
         val pdfX: Float
         val pdfY: Float
 
-        if (aPage.cropBounds != null) {
-            // 有切边：需要考虑切边偏移
+        if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
+            // 有切边且启用切边：先转换为切边区域内的相对坐标，再转换为原始PDF坐标
             val cropBounds = aPage.cropBounds!!
-            pdfX = pageX / totalScale + cropBounds.left
-            pdfY = pageY / totalScale + cropBounds.top
+            val relativeX = pageX / bounds.width
+            val relativeY = pageY / bounds.height
+            
+            pdfX = cropBounds.left + relativeX * cropBounds.width
+            pdfY = cropBounds.top + relativeY * cropBounds.height
         } else {
-            // 无切边：直接转换
-            pdfX = pageX / totalScale
-            pdfY = pageY / totalScale
+            // 无切边：直接按比例转换
+            val relativeX = pageX / bounds.width
+            val relativeY = pageY / bounds.height
+            
+            pdfX = relativeX * aPage.width
+            pdfY = relativeY * aPage.height
         }
 
         //println("Page.findLinkAtPoint: 页面 ${aPage.index}, 点击坐标($x, $y), 页面坐标($pageX, $pageY), PDF坐标($pdfX, $pdfY), 链接数量: ${links.size}, hasCrop:${aPage.hasCrop()}")
@@ -266,22 +272,42 @@ public class Page(
             val bbox = link.bbox ?: continue
 
             // 将PDF坐标转换为屏幕坐标
-            val linkRect = if (aPage.hasCrop()) {
-                // 有切边：需要考虑切边偏移
+            val linkRect = if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
+                // 有切边且启用切边：link的bbox是原始PDF坐标，需要转换为切边后的相对坐标
                 val cropBounds = aPage.cropBounds!!
-                Rect(
-                    left = currentBounds.left + (bbox.left - cropBounds.left) * totalScale * scaleRatio,
-                    top = currentBounds.top + (bbox.top - cropBounds.top) * totalScale * scaleRatio,
-                    right = currentBounds.left + (bbox.right - cropBounds.left) * totalScale * scaleRatio,
-                    bottom = currentBounds.top + (bbox.bottom - cropBounds.top) * totalScale * scaleRatio
-                )
+                
+                // 检查link是否在切边区域内
+                if (bbox.left >= cropBounds.left && bbox.top >= cropBounds.top &&
+                    bbox.right <= cropBounds.right && bbox.bottom <= cropBounds.bottom) {
+                    
+                    // 转换为切边后的相对坐标，然后缩放到屏幕坐标
+                    val relativeLeft = (bbox.left - cropBounds.left) / cropBounds.width
+                    val relativeTop = (bbox.top - cropBounds.top) / cropBounds.height
+                    val relativeRight = (bbox.right - cropBounds.left) / cropBounds.width
+                    val relativeBottom = (bbox.bottom - cropBounds.top) / cropBounds.height
+                    
+                    Rect(
+                        left = currentBounds.left + relativeLeft * currentBounds.width,
+                        top = currentBounds.top + relativeTop * currentBounds.height,
+                        right = currentBounds.left + relativeRight * currentBounds.width,
+                        bottom = currentBounds.top + relativeBottom * currentBounds.height
+                    )
+                } else {
+                    // link在切边区域外，跳过绘制
+                    continue
+                }
             } else {
-                // 无切边：直接转换
+                // 无切边：直接按比例转换
+                val relativeLeft = bbox.left / aPage.width
+                val relativeTop = bbox.top / aPage.height
+                val relativeRight = bbox.right / aPage.width
+                val relativeBottom = bbox.bottom / aPage.height
+                
                 Rect(
-                    left = currentBounds.left + bbox.left * totalScale * scaleRatio,
-                    top = currentBounds.top + bbox.top * totalScale * scaleRatio,
-                    right = currentBounds.left + bbox.right * totalScale * scaleRatio,
-                    bottom = currentBounds.top + bbox.bottom * totalScale * scaleRatio
+                    left = currentBounds.left + relativeLeft * currentBounds.width,
+                    top = currentBounds.top + relativeTop * currentBounds.height,
+                    right = currentBounds.left + relativeRight * currentBounds.width,
+                    bottom = currentBounds.top + relativeBottom * currentBounds.height
                 )
             }
 
