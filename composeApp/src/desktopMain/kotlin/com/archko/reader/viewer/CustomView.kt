@@ -51,6 +51,7 @@ fun CustomView(
     reflow: Long = 0,
     crop: Boolean? = null,
 ) {
+    var vZoom by remember { mutableDoubleStateOf(initialZoom) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
     var loadingError by remember { mutableStateOf<String?>(null) }
@@ -246,8 +247,8 @@ fun CustomView(
         val list: MutableList<APage> = remember {
             createList(decoder!!)
         }
-        // 工具栏显示状态
-        var showToolbar by remember { mutableStateOf(true) }
+        // 工具栏显示状态 - 顶部工具栏始终显示，底部可以隐藏
+        var showBottomToolbar by remember { mutableStateOf(true) }
         // 大纲弹窗状态
         var showOutlineDialog by remember { mutableStateOf(false) }
 
@@ -270,258 +271,239 @@ fun CustomView(
         // 获取字符串资源
         val currentPageString = stringResource(Res.string.current_page)
 
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { viewportSize = it }
         ) {
-            // 根据reflow状态选择显示模式
-            if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
-                // Reflow视图
-                /*ReflowView(
-                    decoder = decoder!!,
-                    pageCount = pageCount,
-                    onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder) onSaveDocument else null,
-                    onCloseDocument = {
-                        println("onCloseDocument.isReflow:$isReflow")
-                        if (!isReflow) {
-                            onCloseDocument?.invoke()
-                        }
-                    }, // 只在非重排模式下传递关闭回调
-                    onDoubleTapToolbar = { showToolbar = !showToolbar },
-                    onPageChanged = { page -> currentPage = page },
-                    onTapNonPageArea = { clickedPageIndex ->
-                        // 点击非翻页区域时隐藏工具栏
-                        if (showToolbar) {
-                            showToolbar = false
-                        }
-                        val pageText = currentPageString.format(clickedPageIndex + 1)
-                        Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
-                    },
-                    jumpToPage = jumpToPage,
-                    initialScrollX = initialScrollX,
-                    initialScrollY = initialScrollY,
-                    initialZoom = initialZoom,
-                    initialOrientation = orientation,
-                    reflow = 1L,
-                )*/
-            } else {
-                // 文档视图（最底层）
-                DesktopDocumentView(
-                    list = list,
-                    state = decoder!!,
-                    jumpToPage = jumpToPage,
-                    initialOrientation = orientation,
-                    onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder && FileTypeUtils.isDocumentFile(
-                            currentPath
-                        )
-                    ) onSaveDocument else null,
-                    onCloseDocument = {
-                        println("onCloseDocument.isReflow:$isReflow")
-                        if (!isReflow) {
-                            onCloseDocument?.invoke()
-                        }
-                    }, // 只在非重排模式下传递关闭回调
-                    onDoubleTapToolbar = { showToolbar = !showToolbar },
-                    onPageChanged = { page -> currentPage = page },
-                    onTapNonPageArea = { clickedPageIndex ->
-                        // 点击非翻页区域时隐藏工具栏
-                        if (showToolbar) {
-                            showToolbar = false
-                        }
-                        //val pageText = currentPageString.format(clickedPageIndex + 1)
-                        //Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
-                    },
-                    initialScrollX = initialScrollX,
-                    initialScrollY = initialScrollY,
-                    initialZoom = initialZoom,
-                    crop = isCrop,
-                )
-            }
-
-            AnimatedVisibility(
-                visible = showToolbar,
-                modifier = Modifier.align(Alignment.TopCenter)
+            // 顶部工具栏 - 始终显示
+            Surface(
+                color = Color(0xff000000),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
             ) {
-                Surface(
-                    color = Color(0xCC222222),
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .height(48.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = {
-                            onCloseDocument?.invoke()
-                        }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = stringResource(Res.string.back),
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
+                    IconButton(onClick = {
+                        onCloseDocument?.invoke()
+                    }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_back),
+                            contentDescription = stringResource(Res.string.back),
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
 
-                        // 方向按钮 - 文档和图片都显示
-                        IconButton(onClick = {
-                            isVertical = !isVertical
-                            showToolbar = false
-                        }) {
+                    // 方向按钮 - 文档和图片都显示
+                    IconButton(onClick = { isVertical = !isVertical }) {
+                        Icon(
+                            painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                            contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                Res.string.horizontal
+                            ),
+                            tint = Color.White
+                        )
+                    }
+
+                    IconButton(onClick = { vZoom = 1.0 }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_fit_to_screen),
+                            contentDescription = "",
+                            tint = Color.White
+                        )
+                    }
+
+                    // 只有文档文件才显示其他按钮
+                    if (FileTypeUtils.isDocumentFile(currentPath)) {
+                        IconButton(onClick = { isCrop = !isCrop }) {
                             Icon(
-                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                    Res.string.horizontal
+                                painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                    Res.string.no_crop
                                 ),
                                 tint = Color.White
                             )
                         }
-
-                        // 只有文档文件才显示其他按钮
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            IconButton(onClick = { isCrop = !isCrop }) {
+                        // 只有单文档文件才显示大纲按钮
+                        if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                            IconButton(onClick = { showOutlineDialog = true }) {
                                 Icon(
-                                    painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                    contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                        Res.string.no_crop
-                                    ),
+                                    painter = painterResource(Res.drawable.ic_toc),
+                                    contentDescription = stringResource(Res.string.outline),
                                     tint = Color.White
                                 )
                             }
-                            // 只有单文档文件才显示大纲按钮
-                            if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
-                                IconButton(onClick = { showOutlineDialog = true }) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_toc),
-                                        contentDescription = stringResource(Res.string.outline),
-                                        tint = Color.White
-                                    )
-                                }
-                            }
-                            //IconButton(onClick = { isReflow = !isReflow }) {
-                            //    Icon(
-                            //        painter = painterResource(Res.drawable.ic_reflow),
-                            //        contentDescription = stringResource(Res.string.reflow),
-                            //        tint = if (isReflow) Color.Green else Color.White
-                            //    )
-                            //}
-                            IconButton(onClick = { /* TODO: 搜索功能 */ }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_search),
-                                    contentDescription = stringResource(Res.string.search),
-                                    tint = Color.White
-                                )
-                            }
+                        }
+                        //IconButton(onClick = { isReflow = !isReflow }) {
+                        //    Icon(
+                        //        painter = painterResource(Res.drawable.ic_reflow),
+                        //        contentDescription = stringResource(Res.string.reflow),
+                        //        tint = if (isReflow) Color.Green else Color.White
+                        //    )
+                        //}
+                        IconButton(onClick = { /* TODO: 搜索功能 */ }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_search),
+                                contentDescription = stringResource(Res.string.search),
+                                tint = Color.White
+                            )
                         }
                     }
                 }
             }
 
-            // 大纲弹窗（最上层）- 只有单文档文件才显示
-            if (showOutlineDialog && FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
-                Dialog(onDismissRequest = {
-                    showOutlineDialog = false
-                }) {
-                    val hasOutline = outlineList.isNotEmpty()
-                    // 根据当前页码找到最接近的大纲项位置
-                    val initialOutlineIndex = outlineList.indexOfFirst { it.page >= currentPage }
-                        .takeIf { it != -1 } ?: outlineList.indexOfLast { it.page <= currentPage }
-                        .takeIf { it != -1 } ?: 0
-                    val lazyListState =
-                        rememberLazyListState(
-                            initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(
-                                0
+            // 文档视图 - 占据剩余空间
+            Box(
+                modifier = Modifier.weight(1f)
+            ) {
+                if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
+                    // Reflow视图
+                } else {
+                    DesktopDocumentView(
+                        list = list,
+                        state = decoder!!,
+                        jumpToPage = jumpToPage,
+                        initialOrientation = orientation,
+                        onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder && FileTypeUtils.isDocumentFile(
+                                currentPath
                             )
-                        )
-                    Surface(
-                        modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
-                        color = Color.White.copy(alpha = 0.8f),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Column(
-                            modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize()
-                        ) {
+                        ) onSaveDocument else null,
+                        onCloseDocument = {
+                            println("onCloseDocument.isReflow:$isReflow")
+                            if (!isReflow) {
+                                onCloseDocument?.invoke()
+                            }
+                        }, // 只在非重排模式下传递关闭回调
+                        onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
+                        onPageChanged = { page -> currentPage = page },
+                        onTapNonPageArea = { clickedPageIndex ->
+                            // 点击非翻页区域时隐藏底部工具栏
+                            if (showBottomToolbar) {
+                                showBottomToolbar = false
+                            }
+                            //val pageText = currentPageString.format(clickedPageIndex + 1)
+                            //Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                        },
+                        initialScrollX = initialScrollX,
+                        initialScrollY = initialScrollY,
+                        initialZoom = vZoom,
+                        crop = isCrop,
+                    )
+                }
 
-                            Box(
-                                Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.CenterStart
+                // 大纲弹窗（最上层）- 只有单文档文件才显示
+                if (showOutlineDialog && FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                    Dialog(onDismissRequest = {
+                        showOutlineDialog = false
+                    }) {
+                        val hasOutline = outlineList.isNotEmpty()
+                        // 根据当前页码找到最接近的大纲项位置
+                        val initialOutlineIndex =
+                            outlineList.indexOfFirst { it.page >= currentPage }
+                                .takeIf { it != -1 }
+                                ?: outlineList.indexOfLast { it.page <= currentPage }
+                                    .takeIf { it != -1 } ?: 0
+                        val lazyListState =
+                            rememberLazyListState(
+                                initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(
+                                    0
+                                )
+                            )
+                        Surface(
+                            modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
+                            color = Color.White.copy(alpha = 0.8f),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Column(
+                                modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize()
                             ) {
-                                Row(
+
+                                Box(
                                     Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    contentAlignment = Alignment.CenterStart
                                 ) {
-                                    IconButton(onClick = {
-                                        showOutlineDialog = false
-                                    }) {
-                                        Icon(
-                                            painter = painterResource(Res.drawable.ic_back),
-                                            contentDescription = stringResource(Res.string.back),
-                                            tint = Color.Black
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(onClick = {
+                                            showOutlineDialog = false
+                                        }) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_back),
+                                                contentDescription = stringResource(Res.string.back),
+                                                tint = Color.Black
+                                            )
+                                        }
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                    Text(
+                                        stringResource(Res.string.document_outline),
+                                        color = Color.Black,
+                                        modifier = Modifier.align(Alignment.Center),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                                // 内容区
+                                if (!hasOutline) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(250.dp)
+                                            .padding(bottom = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            stringResource(Res.string.no_outline),
+                                            color = Color.Gray
                                         )
                                     }
-                                    Spacer(Modifier.weight(1f))
-                                }
-                                Text(
-                                    stringResource(Res.string.document_outline),
-                                    color = Color.Black,
-                                    modifier = Modifier.align(Alignment.Center),
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                            }
-                            // 内容区
-                            if (!hasOutline) {
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(250.dp)
-                                        .padding(bottom = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(stringResource(Res.string.no_outline), color = Color.Gray)
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    state = lazyListState
-                                ) {
-                                    itemsIndexed(
-                                        outlineList,
-                                        key = { index, item -> index }) { index, item ->
-                                        val isSelected = index == initialOutlineIndex
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    if (isSelected) MaterialTheme.colorScheme.surfaceVariant
-                                                    else Color.Transparent
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        state = lazyListState
+                                    ) {
+                                        itemsIndexed(
+                                            outlineList,
+                                            key = { index, item -> index }) { index, item ->
+                                            val isSelected = index == initialOutlineIndex
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        if (isSelected) MaterialTheme.colorScheme.surfaceVariant
+                                                        else Color.Transparent
+                                                    )
+                                                    .clickable {
+                                                        jumpToPage = item.page
+                                                        showOutlineDialog = false
+                                                    }
+                                                    .padding(vertical = 8.dp, horizontal = 16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = item.title ?: "",
+                                                    color = Color.Black,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    fontSize = 15.sp
                                                 )
-                                                .clickable {
-                                                    jumpToPage = item.page
-                                                    showOutlineDialog = false
-                                                    showToolbar = false
-                                                }
-                                                .padding(vertical = 8.dp, horizontal = 16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = item.title ?: "",
-                                                color = Color.Black,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontSize = 15.sp
-                                            )
-                                            Spacer(Modifier.weight(1f))
-                                            Text(
-                                                text = stringResource(Res.string.page_number).format(
-                                                    item.page + 1
-                                                ),
-                                                color = Color.Gray,
-                                                fontSize = 12.sp
-                                            )
+                                                Spacer(Modifier.weight(1f))
+                                                Text(
+                                                    text = stringResource(Res.string.page_number).format(
+                                                        item.page + 1
+                                                    ),
+                                                    color = Color.Gray,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -531,15 +513,15 @@ fun CustomView(
                 }
             }
 
-            // 底部SeekBar - 考虑导航栏（上层）
+            // 底部SeekBar - 可隐藏
             AnimatedVisibility(
-                visible = showToolbar,
-                modifier = Modifier.align(Alignment.BottomCenter)
+                visible = showBottomToolbar
             ) {
                 Surface(
                     color = Color(0xCC222222),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 ) {
                     var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
                     // 当currentPage变化时更新sliderValue

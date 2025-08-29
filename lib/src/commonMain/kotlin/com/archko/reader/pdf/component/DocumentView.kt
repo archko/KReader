@@ -32,6 +32,7 @@ import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
@@ -39,7 +40,7 @@ import kotlin.math.abs
 public const val Vertical: Int = 0
 public const val Horizontal: Int = 1
 
-private const val velocityDistance = 50f
+public const val velocityDistance: Float = 50f
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -447,7 +448,7 @@ public fun DocumentView(
                                     // 延迟处理单击，等待可能的第二次点击
                                     tapDelayJob?.cancel()
                                     tapDelayJob = scope.launch {
-                                        kotlinx.coroutines.delay(300) // 等待300ms
+                                        delay(300) // 等待300ms
 
                                         // 将点击坐标转换为相对于内容的位置
                                         val contentX = tapOffset.x - offset.x
