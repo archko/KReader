@@ -11,15 +11,11 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.util.CropUtils
 import com.archko.reader.pdf.util.loadOutlineItems
-import com.artifex.mupdf.fitz.ColorSpace
-import com.artifex.mupdf.fitz.Context
 import com.artifex.mupdf.fitz.Document
-import com.artifex.mupdf.fitz.DrawDevice
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.Page
-import com.artifex.mupdf.fitz.Pixmap
-import com.artifex.mupdf.fitz.Rect
 import java.awt.image.BufferedImage
 import java.io.File
 
@@ -114,7 +110,20 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
 
+            initPageSizeBean()
             cacheCoverIfNeeded()
+        }
+    }
+
+    private fun initPageSizeBean() {
+        try {
+            val count: Int = originalPageSizes.size
+            for (i in 0..<count) {
+                val aPage = APage(i, originalPageSizes[i].width, originalPageSizes[i].height, 1f)
+                aPageList!!.add(aPage)
+            }
+        } catch (e: Exception) {
+            aPageList!!.clear()
         }
     }
 
@@ -161,16 +170,20 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val cropWidth = maxOf(targetWidth, scaledWidth)
             val cropHeight = maxOf(targetHeight, scaledHeight)
             println("large.width-height:$cropWidth-$cropHeight")
-            val bbox = Rect(
+            val bbox = com.artifex.mupdf.fitz.Rect(
                 0f,
                 0f,
                 cropWidth.toFloat(),
                 cropHeight.toFloat()
             )
-            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
+            val pixmap = com.artifex.mupdf.fitz.Pixmap(
+                com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
+                bbox,
+                true
+            )
             pixmap.clear(255)
-            Context.disableICC();
-            val cropDev = DrawDevice(pixmap)
+            com.artifex.mupdf.fitz.Context.disableICC()
+            val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
             page.run(cropDev, cropCtm, null)
@@ -180,6 +193,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val pixmapHeight = pixmap.height
             val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
             image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+            pixmap.destroy()
             image.toComposeImageBitmap()
         } else if (pWidth > pHeight) {
             // 对于宽大于高的页面，按最大比例缩放后截取
@@ -193,16 +207,20 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val cropHeight = maxOf(targetHeight, scaledHeight)
 
             println("wide.width-height:$cropWidth-$cropHeight")
-            val bbox = Rect(
+            val bbox = com.artifex.mupdf.fitz.Rect(
                 0f,
                 0f,
                 cropWidth.toFloat(),
                 cropHeight.toFloat()
             )
-            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
+            val pixmap = com.artifex.mupdf.fitz.Pixmap(
+                com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
+                bbox,
+                true
+            )
             pixmap.clear(255)
-            Context.disableICC();
-            val cropDev = DrawDevice(pixmap)
+            com.artifex.mupdf.fitz.Context.disableICC()
+            val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
             page.run(cropDev, cropCtm, null)
@@ -212,6 +230,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val pixmapHeight = pixmap.height
             val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
             image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+            pixmap.destroy()
             image.toComposeImageBitmap()
         } else {
             // 原始逻辑处理其他情况
@@ -229,16 +248,20 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val cropHeight = maxOf(targetHeight, scaledHeight)
 
             println("width-height:$cropWidth-$cropHeight")
-            val bbox = Rect(
+            val bbox = com.artifex.mupdf.fitz.Rect(
                 0f,
                 0f,
                 cropWidth.toFloat(),
                 cropHeight.toFloat()
             )
-            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
+            val pixmap = com.artifex.mupdf.fitz.Pixmap(
+                com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
+                bbox,
+                true
+            )
             pixmap.clear(255)
-            Context.disableICC();
-            val cropDev = DrawDevice(pixmap)
+            com.artifex.mupdf.fitz.Context.disableICC()
+            val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
             page.run(cropDev, cropCtm, null)
@@ -248,6 +271,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val pixmapHeight = pixmap.height
             val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
             image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+            pixmap.destroy()
             image.toComposeImageBitmap()
         }
     }
@@ -295,16 +319,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
-    public fun getSize(viewportSize: IntSize): IntSize {
-        if ((imageSize == IntSize.Zero || viewSize != viewportSize)
-            && viewportSize.width > 0 && viewportSize.height > 0
-        ) {
-            viewSize = viewportSize
-            caculateSize(viewportSize)
-        }
-        return imageSize
-    }
-
     /**
      * 获取原始页面尺寸
      */
@@ -312,24 +326,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         return originalPageSizes[index]
     }
 
-    /**
-     * 获取或创建页面，支持缓存
-     */
-    private fun getPage(index: Int): com.artifex.mupdf.fitz.Page {
-        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
-        if (pageCache.size >= maxPageCache && !pageCache.containsKey(index)) {
-            val oldestIndex = pageCache.keys.first()
-            val oldestPage = pageCache.remove(oldestIndex)
-            oldestPage?.destroy()
-            println("Removed page $oldestIndex from cache to make room for page $index")
-        }
-
-        return pageCache.getOrPut(index) {
-            document!!.loadPage(index)
-        }
-    }
-
     override fun close() {
+        if (aPageList != null && !aPageList.isEmpty()) {
+            println("PdfDecoder.close: aPageList size=${aPageList.size}")
+        }
+
         // 清理页面缓存
         pageCache.values.forEach { page ->
             try {
@@ -447,6 +448,56 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
+    private fun decode(
+        index: Int,
+        scale: Float,
+        targetBitmap: ImageBitmap,
+        patchX: Int,
+        patchY: Int,
+        decodeLink: Boolean
+    ): ImageBitmap {
+        val ctm = Matrix(scale)
+
+        val bbox = com.artifex.mupdf.fitz.Rect(
+            0f,
+            0f,
+            targetBitmap.width.toFloat(),
+            targetBitmap.height.toFloat()
+        )
+        val pixmap =
+            com.artifex.mupdf.fitz.Pixmap(com.artifex.mupdf.fitz.ColorSpace.DeviceBGR, bbox, true)
+        pixmap.clear(255)
+        com.artifex.mupdf.fitz.Context.disableICC()
+
+        val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
+
+        // 添加偏移，使渲染区域正确
+        ctm.translate(-(patchX / scale), -(patchY / scale))
+
+        val page = getPage(index)
+        page.run(dev, ctm, null)
+
+        // 在解码缩略图时同时解析链接
+        parseLinksIfNeeded(index, false, decodeLink)
+
+        dev.close()
+        dev.destroy()
+
+        // Convert pixmap to BufferedImage and then to ImageBitmap
+        val pixmapWidth = pixmap.width
+        val pixmapHeight = pixmap.height
+        val image = java.awt.image.BufferedImage(
+            pixmapWidth,
+            pixmapHeight,
+            java.awt.image.BufferedImage.TYPE_3BYTE_BGR
+        )
+        image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+
+        pixmap.destroy()
+
+        return image.toComposeImageBitmap()
+    }
+
     public override fun renderPage(
         aPage: APage,
         viewSize: IntSize,
@@ -458,77 +509,79 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
 
-        /*try {
+        try {
             val index = aPage.index
-            val cropBounds =
-                if (aPage.cropBounds != null) aPage.cropBounds!!
-                else androidx.compose.ui.geometry.Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
+            if (aPage.cropBounds != null && crop) {
+                val cropBounds = aPage.cropBounds!!
 
-            val patchX = cropBounds.left.toInt()
-            val patchY = cropBounds.top.toInt()
-            // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
-            val scale = if (aPage.width > 0) {
-                outWidth.toFloat() / aPage.getWidth(crop)
-            } else {
-                1f
-            }
-            val height = scale * aPage.getHeight(crop)
-            val bitmap = acquireReusableBitmap(outWidth, height.toInt())
-
-            val ctm = Matrix(scale)
-            val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, bitmap.width, bitmap.height)
-
-            val page = getPage(index)
-            page.run(dev, ctm, null)
-            println("PdfDecoder.renderPage:index:$index scale:$scale, w-h:$outWidth-$outHeight-$height, offset:$patchX-$patchY, page.w-h:${page.bounds.x1 - page.bounds.x0}-${page.bounds.y1 - page.bounds.y0} bounds:$cropBounds, crop:$crop")
-
-            // 在解码缩略图时同时解析链接
-            parseLinksIfNeeded(index, false)
-
-            dev.close()
-            dev.destroy()
-
-            val imageBitmap = bitmap.asImageBitmap()
-
-            // 如果启用了切边功能但没有cropBounds，检测并设置
-            if (crop && aPage.cropBounds == null) {
-                val cropBounds = CropUtils.detectCropBounds(imageBitmap)
-                if (cropBounds != null) {
-                    // 将缩略图坐标转换为原始PDF坐标
-                    val originalPage = originalPageSizes[index]
-                    val ratio = originalPage.width.toFloat() / outWidth
-
-                    // 使用宽度比例转换左右边界，使用高度比例转换上下边界
-                    val leftBound = (cropBounds.left * ratio)
-                    val topBound = (cropBounds.top * ratio)
-                    val rightBound = (cropBounds.right * ratio)
-                    val bottomBound = (cropBounds.bottom * ratio)
-                    val pdfCropBounds = Rect(
-                        leftBound,
-                        topBound,
-                        rightBound,
-                        bottomBound
-                    )
-
-                    aPage.cropBounds = pdfCropBounds
-                    pageCropBounds[aPage.index] = pdfCropBounds
-
-                    // 在图片上绘制cropBounds矩形并保存（仅在第一次检测时）
-                    //drawCropBoundsOnBitmap(imageBitmap, cropBounds, index)
-
-                    // 真正对图片进行切边处理
-                    val croppedBitmap = cropImageBitmap(imageBitmap, cropBounds)
-                    return croppedBitmap
+                val scale = if (aPage.width > 0) {
+                    outWidth.toFloat() / cropBounds.width
+                } else {
+                    1f
                 }
-            }
 
-            return imageBitmap
+                val patchX = cropBounds.left.toInt() * scale
+                val patchY = cropBounds.top.toInt() * scale
+                val height = scale * cropBounds.height
+                val bitmap =
+                    acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
+
+                return decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
+            } else {
+                val cropBounds = androidx.compose.ui.geometry.Rect(
+                    0f,
+                    0f,
+                    aPage.width.toFloat(),
+                    aPage.height.toFloat()
+                )
+
+                val patchX = cropBounds.left.toInt()
+                val patchY = cropBounds.top.toInt()
+                // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
+                val scale = if (aPage.width > 0) {
+                    outWidth.toFloat() / aPage.getWidth(crop)
+                } else {
+                    1f
+                }
+                val height = scale * aPage.getHeight(crop)
+                val bitmap = acquireReusableBitmap(outWidth, height.toInt())
+
+                val imageBitmap = decode(index, scale, bitmap, patchX, patchY, true)
+
+                // 如果启用了切边功能但没有cropBounds，检测并设置
+                if (crop) {
+                    val cropBounds = CropUtils.detectCropBounds(imageBitmap)
+                    if (cropBounds != null) {
+                        // 将缩略图坐标转换为原始PDF坐标
+                        val originalPage = originalPageSizes[index]
+                        val ratio = originalPage.width.toFloat() / outWidth
+
+                        // 使用宽度比例转换左右边界，使用高度比例转换上下边界
+                        val leftBound = (cropBounds.left * ratio)
+                        val topBound = (cropBounds.top * ratio)
+                        val rightBound = (cropBounds.right * ratio)
+                        val bottomBound = (cropBounds.bottom * ratio)
+                        val pdfCropBounds = androidx.compose.ui.geometry.Rect(
+                            leftBound,
+                            topBound,
+                            rightBound,
+                            bottomBound
+                        )
+
+                        aPage.cropBounds = pdfCropBounds
+
+                        // 真正对图片进行切边处理
+                        val croppedBitmap = cropImageBitmap(imageBitmap, cropBounds)
+                        return croppedBitmap
+                    }
+                }
+                return imageBitmap
+            }
         } catch (e: Exception) {
             println("PdfDecoder.renderPage error: $e")
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
-        }*/
-        return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
     }
 
     /**
@@ -536,7 +589,14 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * @param pageIndex 页面索引
      * @param forceParse 是否强制解析（即使已缓存）
      */
-    private fun parseLinksIfNeeded(pageIndex: Int, forceParse: Boolean = false) {
+    private fun parseLinksIfNeeded(
+        pageIndex: Int,
+        forceParse: Boolean = false,
+        decodeLink: Boolean = true
+    ) {
+        if (!decodeLink) {
+            return
+        }
         if (!forceParse && linksCache.containsKey(pageIndex)) {
             return
         }
@@ -562,22 +622,32 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         val safeWidth = cropWidth.coerceIn(1, originalBitmap.width - safeX)
         val safeHeight = cropHeight.coerceIn(1, originalBitmap.height - safeY)
 
-        // 创建切边后的图片 - 使用Android Bitmap进行切边，然后转换回ImageBitmap
-        /*val androidBitmap = originalBitmap.asAndroidBitmap()
-        val croppedAndroidBitmap = Bitmap.createBitmap(
-            androidBitmap,
-            safeX,
-            safeY,
-            safeWidth,
-            safeHeight
-        )
+        println("PdfDecoder.cropImageBitmap: 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight)")
 
-        val croppedImageBitmap = croppedAndroidBitmap.asImageBitmap()
+        try {
+            // 读取原始图片的像素数据
+            val originalPixels = IntArray(originalBitmap.width * originalBitmap.height)
+            originalBitmap.readPixels(originalPixels)
 
-        println("PdfDecoder.cropImageBitmap: 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight), 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
+            // 创建切边后的BufferedImage
+            val croppedImage = BufferedImage(safeWidth, safeHeight, BufferedImage.TYPE_INT_ARGB)
 
-        return croppedImageBitmap*/
-        return originalBitmap
+            // 复制切边区域的像素
+            for (y in 0 until safeHeight) {
+                for (x in 0 until safeWidth) {
+                    val srcIndex = (safeY + y) * originalBitmap.width + (safeX + x)
+                    if (srcIndex < originalPixels.size) {
+                        croppedImage.setRGB(x, y, originalPixels[srcIndex])
+                    }
+                }
+            }
+
+            return croppedImage.toComposeImageBitmap()
+        } catch (e: Exception) {
+            println("PdfDecoder.cropImageBitmap error: $e")
+            // 如果切边失败，返回原始图片
+            return originalBitmap
+        }
     }
 
     public override fun renderPageRegion(
@@ -597,51 +667,38 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val patchY = region.top.toInt()
             println("PdfDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
-            val bbox = Rect(
-                0f,
-                0f,
-                outWidth.toFloat(),
-                outHeight.toFloat()
-            )
-            val pixmap = Pixmap(ColorSpace.DeviceBGR, bbox, true)
-            pixmap.clear(255)
-            Context.disableICC();
-
-            // 创建变换矩阵，包含缩放和偏移
-            val ctm = Matrix()
-            ctm.scale(scale, scale)
-            // 添加偏移，使渲染区域正确
-            // patchX 和 patchY 是基于缩放后尺寸的，需要转换为原始PDF坐标
-            //ctm.translate(-patchX.toFloat(), -patchY.toFloat())
-            ctm.translate(-(patchX / scale), -(patchY / scale))
-
-            val dev = DrawDevice(pixmap)
-            val page = getPage(index)
-            page.run(dev, ctm, null)
-            dev.close()
-            dev.destroy()
-
-            // 在解码缩略图时同时解析链接
-            parseLinksIfNeeded(index)
-
-            val pixmapWidth = pixmap.width
-            val pixmapHeight = pixmap.height
-            val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
-            image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-
-            /*// 保存图片到文件
-            val fileName = "rendered_page_$index-${region}.png"
-            val file = File("/Users/archko/$fileName")
-            javax.imageio.ImageIO.write(image, "png", file)
-            
-            // 打印文件存储路径
-            println("图片已保存到: ${file.absolutePath}")*/
-
-            return image.toComposeImageBitmap()
+            val bitmap = acquireReusableBitmap(outWidth, outHeight)
+            return decode(index, scale, bitmap, patchX, patchY, false)
         } catch (e: Exception) {
             println("PdfDecoder.renderPageRegion error: $e")
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
+    }
+
+    /**
+     * 获取或创建页面，支持缓存
+     */
+    private fun getPage(index: Int): Page {
+        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
+        if (pageCache.size >= maxPageCache && !pageCache.containsKey(index)) {
+            val oldestIndex = pageCache.keys.first()
+            val oldestPage = pageCache.remove(oldestIndex)
+            oldestPage?.destroy()
+            println("Removed page $oldestIndex from cache to make room for page $index")
+        }
+
+        return pageCache.getOrPut(index) {
+            document!!.loadPage(index)
+        }
+    }
+
+    /**
+     * 优先尝试从复用池获取ImageBitmap
+     */
+    private fun acquireReusableBitmap(width: Int, height: Int): ImageBitmap {
+        // For desktop, create a new ImageBitmap
+        // In a real implementation, you might want to implement a bitmap pool for desktop too
+        return ImageBitmap(width, height, ImageBitmapConfig.Argb8888)
     }
 }

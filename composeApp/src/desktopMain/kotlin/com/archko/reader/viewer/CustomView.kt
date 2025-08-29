@@ -126,7 +126,7 @@ fun CustomView(
                     val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
                     if (success) {
                         // 密码正确，初始化文档
-                        pdfDecoder.getSize(viewportSize)
+                        pdfDecoder.size(viewportSize)
                         loadingError = null
                         showPasswordDialog = false
                         isPasswordError = false
