@@ -55,15 +55,16 @@ public fun DesktopDocumentView(
     jumpToPage: Int? = null,
     align: PdfViewState.Align = PdfViewState.Align.Top,
     initialOrientation: Int,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
     onPageChanged: ((page: Int) -> Unit)? = null, // 新增页面变化回调
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null, // 新增：点击非翻页区域回调，传递页面索引
-    initialScrollX: Long = 0L, // 新增：初始X偏移量
-    initialScrollY: Long = 0L, // 新增：初始Y偏移量
-    initialZoom: Double = 1.0, // 新增：初始缩放比例
-    reflow: Long = 0, // 新增：初始缩放比例
+    initialScrollX: Long = 0L, // 初始X偏移量
+    initialScrollY: Long = 0L, // 初始Y偏移量
+    initialZoom: Double = 1.0, // 初始缩放比例
+    reflow: Long = 0, // 初始缩放比例
+    crop: Boolean = false, // 是否切边
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -92,7 +93,7 @@ public fun DesktopDocumentView(
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PdfViewState(list, state, orientation, false)
+        PdfViewState(list, state, orientation, crop)
     }
 
     // 处理键盘和鼠标滚轮事件的函数
@@ -338,6 +339,20 @@ public fun DesktopDocumentView(
         }
     }
 
+    LaunchedEffect(crop) {
+        val old = pdfViewState.isCropEnabled()
+        if (old != crop) {
+            println("DocumentView: 切边变化:$crop")
+            pdfViewState.setCropEnabled(crop)
+            // 清理所有页面的缓存图像
+            pdfViewState.pages.forEach { page ->
+                page.recycle()
+            }
+            pdfViewState.invalidatePageSizes()
+            pdfViewState.updateOffset(offset)
+        }
+    }
+
     // 监听页面变化并回调
     LaunchedEffect(offset) {
         // 只有在非跳转状态下才处理页面变化回调
@@ -373,7 +388,7 @@ public fun DesktopDocumentView(
         }
         val pageCount = list.size
         val zoom = vZoom.toDouble()
-        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
+        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation, crop: $crop,${pdfViewState.isCropEnabled()}")
 
         if (!list.isEmpty()) {
             onSaveDocument?.invoke(
@@ -383,7 +398,8 @@ public fun DesktopDocumentView(
                 offset.x.toLong(),
                 offset.y.toLong(),
                 orientation.toLong(),
-                reflow
+                reflow,
+                if (pdfViewState.isCropEnabled()) 0L else 1L
             )
         }
     }
@@ -609,7 +625,12 @@ public fun DesktopDocumentView(
                 .fillMaxSize()
                 .background(Color.Transparent)
         ) {
-            translate(left = offset.x, top = offset.y) {
+            val translateY = if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
+                (viewSize.height - pdfViewState.totalHeight) / 2
+            } else {
+                0f
+            }
+            translate(left = offset.x, top = offset.y + translateY) {
                 //只绘制可见区域.
                 /*val visibleRect = Rect(
                     left = -offset.x,
@@ -766,4 +787,3 @@ private fun handleTapGesture(
         }
     }
 }
-

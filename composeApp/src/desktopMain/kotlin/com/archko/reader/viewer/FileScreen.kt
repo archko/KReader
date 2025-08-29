@@ -125,7 +125,9 @@ fun FileScreen(
                     }
 
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 32.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
@@ -250,12 +252,12 @@ fun FileScreen(
                 CustomView(
                     currentPath = openDocRequest!!.path,
                     progressPage = openDocRequest!!.page,
-                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow ->
+                    onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
                         viewModel.updateProgress(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
                             zoom = zoom,
-                            crop = 0L,
+                            crop = crop,
                             scrollX,
                             scrollY,
                             scrollOri,
@@ -269,7 +271,8 @@ fun FileScreen(
                     initialScrollY = viewModel.progress?.scrollY ?: 0L,
                     initialZoom = viewModel.progress?.zoom ?: 1.0,
                     scrollOri = viewModel.progress?.scrollOri ?: 0,
-                    reflow = viewModel.progress?.reflow ?: 0L
+                    reflow = viewModel.progress?.reflow ?: 0L,
+                    crop = 0L == viewModel.progress?.crop
                 )
             }
         }

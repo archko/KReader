@@ -42,13 +42,14 @@ import java.io.File
 fun CustomView(
     currentPath: String,
     progressPage: Int? = null,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
     scrollOri: Long = 0,
     reflow: Long = 0,
+    crop: Boolean? = null,
 ) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var decoder: ImageDecoder? by remember { mutableStateOf(null) }
@@ -58,11 +59,12 @@ fun CustomView(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
-            println("init:$viewportSize, reflow:$reflow, $currentPath")
+            println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
             if (!FileTypeUtils.isDocumentFile(currentPath)
                 && !FileTypeUtils.isImageFile(currentPath)
                 && !FileTypeUtils.isTiffFile(currentPath)
@@ -89,9 +91,11 @@ fun CustomView(
 
                         pdfDecoder
                     } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                        isCrop = false
                         val tiffDecoder = TiffDecoder(File(currentPath))
                         tiffDecoder
                     } else if (FileTypeUtils.isImageFile(currentPath)) {
+                        isCrop = false
                         val tiffDecoder = PdfDecoder(File(currentPath))
                         tiffDecoder
                     } else {
@@ -331,6 +335,7 @@ fun CustomView(
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
+                    crop = isCrop,
                 )
             }
 
@@ -352,7 +357,6 @@ fun CustomView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = {
-                            // 然后关闭文档
                             onCloseDocument?.invoke()
                         }) {
                             Icon(
@@ -379,6 +383,15 @@ fun CustomView(
 
                         // 只有文档文件才显示其他按钮
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            IconButton(onClick = { isCrop = !isCrop }) {
+                                Icon(
+                                    painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                    contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                        Res.string.no_crop
+                                    ),
+                                    tint = Color.White
+                                )
+                            }
                             // 只有单文档文件才显示大纲按钮
                             if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
                                 IconButton(onClick = { showOutlineDialog = true }) {
