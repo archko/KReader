@@ -330,7 +330,7 @@ public fun DocumentView(
                                 pan += panChange
                                 totalDrag += panChange
                                 panVelocityTracker.addPosition(uptime, pan)
-                                
+
                                 // 检测是否开始拖拽
                                 if (totalDrag.getDistance() > 10f) {
                                     dragging = true
@@ -424,19 +424,19 @@ public fun DocumentView(
                             if (zooming) {
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
-                            
+
                             // 如果没有拖拽和缩放，且按下时没有fling动画，处理点击事件
                             if (!dragging && !zooming && !wasFlingActive && totalDrag.getDistance() < 10f) {
                                 val tapOffset = down.position
                                 val currentTime = System.currentTimeMillis()
-                                
+
                                 // 检查是否是双击（简化检测，只检查时间间隔）
                                 val isDoubleTap = currentTime - lastTapTime < 300
-                                
+
                                 if (isDoubleTap) {
                                     // 取消延迟的单击处理
                                     tapDelayJob?.cancel()
-                                    
+
                                     // 处理双击
                                     val y = tapOffset.y
                                     val height = viewSize.height.toFloat()
@@ -448,13 +448,14 @@ public fun DocumentView(
                                     tapDelayJob?.cancel()
                                     tapDelayJob = scope.launch {
                                         kotlinx.coroutines.delay(300) // 等待300ms
-                                        
+
                                         // 将点击坐标转换为相对于内容的位置
                                         val contentX = tapOffset.x - offset.x
                                         val contentY = tapOffset.y - offset.y
 
                                         // 首先尝试处理链接点击
-                                        val linkHandled = pdfViewState.handleClick(contentX, contentY)
+                                        val linkHandled =
+                                            pdfViewState.handleClick(contentX, contentY)
                                         println("DocumentView.onTap: 链接处理结果: $linkHandled")
 
                                         // 如果没有处理链接，再处理翻页逻辑
@@ -485,7 +486,7 @@ public fun DocumentView(
                                         }
                                     }
                                 }
-                                
+
                                 lastTapTime = currentTime
                             }
                             // 计算pan velocity
@@ -498,95 +499,101 @@ public fun DocumentView(
                             flingJob?.cancel()
                             if (velocitySquared > velocityThreshold) {
                                 val decayAnimationSpec =
-                                    exponentialDecay<Float>(frictionMultiplier = 0.35f, absVelocityThreshold = 0.45f)
+                                    exponentialDecay<Float>(
+                                        frictionMultiplier = 0.35f,
+                                        absVelocityThreshold = 0.45f
+                                    )
                                 isFlingActive = true
                                 flingJob = scope.launch {
                                     try {
-                                    if (orientation == Vertical) {
-                                        // X方向
-                                        if (abs(velocity.x) > velocityDistance) {
-                                            val animX = AnimationState(
-                                                initialValue = offset.x,
-                                                initialVelocity = velocity.x
-                                            )
-                                            launch {
-                                                animX.animateDecay(decayAnimationSpec) {
-                                                    val scaledWidth = viewSize.width * vZoom
-                                                    val minX =
-                                                        minOf(0f, viewSize.width - scaledWidth)
-                                                    val maxX = 0f
-                                                    val newX = value.coerceIn(minX, maxX)
-                                                    offset = Offset(newX, offset.y)
-                                                    pdfViewState.updateOffset(offset)
+                                        if (orientation == Vertical) {
+                                            // X方向
+                                            if (abs(velocity.x) > velocityDistance) {
+                                                val animX = AnimationState(
+                                                    initialValue = offset.x,
+                                                    initialVelocity = velocity.x
+                                                )
+                                                launch {
+                                                    animX.animateDecay(decayAnimationSpec) {
+                                                        val scaledWidth = viewSize.width * vZoom
+                                                        val minX =
+                                                            minOf(0f, viewSize.width - scaledWidth)
+                                                        val maxX = 0f
+                                                        val newX = value.coerceIn(minX, maxX)
+                                                        offset = Offset(newX, offset.y)
+                                                        pdfViewState.updateOffset(offset)
+                                                    }
+                                                }
+                                            }
+                                            // Y方向
+                                            if (abs(velocity.y) > velocityDistance) {
+                                                val animY = AnimationState(
+                                                    initialValue = offset.y,
+                                                    initialVelocity = velocity.y
+                                                )
+                                                launch {
+                                                    animY.animateDecay(decayAnimationSpec) {
+                                                        val scaledHeight =
+                                                            if (orientation == Vertical) {
+                                                                pdfViewState.totalHeight
+                                                            } else {
+                                                                pdfViewState.totalWidth
+                                                            }
+                                                        val minY =
+                                                            if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                                        val maxY = 0f
+                                                        val newY = value.coerceIn(minY, maxY)
+                                                        offset = Offset(offset.x, newY)
+                                                        pdfViewState.updateOffset(offset)
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // X方向
+                                            if (abs(velocity.x) > velocityDistance) {
+                                                val animX = AnimationState(
+                                                    initialValue = offset.x,
+                                                    initialVelocity = velocity.x
+                                                )
+                                                launch {
+                                                    animX.animateDecay(decayAnimationSpec) {
+                                                        val scaledWidth =
+                                                            if (orientation == Vertical) {
+                                                                pdfViewState.totalHeight
+                                                            } else {
+                                                                pdfViewState.totalWidth
+                                                            }
+                                                        val minX =
+                                                            if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                                                        val maxX = 0f
+                                                        val newX = value.coerceIn(minX, maxX)
+                                                        offset = Offset(newX, offset.y)
+                                                        pdfViewState.updateOffset(offset)
+                                                    }
+                                                }
+                                            }
+                                            // Y方向
+                                            if (abs(velocity.y) > velocityDistance) {
+                                                val animY = AnimationState(
+                                                    initialValue = offset.y,
+                                                    initialVelocity = velocity.y
+                                                )
+                                                launch {
+                                                    animY.animateDecay(decayAnimationSpec) {
+                                                        val scaledHeight = viewSize.height * vZoom
+                                                        val minY =
+                                                            minOf(
+                                                                0f,
+                                                                viewSize.height - scaledHeight
+                                                            )
+                                                        val maxY = 0f
+                                                        val newY = value.coerceIn(minY, maxY)
+                                                        offset = Offset(offset.x, newY)
+                                                        pdfViewState.updateOffset(offset)
+                                                    }
                                                 }
                                             }
                                         }
-                                        // Y方向
-                                        if (abs(velocity.y) > velocityDistance) {
-                                            val animY = AnimationState(
-                                                initialValue = offset.y,
-                                                initialVelocity = velocity.y
-                                            )
-                                            launch {
-                                                animY.animateDecay(decayAnimationSpec) {
-                                                    val scaledHeight =
-                                                        if (orientation == Vertical) {
-                                                            pdfViewState.totalHeight
-                                                        } else {
-                                                            pdfViewState.totalWidth
-                                                        }
-                                                    val minY =
-                                                        if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
-                                                    val maxY = 0f
-                                                    val newY = value.coerceIn(minY, maxY)
-                                                    offset = Offset(offset.x, newY)
-                                                    pdfViewState.updateOffset(offset)
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // X方向
-                                        if (abs(velocity.x) > velocityDistance) {
-                                            val animX = AnimationState(
-                                                initialValue = offset.x,
-                                                initialVelocity = velocity.x
-                                            )
-                                            launch {
-                                                animX.animateDecay(decayAnimationSpec) {
-                                                    val scaledWidth =
-                                                        if (orientation == Vertical) {
-                                                            pdfViewState.totalHeight
-                                                        } else {
-                                                            pdfViewState.totalWidth
-                                                        }
-                                                    val minX =
-                                                        if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
-                                                    val maxX = 0f
-                                                    val newX = value.coerceIn(minX, maxX)
-                                                    offset = Offset(newX, offset.y)
-                                                    pdfViewState.updateOffset(offset)
-                                                }
-                                            }
-                                        }
-                                        // Y方向
-                                        if (abs(velocity.y) > velocityDistance) {
-                                            val animY = AnimationState(
-                                                initialValue = offset.y,
-                                                initialVelocity = velocity.y
-                                            )
-                                            launch {
-                                                animY.animateDecay(decayAnimationSpec) {
-                                                    val scaledHeight = viewSize.height * vZoom
-                                                    val minY =
-                                                        minOf(0f, viewSize.height - scaledHeight)
-                                                    val maxY = 0f
-                                                    val newY = value.coerceIn(minY, maxY)
-                                                    offset = Offset(offset.x, newY)
-                                                    pdfViewState.updateOffset(offset)
-                                                }
-                                            }
-                                        }
-                                    }
                                     } finally {
                                         isFlingActive = false
                                     }
@@ -596,11 +603,12 @@ public fun DocumentView(
                     }
                 }
         ) {
-            val translateY = if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
-                (viewSize.height - pdfViewState.totalHeight) / 2
-            } else {
-                0f
-            }
+            val translateY =
+                if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
+                    (viewSize.height - pdfViewState.totalHeight) / 2
+                } else {
+                    0f
+                }
             translate(left = offset.x, top = offset.y + translateY) {
                 //只绘制可见区域.
                 /*val visibleRect = Rect(

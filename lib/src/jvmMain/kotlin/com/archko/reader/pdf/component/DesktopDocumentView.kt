@@ -3,8 +3,10 @@ package com.archko.reader.pdf.component
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +36,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -83,13 +87,9 @@ public fun DesktopDocumentView(
     val keepPx = with(density) { 6.dp.toPx() }
 
     var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
+    var lastTapTime by remember { mutableLongStateOf(0L) } // 用于双击检测
     // 焦点请求器，用于键盘操作
     val focusRequester = remember { FocusRequester() }
-
-    // 鼠标拖拽状态
-    var isDragging by remember { mutableStateOf(false) }
-    var dragStartOffset by remember { mutableStateOf(Offset.Zero) }
-    var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
@@ -435,105 +435,119 @@ public fun DesktopDocumentView(
                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
             }
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offsetTap ->
-                        // 将点击坐标转换为相对于内容的位置
-                        val contentX = offsetTap.x - offset.x
-                        val contentY = offsetTap.y - offset.y
+                awaitEachGesture {
+                    var dragging = false
+                    var totalDrag = Offset.Zero
 
-                        // 首先尝试处理链接点击
-                        //println("DocumentView.onTap: 尝试处理链接点击，坐标($contentX, $contentY)")
-                        val linkHandled = pdfViewState.handleClick(contentX, contentY)
-                        println("DocumentView.onTap: 链接处理结果: $linkHandled")
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val downTime = System.currentTimeMillis()
 
-                        // 如果没有处理链接，再处理翻页逻辑
-                        if (!linkHandled) {
-                            val isPageTurned = handleTapGesture(
-                                offsetTap,
-                                viewSize,
-                                offset,
-                                orientation,
-                                pdfViewState,
-                                keepPx
-                            ) { newOffset ->
-                                offset = newOffset
+                    try {
+                        totalDrag = Offset.Zero
+
+                        do {
+                            val event = awaitPointerEvent()
+                            val panChange = event.calculatePan()
+
+                            totalDrag += panChange
+
+                            // 检测是否开始拖拽（移动距离超过阈值）
+                            if (totalDrag.getDistance() > 10f) {
+                                dragging = true
+                            }
+
+                            // 处理拖拽
+                            if (dragging) {
+                                offset += panChange
+
+                                // 边界检查 - 与移动端保持一致
+                                if (orientation == Vertical) {
+                                    val scaledWidth = viewSize.width * vZoom
+                                    val scaledHeight = pdfViewState.totalHeight
+                                    val minX = minOf(0f, viewSize.width - scaledWidth)
+                                    val maxX = 0f
+                                    val minY =
+                                        if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                    val maxY = 0f
+                                    offset = Offset(
+                                        offset.x.coerceIn(minX, maxX),
+                                        offset.y.coerceIn(minY, maxY)
+                                    )
+                                } else {
+                                    val scaledHeight = viewSize.height * vZoom
+                                    val scaledWidth = pdfViewState.totalWidth
+                                    val minY = minOf(0f, viewSize.height - scaledHeight)
+                                    val maxY = 0f
+                                    val minX =
+                                        if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                                    val maxX = 0f
+                                    offset = Offset(
+                                        offset.x.coerceIn(minX, maxX),
+                                        offset.y.coerceIn(minY, maxY)
+                                    )
+                                }
                                 pdfViewState.updateOffset(offset)
                             }
 
-                            // 如果不是翻页区域，触发非页面区域点击回调
-                            if (!isPageTurned) {
-                                val clickedPage =
-                                    calculateClickedPage(
-                                        offsetTap,
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        } while (event.changes.any { it.pressed })
+                    } finally {
+                        // 如果没有拖拽，处理点击事件
+                        if (!dragging && totalDrag.getDistance() < 10f) {
+                            val tapOffset = down.position
+                            val currentTime = System.currentTimeMillis()
+
+                            // 检查是否是双击
+                            val isDoubleTap = currentTime - lastTapTime < 300
+
+                            if (isDoubleTap) {
+                                // 处理双击
+                                val y = tapOffset.y
+                                val height = viewSize.height.toFloat()
+                                if (y >= height / 4 && y <= height * 3 / 4) {
+                                    onDoubleTapToolbar?.invoke()
+                                }
+                            } else {
+                                // 处理单击
+                                // 将点击坐标转换为相对于内容的位置
+                                val contentX = tapOffset.x - offset.x
+                                val contentY = tapOffset.y - offset.y
+
+                                // 首先尝试处理链接点击
+                                val linkHandled = pdfViewState.handleClick(contentX, contentY)
+                                println("DesktopDocumentView.onTap: 链接处理结果: $linkHandled")
+
+                                // 如果没有处理链接，再处理翻页逻辑
+                                if (!linkHandled) {
+                                    val isPageTurned = handleTapGesture(
+                                        tapOffset,
+                                        viewSize,
                                         offset,
                                         orientation,
-                                        pdfViewState
-                                    )
-                                onTapNonPageArea?.invoke(clickedPage)
-                            }
-                        }
-                    },
-                    onDoubleTap = { offsetTap ->
-                        val y = offsetTap.y
-                        val height = viewSize.height.toFloat()
-                        if (y >= height / 4 && y <= height * 3 / 4) {
-                            onDoubleTapToolbar?.invoke()
-                        }
-                    }
-                )
-            }
-            // 添加鼠标拖拽支持
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { startOffset ->
-                        isDragging = true
-                        dragStartOffset = offset
-                        dragStartPosition = startOffset
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                    },
-                    onDragCancel = {
-                        isDragging = false
-                    },
-                    onDrag = { change, dragAmount ->
-                        if (isDragging) {
-                            val newOffset = Offset(
-                                dragStartOffset.x - dragAmount.x,
-                                dragStartOffset.y - dragAmount.y
-                            )
+                                        pdfViewState,
+                                        keepPx
+                                    ) { newOffset ->
+                                        offset = newOffset
+                                        pdfViewState.updateOffset(offset)
+                                    }
 
-                            // 边界检查
-                            if (orientation == Vertical) {
-                                val scaledWidth = viewSize.width * vZoom
-                                val scaledHeight = pdfViewState.totalHeight
-                                val minX = minOf(0f, viewSize.width - scaledWidth)
-                                val maxX = 0f
-                                val minY =
-                                    if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
-                                val maxY = 0f
-                                offset = Offset(
-                                    newOffset.x.coerceIn(minX, maxX),
-                                    newOffset.y.coerceIn(minY, maxY)
-                                )
-                            } else {
-                                val scaledHeight = viewSize.height * vZoom
-                                val scaledWidth = pdfViewState.totalWidth
-                                val minY = minOf(0f, viewSize.height - scaledHeight)
-                                val maxY = 0f
-                                val minX =
-                                    if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
-                                val maxX = 0f
-                                offset = Offset(
-                                    newOffset.x.coerceIn(minX, maxX),
-                                    newOffset.y.coerceIn(minY, maxY)
-                                )
+                                    // 如果不是翻页区域，触发非页面区域点击回调
+                                    if (!isPageTurned) {
+                                        val clickedPage = calculateClickedPage(
+                                            tapOffset,
+                                            offset,
+                                            orientation,
+                                            pdfViewState
+                                        )
+                                        onTapNonPageArea?.invoke(clickedPage)
+                                    }
+                                }
                             }
-                            pdfViewState.updateOffset(offset)
+
+                            lastTapTime = currentTime
                         }
-                        change.consume()
                     }
-                )
+                }
             }
             // 添加鼠标滚轮支持（支持多种模式）
             .onPointerEvent(PointerEventType.Scroll) { event ->
@@ -560,10 +574,12 @@ public fun DesktopDocumentView(
                         vZoom = newZoom
                         offset = Offset(newOffsetX, newOffsetY)
 
-                        // 边界检查
+                        // 边界检查 - 与移动端保持一致
                         if (orientation == Vertical) {
                             val scaledWidth = viewSize.width * vZoom
-                            val scaledHeight = pdfViewState.totalHeight
+                            // 在缩放过程中，需要根据当前缩放比例调整总高度
+                            val scaleRatio = vZoom / pdfViewState.vZoom
+                            val scaledHeight = pdfViewState.totalHeight * scaleRatio
                             val minX = minOf(0f, viewSize.width - scaledWidth)
                             val maxX = 0f
                             val minY =
@@ -575,7 +591,8 @@ public fun DesktopDocumentView(
                             )
                         } else {
                             val scaledHeight = viewSize.height * vZoom
-                            val scaledWidth = pdfViewState.totalWidth
+                            val scaleRatio = vZoom / pdfViewState.vZoom
+                            val scaledWidth = pdfViewState.totalWidth * scaleRatio
                             val minY = minOf(0f, viewSize.height - scaledHeight)
                             val maxY = 0f
                             val minX =
@@ -592,22 +609,27 @@ public fun DesktopDocumentView(
 
                     isShiftPressed -> {
                         // Shift + 滚轮 = 水平滚动
+                        val scrollMultiplier = 30f
                         val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                        val newX = (offset.x + scrollAmount.y * 50f).coerceIn(-maxX, 0f)
+                        val newX =
+                            (offset.x + scrollAmount.y * scrollMultiplier).coerceIn(-maxX, 0f)
                         offset = Offset(newX, offset.y)
                         pdfViewState.updateOffset(offset)
                     }
 
                     else -> {
-                        // 普通滚轮 = 垂直滚动
+                        // 普通滚轮 = 垂直滚动，调整滚动速度使其更流畅
+                        val scrollMultiplier = 30f // 降低滚动速度
                         if (orientation == Vertical) {
                             val maxY =
                                 (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                            val newY = (offset.y + scrollAmount.y * 50f).coerceIn(-maxY, 0f)
+                            val newY =
+                                (offset.y + scrollAmount.y * scrollMultiplier).coerceIn(-maxY, 0f)
                             offset = Offset(offset.x, newY)
                         } else {
                             val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                            val newX = (offset.x + scrollAmount.x * 50f).coerceIn(-maxX, 0f)
+                            val newX =
+                                (offset.x + scrollAmount.x * scrollMultiplier).coerceIn(-maxX, 0f)
                             offset = Offset(newX, offset.y)
                         }
                         pdfViewState.updateOffset(offset)
@@ -625,11 +647,12 @@ public fun DesktopDocumentView(
                 .fillMaxSize()
                 .background(Color.Transparent)
         ) {
-            val translateY = if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
-                (viewSize.height - pdfViewState.totalHeight) / 2
-            } else {
-                0f
-            }
+            val translateY =
+                if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
+                    (viewSize.height - pdfViewState.totalHeight) / 2
+                } else {
+                    0f
+                }
             translate(left = offset.x, top = offset.y + translateY) {
                 //只绘制可见区域.
                 /*val visibleRect = Rect(
