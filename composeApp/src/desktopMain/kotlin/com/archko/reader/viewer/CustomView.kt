@@ -364,7 +364,7 @@ fun CustomView(
             // 文档视图 - 占据剩余空间
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .clipToBounds() // 确保内容不会绘制到边界外
             ) {
                 if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
@@ -515,56 +515,57 @@ fun CustomView(
                         }
                     }
                 }
-            }
 
-            // 底部SeekBar - 可隐藏
-            AnimatedVisibility(
-                visible = showBottomToolbar
-            ) {
-                Surface(
-                    color = Color(0xCC222222),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                // 底部SeekBar - 覆盖在文档上方
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showBottomToolbar,
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 ) {
-                    var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-                    // 当currentPage变化时更新sliderValue
-                    LaunchedEffect(currentPage) {
-                        isExternalChange = true
-                        sliderValue = (currentPage + 1).toFloat()
-                        isExternalChange = false
-                    }
-                    Column(
+                    Surface(
+                        color = Color(0xCC222222),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                     ) {
-                        Text(
-                            text = "${sliderValue.toInt()} / $pageCount",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { sliderValue = it },
-                            valueRange = 1f..pageCount.toFloat(),
-                            steps = (pageCount - 2).coerceAtLeast(0),
-                            onValueChangeFinished = {
-                                if (!isExternalChange) {
-                                    val targetPage = sliderValue.toInt() - 1
-                                    if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                        jumpToPage = targetPage
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = Color.White,
-                                inactiveTrackColor = Color.Gray
+                        var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
+                        // 当currentPage变化时更新sliderValue
+                        LaunchedEffect(currentPage) {
+                            isExternalChange = true
+                            sliderValue = (currentPage + 1).toFloat()
+                            isExternalChange = false
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "${sliderValue.toInt()} / $pageCount",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
                             )
-                        )
+                            Slider(
+                                value = sliderValue,
+                                onValueChange = { sliderValue = it },
+                                valueRange = 1f..pageCount.toFloat(),
+                                steps = (pageCount - 2).coerceAtLeast(0),
+                                onValueChangeFinished = {
+                                    if (!isExternalChange) {
+                                        val targetPage = sliderValue.toInt() - 1
+                                        if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                            jumpToPage = targetPage
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color.White,
+                                    activeTrackColor = Color.White,
+                                    inactiveTrackColor = Color.Gray
+                                )
+                            )
+                        }
                     }
                 }
             }

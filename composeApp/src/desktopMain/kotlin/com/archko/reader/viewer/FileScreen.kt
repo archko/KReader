@@ -272,7 +272,7 @@ fun FileScreen(
                     initialZoom = viewModel.progress?.zoom ?: 1.0,
                     scrollOri = viewModel.progress?.scrollOri ?: 0,
                     reflow = viewModel.progress?.reflow ?: 0L,
-                    crop = 0L == viewModel.progress?.crop
+                    crop = false//0L == viewModel.progress?.crop
                 )
             }
         }
