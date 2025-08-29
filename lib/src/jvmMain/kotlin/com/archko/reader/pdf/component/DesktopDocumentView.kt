@@ -492,6 +492,8 @@ public fun DesktopDocumentView(
                             event.changes.forEach { if (it.positionChanged()) it.consume() }
                         } while (event.changes.any { it.pressed })
                     } finally {
+                        // 重新获取焦点，确保键盘事件能被捕获
+                        focusRequester.requestFocus()
                         // 如果没有拖拽，处理点击事件
                         if (!dragging && totalDrag.getDistance() < 10f) {
                             val tapOffset = down.position
@@ -552,6 +554,8 @@ public fun DesktopDocumentView(
             // 添加鼠标滚轮支持（支持多种模式）
             .onPointerEvent(PointerEventType.Scroll) { event ->
                 val scrollAmount = event.changes.firstOrNull()?.scrollDelta ?: return@onPointerEvent
+                // 滚轮事件时获取焦点
+                focusRequester.requestFocus()
                 // 暂时简化，只支持普通滚动，后续可以添加键盘修饰符检测
                 val isCtrlPressed = false
                 val isShiftPressed = false
