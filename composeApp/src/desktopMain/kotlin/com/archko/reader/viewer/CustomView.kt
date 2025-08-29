@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
@@ -279,9 +280,10 @@ fun CustomView(
             // 顶部工具栏 - 始终显示
             Surface(
                 color = Color(0xff000000),
+                shadowElevation = 8.dp, // 添加阴影确保层级
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
             ) {
                 Row(
                     modifier = Modifier
@@ -361,7 +363,9 @@ fun CustomView(
 
             // 文档视图 - 占据剩余空间
             Box(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .clipToBounds() // 确保内容不会绘制到边界外
             ) {
                 if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
                     // Reflow视图
