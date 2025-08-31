@@ -12,9 +12,11 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -183,13 +185,15 @@ public class PageNode(
                 if (!isScopeActive()) {
                     return@launch
                 }
-                if (!pdfViewState.isTileVisible(tileSpec)) {
-                    isDecoding = false
-                    return@launch
-                }
+                withContext(Dispatchers.Main) {
+                    if (!pdfViewState.isTileVisible(tileSpec)) {
+                        isDecoding = false
+                        return@withContext
+                    }
 
-                imageBitmap = bitmap
-                isDecoding = false
+                    imageBitmap = bitmap
+                    isDecoding = false
+                }
             }
         }
     }

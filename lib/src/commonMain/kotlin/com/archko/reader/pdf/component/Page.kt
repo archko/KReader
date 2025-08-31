@@ -14,9 +14,11 @@ import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -141,13 +143,15 @@ public class Page(
 
                 ImageCache.put(cacheKey, bitmap)
 
-                setAspectRatio(bitmap.width, bitmap.height)
+                withContext(Dispatchers.Main) {
+                    setAspectRatio(bitmap.width, bitmap.height)
 
-                // 这里不先检测,导致page的高计算不对.
-                if (!isScopeActive()) {
-                    return@launch
+                    // 这里不先检测,导致page的高计算不对.
+                    if (!isScopeActive()) {
+                        return@withContext
+                    }
+                    thumbBitmap = bitmap
                 }
-                thumbBitmap = bitmap
             } catch (_: Exception) {
             } finally {
                 thumbDecoding = false

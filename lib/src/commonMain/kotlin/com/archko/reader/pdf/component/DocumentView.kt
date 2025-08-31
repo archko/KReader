@@ -208,6 +208,7 @@ public fun DocumentView(
             pdfViewState.pages.forEach { page ->
                 page.recycle()
             }
+            ImageCache.clear()
             pdfViewState.invalidatePageSizes()
             pdfViewState.updateOffset(offset)
         }

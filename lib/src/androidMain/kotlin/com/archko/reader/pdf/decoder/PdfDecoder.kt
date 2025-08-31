@@ -504,6 +504,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                             bottomBound
                         )
 
+                        //println("PdfDecoder.cropBounds:$index, 原始尺寸=${originalPage.width}x${originalPage.height}, 切边区域=($cropBounds), 切边后尺寸=${pdfCropBounds}")
+                        if (pdfCropBounds.width < 0 || pdfCropBounds.height < 0) {
+                            aPage.cropBounds = Rect(0f, 0f, imageBitmap.width.toFloat(), imageBitmap.height.toFloat())
+                            return imageBitmap
+                        }
                         aPage.cropBounds = pdfCropBounds
 
                         // 在图片上绘制cropBounds矩形并保存（仅在第一次检测时）
