@@ -140,12 +140,14 @@ public class Page(
                 )
 
                 ImageCache.put(cacheKey, bitmap)
+
+                setAspectRatio(bitmap.width, bitmap.height)
+
+                // 这里不先检测,导致page的高计算不对.
                 if (!isScopeActive()) {
                     return@launch
                 }
                 thumbBitmap = bitmap
-
-                setAspectRatio(bitmap.width, bitmap.height)
             } catch (_: Exception) {
             } finally {
                 thumbDecoding = false
@@ -155,7 +157,7 @@ public class Page(
 
     private fun CoroutineScope.isScopeActive(): Boolean {
         if (!isActive || pdfViewState.isShutdown()) {
-            println("[Page.loadThumbnail] page=PdfViewState已关闭")
+            println("[Page.loadThumbnail] page=PdfViewState已关闭:${aPage.index}")
             thumbDecoding = false
             return false
         }

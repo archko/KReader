@@ -436,7 +436,7 @@ public fun DesktopDocumentView(
                             val contentY = offsetTap.y - offset.y
 
                             val linkHandled = pdfViewState.handleClick(contentX, contentY)
-                            println("DocumentView.onTap: 链接处理结果: $linkHandled")
+                            //println("DocumentView.onTap: 链接处理结果: $linkHandled")
 
                             // 如果没有处理链接，再处理翻页逻辑
                             if (!linkHandled) {

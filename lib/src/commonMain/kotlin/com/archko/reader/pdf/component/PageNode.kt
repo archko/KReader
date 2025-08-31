@@ -35,16 +35,16 @@ public class PageNode(
     ): Rect {
         return if (pdfViewState.orientation == Vertical) {
             // 使用向下取整和向上取整来避免间隙
-            val left = kotlin.math.floor(bounds.left * pageWidth).toFloat()
-            val top = kotlin.math.floor(bounds.top * pageHeight + yOffset).toFloat()
-            val right = kotlin.math.ceil(bounds.right * pageWidth).toFloat()
-            val bottom = kotlin.math.ceil(bounds.bottom * pageHeight + yOffset).toFloat()
+            val left = floor(bounds.left * pageWidth)
+            val top = floor(bounds.top * pageHeight + yOffset)
+            val right = ceil(bounds.right * pageWidth)
+            val bottom = ceil(bounds.bottom * pageHeight + yOffset)
             Rect(left, top, right, bottom)
         } else {
-            val left = kotlin.math.floor(bounds.left * pageWidth + xOffset).toFloat()
-            val top = kotlin.math.floor(bounds.top * pageHeight).toFloat()
-            val right = kotlin.math.ceil(bounds.right * pageWidth + xOffset).toFloat()
-            val bottom = kotlin.math.ceil(bounds.bottom * pageHeight).toFloat()
+            val left = floor(bounds.left * pageWidth + xOffset)
+            val top = floor(bounds.top * pageHeight)
+            val right = ceil(bounds.right * pageWidth + xOffset)
+            val bottom = ceil(bounds.bottom * pageHeight)
             Rect(left, top, right, bottom)
         }
     }
@@ -86,18 +86,17 @@ public class PageNode(
             return
         }
         if (!isVisible(drawScope, offset, pixelRect, aPage.index)) {
-            // 可选：失效时释放图片并取消解码
             recycle()
             return
         }
 
-        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${imageBitmap?.width}x${imageBitmap?.height}")
         if (imageBitmap != null) {
+            //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${imageBitmap?.width}x${imageBitmap?.height}")
             // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
-            val dstLeft = kotlin.math.floor(pixelRect.left).toInt()
-            val dstTop = kotlin.math.floor(pixelRect.top).toInt()
-            val dstWidth = kotlin.math.ceil(pixelRect.width).toInt()
-            val dstHeight = kotlin.math.ceil(pixelRect.height).toInt()
+            val dstLeft = floor(pixelRect.left).toInt()
+            val dstTop = floor(pixelRect.top).toInt()
+            val dstWidth = ceil(pixelRect.width).toInt()
+            val dstHeight = ceil(pixelRect.height).toInt()
             
             drawScope.drawImage(
                 imageBitmap!!,
@@ -108,7 +107,6 @@ public class PageNode(
             decode(totalScale, pageWidth, pageHeight)
         }
 
-        // 绘制PageNode框架用于调试
         /*drawScope.drawRect(
             color = Color.Red,
             topLeft = Offset(pixelRect.left, pixelRect.top),
@@ -165,7 +163,7 @@ public class PageNode(
                     top = bounds.top * pageHeight + top,
                     right = bounds.right * pageWidth + left,
                     bottom = bounds.bottom * pageHeight + top
-                )
+                    )
                 //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
                 val outWidth = ((srcRect.right - srcRect.left)).toInt()
                 val outHeight = ((srcRect.bottom - srcRect.top)).toInt()

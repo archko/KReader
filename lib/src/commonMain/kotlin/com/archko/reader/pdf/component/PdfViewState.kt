@@ -154,7 +154,7 @@ public class PdfViewState(
                 val scaledPageHeight = viewSize.height * vZoom
                 list.zip(pages).forEach { (aPage, page) ->
                     // 根据是否有切边选择不同的尺寸计算方式
-                    val pageScale = if (aPage.hasCrop()) {
+                    val pageScale = if (cropEnabled && aPage.hasCrop()) {
                         // 有切边：使用切边后的尺寸
                         scaledPageHeight / aPage.getHeight(true)
                     } else {
@@ -162,7 +162,7 @@ public class PdfViewState(
                         scaledPageHeight / aPage.getHeight(false)
                     }
 
-                    val scaledPageWidth = if (aPage.hasCrop()) {
+                    val scaledPageWidth = if (cropEnabled && aPage.hasCrop()) {
                         aPage.getWidth(true) * pageScale
                     } else {
                         aPage.getWidth(false) * pageScale
@@ -181,7 +181,7 @@ public class PdfViewState(
                 }
                 totalWidth = currentX
                 totalHeight = viewSize.height * vZoom
-                println("PdfViewState: 横向模式 - totalWidth: $totalWidth, totalHeight: $totalHeight, 页面数: ${pages.size}")
+                //println("PdfViewState: 横向模式 - totalWidth: $totalWidth, totalHeight: $totalHeight, 页面数: ${pages.size}")
             }
             init = true
         }

@@ -510,7 +510,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                         //drawCropBoundsOnBitmap(imageBitmap, cropBounds, index)
 
                         // 真正对图片进行切边处理
-                        val croppedBitmap = cropImageBitmap(imageBitmap, cropBounds)
+                        val croppedBitmap = cropImageBitmap(index, imageBitmap, cropBounds)
                         return croppedBitmap
                     }
                 }
@@ -542,7 +542,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 对图片进行切边处理
      */
-    private fun cropImageBitmap(originalBitmap: ImageBitmap, cropBounds: Rect): ImageBitmap {
+    private fun cropImageBitmap(index: Int, originalBitmap: ImageBitmap, cropBounds: Rect): ImageBitmap {
         val cropX = cropBounds.left.toInt()
         val cropY = cropBounds.top.toInt()
         val cropWidth = (cropBounds.right - cropX).toInt()
@@ -566,7 +566,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         val croppedImageBitmap = croppedAndroidBitmap.asImageBitmap()
 
-        println("PdfDecoder.cropImageBitmap: 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight), 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
+        println("PdfDecoder.cropImageBitmap:$index, 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight), 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
 
         return croppedImageBitmap
     }
