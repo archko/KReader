@@ -502,7 +502,7 @@ public fun DocumentView(
                             if (velocitySquared > velocityThreshold) {
                                 val decayAnimationSpec =
                                     exponentialDecay<Float>(
-                                        frictionMultiplier = 0.35f,
+                                        frictionMultiplier = 0.3f,
                                         absVelocityThreshold = 0.45f
                                     )
                                 isFlingActive = true
