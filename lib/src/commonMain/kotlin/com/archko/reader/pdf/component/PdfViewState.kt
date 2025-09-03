@@ -145,7 +145,7 @@ public class PdfViewState(
                     // 直接用最终宽高初始化Page
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
                     currentY += scaledPageHeight
-                    //println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
+                    //println("PdfViewState.page=${aPage.index}, pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }
                 totalHeight = currentY
                 totalWidth = viewSize.width * vZoom

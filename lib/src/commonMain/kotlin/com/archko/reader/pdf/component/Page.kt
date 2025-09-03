@@ -13,12 +13,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -90,14 +85,14 @@ public class Page(
             val cropBounds = aPage.cropBounds!!
             val relativeX = pageX / bounds.width
             val relativeY = pageY / bounds.height
-            
+
             pdfX = cropBounds.left + relativeX * cropBounds.width
             pdfY = cropBounds.top + relativeY * cropBounds.height
         } else {
             // 无切边：直接按比例转换
             val relativeX = pageX / bounds.width
             val relativeY = pageY / bounds.height
-            
+
             pdfX = relativeX * aPage.width
             pdfY = relativeY * aPage.height
         }
@@ -129,32 +124,24 @@ public class Page(
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
             if (!isScopeActive()) {
+                thumbDecoding = false
                 return@launch
             }
 
-            try {
-                val bitmap = pdfViewState.state.renderPage(
-                    aPage,
-                    pdfViewState.viewSize,
-                    thumbWidth,
-                    thumbHeight,
-                    pdfViewState.isCropEnabled()
-                )
+            val bitmap = pdfViewState.state.renderPage(
+                aPage,
+                pdfViewState.viewSize,
+                thumbWidth,
+                thumbHeight,
+                pdfViewState.isCropEnabled()
+            )
 
-                ImageCache.put(cacheKey, bitmap)
+            ImageCache.put(cacheKey, bitmap)
 
-                withContext(Dispatchers.Main) {
-                    setAspectRatio(bitmap.width, bitmap.height)
-
-                    // 这里不先检测,导致page的高计算不对.
-                    if (!isScopeActive()) {
-                        return@withContext
-                    }
-                    thumbBitmap = bitmap
-                }
-            } catch (_: Exception) {
-            } finally {
+            withContext(Dispatchers.Main) {
                 thumbDecoding = false
+                thumbBitmap = bitmap
+                setAspectRatio(bitmap.width, bitmap.height)
             }
         }
     }
@@ -200,7 +187,7 @@ public class Page(
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
         // 计算当前缩放下的实际显示尺寸和位置
-        // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变
+        // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变,直接用bounds在缩放的时候会白屏
         val scaleRatio = vZoom / pdfViewState.vZoom
         val currentBounds = Rect(
             bounds.left * scaleRatio,
@@ -238,17 +225,18 @@ public class Page(
                 dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
             )
 
-            // 再绘制高清块
-            nodes.forEach { node ->
-                node.draw(
-                    drawScope,
-                    offset,
-                    currentWidth,
-                    currentHeight,
-                    currentBounds.left,
-                    currentBounds.top,
-                    totalScale
-                )
+            if (!pdfViewState.isCropEnabled() || (pdfViewState.isCropEnabled() && aPage.cropBounds != null)) {
+                // 再绘制高清块
+                nodes.forEach { node ->
+                    node.draw(
+                        drawScope,
+                        offset,
+                        currentWidth,
+                        currentHeight,
+                        currentBounds.left,
+                        currentBounds.top,
+                    )
+                }
             }
 
             // 加载链接（在缩略图加载完成后）
@@ -281,17 +269,18 @@ public class Page(
             val linkRect = if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
                 // 有切边且启用切边：link的bbox是原始PDF坐标，需要转换为切边后的相对坐标
                 val cropBounds = aPage.cropBounds!!
-                
+
                 // 检查link是否在切边区域内
                 if (bbox.left >= cropBounds.left && bbox.top >= cropBounds.top &&
-                    bbox.right <= cropBounds.right && bbox.bottom <= cropBounds.bottom) {
-                    
+                    bbox.right <= cropBounds.right && bbox.bottom <= cropBounds.bottom
+                ) {
+
                     // 转换为切边后的相对坐标，然后缩放到屏幕坐标
                     val relativeLeft = (bbox.left - cropBounds.left) / cropBounds.width
                     val relativeTop = (bbox.top - cropBounds.top) / cropBounds.height
                     val relativeRight = (bbox.right - cropBounds.left) / cropBounds.width
                     val relativeBottom = (bbox.bottom - cropBounds.top) / cropBounds.height
-                    
+
                     Rect(
                         left = currentBounds.left + relativeLeft * currentBounds.width,
                         top = currentBounds.top + relativeTop * currentBounds.height,
@@ -308,7 +297,7 @@ public class Page(
                 val relativeTop = bbox.top / aPage.height
                 val relativeRight = bbox.right / aPage.width
                 val relativeBottom = bbox.bottom / aPage.height
-                
+
                 Rect(
                     left = currentBounds.left + relativeLeft * currentBounds.width,
                     top = currentBounds.top + relativeTop * currentBounds.height,

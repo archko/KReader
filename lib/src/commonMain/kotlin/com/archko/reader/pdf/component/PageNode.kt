@@ -5,18 +5,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -79,7 +79,6 @@ public class PageNode(
         pageHeight: Float,
         xOffset: Float,
         yOffset: Float,
-        totalScale: Float
     ) {
         val pixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset)
         // 页码合法性判断，防止越界
@@ -99,30 +98,31 @@ public class PageNode(
             val dstTop = floor(pixelRect.top).toInt()
             val dstWidth = ceil(pixelRect.width).toInt()
             val dstHeight = ceil(pixelRect.height).toInt()
-            
+
             drawScope.drawImage(
                 imageBitmap!!,
                 dstOffset = IntOffset(dstLeft, dstTop),
                 dstSize = IntSize(dstWidth, dstHeight)
             )
         } else {
-            decode(totalScale, pageWidth, pageHeight)
+            decode(pageWidth, pageHeight)
         }
 
         /*drawScope.drawRect(
             color = Color.Red,
             topLeft = Offset(pixelRect.left, pixelRect.top),
             size = androidx.compose.ui.geometry.Size(pixelRect.width, pixelRect.height),
-            style = Stroke(width = 2f)
+            style = Stroke(width = 4f)
         )*/
     }
 
-    private fun decode(totalScale: Float, pageWidth: Float, pageHeight: Float) {
+    private fun decode(pageWidth: Float, pageHeight: Float) {
         if (!isDecoding) {
             isDecoding = true
             decodeJob = pdfViewState.decodeScope.launch {
                 // 解码前判断可见性和协程活跃性
                 if (!isScopeActive()) {
+                    isDecoding = false
                     return@launch
                 }
 
@@ -156,17 +156,17 @@ public class PageNode(
 
                 val left =
                     (if (null != aPage.cropBounds && pdfViewState.isCropEnabled()) aPage.cropBounds!!.left
-                    else 0f) * pageWidth / width
+                    else 1f) * pageWidth / width
                 val top =
                     (if (null != aPage.cropBounds && pdfViewState.isCropEnabled()) aPage.cropBounds!!.top
-                    else 0f) * pageHeight / height
+                    else 1f) * pageHeight / height
                 val srcRect = Rect(
                     left = bounds.left * pageWidth + left,
                     top = bounds.top * pageHeight + top,
                     right = bounds.right * pageWidth + left,
                     bottom = bounds.bottom * pageHeight + top
-                    )
-                //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
+                )
+                println("[PageNode].decode page=${aPage.index}, $pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
                 val outWidth = ((srcRect.right - srcRect.left)).toInt()
                 val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
 
@@ -183,17 +183,17 @@ public class PageNode(
 
                 // 解码后再次判断可见性和协程活跃性
                 if (!isScopeActive()) {
+                    isDecoding = false
                     return@launch
                 }
-                withContext(Dispatchers.Main) {
-                    if (!pdfViewState.isTileVisible(tileSpec)) {
-                        isDecoding = false
-                        return@withContext
-                    }
 
-                    imageBitmap = bitmap
+                if (!pdfViewState.isTileVisible(tileSpec)) {
                     isDecoding = false
+                    return@launch
                 }
+
+                imageBitmap = bitmap
+                isDecoding = false
             }
         }
     }
