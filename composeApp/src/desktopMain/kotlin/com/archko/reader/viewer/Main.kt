@@ -21,8 +21,17 @@ import com.archko.reader.pdf.viewmodel.PdfViewModel
 import org.jetbrains.skiko.setSystemLookAndFeel
 
 @OptIn(ExperimentalComposeUiApi::class)
-fun main() {
+fun main(args: Array<String>) {
     setSystemLookAndFeel()
+
+    // 处理命令行参数，获取要打开的文件路径
+    val initialFilePath = if (args.isNotEmpty()) {
+        args[0] // 第一个参数作为文件路径
+    } else {
+        null
+    }
+
+    println("启动应用，初始文件路径: $initialFilePath")
 
     singleWindowApplication(
         title = "Dragon Viewer",
@@ -52,7 +61,7 @@ fun main() {
         CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
             val viewModel: PdfViewModel = viewModel()
             viewModel.database = database
-            FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel)
+            FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel, initialFilePath)
         }
 
     }

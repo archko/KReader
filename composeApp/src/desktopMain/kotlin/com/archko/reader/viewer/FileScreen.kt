@@ -74,6 +74,7 @@ fun FileScreen(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
+    initialFilePath: String? = null,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {}
 ) {
@@ -86,6 +87,20 @@ fun FileScreen(
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
+            
+            // 如果有初始文件路径，直接打开该文件
+            initialFilePath?.let { filePath ->
+                val file = File(filePath)
+                if (file.exists() && (FileTypeUtils.isValidImageFile(file)
+                    || FileTypeUtils.isDocumentFile(file.absolutePath)
+                    || FileTypeUtils.isTiffFile(file.absolutePath))) {
+                    
+                    // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
+                    viewModel.getProgress(file.absolutePath)
+                    val startPage = viewModel.progress?.page?.toInt() ?: 0
+                    openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                }
+            }
         }
 
         Surface(
