@@ -1,14 +1,14 @@
 [versions]
 #compose = "1.7.8"
-compose-multiplatform = "1.9.0-beta01"
+compose-multiplatform = "1.9.0-rc01"
 
 kotlin = "2.1.20"
 agp = "8.10.1"
 
 androidx-activityCompose = "1.10.1"
-jetbrains-lifecycle = "2.9.1"
+jetbrains-lifecycle = "2.9.3"
 androidx-room = "2.7.2"
-androidx-navigation = "2.9.0-beta04"
+androidx-navigation = "2.9.0-rc01"
 sqlite = "2.5.2"
 coil = "3.3.0"
 ktor = "3.3.0"
@@ -18,7 +18,7 @@ ksp = "2.1.20-2.0.0"
 
 calf = "0.8.0"
 mupdfFitz = "1.25.1"
-mupdfFitzAar = "1.25.0"
+mupdfFitzAar = "1.26.4"
 mmkv-kotlin = "1.2.16"
 core = "1.16.0"
 lifecycleViewmodelComposeAndroid = "2.9.2"
