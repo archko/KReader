@@ -5,12 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.cache.BitmapState
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -100,7 +99,7 @@ public class PageNode(
             val dstTop = floor(pixelRect.top).toInt()
             val dstWidth = ceil(pixelRect.width).toInt()
             val dstHeight = ceil(pixelRect.height).toInt()
-            
+
             drawScope.drawImage(
                 state.bitmap,
                 dstOffset = IntOffset(dstLeft, dstTop),
@@ -161,16 +160,16 @@ public class PageNode(
 
                 val left =
                     (if (null != aPage.cropBounds && pdfViewState.isCropEnabled()) aPage.cropBounds!!.left
-                    else 0f) * pageWidth / width
+                    else 1f) * pageWidth / width
                 val top =
                     (if (null != aPage.cropBounds && pdfViewState.isCropEnabled()) aPage.cropBounds!!.top
-                    else 0f) * pageHeight / height
+                    else 1f) * pageHeight / height
                 val srcRect = Rect(
                     left = bounds.left * pageWidth + left,
                     top = bounds.top * pageHeight + top,
                     right = bounds.right * pageWidth + left,
                     bottom = bounds.bottom * pageHeight + top
-                    )
+                )
                 //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
                 val outWidth = ((srcRect.right - srcRect.left)).toInt()
                 val outHeight = ((srcRect.bottom - srcRect.top)).toInt()

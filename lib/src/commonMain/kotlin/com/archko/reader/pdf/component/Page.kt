@@ -118,7 +118,8 @@ public class Page(
         val thumbHeight = (aPage.height / ratio).toInt()
 
         val cacheKey = cachedCacheKey ?: run {
-            val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
+            val cacheKey =
+                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
             cacheKey
         }
@@ -142,32 +143,22 @@ public class Page(
                 return@launch
             }
 
-            try {
-                val bitmap = pdfViewState.state.renderPage(
-                    aPage,
-                    pdfViewState.viewSize,
-                    thumbWidth,
-                    thumbHeight,
-                    pdfViewState.isCropEnabled()
-                )
+            val bitmap = pdfViewState.state.renderPage(
+                aPage,
+                pdfViewState.viewSize,
+                thumbWidth,
+                thumbHeight,
+                pdfViewState.isCropEnabled()
+            )
 
-                // 使用新的安全缓存
-                val newState = ImageCache.put(cacheKey, bitmap)
+            // 使用新的安全缓存
+            val newState = ImageCache.put(cacheKey, bitmap)
 
-                withContext(Dispatchers.Main) {
-                    setAspectRatio(bitmap.width, bitmap.height)
-
-                    if (!isScopeActive()) {
-                        ImageCache.release(newState)
-                        return@withContext
-                    }
-
-                    thumbBitmapState?.let { ImageCache.release(it) }
-                    thumbBitmapState = newState
-                }
-            } catch (_: Exception) {
-            } finally {
+            withContext(Dispatchers.Main) {
                 thumbDecoding = false
+                thumbBitmapState?.let { ImageCache.release(it) }
+                thumbBitmapState = newState
+                setAspectRatio(bitmap.width, bitmap.height)
             }
         }
     }
