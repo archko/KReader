@@ -146,7 +146,7 @@ public class PdfViewState(
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
                     page.invalidateNodes()
                     currentY += scaledPageHeight
-                    //println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
+                    //println("PdfViewState.page=${aPage.index}, pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }
                 totalHeight = currentY
                 totalWidth = viewSize.width * vZoom

@@ -129,7 +129,7 @@ public class Page(
             thumbBitmapState = cachedState
             return
         }
-        
+
         // 开始解码
         startThumbnailDecoding(cacheKey, thumbWidth, thumbHeight)
     }
@@ -138,6 +138,7 @@ public class Page(
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
             if (!isScopeActive()) {
+                thumbDecoding = false
                 return@launch
             }
 
@@ -212,7 +213,7 @@ public class Page(
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
         // 计算当前缩放下的实际显示尺寸和位置
-        // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变
+        // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变,直接用bounds在缩放的时候会白屏
         val scaleRatio = vZoom / pdfViewState.vZoom
         val currentBounds = Rect(
             bounds.left * scaleRatio,

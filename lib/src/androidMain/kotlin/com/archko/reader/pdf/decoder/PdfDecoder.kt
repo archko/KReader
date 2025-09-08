@@ -23,7 +23,7 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.BitmapUtils
-import com.archko.reader.pdf.util.CropUtils
+import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
@@ -463,7 +463,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val patchY = cropBounds.top.toInt() * scale
                 val height = scale * cropBounds.height
                 val bitmap = acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
-                //println("PdfDecoder.renderPage: $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY")
+                println("PdfDecoder.renderPage:page=$index, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
                 val imageBitmap = bitmap.asImageBitmap()
@@ -486,7 +486,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val imageBitmap = bitmap.asImageBitmap()
                 // 如果启用了切边功能但没有cropBounds，检测并设置
                 if (crop) {
-                    val cropBounds = CropUtils.detectCropBounds(imageBitmap)
+                    val cropBounds = SmartCropUtils.detectSmartCropBounds(imageBitmap)
                     if (cropBounds != null) {
                         // 将缩略图坐标转换为原始PDF坐标
                         val originalPage = originalPageSizes[index]
@@ -504,7 +504,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                             bottomBound
                         )
 
-                        //println("PdfDecoder.cropBounds:$index, 原始尺寸=${originalPage.width}x${originalPage.height}, 切边区域=($cropBounds), 切边后尺寸=${pdfCropBounds}")
+                        println("PdfDecoder.cropBounds:$index, 原始尺寸=${originalPage.width}x${originalPage.height}, 切边区域=($cropBounds), 切边后尺寸=${pdfCropBounds}")
                         if (pdfCropBounds.width < 0 || pdfCropBounds.height < 0) {
                             aPage.cropBounds = Rect(0f, 0f, imageBitmap.width.toFloat(), imageBitmap.height.toFloat())
                             return imageBitmap

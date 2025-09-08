@@ -124,6 +124,7 @@ public class PageNode(
             decodeJob = pdfViewState.decodeScope.launch {
                 // 解码前判断可见性和协程活跃性
                 if (!isScopeActive()) {
+                    isDecoding = false
                     return@launch
                 }
 
@@ -186,6 +187,7 @@ public class PageNode(
                 val newState = ImageCache.put(cacheKey, bitmap)
 
                 if (!isScopeActive()) {
+                    isDecoding = false
                     ImageCache.release(newState)
                     return@launch
                 }
