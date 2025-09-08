@@ -6,10 +6,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
@@ -40,7 +40,7 @@ public class Page(
     //page bound, should be caculate after view measured
     internal var bounds = Rect(0f, 0f, 1f, 1f)
 
-    private var thumbBitmap by mutableStateOf<ImageBitmap?>(null)
+    private var thumbBitmapState by mutableStateOf<BitmapState?>(null)
     private var thumbDecoding = false
     private var thumbJob: Job? = null
     private var aspectRatio = 0f
@@ -53,7 +53,8 @@ public class Page(
     private var linksLoaded = false
 
     public fun recycleThumb() {
-        thumbBitmap = null
+        thumbBitmapState?.let { ImageCache.release(it) }
+        thumbBitmapState = null
         thumbDecoding = false
         thumbJob?.cancel()
         thumbJob = null
@@ -90,14 +91,14 @@ public class Page(
             val cropBounds = aPage.cropBounds!!
             val relativeX = pageX / bounds.width
             val relativeY = pageY / bounds.height
-            
+
             pdfX = cropBounds.left + relativeX * cropBounds.width
             pdfY = cropBounds.top + relativeY * cropBounds.height
         } else {
             // 无切边：直接按比例转换
             val relativeX = pageX / bounds.width
             val relativeY = pageY / bounds.height
-            
+
             pdfX = relativeX * aPage.width
             pdfY = relativeY * aPage.height
         }
@@ -121,11 +122,19 @@ public class Page(
             cachedCacheKey = cacheKey
             cacheKey
         }
-        val cached = ImageCache.get(cacheKey)
-        if (cached != null) {
-            thumbBitmap = cached
+
+        val cachedState = ImageCache.acquire(cacheKey)
+        if (cachedState != null) {
+            thumbBitmapState?.let { ImageCache.release(it) }
+            thumbBitmapState = cachedState
             return
         }
+        
+        // 开始解码
+        startThumbnailDecoding(cacheKey, thumbWidth, thumbHeight)
+    }
+
+    private fun startThumbnailDecoding(cacheKey: String, thumbWidth: Int, thumbHeight: Int) {
         thumbDecoding = true
         thumbJob = pdfViewState.decodeScope.launch {
             if (!isScopeActive()) {
@@ -141,16 +150,19 @@ public class Page(
                     pdfViewState.isCropEnabled()
                 )
 
-                ImageCache.put(cacheKey, bitmap)
+                // 使用新的安全缓存
+                val newState = ImageCache.put(cacheKey, bitmap)
 
                 withContext(Dispatchers.Main) {
                     setAspectRatio(bitmap.width, bitmap.height)
 
-                    // 这里不先检测,导致page的高计算不对.
                     if (!isScopeActive()) {
+                        ImageCache.release(newState)
                         return@withContext
                     }
-                    thumbBitmap = bitmap
+
+                    thumbBitmapState?.let { ImageCache.release(it) }
+                    thumbBitmapState = newState
                 }
             } catch (_: Exception) {
             } finally {
@@ -217,23 +229,28 @@ public class Page(
         val thumbWidth = 300
         val thumbHeight = (aPage.height / ratio).toInt()
         val cacheKey = cachedCacheKey ?: run {
-            val cacheKey = "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
+            val cacheKey =
+                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
             cacheKey
         }
 
-        if (thumbBitmap == null) {
-            thumbBitmap = ImageCache.get(cacheKey)
+        // 尝试获取缓存的缩略图
+        if (thumbBitmapState == null) {
+            val cachedState = ImageCache.acquire(cacheKey)
+            if (cachedState != null) {
+                thumbBitmapState = cachedState
+            }
         }
 
-        //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmap")
+        //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
 
         // 优先绘制缩略图
-        if (null != thumbBitmap) {
+        thumbBitmapState?.let { state ->
             val currentWidth = width * scaleRatio
             val currentHeight = height * scaleRatio
             drawScope.drawImage(
-                image = thumbBitmap!!,
+                image = state.bitmap,
                 dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
                 dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
             )
@@ -258,7 +275,7 @@ public class Page(
 
             // 绘制链接区域（调试用，可以注释掉）
             drawLinks(drawScope, currentBounds, scaleRatio)
-        } else {
+        } ?: run {
             if (!thumbDecoding) {
                 loadThumbnail()
             }
@@ -281,17 +298,18 @@ public class Page(
             val linkRect = if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
                 // 有切边且启用切边：link的bbox是原始PDF坐标，需要转换为切边后的相对坐标
                 val cropBounds = aPage.cropBounds!!
-                
+
                 // 检查link是否在切边区域内
                 if (bbox.left >= cropBounds.left && bbox.top >= cropBounds.top &&
-                    bbox.right <= cropBounds.right && bbox.bottom <= cropBounds.bottom) {
-                    
+                    bbox.right <= cropBounds.right && bbox.bottom <= cropBounds.bottom
+                ) {
+
                     // 转换为切边后的相对坐标，然后缩放到屏幕坐标
                     val relativeLeft = (bbox.left - cropBounds.left) / cropBounds.width
                     val relativeTop = (bbox.top - cropBounds.top) / cropBounds.height
                     val relativeRight = (bbox.right - cropBounds.left) / cropBounds.width
                     val relativeBottom = (bbox.bottom - cropBounds.top) / cropBounds.height
-                    
+
                     Rect(
                         left = currentBounds.left + relativeLeft * currentBounds.width,
                         top = currentBounds.top + relativeTop * currentBounds.height,
@@ -308,7 +326,7 @@ public class Page(
                 val relativeTop = bbox.top / aPage.height
                 val relativeRight = bbox.right / aPage.width
                 val relativeBottom = bbox.bottom / aPage.height
-                
+
                 Rect(
                     left = currentBounds.left + relativeLeft * currentBounds.width,
                     top = currentBounds.top + relativeTop * currentBounds.height,
@@ -406,7 +424,7 @@ public class Page(
         return TileConfig(xBlocks, yBlocks)
     }
 
-    private fun invalidateNodes() {
+    public fun invalidateNodes() {
         val config = calculateTileConfig(width, height)
         //println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
         if (config == currentTileConfig) {

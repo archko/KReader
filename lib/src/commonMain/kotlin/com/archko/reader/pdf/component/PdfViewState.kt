@@ -144,6 +144,7 @@ public class PdfViewState(
                     )
                     // 直接用最终宽高初始化Page
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
+                    page.invalidateNodes()
                     currentY += scaledPageHeight
                     //println("PdfViewState.pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }

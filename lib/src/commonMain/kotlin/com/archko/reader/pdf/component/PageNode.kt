@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,13 +56,13 @@ public class PageNode(
     public val cacheKey: String
         get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pdfViewState.vZoom}-${pdfViewState.orientation}-${pdfViewState.isCropEnabled()}"
 
-    private var imageBitmap by mutableStateOf<ImageBitmap?>(null)
+    private var bitmapState by mutableStateOf<BitmapState?>(null)
     private var isDecoding = false
     private var decodeJob: Job? = null
 
     public fun recycle() {
-        imageBitmap = null
-        // TODO: 如果有Bitmap缓存池，可以在这里回收bitmap
+        bitmapState?.let { ImageCache.release(it) }
+        bitmapState = null
         isDecoding = false
         decodeJob?.cancel()
         decodeJob = null
@@ -92,8 +93,8 @@ public class PageNode(
             return
         }
 
-        if (imageBitmap != null) {
-            //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${imageBitmap?.width}x${imageBitmap?.height}")
+        bitmapState?.let { state ->
+            //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${state.bitmap.width}x${state.bitmap.height}")
             // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
             val dstLeft = floor(pixelRect.left).toInt()
             val dstTop = floor(pixelRect.top).toInt()
@@ -101,12 +102,12 @@ public class PageNode(
             val dstHeight = ceil(pixelRect.height).toInt()
             
             drawScope.drawImage(
-                imageBitmap!!,
+                state.bitmap,
                 dstOffset = IntOffset(dstLeft, dstTop),
                 dstSize = IntSize(dstWidth, dstHeight)
             )
-        } else {
-            decode(totalScale, pageWidth, pageHeight)
+        } ?: run {
+            decode(pageWidth, pageHeight)
         }
 
         /*drawScope.drawRect(
@@ -117,7 +118,7 @@ public class PageNode(
         )*/
     }
 
-    private fun decode(totalScale: Float, pageWidth: Float, pageHeight: Float) {
+    private fun decode(pageWidth: Float, pageHeight: Float) {
         if (!isDecoding) {
             isDecoding = true
             decodeJob = pdfViewState.decodeScope.launch {
@@ -126,10 +127,13 @@ public class PageNode(
                     return@launch
                 }
 
-                // 先查缓存
-                val cacheBitmap = ImageCache.get(cacheKey)
-                if (cacheBitmap != null) {
-                    imageBitmap = cacheBitmap
+                // 先查安全缓存
+                val cachedState = ImageCache.acquire(cacheKey)
+                if (cachedState != null) {
+                    withContext(Dispatchers.Main) {
+                        bitmapState?.let { ImageCache.release(it) }
+                        bitmapState = cachedState
+                    }
                     isDecoding = false
                     return@launch
                 }
@@ -179,10 +183,10 @@ public class PageNode(
                     outHeight
                 )
 
-                ImageCache.put(cacheKey, bitmap)
+                val newState = ImageCache.put(cacheKey, bitmap)
 
-                // 解码后再次判断可见性和协程活跃性
                 if (!isScopeActive()) {
+                    ImageCache.release(newState)
                     return@launch
                 }
                 withContext(Dispatchers.Main) {
@@ -191,7 +195,8 @@ public class PageNode(
                         return@withContext
                     }
 
-                    imageBitmap = bitmap
+                    bitmapState?.let { ImageCache.release(it) }
+                    bitmapState = newState
                     isDecoding = false
                 }
             }

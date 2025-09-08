@@ -1,120 +1,303 @@
 package com.archko.reader.pdf.cache
 
 import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-private const val MAX_IMAGE_COUNT = 48 // 主缓存最大图片数
-private const val CANDIDATE_TIMEOUT = 3000L // 候选池图片最大保留时间（毫秒）
-private const val MAX_CANDIDATE_COUNT = 32 // 候选池最大图片数，防止内存泄漏
+private const val CANDIDATE_TIMEOUT = 5000L
+private var MAX_MEMORY_BYTES = 128 * 1024 * 1024L
+private var MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 3
 
 /**
- * 通用Kotlin LRU缓存实现，支持Compose多平台。
- * 1. 主缓存LRU，满时淘汰最久未用的1/3图片。
- * 2. 淘汰图片进入二级候选池，延迟回收，短时间内可复用。
- * 3. 候选池超时或超量时自动回收，防止内存泄漏。
- * 4. 回收时可安全交给BitmapPool（Android端）。
+ * Bitmap状态管理器，解决并发访问和生命周期问题
+ * 使用引用计数确保正在使用的bitmap不会被回收
  */
-public object ImageCache {
-    private val cache = object : LinkedHashMap<String, ImageBitmap>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean {
-            return false // 手动控制淘汰
-        }
-    }
-
-    // 二级候选池，key->(图片,进入时间)
-    private val candidatePool = mutableMapOf<String, Pair<ImageBitmap, Long>>()
-
-    @Synchronized
-    public fun get(key: String): ImageBitmap? {
-        cache[key]?.let { return it }
-        candidatePool[key]?.let { (img, ts) ->
-            if (System.currentTimeMillis() - ts < CANDIDATE_TIMEOUT) {
-                // 未超时，直接复用
-                cache[key] = img
-                candidatePool.remove(key)
-                cleanCandidatePool()
-                return img
-            } else {
-                // 超时，安全回收
-                recycleImageBitmap(img)
-                candidatePool.remove(key)
-                cleanCandidatePool()
+public class BitmapState(
+    public val bitmap: ImageBitmap,
+    public val key: String
+) {
+    private val mutex = Mutex()
+    private var referenceCount = 0
+    private var isRecycled = false
+    
+    /**
+     * 获取bitmap的使用权，增加引用计数
+     */
+    public fun acquire(): Boolean {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                if (isRecycled) {
+                    return@withLock false
+                }
+                referenceCount++
+                return@withLock true
             }
         }
-        cleanCandidatePool()
-        return null
     }
-
-    @Synchronized
-    public fun put(key: String, painter: ImageBitmap) {
-        cache[key] = painter
-        if (cache.size > MAX_IMAGE_COUNT) {
-            val removeCount = (MAX_IMAGE_COUNT / 3).coerceAtLeast(1)
-            val iterator = cache.entries.iterator()
-            repeat(removeCount) {
-                if (iterator.hasNext()) {
-                    val entry = iterator.next()
-                    addToCandidatePool(entry.key, entry.value)
-                    iterator.remove()
+    
+    /**
+     * 释放bitmap的使用权，减少引用计数
+     */
+    public fun release() {
+        kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                if (referenceCount > 0) {
+                    referenceCount--
                 }
             }
-            cleanCandidatePool()
+        }
+    }
+    
+    /**
+     * 标记bitmap为已回收状态
+     */
+    public fun markRecycled(): Boolean {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                if (referenceCount == 0 && !isRecycled) {
+                    isRecycled = true
+                    return@withLock true
+                }
+                return@withLock false
+            }
+        }
+    }
+    
+    /**
+     * 检查是否可以安全回收
+     */
+    public fun canRecycle(): Boolean {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                return@withLock referenceCount == 0
+            }
+        }
+    }
+    
+    /**
+     * 检查是否已被回收
+     */
+    public fun isRecycled(): Boolean {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                return@withLock isRecycled
+            }
+        }
+    }
+}
+
+/**
+ * 线程安全的图片缓存，使用引用计数防止正在使用的bitmap被回收
+ */
+public object ImageCache {
+    private val mutex = Mutex()
+    private val cache = mutableMapOf<String, BitmapState>()
+    private val candidatePool = mutableMapOf<String, Pair<BitmapState, Long>>()
+    
+    private var currentMemoryBytes = 0L
+    private var candidateMemoryBytes = 0L
+
+    /**
+     * 设置最大内存限制
+     */
+    public fun setMaxMemory(maxMemoryBytes: Long) {
+        MAX_MEMORY_BYTES = maxMemoryBytes
+        MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 3
+    }
+
+    /**
+     * 获取bitmap，如果成功会自动增加引用计数
+     */
+    public fun acquire(key: String): BitmapState? {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                // 先检查主缓存
+                cache[key]?.let { state ->
+                    if (state.acquire()) {
+                        return@withLock state
+                    }
+                }
+                
+                // 检查候选池
+                candidatePool[key]?.let { (state, timestamp) ->
+                    if (System.currentTimeMillis() - timestamp < CANDIDATE_TIMEOUT) {
+                        if (state.acquire()) {
+                            // 从候选池移回主缓存
+                            val imageSize = calculateImageSize(state.bitmap)
+                            cache[key] = state
+                            candidatePool.remove(key)
+                            currentMemoryBytes += imageSize
+                            candidateMemoryBytes -= imageSize
+                            cleanCandidatePool()
+                            return@withLock state
+                        }
+                    } else {
+                        // 超时，尝试回收
+                        if (state.markRecycled()) {
+                            val imageSize = calculateImageSize(state.bitmap)
+                            recycleImageBitmap(state.bitmap)
+                            candidateMemoryBytes -= imageSize
+                        }
+                        candidatePool.remove(key)
+                    }
+                }
+                
+                cleanCandidatePool()
+                return@withLock null
+            }
         }
     }
 
-    @Synchronized
+    /**
+     * 获取bitmap但不增加引用计数（兼容旧接口）
+     */
+    public fun get(key: String): ImageBitmap? {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                cache[key]?.bitmap?.let { return@withLock it }
+                candidatePool[key]?.let { (state, timestamp) ->
+                    if (System.currentTimeMillis() - timestamp < CANDIDATE_TIMEOUT) {
+                        return@withLock state.bitmap
+                    }
+                }
+                return@withLock null
+            }
+        }
+    }
+
+    /**
+     * 释放bitmap的使用权
+     */
+    public fun release(state: BitmapState) {
+        kotlinx.coroutines.runBlocking {
+            state.release()
+        }
+    }
+
+    /**
+     * 添加新的bitmap到缓存
+     */
+    public fun put(key: String, bitmap: ImageBitmap): BitmapState {
+        return kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                val imageSize = calculateImageSize(bitmap)
+                
+                // 如果已存在，先处理旧的
+                cache[key]?.let { oldState ->
+                    val oldSize = calculateImageSize(oldState.bitmap)
+                    addToCandidatePool(key, oldState)
+                    currentMemoryBytes -= oldSize
+                }
+                
+                val state = BitmapState(bitmap, key)
+                cache[key] = state
+                currentMemoryBytes += imageSize
+                
+                // 检查内存限制
+                while (currentMemoryBytes > MAX_MEMORY_BYTES && cache.isNotEmpty()) {
+                    val iterator = cache.entries.iterator()
+                    if (iterator.hasNext()) {
+                        val entry = iterator.next()
+                        val entrySize = calculateImageSize(entry.value.bitmap)
+                        addToCandidatePool(entry.key, entry.value)
+                        iterator.remove()
+                        currentMemoryBytes -= entrySize
+                    }
+                }
+                
+                cleanCandidatePool()
+                return@withLock state
+            }
+        }
+    }
+
+    /**
+     * 移除指定key的bitmap
+     */
     public fun remove(key: String) {
-        cache.remove(key)?.let {
-            addToCandidatePool(key, it)
+        kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                cache.remove(key)?.let { state ->
+                    val imageSize = calculateImageSize(state.bitmap)
+                    currentMemoryBytes -= imageSize
+                    addToCandidatePool(key, state)
+                }
+                cleanCandidatePool()
+            }
         }
-        cleanCandidatePool()
     }
 
-    @Synchronized
+    /**
+     * 清空所有缓存
+     */
     public fun clear() {
-        cache.forEach { (key, value) -> addToCandidatePool(key, value) }
-        cache.clear()
-        cleanCandidatePool(force = true)
+        kotlinx.coroutines.runBlocking {
+            mutex.withLock {
+                cache.clear()
+                currentMemoryBytes = 0L
+                cleanCandidatePool(force = true)
+            }
+        }
     }
 
-    // 加入候选池，超量时优先回收最早的
-    private fun addToCandidatePool(key: String, image: ImageBitmap) {
-        if (candidatePool.size >= MAX_CANDIDATE_COUNT) {
-            // 回收最早的
+    private fun addToCandidatePool(key: String, state: BitmapState) {
+        val imageSize = calculateImageSize(state.bitmap)
+        
+        // 确保候选池不超限
+        while (candidateMemoryBytes + imageSize > MAX_CANDIDATE_MEMORY_BYTES && candidatePool.isNotEmpty()) {
             val oldest = candidatePool.entries.minByOrNull { it.value.second }
             if (oldest != null) {
-                recycleImageBitmap(oldest.value.first)
+                val oldState = oldest.value.first
+                if (oldState.markRecycled()) {
+                    val oldSize = calculateImageSize(oldState.bitmap)
+                    recycleImageBitmap(oldState.bitmap)
+                    candidateMemoryBytes -= oldSize
+                }
                 candidatePool.remove(oldest.key)
             }
         }
-        candidatePool[key] = Pair(image, System.currentTimeMillis())
+        
+        candidatePool[key] = Pair(state, System.currentTimeMillis())
+        candidateMemoryBytes += imageSize
     }
 
-    // 定期清理候选池，超时或强制时回收
-    @Synchronized
     private fun cleanCandidatePool(force: Boolean = false) {
         val now = System.currentTimeMillis()
         val iterator = candidatePool.iterator()
         while (iterator.hasNext()) {
             val (key, pair) = iterator.next()
-            if (force || now - pair.second > CANDIDATE_TIMEOUT) {
-                recycleImageBitmap(pair.first)
-                iterator.remove()
+            val (state, timestamp) = pair
+            if (force || now - timestamp > CANDIDATE_TIMEOUT) {
+                if (state.canRecycle() && state.markRecycled()) {
+                    val imageSize = calculateImageSize(state.bitmap)
+                    recycleImageBitmap(state.bitmap)
+                    candidateMemoryBytes -= imageSize
+                    iterator.remove()
+                }
             }
         }
     }
 
-    // 安全回收底层Bitmap（Android端）
-    private fun recycleImageBitmap(imageBitmap: ImageBitmap) {
-        // 多平台兼容，Android端可反射交给BitmapPool
-        /*try {
-            val method = imageBitmap::class.java.getMethod("asAndroidBitmap")
-            val bitmap = method.invoke(imageBitmap) as? android.graphics.Bitmap
-            if (bitmap != null && !bitmap.isRecycled) {
-                val poolClass = Class.forName("com.archko.reader.pdf.cache.BitmapPool")
-                val releaseMethod = poolClass.getMethod("release", android.graphics.Bitmap::class.java)
-                releaseMethod.invoke(null, bitmap)
-            }
-        } catch (_: Exception) {
-        }*/
+    private fun calculateImageSize(image: ImageBitmap): Long {
+        return ImageSizeCalculator.calculateImageSize(image)
     }
+
+    private fun recycleImageBitmap(imageBitmap: ImageBitmap) {
+        ImageSizeCalculator.recycleImageBitmap(imageBitmap)
+    }
+}
+
+/**
+ * 平台特定的ImageBitmap处理器
+ */
+internal expect object ImageSizeCalculator {
+    /**
+     * 计算ImageBitmap的内存占用大小（字节）
+     */
+    fun calculateImageSize(image: ImageBitmap): Long
+
+    /**
+     * 回收ImageBitmap，释放底层资源
+     */
+    fun recycleImageBitmap(image: ImageBitmap)
 }
