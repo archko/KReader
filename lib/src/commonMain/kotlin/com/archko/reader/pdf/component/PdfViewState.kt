@@ -13,6 +13,7 @@ import com.archko.reader.pdf.entity.Hyperlink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * @author: archko 2025/7/24 :08:21
@@ -48,6 +49,14 @@ public class PdfViewState(
 
     // 切边控制
     private var cropEnabled: Boolean = crop
+
+    // 解码服务
+    public var decodeService: DecodeService? = null
+        private set
+
+    init {
+        initDecodeService()
+    }
 
     /**
      * 设置切边参数
@@ -103,8 +112,31 @@ public class PdfViewState(
         return visible
     }
 
+    /**
+     * 初始化解码服务
+     */
+    private fun initDecodeService() {
+        val decoder = PdfDecoderAdapter(
+            imageDecoder = state,
+            viewSize = viewSize,
+            isCropEnabled = { cropEnabled }
+        )
+        decodeService = DecodeService(decoder)
+        
+        // 如果启用切边，生成切边任务
+        if (cropEnabled) {
+            decodeScope.launch {
+                val cropTasks = decoder.generateCropTasks()
+                if (cropTasks.isNotEmpty()) {
+                    decodeService?.submitCropTasks(cropTasks)
+                }
+            }
+        }
+    }
+
     public fun shutdown() {
         isShutdown = true
+        decodeService?.shutdown()
         decodeScope.cancel()
     }
 

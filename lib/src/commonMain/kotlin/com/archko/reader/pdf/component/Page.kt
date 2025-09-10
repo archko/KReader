@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -13,12 +14,9 @@ import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -143,28 +141,59 @@ public class Page(
                 return@launch
             }
 
-            val bitmap = pdfViewState.state.renderPage(
-                aPage,
-                pdfViewState.viewSize,
-                thumbWidth,
-                thumbHeight,
-                pdfViewState.isCropEnabled()
+            val decodeTask = DecodeTask(
+                type = DecodeTask.TaskType.PAGE,
+                pageIndex = aPage.index,
+                decodeKey = cacheKey,
+                aPage = aPage,
+                zoom = 1f,
+                bounds,
+                width.toInt(),
+                height.toInt(),
+                crop = pdfViewState.isCropEnabled(),
+                callback = object : DecodeCallback {
+                    override fun onDecodeComplete(bitmap: ImageBitmap?, isThumb: Boolean, error: Throwable?) {
+                        if (bitmap != null && !pdfViewState.isShutdown()) {
+                            val newState = ImageCache.put(cacheKey, bitmap)
+                            pdfViewState.decodeScope.launch(Dispatchers.Main) {
+                                if (!pdfViewState.isShutdown()) {
+                                    thumbBitmapState?.let { ImageCache.release(it) }
+                                    thumbBitmapState = newState
+                                    setAspectRatio(bitmap.width, bitmap.height)
+                                } else {
+                                    ImageCache.release(newState)
+                                }
+                            }
+                        } else {
+                            if (error != null) {
+                                println("Page thumbnail decode error: ${error.message}")
+                            }
+                        }
+                        thumbDecoding = false
+                    }
+
+                    override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                        return !pdfViewState.isShutdown() && isPageVisible(pageNumber)
+                    }
+                }
             )
 
-            // 使用新的安全缓存
-            val newState = ImageCache.put(cacheKey, bitmap)
-
-            withContext(Dispatchers.Main) {
-                thumbDecoding = false
-                thumbBitmapState?.let { ImageCache.release(it) }
-                thumbBitmapState = newState
-                setAspectRatio(bitmap.width, bitmap.height)
-            }
+            // 提交任务到DecodeService
+            pdfViewState.decodeService?.submitTask(decodeTask)
         }
     }
 
-    private fun CoroutineScope.isScopeActive(): Boolean {
-        if (!isActive || pdfViewState.isShutdown()) {
+    private fun isPageVisible(pageNumber: Int): Boolean {
+        for (render in pdfViewState.pageToRender) {
+            if (render.aPage.index == pageNumber) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun isScopeActive(): Boolean {
+        if (pdfViewState.isShutdown()) {
             println("[Page.loadThumbnail] page=PdfViewState已关闭:${aPage.index}")
             thumbDecoding = false
             return false
@@ -256,7 +285,6 @@ public class Page(
                     currentHeight,
                     currentBounds.left,
                     currentBounds.top,
-                    totalScale
                 )
             }
 

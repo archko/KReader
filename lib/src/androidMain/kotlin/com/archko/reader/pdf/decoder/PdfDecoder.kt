@@ -677,7 +677,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val oldestIndex = pageCache.keys.first()
             val oldestPage = pageCache.remove(oldestIndex)
             oldestPage?.destroy()
-            println("Removed page $oldestIndex from cache to make room for page $index")
+            //println("Removed page $oldestIndex from cache to make room for page $index")
         }
 
         return pageCache.getOrPut(index) {
