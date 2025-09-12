@@ -87,18 +87,28 @@ fun FileScreen(
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
-            
-            // 如果有初始文件路径，直接打开该文件
+        }
+        
+        // 监听文件路径变化
+        LaunchedEffect(initialFilePath) {
             initialFilePath?.let { filePath ->
+                println("FileScreen: 处理文件路径: $filePath")
                 val file = File(filePath)
+                println("FileScreen: 文件是否存在: ${file.exists()}")
+                
                 if (file.exists() && (FileTypeUtils.isValidImageFile(file)
                     || FileTypeUtils.isDocumentFile(file.absolutePath)
                     || FileTypeUtils.isTiffFile(file.absolutePath))) {
                     
+                    println("FileScreen: 文件类型支持，准备打开")
                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                     viewModel.getProgress(file.absolutePath)
                     val startPage = viewModel.progress?.page?.toInt() ?: 0
+                    println("FileScreen: 开始页码: $startPage")
                     openDocRequest = OpenDocRequest(file.absolutePath, startPage)
+                    println("FileScreen: 已设置打开文档请求")
+                } else {
+                    println("FileScreen: 文件不存在或类型不支持")
                 }
             }
         }
