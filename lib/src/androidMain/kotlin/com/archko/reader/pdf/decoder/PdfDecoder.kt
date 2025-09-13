@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.decoder
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -11,6 +12,7 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
 import com.archko.reader.pdf.cache.BitmapPool
@@ -24,12 +26,14 @@ import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.BitmapUtils
 import com.archko.reader.pdf.util.SmartCropUtils
+import com.archko.reader.pdf.util.Utils
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
+
 
 /**
  * @author: archko 2025/4/11 :11:26
@@ -110,13 +114,22 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
+    private fun getDefFontSize(): Float {
+        val fontSize = (8f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
+        return fontSize
+    }
+
     /**
      * 初始化文档（在认证成功后调用）
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            val fontSize = 54f
-            doc.layout(1280f, 2160f, fontSize)
+            val fontSize = getDefFontSize()
+            val w: Float =
+                Utils.getScreenWidthPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()
+            val h: Float =
+                Utils.getScreenHeightPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()
+            doc.layout(w, h, fontSize)
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
@@ -423,7 +436,14 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
-    private fun decode(index: Int, scale: Float, bitmap: Bitmap, patchX: Int, patchY: Int, decodeLink: Boolean) {
+    private fun decode(
+        index: Int,
+        scale: Float,
+        bitmap: Bitmap,
+        patchX: Int,
+        patchY: Int,
+        decodeLink: Boolean
+    ) {
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, bitmap.width, bitmap.height)
 
@@ -462,7 +482,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val patchX = cropBounds.left.toInt() * scale
                 val patchY = cropBounds.top.toInt() * scale
                 val height = scale * cropBounds.height
-                val bitmap = acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
+                val bitmap =
+                    acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
                 println("PdfDecoder.renderPage:page=$index, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
@@ -506,7 +527,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
                         println("PdfDecoder.cropBounds:$index, 原始尺寸=${originalPage.width}x${originalPage.height}, 切边区域=($cropBounds), 切边后尺寸=${pdfCropBounds}")
                         if (pdfCropBounds.width < 0 || pdfCropBounds.height < 0) {
-                            aPage.cropBounds = Rect(0f, 0f, imageBitmap.width.toFloat(), imageBitmap.height.toFloat())
+                            aPage.cropBounds = Rect(
+                                0f,
+                                0f,
+                                imageBitmap.width.toFloat(),
+                                imageBitmap.height.toFloat()
+                            )
                             return imageBitmap
                         }
                         aPage.cropBounds = pdfCropBounds
@@ -533,7 +559,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * @param pageIndex 页面索引
      * @param forceParse 是否强制解析（即使已缓存）
      */
-    private fun parseLinksIfNeeded(pageIndex: Int, forceParse: Boolean = false, decodeLink: Boolean) {
+    private fun parseLinksIfNeeded(
+        pageIndex: Int,
+        forceParse: Boolean = false,
+        decodeLink: Boolean
+    ) {
         if (!decodeLink) {
             return
         }
@@ -547,7 +577,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 对图片进行切边处理
      */
-    private fun cropImageBitmap(index: Int, originalBitmap: ImageBitmap, cropBounds: Rect): ImageBitmap {
+    private fun cropImageBitmap(
+        index: Int,
+        originalBitmap: ImageBitmap,
+        cropBounds: Rect
+    ): ImageBitmap {
         val cropX = cropBounds.left.toInt()
         val cropY = cropBounds.top.toInt()
         val cropWidth = (cropBounds.right - cropX).toInt()
