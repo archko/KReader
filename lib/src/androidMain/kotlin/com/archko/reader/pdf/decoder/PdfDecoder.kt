@@ -115,7 +115,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     private fun getDefFontSize(): Float {
-        val fontSize = (7.52f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
+        val fontSize = (7.2f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
         return fontSize
     }
 
