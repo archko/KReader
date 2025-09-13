@@ -115,7 +115,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     private fun getDefFontSize(): Float {
-        val fontSize = (8f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
+        val fontSize = (7.52f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
         return fontSize
     }
 
@@ -125,10 +125,19 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private fun initializeDocument() {
         document?.let { doc ->
             val fontSize = getDefFontSize()
+            val fs = fontSize.toInt().toFloat()
             val w: Float =
                 Utils.getScreenWidthPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()
             val h: Float =
                 Utils.getScreenHeightPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()
+            System.out.printf(
+                "width:%s, height:%s, font:%s->%s, open:%s",
+                w,
+                h,
+                fontSize,
+                fs,
+                file.absolutePath
+            );
             doc.layout(w, h, fontSize)
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
