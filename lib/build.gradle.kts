@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.api
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -38,6 +39,8 @@ kotlin {
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)
                 implementation(libs.androidx.room.runtime)
+
+                api(libs.jsoup)
             }
         }
 

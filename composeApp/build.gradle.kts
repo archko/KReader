@@ -121,8 +121,19 @@ compose.desktop {
         nativeDistributions {
             modules("java.instrument", "java.sql", "jdk.unsupported")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "Dragon Viewer"
+            packageName = "KReader"
             packageVersion = "1.0.0"
+            
+            // 应用描述
+            description = "A PDF and document reader application"
+            copyright = "© 2025 KReader. All rights reserved."
+            vendor = "KReader"
+            
+            // macOS 特定配置
+            macOS {
+                // Bundle ID
+                bundleID = "com.archko.reader.viewer"
+            }
         }
     }
 }

@@ -25,6 +25,8 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.BitmapUtils
+import com.archko.reader.pdf.util.FontCSSGenerator
+import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.Utils
 import com.archko.reader.pdf.util.loadOutlineItems
@@ -33,7 +35,6 @@ import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
-
 
 /**
  * @author: archko 2025/4/11 :11:26
@@ -82,6 +83,10 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
 
         try {
+            if (IntentFile.isReflowable(file.absolutePath)) {
+                val css = FontCSSGenerator.generateFontCSS("/sdcard/fonts/simsun.ttf")
+                com.artifex.mupdf.fitz.Context.setUserCSS(css)
+            }
             document = Document.openDocument(file.absolutePath)
             // 检查是否需要密码
             needsPassword = document?.needsPassword() == true
