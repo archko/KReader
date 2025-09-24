@@ -356,7 +356,7 @@ fun CustomView(
                         if (showToolbar) {
                             showToolbar = false
                         }
-                        val pageText = currentPageString.format(clickedPageIndex + 1)
+                        val pageText = currentPageString.format(clickedPageIndex + 1, pageCount)
                         Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
                     },
                     jumpToPage = jumpToPage,
