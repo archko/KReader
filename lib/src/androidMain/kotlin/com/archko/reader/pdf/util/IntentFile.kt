@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.util
 
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -13,11 +14,7 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.text.TextUtils
 import android.util.Log
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.*
 import java.lang.reflect.Method
 import java.util.*
 
@@ -52,9 +49,12 @@ public object IntentFile {
 
     @JvmStatic
     public fun getFilePathByUri(context: Context, uri: Uri): String? {
-        var path: String? = getRealPathFromURI(context, uri)
-        if (path == null) {
-            path = getFullPathFromTreeUri(uri, context)
+        var path: String? = null
+        if (ContentResolver.SCHEME_CONTENT == uri.scheme) {
+            path = getRealPathFromURI(context, uri)
+            if (path == null) {
+                path = getFullPathFromTreeUri(uri, context)
+            }
         }
         return path
     }
