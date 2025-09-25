@@ -1,6 +1,6 @@
 <resources>
     <string name="support_format">目前支持 pdf, epub, mobi, xps, fb, cb, 图片, (无图的docx, pptx), tiff, bigtiff.</string>
-    <string name="about_content">为什么有这个app,市面上基于android view系统的pdf阅读器很多,基于compose的,目前没有看到有.\n那些说是compose的pdf阅读器,要么基于的是旧的view系统的阅读器使用androidview包装,要么就是简单的列表,加载文档,没有丰富的手势,流畅的缩放与滚动的效果.\n所以我做了这个app,因为我已经做了一个基于android view的pdf阅读器了,我想实现一个基于compose的pdf阅读器.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来,以后慢慢做.\n此app支持桌面端,ios等多平台.时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.</string>
+    <string name="about_content">为什么有这个app,市面上基于android view系统的pdf阅读器很多,基于compose的,目前没有看到有.\n所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n目前支持字体为宋体,放在/sdcard/fonts/,ttf与otf两种字体</string>
     <string name="app_author">作者:archko@gmail.com</string>
     <string name="version">版本</string>
     <string name="about">关于</string>

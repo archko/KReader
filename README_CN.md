@@ -5,15 +5,11 @@
 
 ## 关于
 
-为什么有这个app？市面上基于 Android View 系统的 PDF 阅读器很多，基于 Compose 的，目前没有看到有。
-
-那些说是 Compose 的 PDF 阅读器，要么基于的是旧的 View 系统的阅读器使用 AndroidView 包装，要么就是简单的列表，加载文档，没有丰富的手势，流畅的缩放与滚动的效果。
-
-所以我做了这个 app，因为我已经做了一个基于 Android View 的 PDF 阅读器了，我想实现一个基于 Compose 的 PDF 阅读器。
-
-目前缩放、滚动已经非常流畅，旧阅读器的完整功能未迁移过来，以后慢慢做。
-
-此 app 支持桌面端、iOS 等多平台。时间有限，目前在 Android 已经实现，iOS 则需要编译 MuPDF，桌面端的 MuPDF 容易编译就不上传了。
+为什么有这个app,市面上基于android view系统的pdf阅读器很多,基于compose的,目前没有看到有.\n
+所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n
+目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n
+时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n
+目前支持字体为宋体,放在/sdcard/fonts/,ttf与otf两种字体
 
 ## 功能特性
 

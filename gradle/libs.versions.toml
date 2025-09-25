@@ -18,6 +18,7 @@ ksp = "2.1.20-2.0.0"
 calf = "0.8.0"
 mupdfFitz = "1.25.1"
 mupdfFitzAar = "1.26.5"
+mmkv = "2.2.3"
 mmkv-kotlin = "1.3.0"
 core = "1.17.0"
 lifecycleViewmodelComposeAndroid = "2.9.3"
@@ -52,6 +53,7 @@ androidx-lifecycle-viewmodel-compose-android = { group = "androidx.lifecycle", n
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-immutableCollections = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-immutableCollections" }
 
+mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
 mmkv-kotlin = { module = "com.ctrip.flight.mmkv:mmkv-kotlin", version.ref = "mmkv-kotlin" }
 mmkv-kotlin-android = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-android", version.ref = "mmkv-kotlin" }
 mmkv-kotlin-macosx64 = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-macosx64", version.ref = "mmkv-kotlin" }

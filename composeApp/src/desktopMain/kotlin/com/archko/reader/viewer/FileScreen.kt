@@ -19,14 +19,17 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -176,6 +179,7 @@ fun FileScreen(
                         ) {
                             Text(stringResource(Res.string.select_pdf))
                         }
+                        //testTts()
                     }
 
                     if (recentList.isNotEmpty()) {
@@ -303,6 +307,125 @@ fun FileScreen(
         }
     }
 }
+
+/*@Composable
+fun testTts() {
+    val speechService: SpeechService = remember { PlatformSpeechService() } // 实例化平台特定的服务
+
+    var textToSpeak by remember { mutableStateOf("Hello from Compose Multiplatform on macOS!") }
+    var isSpeaking by remember { mutableStateOf(false) }
+    var rate by remember { mutableStateOf(0.5f) }
+    var volume by remember { mutableStateOf(0.8f) }
+    var availableVoices by remember { mutableStateOf(emptyList<String>()) }
+    var selectedVoice by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        availableVoices = speechService.getAvailableVoices()
+        if (availableVoices.isNotEmpty()) {
+            selectedVoice = availableVoices.first() // 默认选择第一个语音
+            speechService.setVoice(selectedVoice)
+        }
+    }
+
+    MaterialTheme {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            TextField(
+                value = textToSpeak,
+                onValueChange = { textToSpeak = it },
+                label = { Text("Text to speak") },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Button(onClick = {
+                    speechService.setRate(rate)
+                    speechService.setVolume(volume)
+                    speechService.setVoice(selectedVoice) // 每次点击都设置一次
+                    speechService.speak(textToSpeak)
+                    isSpeaking = true
+                }, enabled = !isSpeaking) {
+                    Text("Speak")
+                }
+
+                Button(onClick = {
+                    speechService.stop()
+                    isSpeaking = false
+                }, enabled = isSpeaking) {
+                    Text("Stop")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("Rate: ${"%.2f".format(rate)}")
+            Slider(
+                value = rate,
+                onValueChange = {
+                    rate = it
+                    // speechService.setRate(it) // 可以实时设置，也可以在speak前设置
+                },
+                valueRange = 0.1f..1.0f,
+                steps = 9,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Text("Volume: ${"%.2f".format(volume)}")
+            Slider(
+                value = volume,
+                onValueChange = {
+                    volume = it
+                    // speechService.setVolume(it) // 可以实时设置，也可以在speak前设置
+                },
+                valueRange = 0.0f..1.0f,
+                steps = 10,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (availableVoices.isNotEmpty()) {
+                Text("Selected Voice:")
+                DropdownMenu(
+                    expanded = false, // You'd need to manage dropdown expansion state
+                    onDismissRequest = { *//* Handle dismiss *//* }
+                ) {
+                    availableVoices.forEach { voiceId ->
+                        DropdownMenuItem(onClick = {
+                            selectedVoice = voiceId
+                            // speechService.setVoice(voiceId) // 实时设置语音
+                            // You'll need to implement the dropdown UI correctly.
+                            // This is a placeholder for basic voice selection logic.
+                            println("Selected voice: $voiceId")
+                        }) {
+                            Text(voiceId.substringAfterLast(".").replace("_", " ")) // 简单显示名称
+                        }
+                    }
+                }
+                // For a simple dropdown, you might use a composable like:
+                // https://stackoverflow.com/questions/68171630/jetpack-compose-desktop-how-to-implement-dropdown-menu
+                // For brevity, I'm omitting the full DropdownMenu UI here.
+                Text(selectedVoice.substringAfterLast(".").replace("_", " "))
+            }
+        }
+    }
+
+    // 监听说话状态 (Optional, NSSpeechSynthesizerDelegate would be more robust)
+    LaunchedEffect(isSpeaking) {
+        if (isSpeaking) {
+            while (speechService.isSpeaking()) {
+                kotlinx.coroutines.delay(100) // 检查状态
+            }
+            isSpeaking = false // 停止说话后更新状态
+        }
+    }
+}*/
 
 @Composable
 private fun Dp.toIntPx(): Int {

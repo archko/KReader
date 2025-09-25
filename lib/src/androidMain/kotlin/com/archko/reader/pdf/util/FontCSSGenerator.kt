@@ -1,38 +1,61 @@
 package com.archko.reader.pdf.util
 
+import com.tencent.mmkv.MMKV
+import java.io.File
+
 /**
  * @author: archko 2025/9/18 :20:09
  */
-import java.io.File
-
 public object FontCSSGenerator {
 
-    public fun generateFontCSS(fontPath: String?): String {
-        if (fontPath.isNullOrEmpty()) return ""
-
-        val fontFile = File(fontPath)
-        if (!fontFile.exists()) return ""
-
-        val fontName = getFontNameFromPath(fontPath)
-        val fontFamily = fontName
-
-        return buildString {
-            appendLine("@font-face {")
-            appendLine("    font-family: '$fontFamily' !important;")
-            appendLine("    src: url('file://$fontPath');")
-            appendLine("}")
-            appendLine()
-            appendLine("body {")
-            appendLine("    font-family: '$fontFamily', serif !important;")
-            appendLine("}")
-            appendLine()
-            appendLine("p, div, span, h1, h2, h3, h4, h5, h6, calibre, calibre1, calibre2, calibre3, calibre4, calibre5, calibre6, contents, contents1 {")
-            appendLine("    font-family: '$fontFamily', serif !important;")
-            appendLine("}")
-        }
+    //"/sdcard/fonts/simsun.ttf"
+    public fun getFontFace(): String? {
+        val mmkv: MMKV = MMKV.mmkvWithID("epub")
+        val fs = mmkv.decodeString("font_face", "")
+        return fs
     }
 
-//        appendLine("pre, code { font-family: 'SimHei', monospace; }")
+    public fun setFontFace(name: String?) {
+        val mmkv: MMKV = MMKV.mmkvWithID("epub")
+        println("setFontFace:$name")
+        mmkv.encode("font_face", name)
+    }
+
+    public fun generateFontCSS(fontPath: String?, margin: String): String {
+        val buffer = StringBuilder()
+
+        if (!fontPath.isNullOrEmpty()) {
+            val fontFile = File(fontPath)
+            if (fontFile.exists()) {
+                val fontName = getFontNameFromPath(fontPath)
+                val fontFamily = fontName
+                buffer.apply {
+                    appendLine("@font-face {")
+                    appendLine("    font-family: '$fontFamily' !important;")
+                    appendLine("    src: url('file://$fontPath');")
+                    appendLine("}")
+
+                    appendLine("* {")
+                    appendLine("    font-family: '$fontFamily', serif !important;")
+                    appendLine("}")
+                }
+            }
+        }
+
+        buffer.apply {
+            // 忽略mupdf的边距
+            appendLine("    @page { margin:$margin $margin !important; }")
+            appendLine("    p { margin: 30px !important; padding: 0 !important; }")
+            appendLine("    blockquote { margin: 0 !important; padding: 0 !important; }")
+
+            // 强制所有元素的边距和内边距
+            appendLine("* {")
+            appendLine("    margin: 0 !important;")
+            appendLine("    padding: 0 !important;")
+            appendLine("}")
+        }
+        return buffer.toString()
+    }
 
     private fun getFontNameFromPath(fontPath: String): String {
         val fileName = File(fontPath).name

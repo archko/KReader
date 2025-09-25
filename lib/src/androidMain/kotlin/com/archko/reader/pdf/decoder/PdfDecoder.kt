@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Environment
+import android.text.TextUtils
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -84,7 +85,10 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         try {
             if (IntentFile.isReflowable(file.absolutePath)) {
-                val css = FontCSSGenerator.generateFontCSS("/sdcard/fonts/simsun.ttf")
+                val css = FontCSSGenerator.generateFontCSS(FontCSSGenerator.getFontFace(), "10px")
+                if (!TextUtils.isEmpty(css)) {
+                    println("应用自定义CSS: $css")
+                }
                 com.artifex.mupdf.fitz.Context.setUserCSS(css)
             }
             document = Document.openDocument(file.absolutePath)

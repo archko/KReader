@@ -27,6 +27,7 @@ kotlin {
             implementation(libs.androidx.core)
             api(libs.mupdf.fitz.aar)
             api(libs.tiff.loader)
+            api(libs.mmkv)
         }
         commonMain {
             dependencies {
