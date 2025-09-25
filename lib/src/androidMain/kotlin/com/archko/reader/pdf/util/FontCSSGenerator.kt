@@ -1,5 +1,7 @@
 package com.archko.reader.pdf.util
 
+import android.content.Context
+import com.archko.reader.pdf.PdfApp
 import com.tencent.mmkv.MMKV
 import java.io.File
 
@@ -7,6 +9,11 @@ import java.io.File
  * @author: archko 2025/9/18 :20:09
  */
 public object FontCSSGenerator {
+
+    public fun getDefFontSize(): Float {
+        val fontSize = (9f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
+        return fontSize
+    }
 
     //"/sdcard/fonts/simsun.ttf"
     public fun getFontFace(): String? {

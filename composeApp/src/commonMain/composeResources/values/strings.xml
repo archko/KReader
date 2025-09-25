@@ -22,6 +22,11 @@
     <string name="no_crop">No Crop</string>
     <string name="outline">Outline</string>
     <string name="reflow">Reflow</string>
+    <string name="font">Font</string>
+    <string name="font_no">Not Found fonts</string>
+    <string name="font_scaning">"Scaning Fonts...</string>
+    <string name="font_select">Select Font</string>
+    <string name="font_storage">Please copy font (ttf/otf) to /sdcard/fonts/</string>
     <string name="search">Search</string>
     <string name="document_outline">Document Outline</string>
     <string name="no_outline">No Outline</string>

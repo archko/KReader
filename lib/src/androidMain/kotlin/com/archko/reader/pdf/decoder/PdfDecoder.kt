@@ -123,17 +123,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
     }
 
-    private fun getDefFontSize(): Float {
-        val fontSize = (7.2f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
-        return fontSize
-    }
-
     /**
      * 初始化文档（在认证成功后调用）
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            val fontSize = getDefFontSize()
+            val fontSize = FontCSSGenerator.getDefFontSize()
             val fs = fontSize.toInt().toFloat()
             val w: Float =
                 Utils.getScreenWidthPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()

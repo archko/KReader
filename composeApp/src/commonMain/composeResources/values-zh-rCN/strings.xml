@@ -22,6 +22,11 @@
     <string name="crop">切边</string>
     <string name="no_crop">不切边</string>
     <string name="reflow">重排</string>
+    <string name="font">字体</string>
+    <string name="font_no">未找到字体文件</string>
+    <string name="font_scaning">正在扫描字体文件...</string>
+    <string name="font_select">选择字体</string>
+    <string name="font_storage">请将字体文件(ttf/otf)放在 /sdcard/fonts/ 目录下</string>
     <string name="search">搜索</string>
     <string name="document_outline">文档大纲</string>
     <string name="no_outline">无大纲</string>
