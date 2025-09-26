@@ -460,7 +460,7 @@ fun AboutDialog(
                     text = stringResource(Res.string.support_format),
                     style = TextStyle(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 15.sp,
+                        fontSize = 16.sp,
                         lineHeight = 20.sp
                     ),
                     textAlign = TextAlign.Start
@@ -470,7 +470,7 @@ fun AboutDialog(
                     text = stringResource(Res.string.about_content),
                     style = TextStyle(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         lineHeight = 20.sp
                     ),
                     textAlign = TextAlign.Start

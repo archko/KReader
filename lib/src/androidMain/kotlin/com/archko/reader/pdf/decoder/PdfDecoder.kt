@@ -131,9 +131,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val fontSize = FontCSSGenerator.getDefFontSize()
             val fs = fontSize.toInt().toFloat()
             val w: Float =
-                Utils.getScreenWidthPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()
+                Utils.getScreenWidthPixelWithOrientation(PdfApp.app as Context).toFloat()
             val h: Float =
-                Utils.getScreenHeightPixelWithOrientation(PdfApp.Companion.app as Context).toFloat()
+                Utils.getScreenHeightPixelWithOrientation(PdfApp.app as Context).toFloat()
             System.out.printf(
                 "width:%s, height:%s, font:%s->%s, open:%s",
                 w,

@@ -1,6 +1,5 @@
 package com.archko.reader.viewer
 
-import android.graphics.Typeface
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
