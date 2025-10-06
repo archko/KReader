@@ -11,7 +11,7 @@ import java.io.File
 public object FontCSSGenerator {
 
     public fun getDefFontSize(): Float {
-        val fontSize = (9f * Utils.getDensityDpi(PdfApp.app as Context) / 72)
+        val fontSize = (8.4f * Utils.getDensityDpi(PdfApp.app as Context) / 72)
         return fontSize
     }
 
@@ -52,7 +52,7 @@ public object FontCSSGenerator {
         buffer.apply {
             // 忽略mupdf的边距
             appendLine("    @page { margin:$margin $margin !important; }")
-            appendLine("    p { margin: 30px !important; padding: 0 !important; }")
+            appendLine("    p { margin: 20px !important; padding: 0 !important; }")
             appendLine("    blockquote { margin: 0 !important; padding: 0 !important; }")
 
             // 强制所有元素的边距和内边距

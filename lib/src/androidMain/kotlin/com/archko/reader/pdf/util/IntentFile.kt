@@ -42,6 +42,7 @@ public object IntentFile {
         if (null == data) {
             return null
         }
+        Log.d("uri", data.toString())
         val path: String? = getFilePathByUri(context, data)
         Log.d("path", "path:$path")
         return path
@@ -106,6 +107,11 @@ public object IntentFile {
         } else if ("content".equals(uri.scheme, ignoreCase = true)) {
             // Return the remote address
             if (isGooglePhotosUri(uri)) return uri.lastPathSegment
+
+            // Check if it's a FileProvider URI
+            if (isFileProviderUri(uri)) {
+                return getFileProviderPath(uri)
+            }
 
             return getDataColumn(context!!, uri, null, null)
         } else if ("file".equals(uri.scheme, ignoreCase = true)) {
@@ -273,6 +279,49 @@ public object IntentFile {
         return "com.google.android.apps.photos.content" == uri.getAuthority()
     }
 
+    /**
+     * @param uri The Uri to check.
+     * @return Whether the Uri is a FileProvider URI.
+     */
+    public fun isFileProviderUri(uri: Uri): Boolean {
+        return uri.authority?.contains("fileProvider") == true
+    }
+
+    /**
+     * Extract file path from FileProvider URI by parsing the path segments.
+     * @param uri The FileProvider Uri
+     * @return The file path or null if cannot be extracted
+     */
+    public fun getFileProviderPath(uri: Uri): String? {
+        try {
+            val pathSegments = uri.pathSegments
+            if (pathSegments != null && pathSegments.isNotEmpty()) {
+                // For FileProvider URIs like content://authority/external_files/path/to/file
+                // We need to reconstruct the actual file path
+                val sb = StringBuilder()
+                
+                // Skip the first segment if it's "external_files" or similar provider path
+                val startIndex = if (pathSegments.size > 1 && 
+                    (pathSegments[0] == "external_files" || pathSegments[0] == "files")) 1 else 0
+                
+                for (i in startIndex until pathSegments.size) {
+                    if (sb.isNotEmpty()) sb.append("/")
+                    sb.append(pathSegments[i])
+                }
+                
+                // If it starts with external_files, prepend external storage path
+                if (pathSegments.size > 0 && pathSegments[0] == "external_files") {
+                    return Environment.getExternalStorageDirectory().path + "/" + sb.toString()
+                }
+                
+                return sb.toString()
+            }
+        } catch (e: Exception) {
+            Log.e("IntentFile", "Error extracting FileProvider path: ${e.message}")
+        }
+        return null
+    }
+
     public fun getPathFromOther(contentUri: Uri): String? {
         val pathSegments = contentUri.pathSegments
         if (pathSegments != null && pathSegments.size > 1) {
@@ -308,9 +357,13 @@ public object IntentFile {
                 )
             }
             if (cursor != null && cursor.moveToFirst()) {
-                val index = cursor.getColumnIndexOrThrow(column)
-                return cursor.getString(index)
+                val columnIndex = cursor.getColumnIndex(column)
+                if (columnIndex >= 0) {
+                    return cursor.getString(columnIndex)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("IntentFile", "Error querying data column: ${e.message}")
         } finally {
             cursor?.close()
         }
@@ -441,7 +494,6 @@ public object IntentFile {
                         || path.endsWith(".tif", true)
                         || path.endsWith(".tiff", true))
     }
-
 
     public fun isPdf(path: String): Boolean {
         return path.endsWith(".pdf", true)
