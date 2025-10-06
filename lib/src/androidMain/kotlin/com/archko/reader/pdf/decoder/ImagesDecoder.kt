@@ -35,7 +35,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     public override var imageSize: IntSize = IntSize.Zero
 
     public var viewSize: IntSize = IntSize.Zero
-    public override val aPageList: MutableList<APage>? = ArrayList()
+    public override val aPageList: MutableList<APage> = ArrayList()
 
     // 缓存BitmapRegionDecoder，避免重复创建，限制数量为10个
     private val regionDecoders = mutableMapOf<Int, BitmapRegionDecoder>()

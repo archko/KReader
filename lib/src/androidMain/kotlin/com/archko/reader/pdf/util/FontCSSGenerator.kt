@@ -11,7 +11,7 @@ import java.io.File
 public object FontCSSGenerator {
 
     public fun getDefFontSize(): Float {
-        val fontSize = (9f * Utils.getDensityDpi(PdfApp.Companion.app as Context) / 72)
+        val fontSize = (9f * Utils.getDensityDpi(PdfApp.app as Context) / 72)
         return fontSize
     }
 

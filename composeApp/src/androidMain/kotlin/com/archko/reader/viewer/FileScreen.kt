@@ -186,6 +186,9 @@ fun FileScreen(
                                         }
 
                                         if (allImageFiles.isNotEmpty()) {
+                                            // 按修改日期倒序排列，最新修改的在最前面
+                                            allImageFiles.sortByDescending { it.lastModified() }
+
                                             val paths = allImageFiles.map { it.absolutePath }
                                             openDocRequest = OpenDocRequest(paths, 0)
                                         }

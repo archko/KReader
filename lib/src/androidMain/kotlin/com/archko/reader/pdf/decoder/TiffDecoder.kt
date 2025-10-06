@@ -32,7 +32,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     public override var imageSize: IntSize = IntSize.Zero
 
     public var viewSize: IntSize = IntSize.Zero
-    public override val aPageList: MutableList<APage>? = ArrayList()
+    public override val aPageList: MutableList<APage> = ArrayList()
     private var tiffLoader: TiffLoader? = null
 
     init {

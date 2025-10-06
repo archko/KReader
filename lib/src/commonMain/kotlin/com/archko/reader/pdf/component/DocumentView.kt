@@ -79,7 +79,6 @@ public fun DocumentView(
     val keepPx = with(density) { 6.dp.toPx() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
     var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
-    var isFlingActive by remember { mutableStateOf(false) } // 滚动动画状态
     var lastTapTime by remember { mutableLongStateOf(0L) } // 上次点击时间
     var tapDelayJob by remember { mutableStateOf<Job?>(null) } // 延迟处理点击的Job
 
@@ -318,7 +317,6 @@ public fun DocumentView(
                             totalDrag = Offset.Zero
                             panVelocityTracker.resetTracking()
                             flingJob?.cancel()
-                            isFlingActive = false
                             do {
                                 val event = awaitPointerEvent()
                                 val pointerCount = event.changes.size
@@ -492,20 +490,18 @@ public fun DocumentView(
                                 lastTapTime = currentTime
                             }
                             // 计算pan velocity
-                            val velocity =
-                                runCatching { panVelocityTracker.calculateVelocity() }.getOrDefault(
+                            val velocity = runCatching { panVelocityTracker.calculateVelocity() }
+                                .getOrDefault(
                                     Velocity.Zero
                                 )
                             val velocitySquared = velocity.x * velocity.x + velocity.y * velocity.y
-                            val velocityThreshold = with(density) { 64.dp.toPx() * 64.dp.toPx() }
+                            val velocityThreshold = with(density) { 32.dp.toPx() * 32.dp.toPx() }
                             flingJob?.cancel()
                             if (velocitySquared > velocityThreshold) {
-                                val decayAnimationSpec =
-                                    exponentialDecay<Float>(
-                                        frictionMultiplier = 0.3f,
-                                        absVelocityThreshold = 0.45f
-                                    )
-                                isFlingActive = true
+                                val decayAnimationSpec = exponentialDecay<Float>(
+                                    frictionMultiplier = 0.2f,
+                                    absVelocityThreshold = 0.45f
+                                )
                                 flingJob = scope.launch {
                                     try {
                                         if (orientation == Vertical) {
@@ -597,7 +593,6 @@ public fun DocumentView(
                                             }
                                         }
                                     } finally {
-                                        isFlingActive = false
                                     }
                                 }
                             }
