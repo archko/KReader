@@ -47,36 +47,34 @@ fun SettingScreen(
         ) {
             Box {
                 Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(20.dp)
-                        .padding(top = 40.dp) // 添加顶部间距，避免内容伸到状态栏
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Avatar()
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "KReader",
-                            style = TextStyle(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            maxLines = 1
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(Res.string.app_author),
-                            style = TextStyle(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                                fontSize = 14.sp
-                            ),
-                            maxLines = 1
-                        )
-                    }
+                    Avatar()
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "KReader",
+                        style = TextStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = stringResource(Res.string.app_author),
+                        style = TextStyle(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            fontSize = 14.sp
+                        ),
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     SettingCategory()
                 }
