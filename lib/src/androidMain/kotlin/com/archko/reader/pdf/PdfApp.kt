@@ -23,6 +23,7 @@ public class PdfApp : Application(), SingletonImageLoader.Factory {
         app = this
 
         MMKV.initialize(this)
+        Thread.setDefaultUncaughtExceptionHandler(CrashHandler())
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
