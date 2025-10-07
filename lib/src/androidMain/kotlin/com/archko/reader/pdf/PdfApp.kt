@@ -11,6 +11,7 @@ import coil3.request.allowRgb565
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
 import com.archko.reader.pdf.cache.CustomImageFetcher
+import com.archko.reader.pdf.util.CrashHandler
 import com.tencent.mmkv.MMKV
 
 /**
