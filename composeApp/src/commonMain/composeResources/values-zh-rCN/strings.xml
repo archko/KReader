@@ -42,4 +42,32 @@
     <string name="password">密码</string>
     <string name="incorrect_password">密码错误，请重试。</string>
     <string name="ok">确定</string>
+
+    <string name="encrypt_decrypt_title">加密/解密</string>
+    <string name="encrypt_decrypt_tips">Pdf信息</string>
+    <string name="encrypt_decrypt_add">选择Pdf</string>
+    <string name="encrypt_decrypt_encrypt">加密</string>
+    <string name="encrypt_decrypt_decrypt">解密</string>
+    <string name="encrypt_decrypt_file_path">文件路径: %s</string>
+    <string name="encrypt_decrypt_file_size">文件大小: %s</string>
+    <string name="encrypt_decrypt_file_name">文件名: %s</string>
+    <string name="encrypt_decrypt_page_count">页面数: %s</string>
+    <string name="encrypt_decrypt_format">格式: %s</string>
+    <string name="encrypt_decrypt_title2">标题: %s</string>
+    <string name="encrypt_decrypt_author">作者: %s</string>
+    <string name="encrypt_decrypt_subject">主题: %s</string>
+    <string name="encrypt_decrypt_keywords">关键词: %s</string>
+    <string name="encrypt_decrypt_creator">创建者: %s</string>
+    <string name="encrypt_decrypt_producer">生产者: %s</string>
+    <string name="encrypt_decrypt_creation_date">创建日期: %s</string>
+    <string name="encrypt_decrypt_modification_date">修改日期: %s</string>
+    <string name="encrypt_decrypt_encrypted">加密: %s</string>
+    <string name="encrypt_decrypt_error_read_pdf">错误: 无法读取PDF信息 - %s</string>
+    <string name="encrypt_decrypt_select_pdf_first">请先选择PDF文件</string>
+    <string name="encrypt_decrypt_input_pwd">请输入密码</string>
+    <string name="encrypt_decrypt_encrypt_success">加密成功\n%s</string>
+    <string name="encrypt_decrypt_encrypt_failed">加密失败</string>
+    <string name="encrypt_decrypt_decrypt_success">解密成功\n%s</string>
+    <string name="encrypt_decrypt_decrypt_failed">解密失败</string>
+    <string name="encrypt_decrypt_modification_time">修改时间: %s</string>
 </resources>

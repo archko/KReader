@@ -1,0 +1,628 @@
+package com.archko.reader.viewer.utils
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.BitmapRegionDecoder
+import android.graphics.pdf.PdfDocument
+import android.util.Log
+import android.widget.TextView
+import com.archko.reader.pdf.PdfApp
+import com.archko.reader.pdf.cache.BitmapPool
+import com.archko.reader.pdf.util.BitmapUtils
+import com.archko.reader.pdf.util.FileUtils
+import com.archko.reader.pdf.util.IntentFile
+import com.artifex.mupdf.fitz.Document
+import com.artifex.mupdf.fitz.Image
+import com.artifex.mupdf.fitz.PDFDocument
+import com.artifex.mupdf.fitz.PDFObject
+import com.artifex.mupdf.fitz.Rect
+import java.io.File
+import java.io.FileNotFoundException
+import java.io.FileOutputStream
+import java.io.IOException
+import java.lang.StringBuilder
+
+/**
+ * @author: archko 2018/12/21 :1:03 PM
+ */
+public object PDFCreaterHelper {
+
+    /**
+     * A4: 210x297
+     * A3：297×420
+     * A2：420×594
+     * A1：594×841
+     * A0：841×1189 mm
+     */
+    public const val OPTS: String = "compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
+    private const val PAPER_WIDTH = 1080f
+    private const val PAPER_HEIGHT = 1800f
+    private const val PAPER_PADDING = 40f
+    private const val PAPER_FONT_SIZE = 17f
+
+    /**
+     * 如果是原图的高宽,不经过缩放,pdf的页面高宽设置与图片大小一致,得到的pdf会很大.
+     * 图片是否超过指定值,都应该做一次压缩
+     */
+    public fun createPdfFromImages(pdfPath: String?, imagePaths: List<String>): Boolean {
+        Log.d("TAG", String.format("imagePaths:%s", imagePaths))
+        var mDocument: PDFDocument? = null
+        try {
+            mDocument = PDFDocument.openDocument(pdfPath) as PDFDocument
+        } catch (e: Exception) {
+            Log.d("TAG", "could not open:$pdfPath")
+        }
+        if (mDocument == null) {
+            mDocument = PDFDocument()
+        }
+
+        val resultPaths = processLargeImage(imagePaths)
+
+        //空白页面必须是-1,否则会崩溃,但插入-1的位置的页面会成为最后一个,所以追加的时候就全部用-1就行了.
+        var index = -1
+        for (path in resultPaths) {
+            val page = addPage(path, mDocument, index++)
+
+            mDocument.insertPage(-1, page)
+        }
+        mDocument.save(pdfPath, OPTS)
+        Log.d("TAG", String.format("save,%s,%s", mDocument.toString(), mDocument.countPages()))
+        val cacheDir = FileUtils.Companion.getExternalCacheDir(PdfApp.Companion.app!!).path + File.separator + "create"
+        val dir = File(cacheDir)
+        if (dir.isDirectory) {
+            dir.deleteRecursively()
+        }
+        return mDocument.countPages() > 0
+    }
+
+    /**
+     * used for k2pdf
+     */
+    public fun createPdfFromFormatedImages(
+        pdfPath: String?, imagePaths: List<String>
+    ): Boolean {
+        Log.d("TAG", String.format("imagePaths:%s", imagePaths))
+        var mDocument: PDFDocument? = null
+        try {
+            mDocument = PDFDocument.openDocument(pdfPath) as PDFDocument
+        } catch (e: Exception) {
+            Log.d("TAG", "could not open:$pdfPath")
+        }
+        if (mDocument == null) {
+            mDocument = PDFDocument()
+        }
+
+        var index = 0
+        for (path in imagePaths) {
+            val page = addPage(path, mDocument, index++)
+
+            mDocument.insertPage(-1, page)
+            index++
+        }
+        mDocument.save(pdfPath, OPTS)
+        return mDocument.countPages() > 0
+    }
+
+    private fun addPage(
+        path: String,
+        mDocument: PDFDocument,
+        index: Int
+    ): PDFObject? {
+        val image = Image(path)
+        val resources = mDocument.newDictionary()
+        val xobj = mDocument.newDictionary()
+        val obj = mDocument.addImage(image)
+        xobj.put("I", obj)
+        resources.put("XObject", xobj)
+
+        val w = image.width
+        val h = image.height
+        val mediabox = Rect(0f, 0f, w.toFloat(), h.toFloat())
+        val contents = "q $w 0 0 $h 0 0 cm /I Do Q\n"
+        val page = mDocument.addPage(mediabox, 0, resources, contents)
+        Log.d("TAG", String.format("index:%s,page,%s,w:%s,h:%s", index, contents, w, h))
+        return page
+    }
+
+    /**
+     * 将大图片切割成小图片,以长图片切割,不处理宽图片
+     */
+    private fun processLargeImage(imagePaths: List<String>): List<String> {
+        val options = BitmapFactory.Options()
+        options.inJustDecodeBounds = true
+        val maxHeight = 6000
+
+        val result = arrayListOf<String>()
+        for (path in imagePaths) {
+            try {
+                BitmapFactory.decodeFile(path, options)
+                if (options.outHeight > maxHeight) {
+                    //split image,maxheight=PAPER_HEIGHT
+                    splitImages(result, path, options.outWidth, options.outHeight)
+                } else {
+                    if (IntentFile.isSupportedImageForCreater(path)) {
+                        result.add(path)
+                    } else {
+                        convertImageToJpeg(result, path)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return result
+    }
+
+    /**
+     * 默认不支持bmp,svg,heic,webp这些直接转换,所以先解析为jpg
+     */
+    private fun convertImageToJpeg(result: java.util.ArrayList<String>, path: String) {
+        val bitmap: Bitmap = BitmapFactory.decodeFile(path)
+        val file = File(
+            FileUtils.Companion.getExternalCacheDir(PdfApp.Companion.app!!).path
+                    //FileUtils.getStorageDirPath() + "/amupdf"
+                    + File.separator + "create" + File.separator + System.currentTimeMillis() + ".jpg"
+        )
+        BitmapUtils.saveBitmapToFile(bitmap, file, Bitmap.CompressFormat.JPEG, 100)
+        BitmapPool.release(bitmap)
+        Log.d("TAG", "convertImageToJpeg path:${file.absolutePath}")
+
+        result.add(file.absolutePath)
+    }
+
+    private fun splitImages(
+        result: ArrayList<String>,
+        path: String,
+        width: Int,
+        height: Int,
+    ) {
+        var top = 0f
+        val right = 0 + width
+        var bottom = PAPER_HEIGHT
+
+        val decoder = BitmapRegionDecoder.newInstance(path, true)
+
+        while (bottom < height) {
+            val rect = android.graphics.Rect()
+            rect.set(0, top.toInt(), right, bottom.toInt())
+            splitImage(path, rect, result, decoder)
+
+            top = bottom
+            bottom += PAPER_HEIGHT
+        }
+        if (top < height) {
+            val rect = android.graphics.Rect()
+            rect.set(0, top.toInt(), right, height)
+            splitImage(path, rect, result, decoder)
+        }
+        decoder.recycle()
+    }
+
+    private fun splitImage(
+        path: String,
+        rect: android.graphics.Rect,
+        result: ArrayList<String>,
+        decoder: BitmapRegionDecoder
+    ) {
+        val bitmap: Bitmap = decoder.decodeRegion(rect, null)
+        val file = File(
+            FileUtils.Companion.getExternalCacheDir(PdfApp.Companion.app!!).path
+                    //FileUtils.getStorageDirPath() + "/amupdf"
+                    + File.separator + "create" + File.separator + System.currentTimeMillis() + ".jpg"
+        )
+        BitmapUtils.saveBitmapToFile(bitmap, file, Bitmap.CompressFormat.JPEG, 100)
+        BitmapPool.release(bitmap)
+        Log.d("TAG", "new file:height:${rect.bottom - rect.top}, path:${file.absolutePath}")
+
+        result.add(file.absolutePath)
+    }
+
+    //================== 系统创建的api,通过打印的方式来创建 ==================
+
+
+    /**
+     * Page width for our PDF.
+     */
+    private const val PDF_PAGE_WIDTH = 841
+
+    /**
+     * Page height for our PDF.
+     */
+    private const val PDF_PAGE_HEIGHT = 1189
+
+    /*public fun createPdfUseSystemFromTxt(
+        context: Context?,
+        parent: ViewGroup?,
+        fontSize: Float,
+        padding: Int,
+        lineSpace: Float,
+        bgColor: Int,
+        sourcePath: String?,
+        destPath: String?
+    ): Boolean {
+        val content: String = ""//EncodingDetect.readFile(sourcePath)
+        try {
+            return doCreatePdfUseSystemFromTxt(
+                context, parent,
+                fontSize,
+                padding,
+                lineSpace,
+                bgColor,
+                content, destPath
+            )
+        } catch (e: FileNotFoundException) {
+            e.printStackTrace()
+        }
+        return false
+    }*/
+
+    /**
+     * @param context
+     * @param parent  需要有一个临时的布局
+     * @param path    保存的文件名
+     * @throws java.io.FileNotFoundException
+     */
+    /*@Throws(FileNotFoundException::class)
+    public fun doCreatePdfUseSystemFromTxt(
+        context: Context?,
+        parent: ViewGroup?,
+        fontSize: Float,
+        padding: Int,
+        lineSpace: Float,
+        bgColor: Int,
+        content: String,
+        path: String?
+    ): Boolean {
+        val pdfDocument = PdfDocument()
+        val pageWidth = PDF_PAGE_WIDTH
+        val pageHeight = PDF_PAGE_HEIGHT
+        val contentView =
+            LayoutInflater.from(context).inflate(R.layout.pdf_content, parent, false) as TextView
+        applyStyle(contentView, fontSize, padding, bgColor, lineSpace)
+        contentView.text = content
+
+        val measureWidth = View.MeasureSpec.makeMeasureSpec(pageWidth, View.MeasureSpec.EXACTLY)
+        val measuredHeight = View.MeasureSpec.makeMeasureSpec(pageHeight, View.MeasureSpec.EXACTLY)
+        contentView.measure(measureWidth, measuredHeight)
+        contentView.layout(0, 0, pageWidth, pageHeight)
+
+        val lineCountPerPage = contentView.lineCount
+        var lineHeight = contentView.lineHeight
+        if (lineSpace > 0) {
+            lineHeight = (lineHeight * contentView.lineSpacingMultiplier).toInt()
+        }
+        val layout = contentView.layout
+        var start = 0
+        var end: Int
+        var pageH = 0
+        val paddingTopAndBottom: Int = 0// Utils.dipToPixel(context, 40f)
+        //循环遍历打印每一行
+        val sb = StringBuilder()
+        var i = 0
+        var page = 1
+        while (i < lineCountPerPage) {
+            end = layout.getLineEnd(i)
+            val line = content.substring(start, end) //指定行的内容
+            start = end
+            sb.append(line)
+            pageH += lineHeight
+            if (pageH >= pageHeight - paddingTopAndBottom) {
+                Log.d(
+                    "TextView",
+                    String.format(
+                        "============page:%s, count:%s, lineHeight-pheight:%s-%s==========",
+                        page,
+                        lineCountPerPage,
+                        lineHeight,
+                        pageH
+                    )
+                )
+                createTxtPage(
+                    context,
+                    parent,
+                    pdfDocument,
+                    fontSize,
+                    padding,
+                    lineSpace,
+                    bgColor,
+                    pageWidth,
+                    pageHeight,
+                    page,
+                    sb.toString()
+                )
+                page++
+                pageH = 0
+                sb.setLength(0)
+            }
+            i++
+        }
+        if (sb.isNotEmpty()) {
+            //Logcat.d("TextView", "last page:$page")
+            createTxtPage(
+                context, parent, pdfDocument,
+                fontSize,
+                padding,
+                lineSpace,
+                bgColor,
+                pageWidth, pageHeight, page, sb.toString()
+            )
+        }
+        return savePdf(path, pdfDocument)
+    }*/
+
+    private fun applyStyle(
+        contentView: TextView,
+        fontSize: Float,
+        padding: Int,
+        bgColor: Int,
+        lineSpace: Float
+    ) {
+        contentView.textSize = fontSize
+        contentView.setPadding(padding, padding, padding, padding)
+        contentView.setBackgroundColor(bgColor)
+        contentView.setLineSpacing(0f, lineSpace)
+        //Logcat.d("size:$fontSize, padding:$padding, line:$lineSpace,color:$bgColor")
+    }
+
+    /*private fun createTxtPage(
+        context: Context?,
+        parent: ViewGroup?,
+        pdfDocument: PdfDocument,
+        fontSize: Float,
+        padding: Int,
+        lineSpace: Float,
+        bgColor: Int,
+        pageWidth: Int,
+        pageHeight: Int,
+        pageNo: Int,
+        content: String?
+    ) {
+        val contentView =
+            LayoutInflater.from(context).inflate(R.layout.pdf_content, parent, false) as TextView
+        applyStyle(contentView, fontSize, padding, bgColor, lineSpace)
+        contentView.text = content
+        val pageInfo: PdfDocument.PageInfo =
+            PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNo)
+                .create()
+        val page: PdfDocument.Page = pdfDocument.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+        val measureWidth = View.MeasureSpec.makeMeasureSpec(pageWidth, View.MeasureSpec.EXACTLY)
+        val measuredHeight = View.MeasureSpec.makeMeasureSpec(pageHeight, View.MeasureSpec.EXACTLY)
+        contentView.measure(measureWidth, measuredHeight)
+        contentView.layout(0, 0, pageWidth, pageHeight)
+        contentView.draw(canvas)
+
+        // finish the page
+        pdfDocument.finishPage(page)
+    }
+
+    private fun createImagePage(
+        context: Context?,
+        parent: ViewGroup?,
+        pdfDocument: PdfDocument,
+        pageWidth: Int,
+        pageNo: Int,
+        path: String
+    ) {
+        val contentView = LayoutInflater.from(context)
+            .inflate(R.layout.pdf_image_content, parent, false) as ImageView
+        val bitmap = BitmapFactory.decodeFile(path)
+        contentView.setImageBitmap(bitmap)
+        val pageHeight = bitmap.height * pageWidth / bitmap.width
+        val pageInfo: PdfDocument.PageInfo = PdfDocument.PageInfo.Builder(
+            pageWidth,
+            pageHeight,
+            pageNo
+        )
+            .create()
+        val page: PdfDocument.Page = pdfDocument.startPage(pageInfo)
+        val canvas: Canvas = page.canvas
+        val measureWidth = View.MeasureSpec.makeMeasureSpec(pageWidth, View.MeasureSpec.EXACTLY)
+        val measuredHeight = View.MeasureSpec.makeMeasureSpec(pageHeight, View.MeasureSpec.EXACTLY)
+        contentView.measure(measureWidth, measuredHeight)
+        contentView.layout(0, 0, pageWidth, pageHeight)
+        contentView.draw(canvas)
+        Log.d(
+            "TAG",
+            String.format(
+                "createImagePage:%s-%s",
+                pageWidth,
+                pageHeight,
+            )
+        )
+        BitmapPool.release(bitmap)
+
+        // finish the page
+        pdfDocument.finishPage(page)
+    }*/
+
+    @Throws(FileNotFoundException::class)
+    private fun savePdf(path: String?, document: PdfDocument): Boolean {
+        val outputStream = FileOutputStream(path)
+        try {
+            document.writeTo(outputStream)
+            return true
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } finally {
+            document.close()
+        }
+        return false
+    }
+
+    /**
+     * 通过系统api创建pdf,比mupdf创建的要小不少,测试中,14m对10m.
+     */
+    /*public fun createPdfUseSystemFromImages(
+        context: Context,
+        parent: ViewGroup,
+        pdfPath: String?, imagePaths: List<String>
+    ): Boolean {
+        Log.d("TAG", String.format("imagePaths:%s", imagePaths))
+        val pdfDocument = PdfDocument()
+
+        val resultPaths = processLargeImage(imagePaths)
+
+        var index = 0
+        for (path in resultPaths) {
+            createImagePage(context, parent, pdfDocument, PDF_PAGE_WIDTH, index, path)
+            index++
+        }
+        return savePdf(pdfPath, pdfDocument)
+    }*/
+
+    /**
+     * 会有内存溢出的可能,图片数量过多时.所以这个方法尽量用图片少的情况.目前无法通过追加形式添加
+     * 已经处理好的图片,不再处理切割,因为切割需要再解析一次
+     */
+    /*public fun createPdfUseSystemFromFormatedImages(
+        context: Context,
+        parent: ViewGroup,
+        pdfPath: String?, imagePaths: List<String>
+    ): Boolean {
+        Log.d("TAG", String.format("imagePaths:%s", imagePaths))
+        val pdfDocument = PdfDocument()
+
+        var index = 0
+        for (path in imagePaths) {
+            createImagePage(context, parent, pdfDocument, PDF_PAGE_WIDTH, index, path)
+            index++
+        }
+        return savePdf(pdfPath, pdfDocument)
+    }*/
+
+    // =================== encrypt/decrypt ===================
+
+    /**
+     * 保存时添加密码保护
+     */
+    public fun encryptPDF(
+        inputFile: String?, outputFile: String?,
+        userPassword: String?, ownerPassword: String?
+    ): Boolean {
+        try {
+            val doc: Document? = Document.openDocument(inputFile)
+
+            if (doc !is PDFDocument) {
+                System.err.println("输入文件不是PDF格式")
+                return false
+            }
+
+            if (doc.needsPassword()) {
+                println("原文档需要密码验证")
+                // 这里需要提供原文档的密码
+                // pdfDoc.authenticatePassword("original_password");
+            }
+
+            val options = StringBuilder()
+            // 设置加密算法 (AES 256位是最安全的)
+            options.append("encrypt=aes-256")
+
+            // 设置用户密码（打开文档时需要）
+            if (userPassword != null && !userPassword.isEmpty()) {
+                options.append(",user-password=").append(userPassword)
+            }
+
+            // 设置所有者密码（拥有完整权限）
+            if (ownerPassword != null && !ownerPassword.isEmpty()) {
+                options.append(",owner-password=").append(ownerPassword)
+            }
+
+            // 设置权限（-1表示所有权限）
+            options.append(",permissions=-1")
+
+            println("保存选项: $options")
+
+            // 保存加密后的PDF
+            doc.save(outputFile, options.toString())
+            println("PDF加密成功，保存到: $outputFile")
+            return true
+        } catch (e: java.lang.Exception) {
+            System.err.println("加密PDF时出错: " + e.message)
+        }
+        return false
+    }
+
+    /**
+     * 移除PDF密码保护（解密）
+     */
+    public fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean  {
+        try {
+            val doc: Document? = Document.openDocument(inputFile)
+            if (doc !is PDFDocument) {
+                System.err.println("输入文件不是PDF格式")
+                return false
+            }
+
+            // 验证密码（如果需要）
+            if (doc.needsPassword()) {
+                if (!doc.authenticatePassword(password)) {
+                    System.err.println("密码验证失败，无法解密")
+                    return false
+                }
+                println("密码验证成功")
+            }
+
+            // 构建保存选项字符串 - 移除加密
+            val options = "encrypt=no,decrypt=yes"
+
+            // 保存解密后的PDF
+            doc.save(outputFile, options)
+            println("PDF解密成功，保存到: $outputFile")
+            return true
+        } catch (e: java.lang.Exception) {
+            System.err.println("解密PDF时出错: " + e.message)
+        }
+        return false
+    }
+
+    /**
+     * 修改PDF密码
+     */
+    public fun changePDFPassword(
+        inputFile: String?, outputFile: String?,
+        oldPassword: String?, newUserPassword: String?, newOwnerPassword: String?
+    ): Boolean  {
+        try {
+            val doc: Document? = Document.openDocument(inputFile)
+            if (doc !is PDFDocument) {
+                System.err.println("输入文件不是PDF格式")
+                return false
+            }
+
+            // 验证原密码（如果需要）
+            if (doc.needsPassword()) {
+                if (!doc.authenticatePassword(oldPassword)) {
+                    System.err.println("原密码验证失败")
+                    return false
+                }
+                println("原密码验证成功")
+            }
+
+            // 构建保存选项字符串
+            val options = StringBuilder()
+
+            // 设置新的加密算法
+            options.append("encrypt=aes-256")
+
+            // 设置新密码
+            if (newUserPassword != null && !newUserPassword.isEmpty()) {
+                options.append(",user-password=").append(newUserPassword)
+            }
+            if (newOwnerPassword != null && !newOwnerPassword.isEmpty()) {
+                options.append(",owner-password=").append(newOwnerPassword)
+            }
+
+            // 设置权限
+            options.append(",permissions=-1")
+
+            // 保存修改密码后的PDF
+            doc.save(outputFile, options.toString())
+            println("PDF密码修改成功，保存到: $outputFile")
+            return true
+        } catch (e: java.lang.Exception) {
+            System.err.println("修改PDF密码时出错: " + e.message)
+        }
+        return false
+    }
+}

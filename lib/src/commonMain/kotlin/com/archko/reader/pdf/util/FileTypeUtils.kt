@@ -9,7 +9,7 @@ import java.io.File
  */
 public object FileTypeUtils {
 
-    private const val MAX_SIZE_MB = 300 * 1024 * 1024L
+    private const val MAX_SIZE_MB = 20 * 1024 * 1024L
 
     /**
      * 判断是否为图片文件
@@ -27,7 +27,7 @@ public object FileTypeUtils {
     /**
      * 判断是否为有效的图片文件（包括大小判断）
      * @param file 文件对象
-     * @param MAX_SIZE_MB 最大文件大小（MB），默认10MB
+     * @param MAX_SIZE_MB 最大文件大小（MB）
      * @return 是否为有效的图片文件
      */
     public fun isValidImageFile(file: File): Boolean {

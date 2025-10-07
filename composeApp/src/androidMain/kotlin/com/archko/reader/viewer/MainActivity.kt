@@ -58,6 +58,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         super.onNewIntent(intent)
         // 处理新的intent
         processExternalIntent(intent)
+        setIntent(null)
     }
 
     private fun processExternalIntent(intent: Intent?) {

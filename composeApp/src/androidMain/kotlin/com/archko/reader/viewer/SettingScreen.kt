@@ -3,14 +3,9 @@ package com.archko.reader.viewer
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import androidx.compose.foundation.*
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,18 +17,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.about
-import kreader.composeapp.generated.resources.about_content
-import kreader.composeapp.generated.resources.about_kreader
-import kreader.composeapp.generated.resources.app_author
-import kreader.composeapp.generated.resources.confirm
-import kreader.composeapp.generated.resources.support_format
-import kreader.composeapp.generated.resources.version
+import com.archko.reader.pdf.PdfApp
+import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.viewer.utils.PDFCreaterHelper
+import com.mohamedrejeb.calf.picker.FilePickerFileType
+import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
+import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
+import kotlinx.coroutines.launch
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -64,7 +63,7 @@ fun SettingScreen(
                             style = TextStyle(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontSize = 28.sp,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                fontWeight = FontWeight.Bold
                             ),
                             maxLines = 1
                         )
@@ -101,7 +100,7 @@ fun Avatar() {
             val centerX = size.width / 2
             val centerY = size.height / 2
             val iconSize = size.minDimension * 0.7f
-            
+
             // 绘制更丰富的背景渐变
             drawCircle(
                 brush = Brush.radialGradient(
@@ -118,7 +117,7 @@ fun Avatar() {
                 radius = size.minDimension / 2,
                 center = Offset(centerX, centerY)
             )
-            
+
             // 添加额外的光晕效果
             drawCircle(
                 brush = Brush.radialGradient(
@@ -186,7 +185,7 @@ fun Avatar() {
                 start = Offset(kLeft, kTop),
                 end = Offset(kLeft + kSize, kTop + kSize)
             )
-            
+
             val strokeWidth = kSize * 0.15f  // 线条粗细为整体大小的15%
             val letterHeight = kSize * 0.8f  // 字母高度
 
@@ -198,7 +197,7 @@ fun Avatar() {
                 end = Offset(kLeft + kSize * 0.2f, kTop + letterHeight),
                 strokeWidth = strokeWidth
             )
-            
+
             // 上半部分斜线（从竖线中间向上）
             drawLine(
                 brush = kBrush,
@@ -206,7 +205,7 @@ fun Avatar() {
                 end = Offset(kLeft + kSize * 0.75f, kTop - 1.dp.toPx()),  // 与竖线顶部对齐
                 strokeWidth = strokeWidth
             )
-            
+
             // 下半部分斜线（从竖线中间向下）
             drawLine(
                 brush = kBrush,
@@ -214,7 +213,7 @@ fun Avatar() {
                 end = Offset(kLeft + kSize * 0.65f, kTop + letterHeight),
                 strokeWidth = strokeWidth
             )
-            
+
             // 添加圆润的连接点
             drawCircle(
                 brush = kBrush,
@@ -229,7 +228,7 @@ fun Avatar() {
                 radius = leftTopRadius,
                 center = Offset(bookLeft + 10.dp.toPx(), bookTop + 11.dp.toPx())  // 更靠近左上角
             )
-            
+
             // 右下角装饰圆形
             val dotRadius2 = 9.dp.toPx()  // 放大装饰点
             drawCircle(
@@ -237,10 +236,10 @@ fun Avatar() {
                 radius = dotRadius2,
                 center = Offset(bookLeft + bookWidth - 10.dp.toPx(), bookTop + bookHeight - 10.dp.toPx())  // 右下角
             )
-            
+
             // 底部背景装饰圆形 - 形成正三角形（在书本之后绘制，显示在书本上面）
             val triangleRadius = size.minDimension * 0.18f  // 放大装饰圆形
-            
+
             // 第一个圆形（左上角，带渐变效果，显示在最上层）
             drawCircle(
                 brush = Brush.radialGradient(
@@ -249,13 +248,19 @@ fun Avatar() {
                         Color.White.copy(alpha = 0.4f), // 中间过渡
                         Color.White.copy(alpha = 0.6f)  // 下半部分深色
                     ),
-                    center = Offset(centerX - size.minDimension * 0.2f - 2.dp.toPx(), centerY - size.minDimension * 0.2f + 2.dp.toPx() - triangleRadius * 0.3f),
+                    center = Offset(
+                        centerX - size.minDimension * 0.2f - 2.dp.toPx(),
+                        centerY - size.minDimension * 0.2f + 2.dp.toPx() - triangleRadius * 0.3f
+                    ),
                     radius = triangleRadius * 1.2f
                 ),
                 radius = triangleRadius,
-                center = Offset(centerX - size.minDimension * 0.2f - 2.dp.toPx(), centerY - size.minDimension * 0.2f + 2.dp.toPx())
+                center = Offset(
+                    centerX - size.minDimension * 0.2f - 2.dp.toPx(),
+                    centerY - size.minDimension * 0.2f + 2.dp.toPx()
+                )
             )
-            
+
             // 第二个圆形（右边，带渐变效果，显示在最上层）
             /*drawCircle(
                 brush = Brush.radialGradient(
@@ -270,7 +275,7 @@ fun Avatar() {
                 radius = triangleRadius,
                 center = Offset(centerX + size.minDimension * 0.2f, centerY - size.minDimension * 0.2f)
             )*/
-            
+
             // 第三个圆形（底部，形成正三角形，确保不被书本遮挡）
             /*drawCircle(
                 brush = Brush.radialGradient(
@@ -310,7 +315,6 @@ fun SettingCategory() {
     }
     Column(
         modifier = Modifier
-            .padding(top = 20.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(
@@ -394,6 +398,7 @@ fun SettingCategory() {
 
     Spacer(modifier = Modifier.height(8.dp))*/
 
+    var showPdfEncryptDialog by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
@@ -403,8 +408,40 @@ fun SettingCategory() {
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(12.dp)
             )
+            .clickable { showPdfEncryptDialog = true }
             .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .height(44.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = "加密/解密PDF",
+                style = TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                ),
+                maxLines = 1
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable { showAboutDialog = true }
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -430,6 +467,304 @@ fun SettingCategory() {
             onDismiss = { showAboutDialog = false }
         )
     }
+
+    // PDF加密/解密 Dialog
+    if (showPdfEncryptDialog) {
+        PdfEncryptDialog(
+            onDismiss = { showPdfEncryptDialog = false }
+        )
+    }
+}
+
+@Composable
+fun PdfEncryptDialog(
+    onDismiss: () -> Unit
+) {
+    var selectedTab by remember { mutableStateOf(0) }
+    var pdfFilePath by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_back),
+                        contentDescription = "返回",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Text(
+                    text = stringResource(Res.string.encrypt_decrypt_title),
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 8.dp)
+            ) {
+                val pickerLauncher = rememberFilePickerLauncher(
+                    type = FilePickerFileType.Pdf,
+                    selectionMode = FilePickerSelectionMode.Single
+                ) { files ->
+                    scope.launch {
+                        if (files.isNotEmpty()) {
+                            val file = files.first()
+                            val path = IntentFile.getPath(PdfApp.app!!, file.uri) ?: file.uri.toString()
+                            pdfFilePath = path
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = { pickerLauncher.launch() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(Res.string.encrypt_decrypt_add))
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    if (pdfFilePath.isNotEmpty()) {
+                        val fileObj = java.io.File(pdfFilePath)
+                        val fileName = fileObj.name
+                        val fileSize = if (fileObj.exists()) {
+                            val sizeInBytes = fileObj.length()
+                            val sizeInMB = sizeInBytes / (1024.0 * 1024.0)
+                            String.format("%.1fMB", sizeInMB)
+                        } else {
+                            "0MB"
+                        }
+                        val lastModified = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                            .format(java.util.Date(fileObj.lastModified()))
+
+                        Text(
+                            text = stringResource(Res.string.encrypt_decrypt_file_name).format(fileName) + "\n" +
+                                    stringResource(Res.string.encrypt_decrypt_file_size).format(fileSize) + "\n" +
+                                    stringResource(Res.string.encrypt_decrypt_file_path).format(pdfFilePath) + "\n" +
+                                    stringResource(Res.string.encrypt_decrypt_modification_time).format(lastModified),
+                            modifier = Modifier.padding(8.dp),
+                            style = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text(stringResource(Res.string.encrypt_decrypt_encrypt)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text(stringResource(Res.string.encrypt_decrypt_decrypt)) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val passwordLabel = stringResource(Res.string.encrypt_decrypt_input_pwd)
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text(passwordLabel) },
+                    visualTransformation = if (isPasswordVisible) {
+                        androidx.compose.ui.text.input.VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { isPasswordVisible = !isPasswordVisible }
+                        ) {
+                            Icon(
+                                painter = if (isPasswordVisible) {
+                                    painterResource(Res.drawable.ic_visibility_off)
+                                } else {
+                                    painterResource(Res.drawable.ic_visibility)
+                                },
+                                contentDescription = if (isPasswordVisible) "隐藏密码" else "显示密码",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    if (selectedTab == 0) {
+                        Button(
+                            onClick = {
+                                if (pdfFilePath.isNotEmpty() && (password.isNotEmpty())) {
+                                    isLoading = true
+                                    scope.launch {
+                                        try {
+                                            val outputPath = pdfFilePath.replace(".pdf", "_encrypted.pdf")
+                                            val success = PDFCreaterHelper.encryptPDF(
+                                                pdfFilePath,
+                                                outputPath,
+                                                password,
+                                                password
+                                            )
+
+                                            if (success) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    getString(Res.string.encrypt_decrypt_encrypt_success)
+                                                        .format(
+                                                            outputPath
+                                                        ),
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    getString(Res.string.encrypt_decrypt_encrypt_failed),
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                getString(Res.string.encrypt_decrypt_encrypt_failed),
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                } else {
+                                    scope.launch {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            getString(Res.string.encrypt_decrypt_input_pwd),
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = pdfFilePath.isNotEmpty() && password.isNotEmpty()
+                        ) {
+                            Text(stringResource(Res.string.encrypt_decrypt_encrypt))
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                if (pdfFilePath.isNotEmpty() && password.isNotEmpty()) {
+                                    isLoading = true
+                                    scope.launch {
+                                        try {
+                                            val outputPath = pdfFilePath.replace(".pdf", "_decrypted.pdf")
+                                            val success = PDFCreaterHelper.decryptPDF(
+                                                pdfFilePath,
+                                                outputPath,
+                                                password
+                                            )
+
+                                            if (success) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    getString(Res.string.encrypt_decrypt_decrypt_success)
+                                                        .format(
+                                                            outputPath
+                                                        ),
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    getString(Res.string.encrypt_decrypt_decrypt_failed),
+                                                    android.widget.Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                getString(Res.string.encrypt_decrypt_decrypt_failed),
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
+                                } else {
+                                    scope.launch {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            getString(Res.string.encrypt_decrypt_input_pwd),
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = pdfFilePath.isNotEmpty() && password.isNotEmpty()
+                        ) {
+                            Text(stringResource(Res.string.encrypt_decrypt_decrypt))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp),
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    )
 }
 
 @Composable
@@ -439,16 +774,33 @@ fun AboutDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = stringResource(Res.string.about_kreader),
-                style = TextStyle(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 18.sp,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                ),
-                textAlign = TextAlign.Center,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_back),
+                        contentDescription = "返回",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = stringResource(Res.string.about_kreader),
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
         },
         text = {
             Column(
@@ -478,18 +830,6 @@ fun AboutDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(
-                    text = stringResource(Res.string.confirm),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontSize = 14.sp
-                )
-            }
         },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(16.dp),
@@ -499,4 +839,3 @@ fun AboutDialog(
         )
     )
 }
-
