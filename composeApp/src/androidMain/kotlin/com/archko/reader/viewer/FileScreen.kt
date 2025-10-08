@@ -254,7 +254,7 @@ fun FileScreen(
                                     val path = IntentFile.getPath(PdfApp.app!!, file.uri)
                                         ?: file.uri.toString()
                                     val fileObj = File(path)
-                                    if (FileTypeUtils.isValidImageFile(fileObj)) {
+                                    if (FileTypeUtils.isAccetableImageFile(fileObj)) {
                                         imageFiles.add(fileObj)
                                     } else if (FileTypeUtils.isDocumentFile(path)) {
                                         documentFiles.add(fileObj)

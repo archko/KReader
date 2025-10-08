@@ -37,6 +37,12 @@ public object FileTypeUtils {
                 && file.length() <= MAX_SIZE_MB
     }
 
+    public fun isAccetableImageFile(file: File): Boolean {
+        return file.exists()
+                && file.isFile
+                && isImageFile(file.absolutePath)
+    }
+
     /**
      * 判断是否为文档文件
      */
