@@ -15,10 +15,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -94,6 +96,14 @@ fun MainContainer(
     val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     var showBottomBar by remember { mutableStateOf(true) }
+    
+    var currentExternalPath by rememberSaveable { mutableStateOf(externalPath) }
+    
+    LaunchedEffect(externalPath) {
+        if (externalPath != null && currentExternalPath != externalPath) {
+            currentExternalPath = externalPath
+        }
+    }
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -110,6 +120,7 @@ fun MainContainer(
             navController = nestedNavController.navController,
             startDestination = HomeSections.FILE.route
         ) {
+            println("MainContainer: NavHost 重建，当前外部路径: $currentExternalPath")
             addHomeGraph(
                 screenWidthInPixels,
                 screenHeightInPixels,
@@ -117,7 +128,10 @@ fun MainContainer(
                 modifier = Modifier
                     .consumeWindowInsets(padding),
                 onShowBottomBarChanged = { showBottomBar = it },
-                externalPath = externalPath
+                externalPath = currentExternalPath,
+                onCloseDocument = {
+                    currentExternalPath = null
+                }
             )
         }
     }
@@ -129,7 +143,8 @@ fun NavGraphBuilder.addHomeGraph(
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
-    externalPath: String? = null
+    externalPath: String? = null,
+    onCloseDocument: () -> Unit = {}
 ) {
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
@@ -138,7 +153,8 @@ fun NavGraphBuilder.addHomeGraph(
             viewModel,
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
-            externalPath = externalPath
+            externalPath = externalPath,
+            onCloseDocument = onCloseDocument
         )
     }
     composable(HomeSections.SETTING.route) { from ->

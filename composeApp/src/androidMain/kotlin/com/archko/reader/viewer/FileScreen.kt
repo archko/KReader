@@ -94,7 +94,8 @@ fun FileScreen(
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
-    externalPath: String? = null
+    externalPath: String? = null,
+    onCloseDocument: () -> Unit = {}
 ) {
     Theme {
         val scope = rememberCoroutineScope()
@@ -444,6 +445,7 @@ fun FileScreen(
                     },
                     onCloseDocument = {
                         openDocRequest = null
+                        onCloseDocument()
                     },
                     initialScrollX = viewModel.progress?.scrollX ?: 0L,
                     initialScrollY = viewModel.progress?.scrollY ?: 0L,
