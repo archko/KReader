@@ -715,7 +715,7 @@ fun FontDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onDismiss) {
@@ -725,14 +725,12 @@ fun FontDialog(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    Spacer(Modifier.weight(1f))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = stringResource(Res.string.font_select),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(Modifier.weight(1f))
-                    Spacer(modifier = Modifier.width(48.dp))
                 }
 
                 if (isLoading) {
