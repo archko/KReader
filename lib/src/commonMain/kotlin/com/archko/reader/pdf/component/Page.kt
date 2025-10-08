@@ -264,6 +264,10 @@ public class Page(
             }
         }
 
+        if (null != thumbBitmapState && thumbBitmapState!!.isRecycled()) {
+            thumbBitmapState = null
+        }
+
         //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
 
         // 优先绘制缩略图

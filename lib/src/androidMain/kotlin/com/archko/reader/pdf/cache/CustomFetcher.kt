@@ -73,9 +73,9 @@ public class CustomImageFetcher(
         }
 
         private fun loadBitmapFromCache(data: CustomImageData): Bitmap? {
-            val bmp = ImageCache.get(data.path)
+            val bmp = ImageCache.acquire(data.path)
             if (null != bmp) {
-                return bmp.asAndroidBitmap()
+                return bmp.bitmap.asAndroidBitmap()
             }
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")

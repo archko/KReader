@@ -90,6 +90,10 @@ public class PageNode(
             return
         }
 
+        if (null != bitmapState && bitmapState!!.isRecycled()) {
+            bitmapState = null
+        }
+
         bitmapState?.let { state ->
             //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${state.bitmap.width}x${state.bitmap.height}")
             // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸

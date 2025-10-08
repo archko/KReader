@@ -149,23 +149,6 @@ public object ImageCache {
     }
 
     /**
-     * 获取bitmap但不增加引用计数（兼容旧接口）
-     */
-    public fun get(key: String): ImageBitmap? {
-        return kotlinx.coroutines.runBlocking {
-            mutex.withLock {
-                cache[key]?.bitmap?.let { return@withLock it }
-                candidatePool[key]?.let { (state, timestamp) ->
-                    if (System.currentTimeMillis() - timestamp < CANDIDATE_TIMEOUT) {
-                        return@withLock state.bitmap
-                    }
-                }
-                return@withLock null
-            }
-        }
-    }
-
-    /**
      * 释放bitmap的使用权
      */
     public fun release(state: BitmapState) {
@@ -193,15 +176,23 @@ public object ImageCache {
                 cache[key] = state
                 currentMemoryBytes += imageSize
                 
-                // 检查内存限制
+                // 检查内存限制，优先移除没有引用的bitmap
                 while (currentMemoryBytes > MAX_MEMORY_BYTES && cache.isNotEmpty()) {
-                    val iterator = cache.entries.iterator()
-                    if (iterator.hasNext()) {
-                        val entry = iterator.next()
-                        val entrySize = calculateImageSize(entry.value.bitmap)
+                    // 优先选择没有引用的bitmap进行移除
+                    val entryToRemove = cache.entries.find { it.value.canRecycle() }
+                        ?: cache.entries.first() // 如果都有引用，选择第一个
+                    
+                    val entry = entryToRemove
+                    val entrySize = calculateImageSize(entry.value.bitmap)
+                    
+                    // 只有在没有引用时才移到候选池，否则保留在主缓存
+                    if (entry.value.canRecycle()) {
                         addToCandidatePool(entry.key, entry.value)
-                        iterator.remove()
+                        cache.remove(entry.key)
                         currentMemoryBytes -= entrySize
+                    } else {
+                        // 如果所有bitmap都有引用，暂时不清理，避免崩溃
+                        break
                     }
                 }
                 
@@ -268,9 +259,15 @@ public object ImageCache {
             val (key, pair) = iterator.next()
             val (state, timestamp) = pair
             if (force || now - timestamp > CANDIDATE_TIMEOUT) {
-                if (state.canRecycle() && state.markRecycled()) {
+                // 确保bitmap没有被回收且没有引用才进行回收
+                if (!state.isRecycled() && state.canRecycle() && state.markRecycled()) {
                     val imageSize = calculateImageSize(state.bitmap)
                     recycleImageBitmap(state.bitmap)
+                    candidateMemoryBytes -= imageSize
+                    iterator.remove()
+                } else if (state.isRecycled()) {
+                    // 如果已经被标记为回收，直接从候选池移除
+                    val imageSize = calculateImageSize(state.bitmap)
                     candidateMemoryBytes -= imageSize
                     iterator.remove()
                 }
