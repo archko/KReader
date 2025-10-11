@@ -12,6 +12,7 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.util.CropUtils
+import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
@@ -55,6 +56,15 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
 
+    private fun isReflowable(path: String): Boolean {
+        return path.endsWith(".cbz", true)
+                || path.endsWith(".epub", true)
+                || path.endsWith(".mobi", true)
+                || path.endsWith(".pptx", true)
+                || path.endsWith(".docx", true)
+                || path.endsWith(".xlsx", true)
+    }
+
     init {
         // 检查文件是否存在
         if (!file.exists()) {
@@ -67,6 +77,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
 
         try {
+            if (isReflowable(file.absolutePath)) {
+                val css = FontCSSGenerator.generateFontCSS(null, "10px")
+                println("应用自定义CSS: $css")
+                com.artifex.mupdf.fitz.Context.setUserCSS(css)
+            }
             document = Document.openDocument(file.absolutePath)
             // 检查是否需要密码
             needsPassword = document?.needsPassword() == true
@@ -104,8 +119,19 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            val fontSize = 32f
-            doc.layout(1280f, 1024f, fontSize)
+            val fontSize = FontCSSGenerator.getDefFontSize()
+            val fs = fontSize.toInt().toFloat()
+            val w = 1280f
+            val h = 1024f
+            System.out.printf(
+                "width:%s, height:%s, font:%s->%s, open:%s",
+                w,
+                h,
+                fontSize,
+                fs,
+                file.absolutePath
+            );
+            doc.layout(w, h, fontSize)
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
