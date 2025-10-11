@@ -587,15 +587,17 @@ fun CustomView(
                                             Text(
                                                 text = item.title ?: "",
                                                 color = Color.Black,
-                                                maxLines = 1,
+                                                maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis,
-                                                fontSize = 15.sp
+                                                fontSize = 15.sp,
+                                                modifier = Modifier.weight(1f)
                                             )
-                                            Spacer(Modifier.weight(1f))
                                             Text(
                                                 text = stringResource(Res.string.page_number).format(
                                                     item.page + 1
                                                 ),
+                                                maxLines = 1,
+                                                softWrap = false,
                                                 color = Color.Gray,
                                                 fontSize = 12.sp
                                             )

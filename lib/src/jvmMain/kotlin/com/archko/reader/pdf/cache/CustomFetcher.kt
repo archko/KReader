@@ -83,9 +83,9 @@ public class CustomImageFetcher(
 
         private fun loadImageFromCache(data: CustomImageData): ImageBitmap? {
             // 先检查内存缓存
-            val cachedImage = ImageCache.get(data.path)
+            val cachedImage = ImageCache.acquire(data.path)
             if (cachedImage != null) {
-                return cachedImage
+                return cachedImage.bitmap
             }
 
             // 检查磁盘缓存 - 使用包名作为缓存目录
@@ -138,7 +138,7 @@ public class CustomImageFetcher(
                 isSampled = false,
                 dataSource = DataSource.NETWORK
             )
-        } catch (e: IOException) {
+        } catch (_: IOException) {
             null
         }
     }

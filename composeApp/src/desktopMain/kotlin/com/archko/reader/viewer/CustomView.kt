@@ -1,6 +1,5 @@
 package com.archko.reader.viewer
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -301,6 +300,11 @@ fun CustomView(
                             tint = Color.White
                         )
                     }
+                    Text(
+                        text = currentPath,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     Spacer(Modifier.weight(1f))
 
                     // 方向按钮 - 文档和图片都显示
@@ -495,15 +499,17 @@ fun CustomView(
                                                 Text(
                                                     text = item.title ?: "",
                                                     color = Color.Black,
-                                                    maxLines = 1,
+                                                    maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis,
-                                                    fontSize = 15.sp
+                                                    fontSize = 15.sp,
+                                                    modifier = Modifier.weight(1f)
                                                 )
-                                                Spacer(Modifier.weight(1f))
                                                 Text(
                                                     text = stringResource(Res.string.page_number).format(
                                                         item.page + 1
                                                     ),
+                                                    maxLines = 1,
+                                                    softWrap = false,
                                                     color = Color.Gray,
                                                     fontSize = 12.sp
                                                 )
