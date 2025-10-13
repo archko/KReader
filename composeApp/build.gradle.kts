@@ -131,8 +131,17 @@ compose.desktop {
             
             // macOS 特定配置
             macOS {
-                // Bundle ID
                 bundleID = "com.archko.reader.viewer"
+                iconFile.set(project.file("src/desktopMain/resources/ic_launcher.png"))
+                
+                packageName = "KReader"
+                
+                // 使用自定义 Info.plist 文件
+                infoPlist {
+                    extraKeysRawXml = file("src/desktopMain/resources/Info.plist").readText()
+                        .substringAfter("<dict>")
+                        .substringBeforeLast("</dict>")
+                }
             }
         }
     }

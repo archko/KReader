@@ -1,31 +1,20 @@
 package com.archko.reader.viewer
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
-import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import kotlin.system.exitProcess
-import java.io.File
-import java.util.*
-import java.io.RandomAccessFile
-import java.nio.channels.FileChannel
-import java.nio.channels.FileLock
-import java.net.ServerSocket
-import java.net.Socket
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -34,10 +23,25 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.util.DebugLogger
 import coil3.util.Logger
-import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.cache.CustomImageFetcher
+import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import org.jetbrains.skiko.setSystemLookAndFeel
+import java.io.BufferedReader
+import java.io.File
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.io.RandomAccessFile
+import java.net.ServerSocket
+import java.net.Socket
+import java.nio.channels.FileLock
+import java.util.Properties
+import kotlin.system.exitProcess
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
@@ -132,16 +136,37 @@ object SingleInstanceManager {
             val reader = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
             val writer = PrintWriter(clientSocket.getOutputStream(), true)
             
-            val filePath = reader.readLine()
-            if (filePath != null && filePath.isNotEmpty()) {
-                println("收到文件打开请求: $filePath")
-                // 发送文件打开事件
-                CoroutineScope(Dispatchers.Main).launch {
-                    _fileOpenEvents.emit(filePath)
+            val message = reader.readLine()
+            if (message != null && message.isNotEmpty()) {
+                if (message == "ACTIVATE") {
+                    println("收到窗口激活请求")
+                    // 发送激活事件
+                    CoroutineScope(Dispatchers.Main).launch {
+                        _fileOpenEvents.emit("ACTIVATE")
+                    }
+                } else {
+                    println("收到文件打开请求: $message")
+                    // 验证文件是否存在且为支持的格式
+                    val file = File(message)
+                    if (file.exists() && file.isFile) {
+                        // 发送文件打开事件
+                        CoroutineScope(Dispatchers.Main).launch {
+                            _fileOpenEvents.emit(message)
+                        }
+                    } else {
+                        val errorMsg = when {
+                            !file.exists() -> "ERROR: File not found"
+                            !file.isFile -> "ERROR: Not a file"
+                            else -> "ERROR: Unknown error"
+                        }
+                        println("文件验证失败: $message - $errorMsg")
+                        writer.println(errorMsg)
+                        return
+                    }
                 }
                 writer.println("OK")
             } else {
-                writer.println("ERROR")
+                writer.println("ERROR: Empty message")
             }
         } catch (e: Exception) {
             println("处理客户端请求失败: ${e.message}")
@@ -274,36 +299,60 @@ private fun saveWindowState(windowState: WindowState) {
 fun main(args: Array<String>) {
     setSystemLookAndFeel()
 
+    // 简化的启动调试信息
+    println("=== KReader 启动 ===")
+    println("命令行参数数量: ${args.size}")
+    args.forEachIndexed { index, arg ->
+        println("参数[$index]: '$arg'")
+    }
+    
+    // 检查是否通过文件关联启动
+    val javaCommand = System.getProperty("sun.java.command")
+    println("Java命令: $javaCommand")
+    println("===================")
+
     // 处理命令行参数，获取要打开的文件路径
     val initialFilePath = if (args.isNotEmpty()) {
         val filePath = args[0]
-        // 处理可能的引号包围的路径
-        val cleanPath = filePath.trim('"', '\'')
+        val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
         println("原始参数: $filePath")
         println("清理后路径: $cleanPath")
         
-        // 验证文件是否存在
         val file = File(cleanPath)
-        if (file.exists()) {
-            println("文件存在: ${file.absolutePath}")
-            cleanPath
+        if (file.exists() && file.isFile) {
+            println("文件存在且支持: ${file.absolutePath}")
+            file.absolutePath // 使用绝对路径
         } else {
-            println("文件不存在: ${file.absolutePath}")
+            val reason = when {
+                !file.exists() -> "文件不存在"
+                !file.isFile -> "不是文件"
+                else -> "未知错误"
+            }
+            println("文件验证失败: ${file.absolutePath} - $reason")
             null
         }
     } else {
-        null
+        val possibleFilePath = System.getProperty("file.to.open") 
+            ?: System.getenv("KREADER_FILE")
+            ?: System.getProperty("java.awt.desktop.file")
+        
+        if (possibleFilePath != null) {
+            println("从系统属性/环境变量获取到文件路径: $possibleFilePath")
+            val file = File(possibleFilePath)
+            if (file.exists() && file.isFile) {
+                println("备用文件路径有效: ${file.absolutePath}")
+                file.absolutePath
+            } else {
+                println("备用文件路径无效")
+                null
+            }
+        } else {
+            null
+        }
     }
 
     println("启动应用，最终文件路径: $initialFilePath")
-    println("命令行参数数量: ${args.size}")
-    args.forEachIndexed { index, arg ->
-        println("参数[$index]: $arg")
-    }
-
-    // 尝试获取单实例锁
     if (!SingleInstanceManager.tryLockInstance()) {
-        // 已有实例运行，发送文件路径给运行中的实例
         if (initialFilePath != null) {
             println("发送文件到已运行的实例: $initialFilePath")
             if (SingleInstanceManager.sendFileToRunningInstance(initialFilePath)) {
@@ -313,8 +362,13 @@ fun main(args: Array<String>) {
                 println("发送文件失败，继续启动新实例")
             }
         } else {
-            println("已有实例运行，退出")
-            exitProcess(0)
+            println("尝试激活已运行的实例")
+            if (SingleInstanceManager.sendFileToRunningInstance("ACTIVATE")) {
+                println("已激活运行中的实例")
+                exitProcess(0)
+            } else {
+                println("激活失败，继续启动新实例")
+            }
         }
     }
 
@@ -332,7 +386,7 @@ fun main(args: Array<String>) {
             position = savedState.position
         )
 
-        Window(
+        val window = Window(
             title = "KReader",
             state = windowState,
             onCloseRequest = {
@@ -370,12 +424,22 @@ fun main(args: Array<String>) {
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }
                 
                 LaunchedEffect(Unit) {
-                    SingleInstanceManager.fileOpenEvents.collect { newFilePath ->
-                        println("收到新文件打开事件: $newFilePath")
-                        currentFilePath = newFilePath
+                    SingleInstanceManager.fileOpenEvents.collect { message ->
+                        println("收到事件: $message")
                         
-                        // 将窗口置于前台
-                        windowState.isMinimized = false
+                        if (message == "ACTIVATE") {
+                            println("激活窗口")
+                            windowState.isMinimized = false
+                            window.toFront()
+                            window.requestFocus()
+                        } else {
+                            println("收到新文件打开事件: $message")
+                            currentFilePath = message
+                            
+                            windowState.isMinimized = false
+                            window.toFront()
+                            window.requestFocus()
+                        }
                     }
                 }
                 

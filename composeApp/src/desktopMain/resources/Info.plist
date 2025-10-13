@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>KReader</string>
+    <key>CFBundleName</key>
+    <string>KReader</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.archko.reader.viewer</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleExecutable</key>
+    <string>KReader</string>
+    <key>CFBundleIconFile</key>
+    <string>ic_launcher</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>mobi</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>Mobi eBook</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeIconFile</key>
+            <string>ic_launcher</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>pdf</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>PDF Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>epub</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>EPUB eBook</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>cbz</string>
+                <string>cbr</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>Comic Book Archive</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+    </array>
+</dict>
+</plist>
