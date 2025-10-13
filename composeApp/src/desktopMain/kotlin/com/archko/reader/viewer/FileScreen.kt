@@ -137,9 +137,10 @@ fun FileScreen(
                         scope.launch {
                             files.singleOrNull()?.let { file ->
                                 val fileObj = file.file
-                                if (!FileTypeUtils.isValidImageFile(fileObj)
-                                    && !FileTypeUtils.isDocumentFile(fileObj.absolutePath)
-                                    && !FileTypeUtils.isTiffFile(fileObj.absolutePath)
+                                val path = fileObj.absolutePath
+                                if (!FileTypeUtils.isImageFile(path)
+                                    && !FileTypeUtils.isDocumentFile(path)
+                                    && !FileTypeUtils.isTiffFile(path)
                                 ) {
                                     return@launch
                                 }

@@ -352,7 +352,7 @@ fun main(args: Array<String>) {
     }
 
     println("启动应用，最终文件路径: $initialFilePath")
-    if (!SingleInstanceManager.tryLockInstance()) {
+    /*if (!SingleInstanceManager.tryLockInstance()) {
         if (initialFilePath != null) {
             println("发送文件到已运行的实例: $initialFilePath")
             if (SingleInstanceManager.sendFileToRunningInstance(initialFilePath)) {
@@ -370,12 +370,12 @@ fun main(args: Array<String>) {
                 println("激活失败，继续启动新实例")
             }
         }
-    }
+    }*/
 
     // 设置关闭钩子
-    Runtime.getRuntime().addShutdownHook(Thread {
+    /*Runtime.getRuntime().addShutdownHook(Thread {
         SingleInstanceManager.cleanup()
-    })
+    })*/
 
     application {
         // 加载保存的窗口状态
@@ -423,7 +423,7 @@ fun main(args: Array<String>) {
                 // 监听文件打开事件
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }
                 
-                LaunchedEffect(Unit) {
+                /*LaunchedEffect(Unit) {
                     SingleInstanceManager.fileOpenEvents.collect { message ->
                         println("收到事件: $message")
                         
@@ -441,7 +441,7 @@ fun main(args: Array<String>) {
                             window.requestFocus()
                         }
                     }
-                }
+                }*/
                 
                 FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel, currentFilePath)
             }
