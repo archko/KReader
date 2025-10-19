@@ -66,6 +66,7 @@ import kreader.composeapp.generated.resources.components_thumbnail_top
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
+import kreader.composeapp.generated.resources.setting
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -87,6 +88,7 @@ fun FileScreen(
         val hasMoreData by viewModel.hasMoreData.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
+        var showSettingDialog by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
@@ -154,7 +156,7 @@ fun FileScreen(
                         }
                     }
 
-                    Box(
+                    Row (
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 32.dp)
@@ -162,7 +164,7 @@ fun FileScreen(
                         if (recentList.isNotEmpty()) {
                             Button(
                                 onClick = { viewModel.clear() },
-                                modifier = Modifier.align(Alignment.CenterStart),
+                                modifier = Modifier.padding(start = 8.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -173,13 +175,23 @@ fun FileScreen(
                         }
                         Button(
                             onClick = pickerLauncher::launch,
-                            modifier = Modifier.align(Alignment.Center),
+                            modifier = Modifier.padding(start = 16.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             )
                         ) {
                             Text(stringResource(Res.string.select_pdf))
+                        }
+                        Button(
+                            onClick = { showSettingDialog = true },
+                            modifier = Modifier.padding(start = 16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Text(stringResource(Res.string.setting))
                         }
                         //testTts()
                     }
@@ -306,6 +318,11 @@ fun FileScreen(
                     crop = 0L == viewModel.progress?.crop
                 )
             }
+        }
+        if (showSettingDialog) {
+            SettingScreen(
+                onDismiss = { showSettingDialog = false }
+            )
         }
     }
 }
