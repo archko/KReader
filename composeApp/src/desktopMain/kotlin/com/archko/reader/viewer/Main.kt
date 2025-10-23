@@ -119,7 +119,7 @@ object SingleInstanceManager {
                             handleClient(clientSocket)
                         }
                     } catch (e: Exception) {
-                        if (!serverSocket!!.isClosed) {
+                        if (serverSocket != null && !serverSocket!!.isClosed) {
                             println("服务器错误: ${e.message}")
                         }
                         break
@@ -148,10 +148,11 @@ object SingleInstanceManager {
                     println("收到文件打开请求: $message")
                     // 验证文件是否存在且为支持的格式
                     val file = File(message)
+                    // 注意：这里的检查应与 main 函数中的逻辑保持一致，只检查是否存在和是否为文件
                     if (file.exists() && file.isFile) {
                         // 发送文件打开事件
                         CoroutineScope(Dispatchers.Main).launch {
-                            _fileOpenEvents.emit(message)
+                            _fileOpenEvents.emit(file.absolutePath) // 使用绝对路径
                         }
                     } else {
                         val errorMsg = when {
@@ -284,8 +285,16 @@ private fun saveWindowState(windowState: WindowState) {
         
         properties.setProperty("width", windowState.size.width.value.toString())
         properties.setProperty("height", windowState.size.height.value.toString())
-        properties.setProperty("x", windowState.position.x.value.toString())
-        properties.setProperty("y", windowState.position.y.value.toString())
+        // 仅在非最大化时保存位置，否则保存的可能是屏幕外的位置
+        if (windowState.placement == WindowPlacement.Floating) {
+            properties.setProperty("x", windowState.position.x.value.toString())
+            properties.setProperty("y", windowState.position.y.value.toString())
+        } else {
+            // 最大化时保存 0
+            properties.setProperty("x", "0")
+            properties.setProperty("y", "0")
+        }
+
         properties.setProperty("isMaximized", (windowState.placement == WindowPlacement.Maximized).toString())
         
         properties.store(configFile.outputStream(), "KReader Window State")
@@ -314,7 +323,8 @@ fun main(args: Array<String>) {
     // 处理命令行参数，获取要打开的文件路径
     val initialFilePath = if (args.isNotEmpty()) {
         val filePath = args[0]
-        val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
+        // 确保路径被正确清理（移除可能的引号）
+        val cleanPath = filePath.trim('"', '\'').replace("\\", "/") 
         println("原始参数: $filePath")
         println("清理后路径: $cleanPath")
         
@@ -332,13 +342,17 @@ fun main(args: Array<String>) {
             null
         }
     } else {
+        // 备用获取文件路径的方法（例如 macOS/Windows 桌面集成属性）
         val possibleFilePath = System.getProperty("file.to.open") 
             ?: System.getenv("KREADER_FILE")
             ?: System.getProperty("java.awt.desktop.file")
         
         if (possibleFilePath != null) {
             println("从系统属性/环境变量获取到文件路径: $possibleFilePath")
-            val file = File(possibleFilePath)
+            // 同样进行清理
+            val cleanPath = possibleFilePath.trim('"', '\'').replace("\\", "/")
+            val file = File(cleanPath)
+            
             if (file.exists() && file.isFile) {
                 println("备用文件路径有效: ${file.absolutePath}")
                 file.absolutePath
@@ -352,30 +366,38 @@ fun main(args: Array<String>) {
     }
 
     println("启动应用，最终文件路径: $initialFilePath")
-    /*if (!SingleInstanceManager.tryLockInstance()) {
+    
+    // =======================================================
+    // 启用单实例管理逻辑
+    // =======================================================
+    if (!SingleInstanceManager.tryLockInstance()) {
+        // 如果实例已运行，则将文件路径发送给它
         if (initialFilePath != null) {
             println("发送文件到已运行的实例: $initialFilePath")
             if (SingleInstanceManager.sendFileToRunningInstance(initialFilePath)) {
                 println("文件已发送到运行中的实例")
-                exitProcess(0)
+                exitProcess(0) // 成功发送后退出新进程
             } else {
                 println("发送文件失败，继续启动新实例")
             }
         } else {
+            // 如果没有文件路径，尝试激活已运行的实例（防止用户双击应用图标）
             println("尝试激活已运行的实例")
             if (SingleInstanceManager.sendFileToRunningInstance("ACTIVATE")) {
                 println("已激活运行中的实例")
-                exitProcess(0)
+                exitProcess(0) // 成功激活后退出新进程
             } else {
                 println("激活失败，继续启动新实例")
             }
         }
-    }*/
+    }
 
-    // 设置关闭钩子
-    /*Runtime.getRuntime().addShutdownHook(Thread {
+    // 设置关闭钩子，以确保应用退出时释放文件锁和关闭服务器
+    Runtime.getRuntime().addShutdownHook(Thread {
         SingleInstanceManager.cleanup()
-    })*/
+    })
+    // =======================================================
+
 
     application {
         // 加载保存的窗口状态
@@ -402,6 +424,7 @@ fun main(args: Array<String>) {
                     .build()
             }
 
+            // 获取屏幕尺寸信息
             val windowInfo = LocalWindowInfo.current
             val density = LocalDensity.current
             var screenWidthInPixels by remember { mutableStateOf(0) }
@@ -413,7 +436,8 @@ fun main(args: Array<String>) {
             println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
 
             val driverFactory = DriverFactory()
-            val database = driverFactory.createRoomDatabase()
+            // 假设 createRoomDatabase 是一个轻量级操作或在初始化阶段进行
+            val database = driverFactory.createRoomDatabase() 
 
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
@@ -423,26 +447,32 @@ fun main(args: Array<String>) {
                 // 监听文件打开事件
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }
                 
-                /*LaunchedEffect(Unit) {
+                // =======================================================
+                // 启用事件监听逻辑，处理第二个实例发送过来的文件路径
+                // =======================================================
+                LaunchedEffect(Unit) { 
                     SingleInstanceManager.fileOpenEvents.collect { message ->
                         println("收到事件: $message")
                         
                         if (message == "ACTIVATE") {
                             println("激活窗口")
-                            windowState.isMinimized = false
-                            window.toFront()
+                            windowState.isMinimized = false // 恢复最小化窗口
+                            // 确保窗口被带到最前和聚焦
+                            window.toFront() 
                             window.requestFocus()
                         } else {
                             println("收到新文件打开事件: $message")
-                            currentFilePath = message
+                            currentFilePath = message // 更新文件路径状态
                             
                             windowState.isMinimized = false
                             window.toFront()
                             window.requestFocus()
                         }
                     }
-                }*/
+                }
+                // =======================================================
                 
+                // FileScreen 将使用 currentFilePath 来加载文件
                 FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel, currentFilePath)
             }
         }

@@ -206,7 +206,22 @@ public class PageNode(
                         }
 
                         override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                            return pdfViewState.isTileVisible(tileSpec) && !pdfViewState.isShutdown()
+                            if (pdfViewState.isShutdown()) {
+                                return false
+                            }
+                            
+                            // 检查页面是否在当前可见页面列表中
+                            val isPageVisible = pdfViewState.pageToRender.any { it.aPage.index == pageNumber }
+                            if (!isPageVisible) {
+                                return false
+                            }
+                            
+                            // 对于节点任务，还需要检查具体的tile是否可见
+                            if (!isFullPage) {
+                                return pdfViewState.isTileVisible(tileSpec)
+                            }
+                            
+                            return true
                         }
                     }
                 )

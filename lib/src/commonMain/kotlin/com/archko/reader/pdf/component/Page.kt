@@ -184,12 +184,7 @@ public class Page(
     }
 
     private fun isPageVisible(pageNumber: Int): Boolean {
-        for (render in pdfViewState.pageToRender) {
-            if (render.aPage.index == pageNumber) {
-                return true
-            }
-        }
-        return false
+        return pdfViewState.pageToRender.any { it.aPage.index == pageNumber }
     }
 
     private fun isScopeActive(): Boolean {

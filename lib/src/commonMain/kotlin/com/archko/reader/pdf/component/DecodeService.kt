@@ -58,12 +58,35 @@ public class DecodeService(
 
     private suspend fun selectNextTask(): DecodeTask? {
         return queueMutex.withLock {
+            // 清理不可见的任务
+            //cleanupInvisibleTasks()
+            
             when {
                 pageTaskQueue.isNotEmpty() -> pageTaskQueue.removeAt(0)
                 nodeTaskQueue.isNotEmpty() -> nodeTaskQueue.removeAt(0)
                 cropTaskQueue.isNotEmpty() -> cropTaskQueue.removeAt(0)
                 else -> null
             }
+        }
+    }
+
+    private fun cleanupInvisibleTasks() {
+        // 清理页面任务中不可见的任务
+        pageTaskQueue.removeAll { task ->
+            val shouldRender = task.callback?.shouldRender(task.pageIndex, true) ?: true
+            if (!shouldRender) {
+                println("DecodeService.cleanupInvisibleTasks: 清理不可见页面任务 - page: ${task.pageIndex}")
+            }
+            !shouldRender
+        }
+        
+        // 清理节点任务中不可见的任务
+        nodeTaskQueue.removeAll { task ->
+            val shouldRender = task.callback?.shouldRender(task.pageIndex, false) ?: true
+            if (!shouldRender) {
+                println("DecodeService.cleanupInvisibleTasks: 清理不可见节点任务 - page: ${task.pageIndex}")
+            }
+            !shouldRender
         }
     }
 
@@ -94,6 +117,13 @@ public class DecodeService(
 
     private suspend fun executeTask(task: DecodeTask) {
         if (isShutdown) return
+
+        // 执行前检查任务是否仍然需要渲染
+        val shouldRender = task.callback?.shouldRender(task.pageIndex, task.type == DecodeTask.TaskType.PAGE) ?: true
+        if (!shouldRender) {
+            //println("DecodeService.executeTask: 跳过不可见任务 - page: ${task.pageIndex}, type: ${task.type}")
+            return
+        }
 
         try {
             when (task.type) {
