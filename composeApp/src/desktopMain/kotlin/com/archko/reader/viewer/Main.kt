@@ -3,6 +3,7 @@ package com.archko.reader.viewer
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,7 +42,11 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.channels.FileLock
 import java.util.Properties
+import java.util.Locale
 import kotlin.system.exitProcess
+import java.awt.Desktop
+import java.awt.desktop.OpenFilesEvent
+import java.awt.desktop.OpenFilesHandler
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
@@ -60,6 +65,13 @@ object SingleInstanceManager {
     // 文件打开事件流
     private val _fileOpenEvents = MutableSharedFlow<String>()
     val fileOpenEvents: SharedFlow<String> = _fileOpenEvents
+    
+    // 发送文件打开事件的公开方法
+    fun sendFileOpenEvent(filePath: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            _fileOpenEvents.emit(filePath)
+        }
+    }
     
     fun tryLockInstance(): Boolean {
         return try {
@@ -308,63 +320,119 @@ private fun saveWindowState(windowState: WindowState) {
 fun main(args: Array<String>) {
     setSystemLookAndFeel()
 
-    // 简化的启动调试信息
+    // 详细的启动调试信息
     println("=== KReader 启动 ===")
     println("命令行参数数量: ${args.size}")
     args.forEachIndexed { index, arg ->
         println("参数[$index]: '$arg'")
     }
     
-    // 检查是否通过文件关联启动
+    // 检查所有可能的系统属性
     val javaCommand = System.getProperty("sun.java.command")
     println("Java命令: $javaCommand")
-    println("===================")
-
-    // 处理命令行参数，获取要打开的文件路径
-    val initialFilePath = if (args.isNotEmpty()) {
-        val filePath = args[0]
-        // 确保路径被正确清理（移除可能的引号）
-        val cleanPath = filePath.trim('"', '\'').replace("\\", "/") 
-        println("原始参数: $filePath")
-        println("清理后路径: $cleanPath")
-        
-        val file = File(cleanPath)
-        if (file.exists() && file.isFile) {
-            println("文件存在且支持: ${file.absolutePath}")
-            file.absolutePath // 使用绝对路径
-        } else {
-            val reason = when {
-                !file.exists() -> "文件不存在"
-                !file.isFile -> "不是文件"
-                else -> "未知错误"
-            }
-            println("文件验证失败: ${file.absolutePath} - $reason")
-            null
-        }
-    } else {
-        // 备用获取文件路径的方法（例如 macOS/Windows 桌面集成属性）
-        val possibleFilePath = System.getProperty("file.to.open") 
-            ?: System.getenv("KREADER_FILE")
-            ?: System.getProperty("java.awt.desktop.file")
-        
-        if (possibleFilePath != null) {
-            println("从系统属性/环境变量获取到文件路径: $possibleFilePath")
-            // 同样进行清理
-            val cleanPath = possibleFilePath.trim('"', '\'').replace("\\", "/")
-            val file = File(cleanPath)
-            
-            if (file.exists() && file.isFile) {
-                println("备用文件路径有效: ${file.absolutePath}")
-                file.absolutePath
-            } else {
-                println("备用文件路径无效")
-                null
-            }
-        } else {
-            null
+    
+    // 打印所有相关的系统属性
+    val relevantProps = listOf(
+        "file.to.open", "java.awt.desktop.file", "apple.awt.application.name",
+        "com.apple.mrj.application.apple.menu.about.name", "user.dir"
+    )
+    relevantProps.forEach { prop ->
+        val value = System.getProperty(prop)
+        if (value != null) {
+            println("系统属性 $prop: $value")
         }
     }
+    
+    // 检查环境变量
+    val relevantEnvs = listOf("KREADER_FILE", "JAVA_MAIN_CLASS_PID")
+    relevantEnvs.forEach { env ->
+        val value = System.getenv(env)
+        if (value != null) {
+            println("环境变量 $env: $value")
+        }
+    }
+    println("===================")
 
+    // 多种方式获取要打开的文件路径
+    fun findFilePath(): String? {
+        // 方法1: 命令行参数
+        if (args.isNotEmpty()) {
+            val filePath = args[0]
+            val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
+            println("方法1 - 命令行参数: $filePath -> $cleanPath")
+            
+            val file = File(cleanPath)
+            if (file.exists() && file.isFile) {
+                println("✓ 命令行参数文件有效: ${file.absolutePath}")
+                return file.absolutePath
+            } else {
+                println("✗ 命令行参数文件无效: ${file.absolutePath}")
+            }
+        }
+        
+        // 方法2: 系统属性
+        val systemProps = listOf(
+            "file.to.open",
+            "java.awt.desktop.file", 
+            "apple.laf.useScreenMenuBar.file"
+        )
+        
+        for (prop in systemProps) {
+            val filePath = System.getProperty(prop)
+            if (filePath != null) {
+                val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
+                println("方法2 - 系统属性 $prop: $filePath -> $cleanPath")
+                
+                val file = File(cleanPath)
+                if (file.exists() && file.isFile) {
+                    println("✓ 系统属性文件有效: ${file.absolutePath}")
+                    return file.absolutePath
+                } else {
+                    println("✗ 系统属性文件无效: ${file.absolutePath}")
+                }
+            }
+        }
+        
+        // 方法3: 环境变量
+        val filePath = System.getenv("KREADER_FILE")
+        if (filePath != null) {
+            val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
+            println("方法3 - 环境变量: $filePath -> $cleanPath")
+            
+            val file = File(cleanPath)
+            if (file.exists() && file.isFile) {
+                println("✓ 环境变量文件有效: ${file.absolutePath}")
+                return file.absolutePath
+            } else {
+                println("✗ 环境变量文件无效: ${file.absolutePath}")
+            }
+        }
+        
+        // 方法4: 检查 Java 命令中是否包含文件路径
+        if (javaCommand != null && javaCommand.contains("/") && !javaCommand.endsWith(".jar")) {
+            val parts = javaCommand.split(" ")
+            for (part in parts) {
+                if (part.contains("/") && (part.endsWith(".pdf") || part.endsWith(".epub") || 
+                    part.endsWith(".mobi") || part.endsWith(".txt") || part.endsWith(".djvu"))) {
+                    val cleanPath = part.trim('"', '\'').replace("\\", "/")
+                    println("方法4 - Java命令解析: $part -> $cleanPath")
+                    
+                    val file = File(cleanPath)
+                    if (file.exists() && file.isFile) {
+                        println("✓ Java命令文件有效: ${file.absolutePath}")
+                        return file.absolutePath
+                    } else {
+                        println("✗ Java命令文件无效: ${file.absolutePath}")
+                    }
+                }
+            }
+        }
+        
+        println("所有方法都未找到有效文件路径")
+        return null
+    }
+
+    val initialFilePath = findFilePath()
     println("启动应用，最终文件路径: $initialFilePath")
     
     // =======================================================
@@ -400,6 +468,31 @@ fun main(args: Array<String>) {
 
 
     application {
+        // 设置 macOS 文件打开事件处理
+        if (System.getProperty("os.name").lowercase(Locale.getDefault()).contains("mac")) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    val desktop = Desktop.getDesktop()
+                    if (desktop.isSupported(Desktop.Action.APP_OPEN_FILE)) {
+                        desktop.setOpenFileHandler { event ->
+                            println("macOS 文件打开事件触发")
+                            val files = event.files
+                            if (files.isNotEmpty()) {
+                                val file = files[0]
+                                println("通过 macOS 事件接收到文件: ${file.absolutePath}")
+                                
+                                // 发送文件打开事件到应用
+                                SingleInstanceManager.sendFileOpenEvent(file.absolutePath)
+                            }
+                        }
+                        println("macOS 文件打开事件处理器已设置")
+                    }
+                }
+            } catch (e: Exception) {
+                println("设置 macOS 文件打开事件处理器失败: ${e.message}")
+            }
+        }
+        
         // 加载保存的窗口状态
         val savedState = loadWindowState()
         val windowState = rememberWindowState(
@@ -444,8 +537,9 @@ fun main(args: Array<String>) {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
                 
-                // 监听文件打开事件
+                // 文档管理状态
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }
+                var forceReload by remember { mutableStateOf(false) }
                 
                 // =======================================================
                 // 启用事件监听逻辑，处理第二个实例发送过来的文件路径
@@ -456,13 +550,30 @@ fun main(args: Array<String>) {
                         
                         if (message == "ACTIVATE") {
                             println("激活窗口")
-                            windowState.isMinimized = false // 恢复最小化窗口
-                            // 确保窗口被带到最前和聚焦
+                            windowState.isMinimized = false
                             window.toFront() 
                             window.requestFocus()
                         } else {
                             println("收到新文件打开事件: $message")
-                            currentFilePath = message // 更新文件路径状态
+                            
+                            // 检查是否是不同的文件
+                            if (currentFilePath != message) {
+                                println("切换文档: $currentFilePath -> $message")
+                                
+                                // 如果当前有打开的文档，先关闭它
+                                if (currentFilePath != null) {
+                                    println("关闭当前文档: $currentFilePath")
+                                    // 这里可以添加保存阅读进度等逻辑
+                                }
+                                
+                                // 更新到新文档
+                                currentFilePath = message
+                                forceReload = !forceReload // 触发重新加载
+                                
+                                println("已切换到新文档: $message")
+                            } else {
+                                println("相同文件，只激活窗口")
+                            }
                             
                             windowState.isMinimized = false
                             window.toFront()
@@ -470,10 +581,20 @@ fun main(args: Array<String>) {
                         }
                     }
                 }
+                
+                // 监听文件路径变化，确保 FileScreen 能响应新文件
+                LaunchedEffect(currentFilePath, forceReload) {
+                    if (currentFilePath != null) {
+                        println("LaunchedEffect: 准备加载文档 $currentFilePath")
+                    }
+                }
                 // =======================================================
                 
                 // FileScreen 将使用 currentFilePath 来加载文件
-                FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel, currentFilePath)
+                // 使用 key 确保文档切换时正确重新加载
+                key(currentFilePath) {
+                    FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel, currentFilePath)
+                }
             }
         }
     }

@@ -16,3 +16,8 @@ captures
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
+composeApp/release
+composeApp/release_key.jks
+composeApp/*.sh
+*.log
+.vscode

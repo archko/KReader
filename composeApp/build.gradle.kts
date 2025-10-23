@@ -49,6 +49,9 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
+            // 保持 JNA 依赖如果你的 dylib 使用 JNA 加载
+            // implementation("net.java.dev.jna:jna:5.18.0")
+            // implementation("net.java.dev.jna:jna-platform:5.18.0")
         }
     }
 }
@@ -117,26 +120,32 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.archko.reader.viewer.MainKt"
+        
+        // 为打包的应用配置 JVM 参数，让应用能找到 dylib 文件
+        jvmArgs += listOf(
+            "-Djava.library.path=\$APPDIR/../Resources/macos-aarch64:\$APPDIR/../Resources/macos-x64"
+        )
 
         nativeDistributions {
             modules("java.instrument", "java.sql", "jdk.unsupported")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "KReader"
             packageVersion = "1.0.0"
-            
+
             // 应用描述
             description = "A PDF and document reader application"
             copyright = "© 2025 KReader. All rights reserved."
             vendor = "KReader"
-            
+
             // macOS 特定配置
             macOS {
                 bundleID = "com.archko.reader.viewer"
-                //iconFile.set(project.file("src/desktopMain/resources/ic_launcher.png"))
-                
+                // 使用生成的 ICNS 图标文件
+                iconFile.set(project.file("src/desktopMain/resources/app_icon.icns"))
+
                 packageName = "KReader"
-                
-                // 使用自定义 Info.plist 文件
+
+                // 使用完整的 Info.plist 文件配置文件关联
                 infoPlist {
                     extraKeysRawXml = file("src/desktopMain/resources/Info.plist").readText()
                         .substringAfter("<dict>")
@@ -180,27 +189,43 @@ tasks.withType<Jar> {
     exclude("macos-x64/**")
 }
 
-// 复制 dylib 文件到 JAR 输出目录
-tasks.register<Copy>("copyDylibFiles") {
-    val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-    val arch = System.getProperty("os.arch").lowercase(Locale.getDefault())
-
-    if (osName.contains("mac")) {
-        if (arch.contains("aarch64") || arch.contains("arm64")) {
-            from("src/commonMain/resources/macos-aarch64")
-        } else if (arch.contains("x86_64")) {
-            from("src/commonMain/resources/macos-x64")
-        }
+// 复制 dylib 文件到应用包内
+tasks.register<Copy>("copyNativeLibs") {
+    // 复制两个架构的 dylib 文件到应用包的 Resources 目录
+    from("src/commonMain/resources/macos-aarch64") {
+        into("macos-aarch64")
     }
-    // 目标路径为.app包内的目录
-    val targetDir = layout.buildDirectory.dir("app").get().asFile
-    into(targetDir)
-
-    // 确保目标目录存在
+    from("src/commonMain/resources/macos-x64") {
+        into("macos-x64")
+    }
+    
+    // 目标路径为应用包的 Contents/Resources 目录
+    into(layout.buildDirectory.dir("compose/binaries/main/app/KReader.app/Contents/Resources"))
+    
     doFirst {
+        val targetDir = layout.buildDirectory.dir("compose/binaries/main/app/KReader.app/Contents/Resources").get().asFile
         targetDir.mkdirs()
+        println("Copying native libraries to: ${targetDir.absolutePath}")
+    }
+    
+    // 只在 macOS 上执行
+    onlyIf {
+        System.getProperty("os.name").lowercase(Locale.getDefault()).contains("mac")
     }
 }
 
-// 确保此任务在打包应用之前运行
-tasks.named("assemble") { dependsOn("copyDylibFiles") }
+// 新版本 Compose Multiplatform 的任务名称
+// 确保在创建应用包时复制 dylib 文件
+tasks.matching { it.name == "createDistributable" || it.name == "prepareAppResources" }.configureEach {
+    finalizedBy("copyNativeLibs")
+}
+
+// 确保在打包 DMG 前复制了文件
+tasks.matching { it.name == "packageDmg" || it.name == "packageDistributionForCurrentOS" }.configureEach {
+    dependsOn("copyNativeLibs")
+}
+
+// 为了确保文件被正确复制，也在相关任务后执行
+tasks.matching { it.name.contains("packageUberJar") || it.name.contains("runDistributable") }.configureEach {
+    finalizedBy("copyNativeLibs")
+}
