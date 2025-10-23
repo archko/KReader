@@ -132,7 +132,7 @@ compose.desktop {
             // macOS 特定配置
             macOS {
                 bundleID = "com.archko.reader.viewer"
-                iconFile.set(project.file("src/desktopMain/resources/ic_launcher.png"))
+                //iconFile.set(project.file("src/desktopMain/resources/ic_launcher.png"))
                 
                 packageName = "KReader"
                 
