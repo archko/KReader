@@ -95,6 +95,7 @@ fun FileScreen(
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
+    onExternalPathConsumed: () -> Unit = {},
     onCloseDocument: () -> Unit = {}
 ) {
     Theme {
@@ -111,15 +112,15 @@ fun FileScreen(
             viewModel.loadRecents()
         }
 
-        // 处理外部路径
+        // 处理外部路径 - 只处理一次，处理后立即清除
         LaunchedEffect(externalPath) {
-            externalPath?.let { path ->
+            if (externalPath != null) {
                 scope.launch {
-                    val file = File(path)
+                    val file = File(externalPath)
                     if (file.exists()) {
-                        if (FileTypeUtils.isImageFile(path)) {
-                            openDocRequest = OpenDocRequest(listOf(path), 0)
-                        } else if (FileTypeUtils.isDocumentFile(path)) {
+                        if (FileTypeUtils.isImageFile(externalPath)) {
+                            openDocRequest = OpenDocRequest(listOf(externalPath), 0)
+                        } else if (FileTypeUtils.isDocumentFile(externalPath)) {
                             // 如果是支持的文档文件，直接打开
                             val paths = listOf(file.absolutePath)
                             if (FileTypeUtils.shouldSaveProgress(paths)) {
@@ -129,12 +130,14 @@ fun FileScreen(
                             } else {
                                 openDocRequest = OpenDocRequest(paths, 0)
                             }
-                        } else if (FileTypeUtils.isTiffFile(path)) {
+                        } else if (FileTypeUtils.isTiffFile(externalPath)) {
                             // 如果是tiff
                             val paths = listOf(file.absolutePath)
                             openDocRequest = OpenDocRequest(paths, 0)
                         }
                     }
+                    // 处理完外部路径后立即清除，防止重复打开
+                    onExternalPathConsumed()
                 }
             }
         }
@@ -144,6 +147,7 @@ fun FileScreen(
 
         BackHandler(enabled = openDocRequest != null) {
             openDocRequest = null
+            onCloseDocument()
             // 恢复状态栏显示
             val activity = context as? ComponentActivity
             activity?.window?.let { window ->

@@ -56,6 +56,16 @@ fun KApp(
     viewModel: PdfViewModel,
     externalPath: String? = null
 ) {
+    // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
+    var currentExternalPath by remember { mutableStateOf(externalPath) }
+    
+    // 只在首次接收到 externalPath 时设置
+    LaunchedEffect(externalPath) {
+        if (externalPath != null && currentExternalPath == null) {
+            currentExternalPath = externalPath
+        }
+    }
+    
     Theme {
         val jetsnackNavController = rememberKNavController()
         SharedTransitionLayout {
@@ -75,7 +85,11 @@ fun KApp(
                             screenHeightInPixels,
                             viewModel,
                             modifier = Modifier,
-                            externalPath = externalPath
+                            externalPath = currentExternalPath,
+                            onExternalPathConsumed = {
+                                // 当外部路径被处理后，清除它以防止重复打开
+                                currentExternalPath = null
+                            }
                         )
                     }
                 }
@@ -90,20 +104,14 @@ fun MainContainer(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
-    externalPath: String? = null
+    externalPath: String? = null,
+    onExternalPathConsumed: () -> Unit = {}
 ) {
     val nestedNavController = rememberKNavController()
     val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     var showBottomBar by remember { mutableStateOf(true) }
     
-    var currentExternalPath by rememberSaveable { mutableStateOf(externalPath) }
-    
-    LaunchedEffect(externalPath) {
-        if (externalPath != null && currentExternalPath != externalPath) {
-            currentExternalPath = externalPath
-        }
-    }
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -120,18 +128,14 @@ fun MainContainer(
             navController = nestedNavController.navController,
             startDestination = HomeSections.FILE.route
         ) {
-            println("MainContainer: NavHost 重建，当前外部路径: $currentExternalPath")
             addHomeGraph(
                 screenWidthInPixels,
                 screenHeightInPixels,
                 viewModel,
-                modifier = Modifier
-                    .consumeWindowInsets(padding),
+                modifier = Modifier.consumeWindowInsets(padding),
                 onShowBottomBarChanged = { showBottomBar = it },
-                externalPath = currentExternalPath,
-                onCloseDocument = {
-                    currentExternalPath = null
-                }
+                externalPath = externalPath,
+                onExternalPathConsumed = onExternalPathConsumed
             )
         }
     }
@@ -144,7 +148,7 @@ fun NavGraphBuilder.addHomeGraph(
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
-    onCloseDocument: () -> Unit = {}
+    onExternalPathConsumed: () -> Unit = {}
 ) {
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
@@ -154,7 +158,7 @@ fun NavGraphBuilder.addHomeGraph(
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
             externalPath = externalPath,
-            onCloseDocument = onCloseDocument
+            onExternalPathConsumed = onExternalPathConsumed
         )
     }
     composable(HomeSections.SETTING.route) { from ->
