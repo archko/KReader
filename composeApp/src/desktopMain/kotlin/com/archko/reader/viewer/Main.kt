@@ -318,6 +318,9 @@ private fun saveWindowState(windowState: WindowState) {
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main(args: Array<String>) {
+    // 初始化原生库加载器
+    NativeLibraryLoader.initialize()
+    
     setSystemLookAndFeel()
 
     // 详细的启动调试信息
