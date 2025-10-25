@@ -486,11 +486,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             if (aPage.cropBounds != null && crop) {
                 val cropBounds = aPage.cropBounds!!
 
-                val scale = if (aPage.width > 0) {
-                    outWidth.toFloat() / cropBounds.width
-                } else {
-                    1f
-                }
+                val scaleX = outWidth.toFloat() / cropBounds.width
+                val scaleY = outHeight.toFloat() / cropBounds.height
+                val scale = minOf(scaleX, scaleY)
 
                 val patchX = cropBounds.left.toInt() * scale
                 val patchY = cropBounds.top.toInt() * scale
@@ -507,12 +505,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
                 val patchX = cropBounds.left.toInt()
                 val patchY = cropBounds.top.toInt()
-                // 计算缩略图的缩放比例：缩略图宽度 / 原始页面宽度
-                val scale = if (aPage.width > 0) {
-                    outWidth.toFloat() / aPage.getWidth(crop)
-                } else {
-                    1f
-                }
+                // 根据输出尺寸计算合适的缩放比例
+                val originalSize = originalPageSizes[index]
+                val scaleX = outWidth.toFloat() / originalSize.width
+                val scaleY = outHeight.toFloat() / originalSize.height
+                val scale = minOf(scaleX, scaleY)
                 val height = scale * aPage.getHeight(crop)
                 val bitmap = acquireReusableBitmap(outWidth, height.toInt())
 

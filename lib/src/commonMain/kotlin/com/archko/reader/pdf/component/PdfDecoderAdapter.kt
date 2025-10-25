@@ -16,13 +16,39 @@ public class PdfDecoderAdapter(
     private val isCropEnabled: () -> Boolean
 ) : Decoder {
 
+    /**
+     * 计算缩略图尺寸：根据宽高比选择基准边
+     */
+    private fun calculateThumbnailSize(pageWidth: Int, pageHeight: Int, baseSize: Int = 240): Pair<Int, Int> {
+        val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
+        return when {
+            aspectRatio <= 0.5f -> {
+                // 高度是宽度的2倍以上（竖长条），以宽为基准
+                val width = baseSize
+                val height = (baseSize / aspectRatio).toInt()
+                Pair(width, height)
+            }
+            aspectRatio >= 2.0f -> {
+                // 宽度是高度的2倍以上（横长条），以高为基准
+                val height = baseSize
+                val width = (baseSize * aspectRatio).toInt()
+                Pair(width, height)
+            }
+            else -> {
+                // 宽高比在 1:2 到 2:1 之间，以宽为基准
+                val width = baseSize
+                val height = (baseSize / aspectRatio).toInt()
+                Pair(width, height)
+            }
+        }
+    }
+
     override suspend fun decodePage(task: DecodeTask): ImageBitmap? {
         return try {
             val aPage = task.aPage
-            val ratio: Float = 1f * aPage.width / (aPage.getWidth(task.crop) * task.zoom)
-            val thumbWidth = (300 * task.zoom).toInt()
-            val thumbHeight = (aPage.height / ratio).toInt()
+            val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height, 240)
 
+            println("decodePage:$thumbWidth-$thumbHeight")
             imageDecoder.renderPage(
                 aPage = aPage,
                 viewSize = viewSize,

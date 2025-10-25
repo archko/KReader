@@ -155,16 +155,14 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     ): ImageBitmap {
         try {
             val originalSize = originalPageSizes[aPage.index]
-            val scale = if (aPage.width > 0) {
-                viewSize.width.toFloat() / aPage.getWidth(false)
-            } else {
-                1f
-            }
+            
+            // 根据输出尺寸计算合适的缩放比例
+            // 选择能够完全适应输出尺寸的缩放比例
+            val scaleX = outWidth.toFloat() / originalSize.width
+            val scaleY = outHeight.toFloat() / originalSize.height
+            val scale = minOf(scaleX, scaleY)
 
-            // 使用传入的scale参数计算目标尺寸
-            val targetWidth = (originalSize.width * scale).toInt()
-            val targetHeight = (originalSize.height * scale).toInt()
-            println("TiffDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}")
+            println("TiffDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale (scaleX=$scaleX, scaleY=$scaleY)")
 
             val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 0,
