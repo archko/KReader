@@ -56,7 +56,7 @@ public class CustomImageFetcher(
                 return
             }
             // 内存缓存使用ImageCache存储ImageBitmap
-            ImageCache.put(path, image)
+            ImageCache.putPage(path, image)
 
             val cacheDir = getCacheDirectory()
             val cacheFile = File(cacheDir, "${path.hashCode()}.png")
@@ -71,7 +71,7 @@ public class CustomImageFetcher(
                 return
             }
             // 删除内存缓存
-            ImageCache.remove(path)
+            ImageCache.removePage(path)
 
             // 删除磁盘缓存
             val cacheDir = getCacheDirectory()
@@ -83,7 +83,7 @@ public class CustomImageFetcher(
 
         private fun loadImageFromCache(data: CustomImageData): ImageBitmap? {
             // 先检查内存缓存
-            val cachedImage = ImageCache.acquire(data.path)
+            val cachedImage = ImageCache.acquirePage(data.path)
             if (cachedImage != null) {
                 return cachedImage.bitmap
             }
@@ -102,7 +102,7 @@ public class CustomImageFetcher(
                         val image = bufferedImage.toComposeImageBitmap()
 
                         // 放入内存缓存
-                        ImageCache.put(data.path, image)
+                        ImageCache.putPage(data.path, image)
                         return image
                     }
                 } catch (e: Exception) {

@@ -36,7 +36,7 @@ public class CustomImageFetcher(
             if (null == bitmap) {
                 return
             }
-            ImageCache.put(path, bitmap.asImageBitmap())
+            ImageCache.putPage(path, bitmap.asImageBitmap())
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
             if (!cacheDir.exists()) {
@@ -60,7 +60,7 @@ public class CustomImageFetcher(
                 return
             }
             // 删除内存缓存
-            ImageCache.remove(path)
+            ImageCache.removePage(path)
             
             // 删除磁盘缓存
             val dir = PdfApp.app!!.externalCacheDir
@@ -73,7 +73,7 @@ public class CustomImageFetcher(
         }
 
         private fun loadBitmapFromCache(data: CustomImageData): Bitmap? {
-            val bmp = ImageCache.acquire(data.path)
+            val bmp = ImageCache.acquirePage(data.path)
             if (null != bmp) {
                 return bmp.bitmap.asAndroidBitmap()
             }

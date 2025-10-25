@@ -183,7 +183,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun cacheCoverIfNeeded() {
         try {
-            if (null != ImageCache.acquire(file.absolutePath)) {
+            if (null != ImageCache.acquirePage(file.absolutePath)) {
                 return
             }
             val page = getPage(0)

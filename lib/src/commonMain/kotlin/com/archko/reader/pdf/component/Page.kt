@@ -51,7 +51,7 @@ public class Page(
     private var linksLoaded = false
 
     public fun recycleThumb() {
-        thumbBitmapState?.let { ImageCache.release(it) }
+        thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
         thumbDecoding = false
         thumbJob?.cancel()
@@ -122,9 +122,9 @@ public class Page(
             cacheKey
         }
 
-        val cachedState = ImageCache.acquire(cacheKey)
+        val cachedState = ImageCache.acquirePage(cacheKey)
         if (cachedState != null) {
-            thumbBitmapState?.let { ImageCache.release(it) }
+            thumbBitmapState?.let { ImageCache.releasePage(it) }
             thumbBitmapState = cachedState
             return
         }
@@ -154,14 +154,14 @@ public class Page(
                 callback = object : DecodeCallback {
                     override fun onDecodeComplete(bitmap: ImageBitmap?, isThumb: Boolean, error: Throwable?) {
                         if (bitmap != null && !pdfViewState.isShutdown()) {
-                            val newState = ImageCache.put(cacheKey, bitmap)
+                            val newState = ImageCache.putPage(cacheKey, bitmap)
                             pdfViewState.decodeScope.launch(Dispatchers.Main) {
                                 if (!pdfViewState.isShutdown()) {
-                                    thumbBitmapState?.let { ImageCache.release(it) }
+                                    thumbBitmapState?.let { ImageCache.releasePage(it) }
                                     thumbBitmapState = newState
                                     setAspectRatio(bitmap.width, bitmap.height)
                                 } else {
-                                    ImageCache.release(newState)
+                                    ImageCache.releasePage(newState)
                                 }
                             }
                         } else {
@@ -253,7 +253,7 @@ public class Page(
 
         // 尝试获取缓存的缩略图
         if (thumbBitmapState == null) {
-            val cachedState = ImageCache.acquire(cacheKey)
+            val cachedState = ImageCache.acquirePage(cacheKey)
             if (cachedState != null) {
                 thumbBitmapState = cachedState
             }

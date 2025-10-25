@@ -1,12 +1,16 @@
 package com.archko.reader.pdf.cache
 
 import androidx.compose.ui.graphics.ImageBitmap
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 private const val CANDIDATE_TIMEOUT = 5000L
 private var MAX_MEMORY_BYTES = 128 * 1024 * 1024L
 private var MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 3
+
+private var PAGE_CACHE_MEMORY_BYTES = 24 * 1024 * 1024L
+private var PAGE_CANDIDATE_MEMORY_BYTES = PAGE_CACHE_MEMORY_BYTES / 4
 
 /**
  * Bitmap状态管理器，解决并发访问和生命周期问题
@@ -24,7 +28,7 @@ public class BitmapState(
      * 获取bitmap的使用权，增加引用计数
      */
     public fun acquire(): Boolean {
-        return kotlinx.coroutines.runBlocking {
+        return runBlocking {
             mutex.withLock {
                 if (isRecycled) {
                     return@withLock false
@@ -39,7 +43,7 @@ public class BitmapState(
      * 释放bitmap的使用权，减少引用计数
      */
     public fun release() {
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             mutex.withLock {
                 if (referenceCount > 0) {
                     referenceCount--
@@ -52,7 +56,7 @@ public class BitmapState(
      * 标记bitmap为已回收状态
      */
     public fun markRecycled(): Boolean {
-        return kotlinx.coroutines.runBlocking {
+        return runBlocking {
             mutex.withLock {
                 if (referenceCount == 0 && !isRecycled) {
                     isRecycled = true
@@ -67,7 +71,7 @@ public class BitmapState(
      * 检查是否可以安全回收
      */
     public fun canRecycle(): Boolean {
-        return kotlinx.coroutines.runBlocking {
+        return runBlocking {
             mutex.withLock {
                 return@withLock referenceCount == 0
             }
@@ -78,7 +82,7 @@ public class BitmapState(
      * 检查是否已被回收
      */
     public fun isRecycled(): Boolean {
-        return kotlinx.coroutines.runBlocking {
+        return runBlocking {
             mutex.withLock {
                 return@withLock isRecycled
             }
@@ -89,7 +93,10 @@ public class BitmapState(
 /**
  * 线程安全的图片缓存，使用引用计数防止正在使用的bitmap被回收
  */
-public object ImageCache {
+private class InnerImageCache(
+    private val maxMemoryBytes: Long,
+    private val maxCandidateMemoryBytes: Long = maxMemoryBytes / 3
+) {
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, BitmapState>()
     private val candidatePool = mutableMapOf<String, Pair<BitmapState, Long>>()
@@ -109,7 +116,7 @@ public object ImageCache {
      * 获取bitmap，如果成功会自动增加引用计数
      */
     public fun acquire(key: String): BitmapState? {
-        return kotlinx.coroutines.runBlocking {
+        return runBlocking {
             mutex.withLock {
                 // 先检查主缓存
                 cache[key]?.let { state ->
@@ -152,7 +159,7 @@ public object ImageCache {
      * 释放bitmap的使用权
      */
     public fun release(state: BitmapState) {
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             state.release()
         }
     }
@@ -161,7 +168,7 @@ public object ImageCache {
      * 添加新的bitmap到缓存
      */
     public fun put(key: String, bitmap: ImageBitmap): BitmapState {
-        return kotlinx.coroutines.runBlocking {
+        return runBlocking {
             mutex.withLock {
                 val imageSize = calculateImageSize(bitmap)
                 
@@ -177,7 +184,7 @@ public object ImageCache {
                 currentMemoryBytes += imageSize
                 
                 // 检查内存限制，优先移除没有引用的bitmap
-                while (currentMemoryBytes > MAX_MEMORY_BYTES && cache.isNotEmpty()) {
+                while (currentMemoryBytes > maxMemoryBytes && cache.isNotEmpty()) {
                     // 优先选择没有引用的bitmap进行移除
                     val entryToRemove = cache.entries.find { it.value.canRecycle() }
                         ?: cache.entries.first() // 如果都有引用，选择第一个
@@ -206,7 +213,7 @@ public object ImageCache {
      * 移除指定key的bitmap
      */
     public fun remove(key: String) {
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             mutex.withLock {
                 cache.remove(key)?.let { state ->
                     val imageSize = calculateImageSize(state.bitmap)
@@ -222,7 +229,7 @@ public object ImageCache {
      * 清空所有缓存
      */
     public fun clear() {
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             mutex.withLock {
                 cache.clear()
                 currentMemoryBytes = 0L
@@ -235,7 +242,7 @@ public object ImageCache {
         val imageSize = calculateImageSize(state.bitmap)
         
         // 确保候选池不超限
-        while (candidateMemoryBytes + imageSize > MAX_CANDIDATE_MEMORY_BYTES && candidatePool.isNotEmpty()) {
+        while (candidateMemoryBytes + imageSize > maxCandidateMemoryBytes && candidatePool.isNotEmpty()) {
             val oldest = candidatePool.entries.minByOrNull { it.value.second }
             if (oldest != null) {
                 val oldState = oldest.value.first
@@ -297,4 +304,50 @@ internal expect object ImageSizeCalculator {
      * 回收ImageBitmap，释放底层资源
      */
     fun recycleImageBitmap(image: ImageBitmap)
+}
+
+/**
+ * 全局缓存实例
+ */
+public object ImageCache {
+    // Node 高清图缓存（动态大小）
+    private var nodeCache = InnerImageCache(MAX_MEMORY_BYTES, MAX_CANDIDATE_MEMORY_BYTES)
+    
+    // Page 缩略图缓存（固定 32MB）
+    private val pageCache = InnerImageCache(PAGE_CACHE_MEMORY_BYTES, PAGE_CANDIDATE_MEMORY_BYTES)
+
+    /**
+     * 设置最大内存限制（只影响 Node 缓存）
+     */
+    public fun setMaxMemory(maxMemoryBytes: Long) {
+        MAX_MEMORY_BYTES = maxMemoryBytes
+        MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 3
+        nodeCache.setMaxMemory(maxMemoryBytes)
+    }
+
+    /**
+     * Node 高清图缓存操作
+     */
+    public fun acquireNode(key: String): BitmapState? = nodeCache.acquire(key)
+    public fun releaseNode(state: BitmapState): Unit = nodeCache.release(state)
+    public fun putNode(key: String, bitmap: ImageBitmap): BitmapState = nodeCache.put(key, bitmap)
+    public fun removeNode(key: String): Unit = nodeCache.remove(key)
+    public fun clearNodes(): Unit = nodeCache.clear()
+
+    /**
+     * Page 缩略图缓存操作
+     */
+    public fun acquirePage(key: String): BitmapState? = pageCache.acquire(key)
+    public fun releasePage(state: BitmapState): Unit = pageCache.release(state)
+    public fun putPage(key: String, bitmap: ImageBitmap): BitmapState = pageCache.put(key, bitmap)
+    public fun removePage(key: String): Unit = pageCache.remove(key)
+    public fun clearPages(): Unit = pageCache.clear()
+
+    /**
+     * 清空所有缓存
+     */
+    public fun clear() {
+        nodeCache.clear()
+        pageCache.clear()
+    }
 }

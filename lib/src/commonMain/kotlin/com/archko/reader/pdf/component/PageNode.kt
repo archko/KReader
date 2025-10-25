@@ -59,7 +59,7 @@ public class PageNode(
     private var decodeJob: Job? = null
 
     public fun recycle() {
-        bitmapState?.let { ImageCache.release(it) }
+        bitmapState?.let { ImageCache.releaseNode(it) }
         bitmapState = null
         isDecoding = false
         decodeJob?.cancel()
@@ -130,10 +130,10 @@ public class PageNode(
                 }
 
                 // 先查安全缓存
-                val cachedState = ImageCache.acquire(cacheKey)
+                val cachedState = ImageCache.acquireNode(cacheKey)
                 if (cachedState != null) {
                     withContext(Dispatchers.Main) {
-                        bitmapState?.let { ImageCache.release(it) }
+                        bitmapState?.let { ImageCache.releaseNode(it) }
                         bitmapState = cachedState
                     }
                     isDecoding = false
@@ -188,13 +188,13 @@ public class PageNode(
                     callback = object : DecodeCallback {
                         override fun onDecodeComplete(bitmap: ImageBitmap?, isThumb: Boolean, error: Throwable?) {
                             if (bitmap != null && !pdfViewState.isShutdown()) {
-                                val newState = ImageCache.put(cacheKey, bitmap)
+                                val newState = ImageCache.putNode(cacheKey, bitmap)
                                 pdfViewState.decodeScope.launch(Dispatchers.Main) {
                                     if (pdfViewState.isTileVisible(tileSpec) && !pdfViewState.isShutdown()) {
-                                        bitmapState?.let { ImageCache.release(it) }
+                                        bitmapState?.let { ImageCache.releaseNode(it) }
                                         bitmapState = newState
                                     } else {
-                                        ImageCache.release(newState)
+                                        ImageCache.releaseNode(newState)
                                     }
                                 }
                             } else {
