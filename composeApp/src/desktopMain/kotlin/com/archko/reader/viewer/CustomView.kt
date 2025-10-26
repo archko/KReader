@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,7 @@ import java.io.File
 /**
  * @author: archko 2025/7/23 :09:09
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
     currentPath: String,
@@ -287,8 +289,8 @@ fun CustomView(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .height(36.dp)
+                        .padding(horizontal = 8.dp, vertical = 0.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = {
@@ -318,13 +320,13 @@ fun CustomView(
                         )
                     }
 
-                    IconButton(onClick = { vZoom = 1.0 }) {
+                    /*IconButton(onClick = { vZoom = 1.0 }) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_fit_to_screen),
                             contentDescription = "",
                             tint = Color.White
                         )
-                    }
+                    }*/
 
                     // 只有文档文件才显示其他按钮
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
@@ -543,7 +545,7 @@ fun CustomView(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .padding(horizontal = 16.dp, vertical = 4.dp) // 减小垂直padding
                         ) {
                             Text(
                                 text = "${sliderValue.toInt()} / $pageCount",
@@ -564,12 +566,33 @@ fun CustomView(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(20.dp),
                                 colors = SliderDefaults.colors(
                                     thumbColor = Color.White,
                                     activeTrackColor = Color.White,
                                     inactiveTrackColor = Color.Gray
-                                )
+                                ),
+                                track = { sliderState ->
+                                    SliderDefaults.Track(
+                                        sliderState = sliderState,
+                                        modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
+                                        colors = SliderDefaults.colors(
+                                            activeTrackColor = Color.White,
+                                            inactiveTrackColor = Color.Gray
+                                        )
+                                    )
+                                },
+                                thumb = {
+                                    SliderDefaults.Thumb(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = Color.White
+                                        )
+                                    )
+                                }
                             )
                         }
                     }
