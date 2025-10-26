@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlin.math.max
+import kotlin.math.min
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -70,6 +72,10 @@ public fun DesktopDocumentView(
     var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
     // 焦点请求器，用于键盘操作
     val focusRequester = remember { FocusRequester() }
+    
+    // 缩放相关状态
+    val minZoom = 0.5f
+    val maxZoom = 5.0f
 
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
@@ -201,6 +207,56 @@ public fun DesktopDocumentView(
                     }
                     pdfViewState.updateOffset(offset)
                     true
+                }
+
+                Key.Equals -> {
+                    // 加号键放大
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        val newZoom = min(vZoom * 1.2f, maxZoom)
+                        if (newZoom != vZoom) {
+                            val centerX = viewSize.width / 2f
+                            val centerY = viewSize.height / 2f
+                            handleZoom(newZoom, centerX, centerY, vZoom, offset, pdfViewState, viewSize, orientation) { newOffset, newVZoom ->
+                                offset = newOffset
+                                vZoom = newVZoom
+                                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                            }
+                        }
+                        true
+                    } else false
+                }
+
+                Key.Minus -> {
+                    // 减号键缩小
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        val newZoom = max(vZoom / 1.2f, minZoom)
+                        if (newZoom != vZoom) {
+                            val centerX = viewSize.width / 2f
+                            val centerY = viewSize.height / 2f
+                            handleZoom(newZoom, centerX, centerY, vZoom, offset, pdfViewState, viewSize, orientation) { newOffset, newVZoom ->
+                                offset = newOffset
+                                vZoom = newVZoom
+                                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                            }
+                        }
+                        true
+                    } else false
+                }
+
+                Key.Zero -> {
+                    // 0键重置缩放
+                    if (event.isCtrlPressed || event.isMetaPressed) {
+                        if (vZoom != 1.0f) {
+                            val centerX = viewSize.width / 2f
+                            val centerY = viewSize.height / 2f
+                            handleZoom(1.0f, centerX, centerY, vZoom, offset, pdfViewState, viewSize, orientation) { newOffset, newVZoom ->
+                                offset = newOffset
+                                vZoom = newVZoom
+                                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                            }
+                        }
+                        true
+                    } else false
                 }
 
                 else -> false
@@ -481,17 +537,16 @@ public fun DesktopDocumentView(
 
                     // 普通滚动（鼠标滚轮和触摸板滚动）
                     val scrollMultiplier = 30f
-                    if (orientation == Vertical) {
-                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                        val newY =
-                            (offset.y + scrollAmount.y * scrollMultiplier).coerceIn(-maxY, 0f)
-                        offset = Offset(offset.x, newY)
-                    } else {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                        val newX =
-                            (offset.x + scrollAmount.x * scrollMultiplier).coerceIn(-maxX, 0f)
-                        offset = Offset(newX, offset.y)
-                    }
+                    
+                    // 计算边界限制
+                    val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    
+                    // 支持双向滚动，特别是在缩放后
+                    val newX = (offset.x + scrollAmount.x * scrollMultiplier).coerceIn(-maxX, 0f)
+                    val newY = (offset.y + scrollAmount.y * scrollMultiplier).coerceIn(-maxY, 0f)
+                    
+                    offset = Offset(newX, newY)
                     pdfViewState.updateOffset(offset)
                 }
                 .focusRequester(focusRequester)
@@ -600,6 +655,48 @@ private fun calculateClickedPage(
             page.bounds.right > left && page.bounds.left < right
         }
     }.coerceAtLeast(0)
+}
+
+/**
+ * 处理缩放操作的公共方法
+ */
+private fun handleZoom(
+    newZoom: Float,
+    centerX: Float,
+    centerY: Float,
+    currentZoom: Float,
+    currentOffset: Offset,
+    pdfViewState: PdfViewState,
+    viewSize: IntSize,
+    orientation: Int,
+    onZoomChanged: (Offset, Float) -> Unit
+) {
+    // 计算缩放前的内容坐标
+    val contentX = centerX - currentOffset.x
+    val contentY = centerY - currentOffset.y
+    
+    // 计算缩放比例
+    val zoomRatio = newZoom / currentZoom
+    
+    // 计算缩放后的新偏移量，保持缩放中心点不变
+    val newOffsetX = centerX - contentX * zoomRatio
+    val newOffsetY = centerY - contentY * zoomRatio
+    
+    // 更新PdfViewState的缩放
+    pdfViewState.updateViewSize(viewSize, newZoom, orientation)
+    
+    // 计算边界限制
+    val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+    val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+    
+    // 应用边界限制
+    val clampedOffsetX = newOffsetX.coerceIn(-maxX, 0f)
+    val clampedOffsetY = newOffsetY.coerceIn(-maxY, 0f)
+    
+    val newOffset = Offset(clampedOffsetX, clampedOffsetY)
+    pdfViewState.updateOffset(newOffset)
+    
+    onZoomChanged(newOffset, newZoom)
 }
 
 /**
