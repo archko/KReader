@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,6 +53,7 @@ import java.io.File
 /**
  * @author: archko 2025/7/23 :09:09
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
     paths: List<String>,
@@ -663,12 +665,33 @@ fun CustomView(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(20.dp),
                             colors = SliderDefaults.colors(
                                 thumbColor = Color.White,
                                 activeTrackColor = Color.White,
                                 inactiveTrackColor = Color.Gray
-                            )
+                            ),
+                            track = { sliderState ->
+                                SliderDefaults.Track(
+                                    sliderState = sliderState,
+                                    modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
+                                    colors = SliderDefaults.colors(
+                                        activeTrackColor = Color.White,
+                                        inactiveTrackColor = Color.Gray
+                                    )
+                                )
+                            },
+                            thumb = {
+                                SliderDefaults.Thumb(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White
+                                    )
+                                )
+                            }
                         )
                     }
                 }
