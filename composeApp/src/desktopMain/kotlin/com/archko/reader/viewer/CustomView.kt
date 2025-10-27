@@ -2,11 +2,11 @@ package com.archko.reader.viewer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -320,13 +320,31 @@ fun CustomView(
                         )
                     }
 
-                    /*IconButton(onClick = { vZoom = 1.0 }) {
+                    IconButton(onClick = {
+                        val newZoom = vZoom + 0.1
+                        if (newZoom <= 5f) {
+                            vZoom = newZoom
+                        }
+                    }) {
                         Icon(
-                            painter = painterResource(Res.drawable.ic_fit_to_screen),
+                            painter = painterResource(Res.drawable.ic_zoom_in),
                             contentDescription = "",
                             tint = Color.White
                         )
-                    }*/
+                    }
+
+                    IconButton(onClick = {
+                        val newZoom = vZoom - 0.1
+                        if (newZoom >= 0.51f) {
+                            vZoom = newZoom
+                        }
+                    }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_zoom_out),
+                            contentDescription = "",
+                            tint = Color.White
+                        )
+                    }
 
                     // 只有文档文件才显示其他按钮
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
