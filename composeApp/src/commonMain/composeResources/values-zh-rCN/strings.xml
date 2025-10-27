@@ -16,6 +16,7 @@
     <string name="delete_cache">删除缓存</string>
     <string name="load_more">加载更多</string>
     <string name="back">返回</string>
+    <string name="tts">朗读</string>
     <string name="vertical">竖向</string>
     <string name="horizontal">横向</string>
     <string name="outline">大纲</string>

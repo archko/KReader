@@ -65,6 +65,8 @@ fun CustomView(
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
 
+    val speechService: SpeechService = remember { TtsQueueService() }
+
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
@@ -122,6 +124,19 @@ fun CustomView(
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
             decoder?.close()
+        }
+    }
+    LaunchedEffect(Unit) {
+        val availableVoices = speechService.getAvailableVoices()
+        if (availableVoices.isNotEmpty()) {
+            // 优先选择中文语音
+            val chineseVoices = listOf("Ting-Ting", "Sin-ji", "Mei-Jia", "Li-mu", "Yu-shu")
+            val selectedVoice = chineseVoices.firstOrNull { it in availableVoices }
+                ?: availableVoices.first()
+            speechService.setVoice(selectedVoice)
+
+            speechService.setRate(0.25f)
+            speechService.setVolume(0.8f)
         }
     }
 
@@ -308,6 +323,14 @@ fun CustomView(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Spacer(Modifier.weight(1f))
+
+                    IconButton(onClick = { speak(currentPage, decoder!!, speechService) }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_tts),
+                            contentDescription = stringResource(Res.string.tts),
+                            tint = Color.White
+                        )
+                    }
 
                     // 方向按钮 - 文档和图片都显示
                     IconButton(onClick = { isVertical = !isVertical }) {
@@ -617,5 +640,16 @@ fun CustomView(
                 }
             }
         }
+    }
+}
+
+fun speak(page:Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
+    if (speechService.isSpeaking()) {
+        speechService.stop()
+    }
+    if (imageDecoder is PdfDecoder) {
+        val pdfDecoder = imageDecoder
+        val str = pdfDecoder.decodeReflow(page)
+        speechService.speak(str[0])
     }
 }

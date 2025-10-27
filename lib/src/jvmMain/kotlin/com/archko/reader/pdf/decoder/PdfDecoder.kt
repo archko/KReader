@@ -11,6 +11,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.CropUtils
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
@@ -696,6 +697,39 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
+    }
+
+    /**
+     * 解析PDF页面为reflow内容（文本和图片）
+     * 注意：此方法必须在主线程调用，MuPDF不支持多线程
+     */
+    public fun decodeReflow(pageIndex: Int): List<String> {
+        val reflowBeans = mutableListOf<String>()
+
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return reflowBeans
+        }
+
+        try {
+            val page = getPage(pageIndex)
+
+            // 提取文本内容
+            val result = page.textAsText("preserve-whitespace,inhibit-spaces,preserve-images")
+            val text = if (null != result) {
+                ParseTextMain.parseAsText(result)
+            } else null
+
+            if (text != null && text.isNotEmpty()) {
+                reflowBeans.add(text)
+            }
+
+            // 注意：这里不调用page.destroy()，因为页面被缓存了
+        } catch (e: Exception) {
+            println("decodeReflow error for page $pageIndex: $e")
+            // 如果解析失败，返回空列表
+        }
+
+        return reflowBeans
     }
 
     /**

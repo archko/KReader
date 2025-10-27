@@ -16,6 +16,7 @@
     <string name="delete_cache">Delete Cache</string>
     <string name="load_more">Load More</string>
     <string name="back">Back</string>
+    <string name="tts">TTS</string>
     <string name="vertical">Vertical</string>
     <string name="horizontal">Horizontal</string>
     <string name="crop">Crop</string>
