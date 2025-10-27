@@ -375,6 +375,16 @@ fun CustomView(
                         )
                     }
 
+                    IconButton(onClick = {
+                        vZoom = 1.0
+                    }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_zoom_reset),
+                            contentDescription = "",
+                            tint = Color.White
+                        )
+                    }
+
                     // 只有文档文件才显示其他按钮
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
                         IconButton(onClick = { isCrop = !isCrop }) {
