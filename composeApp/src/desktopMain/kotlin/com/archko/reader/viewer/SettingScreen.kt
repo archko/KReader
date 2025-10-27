@@ -343,6 +343,39 @@ fun SettingCategory() {
 
     Spacer(modifier = Modifier.height(8.dp))
 
+    var showTtsDialog by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable { showTtsDialog = true }
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .height(44.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = stringResource(Res.string.tts_setting_title),
+                style = TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                ),
+                maxLines = 1
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
@@ -384,6 +417,13 @@ fun SettingCategory() {
     if (showPdfEncryptDialog) {
         PdfEncryptDialog(
             onDismiss = { showPdfEncryptDialog = false }
+        )
+    }
+
+    // tts 设置Dialog
+    if (showTtsDialog) {
+        TtsDialog (
+            onDismiss = { showTtsDialog = false }
         )
     }
 }
@@ -448,6 +488,47 @@ fun AboutDialog(
                         textAlign = TextAlign.Start
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun TtsDialog(
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.wrapContentSize(),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.wrapContentSize()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_back),
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(Res.string.tts_setting_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                TtsTestScreen()
             }
         }
     }

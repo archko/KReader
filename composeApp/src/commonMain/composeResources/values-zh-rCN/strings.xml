@@ -71,4 +71,6 @@
     <string name="encrypt_decrypt_decrypt_success">解密成功\n%s</string>
     <string name="encrypt_decrypt_decrypt_failed">解密失败</string>
     <string name="encrypt_decrypt_modification_time">修改时间: %s</string>
+
+    <string name="tts_setting_title">语音设置</string>
 </resources>

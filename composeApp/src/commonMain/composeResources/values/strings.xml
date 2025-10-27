@@ -70,4 +70,6 @@
     <string name="encrypt_decrypt_decrypt_success">Decrypt successfully\n%s</string>
     <string name="encrypt_decrypt_decrypt_failed">Decrypt failed</string>
     <string name="encrypt_decrypt_modification_time">Modification time: %s</string>
+
+    <string name="tts_setting_title">Tts Setting</string>
 </resources>
