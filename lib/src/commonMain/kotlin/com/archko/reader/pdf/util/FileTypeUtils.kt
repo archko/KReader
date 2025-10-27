@@ -90,4 +90,13 @@ public object FileTypeUtils {
             && file.length() <= MAX_SIZE_MB
         }
     }
+
+    public fun isReflowable(path: String): Boolean {
+        return path.endsWith(".cbz", true)
+                || path.endsWith(".epub", true)
+                || path.endsWith(".mobi", true)
+                || path.endsWith(".pptx", true)
+                || path.endsWith(".docx", true)
+                || path.endsWith(".xlsx", true)
+    }
 } 
