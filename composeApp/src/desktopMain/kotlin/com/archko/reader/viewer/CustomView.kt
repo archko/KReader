@@ -124,6 +124,12 @@ fun CustomView(
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
             decoder?.close()
+            // 清理 TTS 服务
+            if (speechService is TtsQueueService) {
+                speechService.destroy()
+            } else {
+                speechService.stop()
+            }
         }
     }
     LaunchedEffect(Unit) {

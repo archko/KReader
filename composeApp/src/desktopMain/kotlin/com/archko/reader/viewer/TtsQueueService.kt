@@ -37,6 +37,11 @@ class TtsQueueService : SpeechService {
     
     init {
         startProcessing()
+        // 添加 JVM 关闭钩子，确保应用退出时清理 TTS 进程
+        Runtime.getRuntime().addShutdownHook(Thread {
+            println("TTS: JVM shutdown hook triggered, cleaning up...")
+            forceKillAllTtsProcesses()
+        })
     }
     
     private fun startProcessing() {
@@ -135,7 +140,7 @@ class TtsQueueService : SpeechService {
             
             isSpeakingFlag.set(true)
             currentProcess = withContext(Dispatchers.IO) {
-                ProcessBuilder(*command).start()
+                createManagedProcess(command)
             }
             
             // 使用协程等待进程结束
@@ -156,27 +161,57 @@ class TtsQueueService : SpeechService {
         }
     }
     
+    private fun createManagedProcess(command: Array<String>): Process {
+        val processBuilder = ProcessBuilder(*command)
+        
+        if (isWindows) {
+            // Windows: 创建新的进程组，当父进程退出时子进程也会退出
+            processBuilder.environment()["CREATE_NEW_PROCESS_GROUP"] = "true"
+        } else {
+            // macOS/Linux: 设置进程组，使子进程在父进程退出时收到 SIGHUP
+            // 这里我们通过 shell 包装来确保进程能被正确清理
+            val wrappedCommand = arrayOf(
+                "sh", "-c", 
+                "trap 'kill 0' TERM; ${command.joinToString(" ")} & wait"
+            )
+            return ProcessBuilder(*wrappedCommand).start()
+        }
+        
+        return processBuilder.start()
+    }
+    
     private fun createWindowsCommand(text: String, voice: String): Array<String> {
         val rateValue = (rate * 10).toInt() // Windows rate range 0-10
         val volumeValue = (volume * 100).toInt() // Windows volume 0-100
         
-        // 使用 PowerShell 调用 Windows Speech API
+        // 转义文本中的特殊字符
+        val escapedText = text.replace("'", "''").replace("\"", "`\"")
+        
+        // 使用 PowerShell 调用 Windows Speech API，添加进程管理
         return arrayOf(
             "powershell",
             "-Command",
             """
             Add-Type -AssemblyName System.Speech;
             ${'$'}synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
-            ${'$'}synth.SelectVoice('$voice');
-            ${'$'}synth.Rate = $rateValue;
-            ${'$'}synth.Volume = $volumeValue;
-            ${'$'}synth.Speak('$text');
+            try {
+                ${'$'}synth.SelectVoice('$voice');
+                ${'$'}synth.Rate = $rateValue;
+                ${'$'}synth.Volume = $volumeValue;
+                ${'$'}synth.Speak('$escapedText');
+            } finally {
+                ${'$'}synth.Dispose();
+            }
             """.trimIndent()
         )
     }
     
     private fun createMacCommand(text: String, voice: String): Array<String> {
         val rateValue = (rate * 400 + 100).toInt() // Mac rate range 100-500
+        
+        // 为了更好的进程管理，我们给 say 命令添加一个标识符
+        val processId = "KReader_TTS_${System.currentTimeMillis()}"
+        
         return arrayOf(
             "say",
             "-v", voice,
@@ -328,9 +363,36 @@ class TtsQueueService : SpeechService {
     }
     
     fun destroy() {
+        isShutdown = true
         stop()
         processingJob?.cancel()
         taskNotificationChannel.close()
         serviceScope.cancel()
+        
+        // 强制终止所有可能的 TTS 进程
+        forceKillAllTtsProcesses()
+    }
+    
+    private fun forceKillAllTtsProcesses() {
+        try {
+            if (isWindows) {
+                // Windows: 更精确地终止 TTS 相关的 PowerShell 进程
+                ProcessBuilder("powershell", "-Command", 
+                    "Get-Process | Where-Object {${'$'}_.ProcessName -eq 'powershell' -and ${'$'}_.CommandLine -like '*Speech*'} | Stop-Process -Force"
+                ).start().waitFor()
+                
+                // 备用方案：终止所有 PowerShell 进程（可能影响其他应用）
+                // ProcessBuilder("taskkill", "/F", "/IM", "powershell.exe").start()
+            } else {
+                // macOS: 终止所有 say 进程
+                ProcessBuilder("pkill", "say").start().waitFor()
+                
+                // 如果 pkill 不工作，尝试 killall
+                ProcessBuilder("killall", "say").start().waitFor()
+            }
+            println("TTS: Force killed all TTS processes")
+        } catch (e: Exception) {
+            println("TTS: Failed to force kill TTS processes: ${e.message}")
+        }
     }
 }
