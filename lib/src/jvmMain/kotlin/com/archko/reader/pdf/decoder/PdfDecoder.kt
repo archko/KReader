@@ -12,6 +12,7 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.util.CropUtils
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.loadOutlineItems
 import com.artifex.mupdf.fitz.Document
@@ -56,15 +57,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
 
-    private fun isReflowable(path: String): Boolean {
-        return path.endsWith(".cbz", true)
-                || path.endsWith(".epub", true)
-                || path.endsWith(".mobi", true)
-                || path.endsWith(".pptx", true)
-                || path.endsWith(".docx", true)
-                || path.endsWith(".xlsx", true)
-    }
-
     init {
         // 检查文件是否存在
         if (!file.exists()) {
@@ -77,7 +69,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
 
         try {
-            if (isReflowable(file.absolutePath)) {
+            if (FileTypeUtils.isReflowable(file.absolutePath)) {
                 val css = FontCSSGenerator.generateFontCSS(null, "10px")
                 println("应用自定义CSS: $css")
                 com.artifex.mupdf.fitz.Context.setUserCSS(css)
@@ -130,7 +122,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 fontSize,
                 fs,
                 file.absolutePath
-            );
+            )
             doc.layout(w, h, fontSize)
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
@@ -148,7 +140,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val aPage = APage(i, originalPageSizes[i].width, originalPageSizes[i].height, 1f)
                 aPageList!!.add(aPage)
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             aPageList!!.clear()
         }
     }
@@ -157,14 +149,18 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
+        val path = file.absolutePath
+        if (FileTypeUtils.isImageFile(path) || FileTypeUtils.isTiffFile(path)) {
+            return
+        }
         try {
-            if (null != ImageCache.acquirePage(file.absolutePath)) {
+            if (null != ImageCache.acquirePage(path)) {
                 return
             }
             val page = getPage(0)
             val bitmap = renderCoverPage(page)
 
-            CustomImageFetcher.cacheBitmap(bitmap, file.absolutePath)
+            CustomImageFetcher.cacheBitmap(bitmap, path)
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
         }
@@ -512,10 +508,10 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         // Convert pixmap to BufferedImage and then to ImageBitmap
         val pixmapWidth = pixmap.width
         val pixmapHeight = pixmap.height
-        val image = java.awt.image.BufferedImage(
+        val image = BufferedImage(
             pixmapWidth,
             pixmapHeight,
-            java.awt.image.BufferedImage.TYPE_3BYTE_BGR
+            BufferedImage.TYPE_3BYTE_BGR
         )
         image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
 

@@ -99,8 +99,8 @@ fun CustomView(
                         tiffDecoder
                     } else if (FileTypeUtils.isImageFile(currentPath)) {
                         isCrop = false
-                        val tiffDecoder = PdfDecoder(File(currentPath))
-                        tiffDecoder
+                        val pdfDecoder = PdfDecoder(File(currentPath))
+                        pdfDecoder
                     } else {
                         null
                     }
