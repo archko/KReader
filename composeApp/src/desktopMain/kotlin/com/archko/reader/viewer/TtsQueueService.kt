@@ -17,9 +17,9 @@ class TtsQueueService : SpeechService {
     private var currentProcess: Process? = null
     private val isSpeakingFlag = AtomicBoolean(false)
     private val isPausedFlag = AtomicBoolean(false)
-    private var rate: Float = 0.20f
+    private var rate: Float = 0.30f
     private var volume: Float = 0.8f
-    private var selectedVoice: String = "Alex"
+    private var selectedVoice: String = "Mei-Jia"
     
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
@@ -103,7 +103,7 @@ class TtsQueueService : SpeechService {
     private val chineseVoices = if (isWindows) {
         listOf("Microsoft Huihui Desktop", "Microsoft Yaoyao Desktop", "Microsoft Kangkang Desktop")
     } else {
-        listOf("Ting-Ting", "Sin-ji", "Mei-Jia", "Li-mu", "Yu-shu")
+        listOf("Mei-Jia", "Ting-Ting", "Sin-ji", "Li-mu", "Yu-shu")
     }
     
     private val englishVoices = if (isWindows) {
