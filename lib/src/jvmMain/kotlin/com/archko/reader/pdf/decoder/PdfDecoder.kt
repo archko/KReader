@@ -714,7 +714,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val page = getPage(pageIndex)
 
             // 提取文本内容
-            val result = page.textAsText("preserve-whitespace,inhibit-spaces,preserve-images")
+            val result = page.textAsText("preserve-whitespace,inhibit-spaces")
             val text = if (null != result) {
                 ParseTextMain.parseAsText(result)
             } else null

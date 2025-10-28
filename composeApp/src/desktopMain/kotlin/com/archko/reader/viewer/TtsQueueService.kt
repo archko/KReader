@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -136,14 +137,54 @@ class TtsQueueService : SpeechService {
     private suspend fun executeTask(task: TtsTask) {
         if (isShutdown || isPausedFlag.get()) return
 
-        try {
-            val voiceToUse = detectLanguageAndSelectVoice(task.text)
-            println("TTS: Using voice '$voiceToUse' for text: ${task.text.take(50)}...")
-
+        val voiceToUse = detectLanguageAndSelectVoice(task.text)
+        
+        // 尝试多种文本处理方式
+        val textVariants = listOf(
+            cleanTextForTts(task.text),           // 清理后的文本
+            task.text
+                .replace(Regex("-{2,}"), "")      // 先移除连续破折号
+                .replace(Regex("[^\\p{L}\\p{N}\\s，。！？:/.\\-]"), ""), // 只保留字母、数字、空格、基本标点和URL字符
+            task.text.replace(Regex("[^\\u4e00-\\u9fff\\w\\s:/.\\-]"), ""),   // 只保留中文、英文字母、数字、空格和URL字符
+            extractMeaningfulText(task.text),     // 提取有意义的文本
+            "跳过无法朗读的内容"                      // 最后的备用文本
+        )
+        
+        for ((index, text) in textVariants.withIndex()) {
+            if (isShutdown || isPausedFlag.get()) return
+            
+            if (text.isBlank()) continue
+            
+            try {
+                println("TTS: Attempt ${index + 1} - Using voice '$voiceToUse' for text: ${text.take(50)}...")
+                
+                val success = attemptSpeak(text, voiceToUse)
+                if (success) {
+                    println("TTS: Successfully spoke text on attempt ${index + 1}")
+                    return
+                } else {
+                    println("TTS: Attempt ${index + 1} failed, trying next variant...")
+                }
+                
+            } catch (e: Exception) {
+                println("TTS: Attempt ${index + 1} error: ${e.message}")
+                continue
+            }
+        }
+        
+        println("TTS: All attempts failed, skipping this text")
+        isSpeakingFlag.set(false)
+    }
+    
+    /**
+     * 尝试朗读文本，返回是否成功
+     */
+    private suspend fun attemptSpeak(text: String, voice: String): Boolean {
+        return try {
             val command = if (isWindows) {
-                createWindowsCommand(task.text, voiceToUse)
+                createWindowsCommand(text, voice)
             } else {
-                createMacCommand(task.text, voiceToUse)
+                createMacCommand(text, voice)
             }
 
             isSpeakingFlag.set(true)
@@ -151,22 +192,109 @@ class TtsQueueService : SpeechService {
                 createManagedProcess(command)
             }
 
-            // 使用协程等待进程结束
-            withContext(Dispatchers.IO) {
-                try {
-                    currentProcess?.waitFor()
-                } catch (e: InterruptedException) {
-                    // 进程被中断
-                } finally {
-                    isSpeakingFlag.set(false)
-                    currentProcess = null
+            // 设置超时时间：根据文本长度计算，最少10秒，最多60秒
+            val timeoutSeconds = (text.length / 10).coerceIn(10, 60)
+            
+            // 等待进程结束并检查退出码，带超时
+            val exitCode = withTimeoutOrNull(timeoutSeconds * 1000L) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        currentProcess?.waitFor() ?: -1
+                    } catch (e: InterruptedException) {
+                        -1
+                    }
                 }
             }
-
-        } catch (e: Exception) {
-            println("TTS Error: ${e.message}")
+            
+            // 清理状态
             isSpeakingFlag.set(false)
+            if (exitCode == null) {
+                // 超时了，强制终止进程
+                println("TTS: Timeout after ${timeoutSeconds}s, killing process")
+                currentProcess?.destroyForcibly()
+                currentProcess = null
+                false
+            } else {
+                currentProcess = null
+                // 检查是否成功（退出码为0表示成功）
+                exitCode == 0
+            }
+            
+        } catch (e: Exception) {
+            println("TTS: attemptSpeak error: ${e.message}")
+            isSpeakingFlag.set(false)
+            currentProcess?.destroyForcibly()
+            currentProcess = null
+            false
         }
+    }
+    
+    /**
+     * 提取文本中有意义的部分，忽略装饰性字符
+     */
+    private fun extractMeaningfulText(text: String): String {
+        // 按行分割，处理每一行
+        return text.lines()
+            .map { line ->
+                line
+                    // 移除装饰性的重复字符
+                    .replace(Regex("[-=*#_]{3,}"), "")
+                    // 移除count信息
+                    .replace(Regex("count\\d*:\\d+"), "")
+                    // 保留有意义的内容
+                    .replace(Regex("[^\\u4e00-\\u9fff\\w\\s:/.，。！？]"), " ")
+                    .trim()
+            }
+            .filter { it.isNotBlank() && it.length > 2 }  // 过滤掉空行和太短的行
+            .joinToString(" ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    /**
+     * 清理文本中的特殊字符，使其适合 TTS 朗读
+     */
+    private fun cleanTextForTts(text: String): String {
+        return text
+            // 首先处理长串的重复字符（如长破折号）
+            .replace(Regex("-{3,}"), "")  // 移除3个或更多连续的破折号
+            .replace(Regex("={3,}"), "")  // 移除3个或更多连续的等号
+            .replace(Regex("\\*{3,}"), "")  // 移除3个或更多连续的星号
+            .replace(Regex("#{3,}"), "")  // 移除3个或更多连续的井号
+            .replace(Regex("_{3,}"), "")  // 移除3个或更多连续的下划线
+            
+            // 移除或替换特殊符号
+            .replace("---", "")  // 移除长破折号
+            .replace("--", "")   // 移除双破折号
+            .replace("—", "")    // 移除em dash
+            .replace("–", "")    // 移除en dash
+            .replace("…", "")    // 移除省略号
+            .replace("　", " ")   // 全角空格转半角空格
+            
+            // 处理括号内容 - 可以选择保留或移除
+            .replace(Regex("（[^）]*）"), "")  // 移除全角括号及内容
+            .replace(Regex("\\([^)]*\\)"), "")  // 移除半角括号及内容
+            
+            // 处理标点符号
+            .replace("，", ",")   // 全角逗号转半角
+            .replace("。", ".")   // 全角句号转半角
+            .replace("；", ";")   // 全角分号转半角
+            .replace("：", ":")   // 全角冒号转半角
+            .replace("？", "?")   // 全角问号转半角
+            .replace("！", "!")   // 全角感叹号转半角
+            
+            // 移除多余的空白字符
+            .replace(Regex("\\s+"), " ")  // 多个空格合并为一个
+            .trim()  // 移除首尾空格
+            
+            // 如果文本为空或太短，提供默认文本
+            .let { cleaned ->
+                if (cleaned.isBlank() || cleaned.length < 2) {
+                    "无法识别的文本内容"
+                } else {
+                    cleaned
+                }
+            }
     }
 
     private fun createManagedProcess(command: Array<String>): Process {
@@ -192,8 +320,16 @@ class TtsQueueService : SpeechService {
         val rateValue = (rate * 10).toInt() // Windows rate range 0-10
         val volumeValue = (volume * 100).toInt() // Windows volume 0-100
 
-        // 转义文本中的特殊字符
-        val escapedText = text.replace("'", "''").replace("\"", "`\"")
+        // 转义文本中的特殊字符，更全面的转义
+        val escapedText = text
+            .replace("\\", "\\\\")  // 反斜杠
+            .replace("'", "''")     // 单引号
+            .replace("\"", "`\"")   // 双引号
+            .replace("`", "``")     // 反引号
+            .replace("$", "`$")     // 美元符号
+            .replace("\n", " ")     // 换行符
+            .replace("\r", " ")     // 回车符
+            .replace("\t", " ")     // 制表符
 
         // 使用 PowerShell 调用 Windows Speech API，添加进程管理
         return arrayOf(
@@ -217,14 +353,22 @@ class TtsQueueService : SpeechService {
     private fun createMacCommand(text: String, voice: String): Array<String> {
         val rateValue = (rate * 400 + 100).toInt() // Mac rate range 100-500
 
-        // 为了更好的进程管理，我们给 say 命令添加一个标识符
-        val processId = "KReader_TTS_${System.currentTimeMillis()}"
+        // 对于 macOS say 命令，处理特殊字符
+        val processedText = text
+            .replace("\\", "\\\\")  // 反斜杠
+            .replace("\"", "\\\"")  // 双引号
+            .replace("'", "\\'")    // 单引号
+            .replace("`", "\\`")    // 反引号
+            .replace("$", "\\$")    // 美元符号
+            .replace("\n", " ")     // 换行符
+            .replace("\r", " ")     // 回车符
+            .replace("\t", " ")     // 制表符
 
         return arrayOf(
             "say",
             "-v", voice,
             "-r", rateValue.toString(),
-            text
+            processedText
         )
     }
 

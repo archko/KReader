@@ -1,8 +1,10 @@
 package com.archko.reader.pdf.component
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +37,7 @@ import com.archko.reader.pdf.entity.APage
 /**
  * 桌面端文档视图，专注于鼠标滚轮和键盘事件
  */
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 public fun DesktopDocumentView(
     list: MutableList<APage>,
@@ -483,7 +485,7 @@ public fun DesktopDocumentView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Transparent)
-                .pointerInput(Unit) {
+                .pointerInput("tap_gestures") {
                     detectTapGestures(
                         onTap = { offsetTap ->
                             focusRequester.requestFocus()
@@ -527,6 +529,25 @@ public fun DesktopDocumentView(
                             if (y >= height / 4 && y <= height * 3 / 4) {
                                 onDoubleTapToolbar?.invoke()
                             }
+                        }
+                    )
+                }
+                .pointerInput("drag_gestures") {
+                    detectDragGestures(
+                        onDragStart = { 
+                            focusRequester.requestFocus()
+                        },
+                        onDrag = { change ->
+                            // 计算边界限制
+                            val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                            val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            
+                            // 应用拖拽偏移量
+                            val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
+                            val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
+                            
+                            offset = Offset(newX, newY)
+                            pdfViewState.updateOffset(offset)
                         }
                     )
                 }

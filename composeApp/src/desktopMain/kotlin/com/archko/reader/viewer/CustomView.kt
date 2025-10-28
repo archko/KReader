@@ -29,6 +29,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
@@ -317,11 +318,15 @@ fun CustomView(
                     )
                     Spacer(Modifier.weight(1f))
 
-                    IconButton(onClick = { speak(currentPage, decoder!!, speechService) }) {
+                    IconButton(onClick = { 
+                        scope.launch {
+                            speakFromCurrentPage(currentPage, decoder!!, speechService)
+                        }
+                    }) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_tts),
                             contentDescription = stringResource(Res.string.tts),
-                            tint = Color.White
+                            tint = if (speechService.isSpeaking()) Color.Green else Color.White
                         )
                     }
 
@@ -646,13 +651,65 @@ fun CustomView(
     }
 }
 
-fun speak(page: Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
+suspend fun speakFromCurrentPage(startPage: Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
     if (speechService.isSpeaking()) {
         speechService.stop()
+        return
     }
+    
     if (imageDecoder is PdfDecoder) {
-        val pdfDecoder = imageDecoder
-        val str = pdfDecoder.decodeReflow(page)
-        speechService.speak(str[0])
+        withContext(Dispatchers.IO) {
+            try {
+                val totalPages = imageDecoder.originalPageSizes.size
+                println("TTS: 开始从第${startPage + 1}页解码到第${totalPages}页，共${totalPages - startPage}页")
+                
+                // 清空队列，准备添加新内容
+                speechService.clearQueue()
+                
+                var addedPages = 0
+                var skippedPages = 0
+                
+                for (currentPage in startPage until totalPages) {
+                    try {
+                        val textArray = imageDecoder.decodeReflow(currentPage)
+                        if (textArray.isNotEmpty() && textArray[0].isNotBlank()) {
+                            val pageText = textArray[0].trim()
+                            if (pageText.length > 10) { // 只添加有意义的文本
+                                println("TTS: 添加第${currentPage + 1}页文本到队列，长度: ${pageText.length}")
+                                speechService.addToQueue(pageText)
+                                addedPages++
+                            } else {
+                                println("TTS: 跳过第${currentPage + 1}页，文本太短: ${pageText.length}")
+                                skippedPages++
+                            }
+                        } else {
+                            println("TTS: 跳过第${currentPage + 1}页，无文本内容")
+                            skippedPages++
+                        }
+                    } catch (e: Exception) {
+                        println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                        skippedPages++
+                        // 继续处理下一页
+                    }
+                    
+                    // 每处理10页输出一次进度
+                    if ((currentPage - startPage + 1) % 10 == 0) {
+                        println("TTS: 已处理 ${currentPage - startPage + 1}/${totalPages - startPage} 页")
+                    }
+                }
+                
+                val queueSize = speechService.getQueueSize()
+                println("TTS: 解码完成，成功添加 $addedPages 页，跳过 $skippedPages 页，队列中共有 $queueSize 个文本段落")
+                
+                if (queueSize == 0) {
+                    // 如果没有添加任何内容，添加一个提示
+                    speechService.addToQueue("从第${startPage + 1}页到第${totalPages}页未找到可朗读的文本内容")
+                }
+                
+            } catch (e: Exception) {
+                println("TTS: 批量解码失败: ${e.message}")
+                speechService.addToQueue("文本解码失败，无法朗读")
+            }
+        }
     }
 }
