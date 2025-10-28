@@ -37,5 +37,5 @@ interface SpeechService {
     fun getCurrentText(): String?
     fun getDefaultVoice(): Voice
     suspend fun saveVoiceSetting(voice: Voice)
-    suspend fun getVoiceSetting(): Voice?
+    suspend fun getVoiceSetting(): Voice
 }

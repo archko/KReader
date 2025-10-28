@@ -64,19 +64,11 @@ class TtsQueueService : SpeechService {
         try {
             // 尝试加载保存的语音设置
             val savedVoice = getVoiceSetting()
-            if (savedVoice != null) {
-                selectedVoice = savedVoice.name
-                rate = 0.25f // 使用当前设置，不从文件读取
-                volume = 0.8f // 使用当前设置，不从文件读取
-                _selectedVoiceFlow.value = savedVoice
-                println("TTS: Loaded saved voice: ${savedVoice.name}")
-            } else {
-                // 没有保存的设置，使用默认语音
-                val defaultVoice = getDefaultVoice()
-                selectedVoice = defaultVoice.name
-                _selectedVoiceFlow.value = defaultVoice
-                println("TTS: Using default voice: ${defaultVoice.name}")
-            }
+            selectedVoice = savedVoice.name
+            rate = savedVoice.rate // 从文件读取保存的 rate
+            volume = savedVoice.volume // 从文件读取保存的 volume
+            _selectedVoiceFlow.value = savedVoice
+            println("TTS: Loaded saved voice: ${savedVoice.name} with rate=${savedVoice.rate}, volume=${savedVoice.volume}")
         } catch (e: Exception) {
             println("TTS: Failed to initialize voice setting: ${e.message}")
         }
@@ -483,7 +475,7 @@ class TtsQueueService : SpeechService {
             voice = availableVoices.first()
         }
         if (null == voice) {
-            voice = Voice(selectedVoice, "zh_CN", "中文")
+            voice = Voice(selectedVoice, "zh_CN", "中文", rate, volume)
         }
         return voice
     }
@@ -536,26 +528,32 @@ class TtsQueueService : SpeechService {
 
     override suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
         try {
-
             val configFile = File(getConfigFilePath())
             configFile.parentFile?.mkdirs()
 
-            val json = Json { prettyPrint = true }
+            // 添加调试信息
+            println("TTS: Saving voice - name=${voice.name}, rate=${voice.rate}, volume=${voice.volume}")
+
+            val json = Json {
+                prettyPrint = true
+                encodeDefaults = true  // 强制编码默认值
+            }
             val jsonString = json.encodeToString(voice)
             configFile.writeText(jsonString)
 
             println("TTS: Voice setting saved to ${configFile.absolutePath}")
+            println("TTS: Saved JSON content: $jsonString")
         } catch (e: Exception) {
             println("TTS: Failed to save voice setting: ${e.message}")
         }
     }
 
-    override suspend fun getVoiceSetting(): Voice? = withContext(Dispatchers.IO) {
+    override suspend fun getVoiceSetting(): Voice = withContext(Dispatchers.IO) {
         try {
             val configFile = File(getConfigFilePath())
             if (!configFile.exists()) {
                 println("TTS: No voice setting file found")
-                return@withContext null
+                return@withContext getDefaultVoice()
             }
 
             val jsonString = configFile.readText()
@@ -566,7 +564,7 @@ class TtsQueueService : SpeechService {
             voice
         } catch (e: Exception) {
             println("TTS: Failed to load voice setting: ${e.message}")
-            null
         }
+        return@withContext getDefaultVoice()
     }
 }
