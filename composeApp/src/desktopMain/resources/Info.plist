@@ -151,6 +151,28 @@
             <key>LSHandlerRank</key>
             <string>Alternate</string>
         </dict>
+        
+        <!-- TIFF 图像文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>TIFF Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>tiff</string>
+                <string>tif</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>image/tiff</string>
+                <string>image/tif</string>
+            </array>
+        </dict>
     </array>
     
     <!-- URL Schemes (如果需要) -->

@@ -1,17 +1,43 @@
 package com.archko.reader.viewer
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 @Composable
 fun TtsTestScreen() {
+    val scope = rememberCoroutineScope()
     val speechService: SpeechService = remember { TtsQueueService() }
-
+    var isRunning by remember { mutableStateOf(true) }
     var textToSpeak by remember { mutableStateOf("你好，这是中文语音测试。Hello, this is a bilingual test.") }
     var isSpeaking by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
@@ -19,24 +45,31 @@ fun TtsTestScreen() {
     var currentText by remember { mutableStateOf<String?>(null) }
     var rate by remember { mutableStateOf(0.25f) }
     var volume by remember { mutableStateOf(0.8f) }
-    var availableVoices by remember { mutableStateOf(emptyList<String>()) }
-    var selectedVoice by remember { mutableStateOf("Ting-Ting") }
+    var availableVoices by remember { mutableStateOf(emptyList<Voice>()) }
+    var selectedVoice by remember { mutableStateOf<Voice?>(null) }
     var showVoiceDropdown by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         availableVoices = speechService.getAvailableVoices()
-        if (availableVoices.isNotEmpty()) {
-            // 优先选择中文语音
-            val chineseVoices = listOf("Ting-Ting", "Sin-ji", "Mei-Jia", "Li-mu", "Yu-shu")
-            selectedVoice = chineseVoices.firstOrNull { it in availableVoices } 
-                ?: availableVoices.first()
-            speechService.setVoice(selectedVoice)
+    }
+
+    // 观察语音变化
+    val currentVoice by (speechService as TtsQueueService).selectedVoiceFlow.collectAsState()
+
+    LaunchedEffect(currentVoice) {
+        currentVoice?.let { voice ->
+            selectedVoice = voice
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            isRunning = false
         }
     }
 
     // 监听说话状态和队列状态
     LaunchedEffect(Unit) {
-        while (true) {
+        while (isRunning) {
             isSpeaking = speechService.isSpeaking()
             isPaused = speechService.isPaused()
             queueSize = speechService.getQueueSize()
@@ -65,7 +98,7 @@ fun TtsTestScreen() {
                 onClick = {
                     speechService.setRate(rate)
                     speechService.setVolume(volume)
-                    speechService.setVoice(selectedVoice)
+                    selectedVoice?.let { speechService.setVoice(it.name) }
                     speechService.speak(textToSpeak)
                 }
             ) {
@@ -76,7 +109,7 @@ fun TtsTestScreen() {
                 onClick = {
                     speechService.setRate(rate)
                     speechService.setVolume(volume)
-                    speechService.setVoice(selectedVoice)
+                    selectedVoice?.let { speechService.setVoice(it.name) }
                     speechService.addToQueue(textToSpeak)
                 }
             ) {
@@ -127,61 +160,87 @@ fun TtsTestScreen() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        Text("Volume: ${"%.2f".format(volume)}")
+        /*Text("Volume: ${"%.2f".format(volume)}")
         Slider(
             value = volume,
             onValueChange = { volume = it },
             valueRange = 0.0f..1.0f,
             modifier = Modifier.fillMaxWidth()
-        )
+        )*/
 
         Spacer(modifier = Modifier.height(16.dp))
 
         if (availableVoices.isNotEmpty()) {
-            Text("Voice: $selectedVoice")
-            Box {
-                Button(
-                    onClick = { showVoiceDropdown = true }
-                ) {
-                    Text("Select Voice")
-                }
-                
-                DropdownMenu(
-                    expanded = showVoiceDropdown,
-                    onDismissRequest = { showVoiceDropdown = false }
-                ) {
-                    availableVoices.forEach { voiceId ->
-                        DropdownMenuItem(
-                            text = { Text(voiceId) },
-                            onClick = {
-                                selectedVoice = voiceId
-                                speechService.setVoice(voiceId)
-                                showVoiceDropdown = false
-                            }
-                        )
+            Text("Voice: ${selectedVoice?.name ?: "None"}")
+            Row {
+                Box {
+                    Button(
+                        onClick = { showVoiceDropdown = true }
+                    ) {
+                        Text("Select Voice")
+                    }
+
+                    DropdownMenu(
+                        expanded = showVoiceDropdown,
+                        onDismissRequest = { showVoiceDropdown = false }
+                    ) {
+                        availableVoices.forEach { voice ->
+                            DropdownMenuItem(
+                                text = { Text(voice.toString()) },
+                                onClick = {
+                                    selectedVoice = voice
+                                    speechService.setVoice(voice.name)
+                                    showVoiceDropdown = false
+                                }
+                            )
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Button(
+                    onClick = {
+                        selectedVoice?.let { voice ->
+                            val newVoice = Voice(
+                                voice.name,
+                                voice.countryCode,
+                                voice.description,
+                                rate = rate.absoluteValue,
+                                volume = volume,
+                            )
+                            scope.launch { speechService.saveVoiceSetting(newVoice) }
+                        }
+                    }
+                ) {
+                    Text("Save Voice Setting")
+                }
+
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // 状态显示
         Column {
-            Text("Status: ${when {
-                isSpeaking -> "Speaking"
-                isPaused -> "Paused"
-                else -> "Idle"
-            }}", color = MaterialTheme.colorScheme.primary)
-            
+            Text(
+                "Status: ${
+                    when {
+                        isSpeaking -> "Speaking"
+                        isPaused -> "Paused"
+                        else -> "Idle"
+                    }
+                }", color = MaterialTheme.colorScheme.primary
+            )
+
             Text("Queue Size: $queueSize")
-            
-            currentText?.let { text ->
+
+            /*currentText?.let { text ->
                 Text(
                     "Current: ${text.take(30)}${if (text.length > 30) "..." else ""}",
                     color = MaterialTheme.colorScheme.secondary
                 )
-            }
+            }*/
         }
     }
 }

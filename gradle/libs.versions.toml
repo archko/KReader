@@ -53,6 +53,8 @@ androidx-lifecycle-viewmodel-compose-android = { group = "androidx.lifecycle", n
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-immutableCollections = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-immutableCollections" }
 
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
 mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
 mmkv-kotlin = { module = "com.ctrip.flight.mmkv:mmkv-kotlin", version.ref = "mmkv-kotlin" }
 mmkv-kotlin-android = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-android", version.ref = "mmkv-kotlin" }

@@ -132,19 +132,6 @@ fun CustomView(
             }
         }
     }
-    LaunchedEffect(Unit) {
-        val availableVoices = speechService.getAvailableVoices()
-        if (availableVoices.isNotEmpty()) {
-            // 优先选择中文语音
-            val chineseVoices = listOf("Ting-Ting", "Sin-ji", "Mei-Jia", "Li-mu", "Yu-shu")
-            val selectedVoice = chineseVoices.firstOrNull { it in availableVoices }
-                ?: availableVoices.first()
-            speechService.setVoice(selectedVoice)
-
-            speechService.setRate(0.25f)
-            speechService.setVolume(0.8f)
-        }
-    }
 
     // 处理密码输入
     fun handlePasswordEntered(password: String) {
@@ -659,7 +646,7 @@ fun CustomView(
     }
 }
 
-fun speak(page:Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
+fun speak(page: Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
     if (speechService.isSpeaking()) {
         speechService.stop()
     }

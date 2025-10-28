@@ -17,10 +17,14 @@ class TtsQueueService : SpeechService {
     private var currentProcess: Process? = null
     private val isSpeakingFlag = AtomicBoolean(false)
     private val isPausedFlag = AtomicBoolean(false)
-    private var rate: Float = 0.30f
+    private var rate: Float = 0.20f
     private var volume: Float = 0.8f
-    private var selectedVoice: String = "Mei-Jia"
-    
+    private var selectedVoice: String = "Meijia"
+
+    // Flow for selected voice
+    private val _selectedVoiceFlow = MutableStateFlow<Voice?>(null)
+    val selectedVoiceFlow: StateFlow<Voice?> = _selectedVoiceFlow.asStateFlow()
+
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
     private val currentText = AtomicReference<String?>(null)
@@ -98,20 +102,7 @@ class TtsQueueService : SpeechService {
         // 通知处理循环有新任务
         taskNotificationChannel.trySend(Unit)
     }
-    
-    // 中文语音映射
-    private val chineseVoices = if (isWindows) {
-        listOf("Microsoft Huihui Desktop", "Microsoft Yaoyao Desktop", "Microsoft Kangkang Desktop")
-    } else {
-        listOf("Mei-Jia", "Ting-Ting", "Sin-ji", "Li-mu", "Yu-shu")
-    }
-    
-    private val englishVoices = if (isWindows) {
-        listOf("Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Mark Desktop")
-    } else {
-        listOf("Alex", "Samantha", "Victoria", "Daniel", "Karen", "Moira", "Tessa")
-    }
-    
+
     private fun detectLanguageAndSelectVoice(text: String): String {
         val chineseCharCount = text.count { it.toString().matches(Regex("[\\u4e00-\\u9fff]")) }
         val totalChars = text.length

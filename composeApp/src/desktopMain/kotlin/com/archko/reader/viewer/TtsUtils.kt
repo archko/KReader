@@ -46,7 +46,7 @@ object TtsUtils {
         return speechService.getCurrentText()
     }
     
-    fun getAvailableVoices(): List<String> {
+    fun getAvailableVoices(): List<Voice> {
         return speechService.getAvailableVoices()
     }
 }

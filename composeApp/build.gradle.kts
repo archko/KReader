@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {
@@ -49,9 +50,7 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
-            // 保持 JNA 依赖如果你的 dylib 使用 JNA 加载
-            // implementation("net.java.dev.jna:jna:5.18.0")
-            // implementation("net.java.dev.jna:jna-platform:5.18.0")
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
     }
 }
