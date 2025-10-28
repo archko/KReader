@@ -1,17 +1,25 @@
 package com.archko.reader.viewer
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.io.IOException
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-
-data class TtsTask(
-    val text: String,
-    val priority: Int = 0 // 0 = normal, 1 = high priority
-)
 
 class TtsQueueService : SpeechService {
     private var currentProcess: Process? = null
@@ -28,32 +36,50 @@ class TtsQueueService : SpeechService {
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
     private val currentText = AtomicReference<String?>(null)
-    
+
     // 协程作用域和任务通知
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val taskNotificationChannel = Channel<Unit>(Channel.UNLIMITED)
     private var processingJob: Job? = null
-    
+
     // 平台检测
     private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
     private val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
     private var isShutdown = false
-    
+
     init {
         startProcessing()
+        // 初始化语音设置
+        serviceScope.launch {
+            initializeVoiceSetting()
+        }
         // 添加 JVM 关闭钩子，确保应用退出时清理 TTS 进程
         Runtime.getRuntime().addShutdownHook(Thread {
             println("TTS: JVM shutdown hook triggered, cleaning up...")
             forceKillAllTtsProcesses()
         })
     }
-    
+
+    private suspend fun initializeVoiceSetting() {
+        try {
+            // 尝试加载保存的语音设置
+            val savedVoice = getVoiceSetting()
+            selectedVoice = savedVoice.name
+            rate = savedVoice.rate // 从文件读取保存的 rate
+            volume = savedVoice.volume // 从文件读取保存的 volume
+            _selectedVoiceFlow.value = savedVoice
+            println("TTS: Loaded saved voice: ${savedVoice.name} with rate=${savedVoice.rate}, volume=${savedVoice.volume}")
+        } catch (e: Exception) {
+            println("TTS: Failed to initialize voice setting: ${e.message}")
+        }
+    }
+
     private fun startProcessing() {
         processingJob = serviceScope.launch {
             taskProcessorLoop()
         }
     }
-    
+
     private suspend fun taskProcessorLoop() {
         while (serviceScope.isActive && !isShutdown) {
             if (isPausedFlag.get()) {
@@ -61,7 +87,7 @@ class TtsQueueService : SpeechService {
                 delay(100)
                 continue
             }
-            
+
             val task = selectNextTask()
             if (task != null) {
                 currentText.set(task.text)
@@ -73,7 +99,7 @@ class TtsQueueService : SpeechService {
                 currentText.set(null)
                 continue
             }
-            
+
             // 没有任务时，等待新任务通知
             try {
                 taskNotificationChannel.receive()
@@ -82,7 +108,7 @@ class TtsQueueService : SpeechService {
             }
         }
     }
-    
+
     private suspend fun selectNextTask(): TtsTask? {
         return queueMutex.withLock {
             if (taskQueue.isNotEmpty()) {
@@ -94,7 +120,7 @@ class TtsQueueService : SpeechService {
             }
         }
     }
-    
+
     private suspend fun addTaskToQueue(task: TtsTask) {
         queueMutex.withLock {
             taskQueue.add(task)
@@ -104,36 +130,27 @@ class TtsQueueService : SpeechService {
     }
 
     private fun detectLanguageAndSelectVoice(text: String): String {
-        val chineseCharCount = text.count { it.toString().matches(Regex("[\\u4e00-\\u9fff]")) }
-        val totalChars = text.length
-        
-        return if (chineseCharCount > totalChars * 0.3) {
-            val availableVoices = getAvailableVoices()
-            chineseVoices.firstOrNull { it in availableVoices } 
-                ?: if (isWindows) "Microsoft Huihui Desktop" else "Ting-Ting"
-        } else {
-            selectedVoice
-        }
+        return selectedVoice
     }
-    
+
     private suspend fun executeTask(task: TtsTask) {
         if (isShutdown || isPausedFlag.get()) return
-        
+
         try {
             val voiceToUse = detectLanguageAndSelectVoice(task.text)
             println("TTS: Using voice '$voiceToUse' for text: ${task.text.take(50)}...")
-            
+
             val command = if (isWindows) {
                 createWindowsCommand(task.text, voiceToUse)
             } else {
                 createMacCommand(task.text, voiceToUse)
             }
-            
+
             isSpeakingFlag.set(true)
             currentProcess = withContext(Dispatchers.IO) {
                 createManagedProcess(command)
             }
-            
+
             // 使用协程等待进程结束
             withContext(Dispatchers.IO) {
                 try {
@@ -145,16 +162,16 @@ class TtsQueueService : SpeechService {
                     currentProcess = null
                 }
             }
-            
+
         } catch (e: Exception) {
             println("TTS Error: ${e.message}")
             isSpeakingFlag.set(false)
         }
     }
-    
+
     private fun createManagedProcess(command: Array<String>): Process {
         val processBuilder = ProcessBuilder(*command)
-        
+
         if (isWindows) {
             // Windows: 创建新的进程组，当父进程退出时子进程也会退出
             processBuilder.environment()["CREATE_NEW_PROCESS_GROUP"] = "true"
@@ -162,22 +179,22 @@ class TtsQueueService : SpeechService {
             // macOS/Linux: 设置进程组，使子进程在父进程退出时收到 SIGHUP
             // 这里我们通过 shell 包装来确保进程能被正确清理
             val wrappedCommand = arrayOf(
-                "sh", "-c", 
+                "sh", "-c",
                 "trap 'kill 0' TERM; ${command.joinToString(" ")} & wait"
             )
             return ProcessBuilder(*wrappedCommand).start()
         }
-        
+
         return processBuilder.start()
     }
-    
+
     private fun createWindowsCommand(text: String, voice: String): Array<String> {
         val rateValue = (rate * 10).toInt() // Windows rate range 0-10
         val volumeValue = (volume * 100).toInt() // Windows volume 0-100
-        
+
         // 转义文本中的特殊字符
         val escapedText = text.replace("'", "''").replace("\"", "`\"")
-        
+
         // 使用 PowerShell 调用 Windows Speech API，添加进程管理
         return arrayOf(
             "powershell",
@@ -196,13 +213,13 @@ class TtsQueueService : SpeechService {
             """.trimIndent()
         )
     }
-    
+
     private fun createMacCommand(text: String, voice: String): Array<String> {
         val rateValue = (rate * 400 + 100).toInt() // Mac rate range 100-500
-        
+
         // 为了更好的进程管理，我们给 say 命令添加一个标识符
         val processId = "KReader_TTS_${System.currentTimeMillis()}"
-        
+
         return arrayOf(
             "say",
             "-v", voice,
@@ -275,62 +292,151 @@ class TtsQueueService : SpeechService {
 
     override fun setVoice(voiceId: String) {
         this.selectedVoice = voiceId
+        // 更新 Flow
+        serviceScope.launch {
+            val availableVoices = getAvailableVoices()
+            val voice = availableVoices.find { it.name == voiceId }
+            _selectedVoiceFlow.value = voice
+        }
     }
 
-    override fun getAvailableVoices(): List<String> {
+    override fun getAvailableVoices(): List<Voice> {
         return try {
-            if (isWindows) {
+            val allVoices = if (isWindows) {
                 getWindowsVoices()
             } else {
                 getMacVoices()
             }
+            // 只保留中文和英文语音
+            filterChineseAndEnglishVoices(allVoices)
         } catch (e: Exception) {
             println("Get voices error: ${e.message}")
-            if (isWindows) {
-                listOf("Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Huihui Desktop")
-            } else {
-                listOf("Alex", "Samantha", "Ting-Ting", "Sin-ji", "Mei-Jia")
-            }
+            emptyList()
         }
     }
-    
-    private fun getWindowsVoices(): List<String> {
+
+    private fun filterChineseAndEnglishVoices(voices: List<Voice>): List<Voice> {
+        return voices.filter { voice ->
+            val countryCode = voice.countryCode.lowercase()
+            // 中文：zh-cn, zh-tw, zh-hk, zh-sg 等
+            // 英文：en-us, en-gb, en-au, en-ca 等
+            countryCode.startsWith("zh") || countryCode.startsWith("en")
+        }
+    }
+
+    private fun getWindowsVoices(): List<Voice> {
         return try {
             val process = ProcessBuilder(
                 "powershell",
                 "-Command",
-                "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object { \$_.VoiceInfo.Name }"
+                """
+                Add-Type -AssemblyName System.Speech;
+                (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object {
+                    ${'$'}voice = ${'$'}_.VoiceInfo;
+                    "${'$'}(${'$'}voice.Name)|${'$'}(${'$'}voice.Culture.Name)|${'$'}(${'$'}voice.Description)"
+                }
+                """.trimIndent()
             ).start()
-            
+
             val output = process.inputStream.bufferedReader().readText()
             process.waitFor()
-            
+
             output.lines()
                 .filter { it.isNotBlank() }
-                .map { it.trim() }
+                .mapNotNull { line ->
+                    val parts = line.trim().split("|")
+                    if (parts.size >= 3) {
+                        Voice(
+                            name = parts[0],
+                            countryCode = parts[1],
+                            description = parts[2]
+                        )
+                    } else null
+                }
         } catch (e: Exception) {
             println("Failed to get Windows voices: ${e.message}")
-            listOf("Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Huihui Desktop")
+            getDefaultWindowsVoices()
         }
     }
-    
-    private fun getMacVoices(): List<String> {
+
+    private fun getMacVoices(): List<Voice> {
         return try {
             val process = ProcessBuilder("say", "-v", "?").start()
             val output = process.inputStream.bufferedReader().readText()
             process.waitFor()
-            
+
             output.lines()
                 .filter { it.isNotBlank() }
                 .mapNotNull { line ->
-                    val parts = line.trim().split("\\s+".toRegex())
-                    if (parts.isNotEmpty()) parts[0] else null
+                    parseMacVoiceLine(line.trim())
                 }
-                .filter { it.isNotEmpty() }
         } catch (e: Exception) {
             println("Failed to get Mac voices: ${e.message}")
-            listOf("Alex", "Samantha", "Ting-Ting", "Sin-ji", "Mei-Jia")
+            getDefaultMacVoices()
         }
+    }
+
+    private fun parseMacVoiceLine(line: String): Voice? {
+        // macOS say -v ? 输出格式通常是: "VoiceName    language_code    # description"
+        // 例如: "Alex                 en_US    # Most people recognize me by my voice."
+        // 或者: "Ting-Ting            zh_CN    # 普通话（中国大陆）- 女声"
+
+        return try {
+            val parts = line.split("#", limit = 2)
+            val voiceInfo = parts[0].trim()
+            val description = if (parts.size > 1) parts[1].trim() else ""
+
+            // 分离语音名称和语言代码
+            val voiceParts = voiceInfo.split("\\s+".toRegex())
+            if (voiceParts.size >= 2) {
+                val name = voiceParts[0]
+                val countryCode = voiceParts[voiceParts.size - 1]
+
+                Voice(
+                    name = name,
+                    countryCode = countryCode,
+                    description = description.ifEmpty { "System voice" }
+                )
+            } else {
+                // 如果解析失败，至少返回语音名称
+                Voice(
+                    name = voiceParts[0],
+                    countryCode = "unknown",
+                    description = description.ifEmpty { "System voice" }
+                )
+            }
+        } catch (e: Exception) {
+            println("Failed to parse voice line: $line, error: ${e.message}")
+            null
+        }
+    }
+
+    private fun getDefaultWindowsVoices(): List<Voice> {
+        return listOf(
+            Voice("Microsoft David Desktop", "en-US", "English (United States) - Male"),
+            Voice("Microsoft Zira Desktop", "en-US", "English (United States) - Female"),
+            Voice("Microsoft Mark Desktop", "en-US", "English (United States) - Male"),
+            Voice("Microsoft Huihui Desktop", "zh-CN", "Chinese (Simplified) - Female"),
+            Voice("Microsoft Yaoyao Desktop", "zh-CN", "Chinese (Simplified) - Female"),
+            Voice("Microsoft Kangkang Desktop", "zh-CN", "Chinese (Simplified) - Male")
+        )
+    }
+
+    private fun getDefaultMacVoices(): List<Voice> {
+        return listOf(
+            Voice("Alex", "en-US", "English (United States) - Male"),
+            Voice("Samantha", "en-US", "English (United States) - Female"),
+            Voice("Victoria", "en-US", "English (United States) - Female"),
+            Voice("Daniel", "en-GB", "English (United Kingdom) - Male"),
+            Voice("Karen", "en-AU", "English (Australia) - Female"),
+            Voice("Moira", "en-IE", "English (Ireland) - Female"),
+            Voice("Tessa", "en-ZA", "English (South Africa) - Female"),
+            Voice("Ting-Ting", "zh-CN", "Chinese (Simplified) - Female"),
+            Voice("Sin-ji", "zh-HK", "Chinese (Hong Kong) - Female"),
+            Voice("Mei-Jia", "zh-TW", "Chinese (Traditional) - Female"),
+            Voice("Li-mu", "zh-CN", "Chinese (Simplified) - Male"),
+            Voice("Yu-shu", "zh-CN", "Chinese (Simplified) - Female")
+        )
     }
 
     override fun isSpeaking(): Boolean {
@@ -352,32 +458,54 @@ class TtsQueueService : SpeechService {
     override fun getCurrentText(): String? {
         return currentText.get()
     }
-    
+
+    override fun getDefaultVoice(): Voice {
+        val availableVoices = getAvailableVoices()
+
+        var voice: Voice? = null
+        if (isMacOS) {
+            // 对于 macOS，优先查找 Mei-Jia 或 Meijia
+            voice = availableVoices.find { voice ->
+                voice.name.equals("Mei-Jia", ignoreCase = true) ||
+                        voice.name.equals("Meijia", ignoreCase = true)
+            }
+        }
+
+        if (null == voice && availableVoices.isNotEmpty()) {
+            voice = availableVoices.first()
+        }
+        if (null == voice) {
+            voice = Voice(selectedVoice, "zh_CN", "中文", rate, volume)
+        }
+        return voice
+    }
+
     fun destroy() {
         isShutdown = true
         stop()
         processingJob?.cancel()
         taskNotificationChannel.close()
         serviceScope.cancel()
-        
+
         // 强制终止所有可能的 TTS 进程
         forceKillAllTtsProcesses()
     }
-    
+
     private fun forceKillAllTtsProcesses() {
         try {
             if (isWindows) {
                 // Windows: 更精确地终止 TTS 相关的 PowerShell 进程
-                ProcessBuilder("powershell", "-Command", 
+                ProcessBuilder(
+                    "powershell", "-Command",
                     "Get-Process | Where-Object {${'$'}_.ProcessName -eq 'powershell' -and ${'$'}_.CommandLine -like '*Speech*'} | Stop-Process -Force"
                 ).start().waitFor()
-                
+
                 // 备用方案：终止所有 PowerShell 进程（可能影响其他应用）
                 // ProcessBuilder("taskkill", "/F", "/IM", "powershell.exe").start()
             } else {
                 // macOS: 终止所有 say 进程
                 ProcessBuilder("pkill", "say").start().waitFor()
-                
+
                 // 如果 pkill 不工作，尝试 killall
                 ProcessBuilder("killall", "say").start().waitFor()
             }
@@ -385,5 +513,58 @@ class TtsQueueService : SpeechService {
         } catch (e: Exception) {
             println("TTS: Failed to force kill TTS processes: ${e.message}")
         }
+    }
+
+    private fun getConfigFilePath(): String {
+        val userHome = System.getProperty("user.home")
+        return if (isWindows) {
+            val appData = System.getenv("APPDATA") ?: "$userHome\\AppData\\Roaming"
+            "$appData\\KReader\\tts_voice_setting.json"
+        } else {
+            // macOS
+            "$userHome/Library/Application Support/KReader/tts_voice_setting.json"
+        }
+    }
+
+    override suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
+        try {
+            val configFile = File(getConfigFilePath())
+            configFile.parentFile?.mkdirs()
+
+            // 添加调试信息
+            println("TTS: Saving voice - name=${voice.name}, rate=${voice.rate}, volume=${voice.volume}")
+
+            val json = Json {
+                prettyPrint = true
+                encodeDefaults = true  // 强制编码默认值
+            }
+            val jsonString = json.encodeToString(voice)
+            configFile.writeText(jsonString)
+
+            println("TTS: Voice setting saved to ${configFile.absolutePath}")
+            println("TTS: Saved JSON content: $jsonString")
+        } catch (e: Exception) {
+            println("TTS: Failed to save voice setting: ${e.message}")
+        }
+    }
+
+    override suspend fun getVoiceSetting(): Voice = withContext(Dispatchers.IO) {
+        try {
+            val configFile = File(getConfigFilePath())
+            if (!configFile.exists()) {
+                println("TTS: No voice setting file found")
+                return@withContext getDefaultVoice()
+            }
+
+            val jsonString = configFile.readText()
+            val json = Json { ignoreUnknownKeys = true }
+            val voice = json.decodeFromString<Voice>(jsonString)
+
+            println("TTS: Voice setting loaded from ${configFile.absolutePath}")
+            voice
+        } catch (e: Exception) {
+            println("TTS: Failed to load voice setting: ${e.message}")
+        }
+        return@withContext getDefaultVoice()
     }
 }
