@@ -137,12 +137,10 @@ fun CustomView(
         if (availableVoices.isNotEmpty()) {
             // 优先选择中文语音
             val chineseVoices = listOf("Ting-Ting", "Sin-ji", "Mei-Jia", "Li-mu", "Yu-shu")
-            val selectedVoice = chineseVoices.firstOrNull { it in availableVoices }
-                ?: availableVoices.first()
+            val availableVoiceNames = availableVoices.map { it.name }
+            val selectedVoice = chineseVoices.firstOrNull { it in availableVoiceNames }
+                ?: availableVoices.first().name
             speechService.setVoice(selectedVoice)
-
-            speechService.setRate(0.25f)
-            speechService.setVolume(0.8f)
         }
     }
 

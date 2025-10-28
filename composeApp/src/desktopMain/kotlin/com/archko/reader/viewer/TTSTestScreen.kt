@@ -19,8 +19,8 @@ fun TtsTestScreen() {
     var currentText by remember { mutableStateOf<String?>(null) }
     var rate by remember { mutableStateOf(0.25f) }
     var volume by remember { mutableStateOf(0.8f) }
-    var availableVoices by remember { mutableStateOf(emptyList<String>()) }
-    var selectedVoice by remember { mutableStateOf("Ting-Ting") }
+    var availableVoices by remember { mutableStateOf(emptyList<Voice>()) }
+    var selectedVoice by remember { mutableStateOf("Mei-Jia") }
     var showVoiceDropdown by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -28,8 +28,9 @@ fun TtsTestScreen() {
         if (availableVoices.isNotEmpty()) {
             // 优先选择中文语音
             val chineseVoices = listOf("Ting-Ting", "Sin-ji", "Mei-Jia", "Li-mu", "Yu-shu")
-            selectedVoice = chineseVoices.firstOrNull { it in availableVoices } 
-                ?: availableVoices.first()
+            val availableVoiceNames = availableVoices.map { it.name }
+            selectedVoice = chineseVoices.firstOrNull { it in availableVoiceNames } 
+                ?: availableVoices.first().name
             speechService.setVoice(selectedVoice)
         }
     }
@@ -150,12 +151,12 @@ fun TtsTestScreen() {
                     expanded = showVoiceDropdown,
                     onDismissRequest = { showVoiceDropdown = false }
                 ) {
-                    availableVoices.forEach { voiceId ->
+                    availableVoices.forEach { voice ->
                         DropdownMenuItem(
-                            text = { Text(voiceId) },
+                            text = { Text(voice.toString()) },
                             onClick = {
-                                selectedVoice = voiceId
-                                speechService.setVoice(voiceId)
+                                selectedVoice = voice.name
+                                speechService.setVoice(voice.name)
                                 showVoiceDropdown = false
                             }
                         )

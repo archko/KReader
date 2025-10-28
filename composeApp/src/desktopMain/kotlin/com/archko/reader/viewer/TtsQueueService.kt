@@ -8,11 +8,6 @@ import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-data class TtsTask(
-    val text: String,
-    val priority: Int = 0 // 0 = normal, 1 = high priority
-)
-
 class TtsQueueService : SpeechService {
     private var currentProcess: Process? = null
     private val isSpeakingFlag = AtomicBoolean(false)
@@ -118,7 +113,8 @@ class TtsQueueService : SpeechService {
         
         return if (chineseCharCount > totalChars * 0.3) {
             val availableVoices = getAvailableVoices()
-            chineseVoices.firstOrNull { it in availableVoices } 
+            val availableVoiceNames = availableVoices.map { it.name }
+            chineseVoices.firstOrNull { it in availableVoiceNames } 
                 ?: if (isWindows) "Microsoft Huihui Desktop" else "Ting-Ting"
         } else {
             selectedVoice
@@ -286,29 +282,42 @@ class TtsQueueService : SpeechService {
         this.selectedVoice = voiceId
     }
 
-    override fun getAvailableVoices(): List<String> {
+    override fun getAvailableVoices(): List<Voice> {
         return try {
-            if (isWindows) {
+            val allVoices = if (isWindows) {
                 getWindowsVoices()
             } else {
                 getMacVoices()
             }
+            // 只保留中文和英文语音
+            filterChineseAndEnglishVoices(allVoices)
         } catch (e: Exception) {
             println("Get voices error: ${e.message}")
-            if (isWindows) {
-                listOf("Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Huihui Desktop")
-            } else {
-                listOf("Alex", "Samantha", "Ting-Ting", "Sin-ji", "Mei-Jia")
-            }
+            emptyList()
         }
     }
     
-    private fun getWindowsVoices(): List<String> {
+    private fun filterChineseAndEnglishVoices(voices: List<Voice>): List<Voice> {
+        return voices.filter { voice ->
+            val countryCode = voice.countryCode.lowercase()
+            // 中文：zh-cn, zh-tw, zh-hk, zh-sg 等
+            // 英文：en-us, en-gb, en-au, en-ca 等
+            countryCode.startsWith("zh") || countryCode.startsWith("en")
+        }
+    }
+    
+    private fun getWindowsVoices(): List<Voice> {
         return try {
             val process = ProcessBuilder(
                 "powershell",
                 "-Command",
-                "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object { \$_.VoiceInfo.Name }"
+                """
+                Add-Type -AssemblyName System.Speech;
+                (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | ForEach-Object {
+                    ${'$'}voice = ${'$'}_.VoiceInfo;
+                    "${'$'}(${'$'}voice.Name)|${'$'}(${'$'}voice.Culture.Name)|${'$'}(${'$'}voice.Description)"
+                }
+                """.trimIndent()
             ).start()
             
             val output = process.inputStream.bufferedReader().readText()
@@ -316,14 +325,23 @@ class TtsQueueService : SpeechService {
             
             output.lines()
                 .filter { it.isNotBlank() }
-                .map { it.trim() }
+                .mapNotNull { line ->
+                    val parts = line.trim().split("|")
+                    if (parts.size >= 3) {
+                        Voice(
+                            name = parts[0],
+                            countryCode = parts[1],
+                            description = parts[2]
+                        )
+                    } else null
+                }
         } catch (e: Exception) {
             println("Failed to get Windows voices: ${e.message}")
-            listOf("Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Huihui Desktop")
+            getDefaultWindowsVoices()
         }
     }
     
-    private fun getMacVoices(): List<String> {
+    private fun getMacVoices(): List<Voice> {
         return try {
             val process = ProcessBuilder("say", "-v", "?").start()
             val output = process.inputStream.bufferedReader().readText()
@@ -332,14 +350,75 @@ class TtsQueueService : SpeechService {
             output.lines()
                 .filter { it.isNotBlank() }
                 .mapNotNull { line ->
-                    val parts = line.trim().split("\\s+".toRegex())
-                    if (parts.isNotEmpty()) parts[0] else null
+                    parseMacVoiceLine(line.trim())
                 }
-                .filter { it.isNotEmpty() }
         } catch (e: Exception) {
             println("Failed to get Mac voices: ${e.message}")
-            listOf("Alex", "Samantha", "Ting-Ting", "Sin-ji", "Mei-Jia")
+            getDefaultMacVoices()
         }
+    }
+    
+    private fun parseMacVoiceLine(line: String): Voice? {
+        // macOS say -v ? 输出格式通常是: "VoiceName    language_code    # description"
+        // 例如: "Alex                 en_US    # Most people recognize me by my voice."
+        // 或者: "Ting-Ting            zh_CN    # 普通话（中国大陆）- 女声"
+        
+        return try {
+            val parts = line.split("#", limit = 2)
+            val voiceInfo = parts[0].trim()
+            val description = if (parts.size > 1) parts[1].trim() else ""
+            
+            // 分离语音名称和语言代码
+            val voiceParts = voiceInfo.split("\\s+".toRegex())
+            if (voiceParts.size >= 2) {
+                val name = voiceParts[0]
+                val countryCode = voiceParts[voiceParts.size - 1]
+                
+                Voice(
+                    name = name,
+                    countryCode = countryCode,
+                    description = description.ifEmpty { "System voice" }
+                )
+            } else {
+                // 如果解析失败，至少返回语音名称
+                Voice(
+                    name = voiceParts[0],
+                    countryCode = "unknown",
+                    description = description.ifEmpty { "System voice" }
+                )
+            }
+        } catch (e: Exception) {
+            println("Failed to parse voice line: $line, error: ${e.message}")
+            null
+        }
+    }
+    
+    private fun getDefaultWindowsVoices(): List<Voice> {
+        return listOf(
+            Voice("Microsoft David Desktop", "en-US", "English (United States) - Male"),
+            Voice("Microsoft Zira Desktop", "en-US", "English (United States) - Female"),
+            Voice("Microsoft Mark Desktop", "en-US", "English (United States) - Male"),
+            Voice("Microsoft Huihui Desktop", "zh-CN", "Chinese (Simplified) - Female"),
+            Voice("Microsoft Yaoyao Desktop", "zh-CN", "Chinese (Simplified) - Female"),
+            Voice("Microsoft Kangkang Desktop", "zh-CN", "Chinese (Simplified) - Male")
+        )
+    }
+    
+    private fun getDefaultMacVoices(): List<Voice> {
+        return listOf(
+            Voice("Alex", "en-US", "English (United States) - Male"),
+            Voice("Samantha", "en-US", "English (United States) - Female"),
+            Voice("Victoria", "en-US", "English (United States) - Female"),
+            Voice("Daniel", "en-GB", "English (United Kingdom) - Male"),
+            Voice("Karen", "en-AU", "English (Australia) - Female"),
+            Voice("Moira", "en-IE", "English (Ireland) - Female"),
+            Voice("Tessa", "en-ZA", "English (South Africa) - Female"),
+            Voice("Ting-Ting", "zh-CN", "Chinese (Simplified) - Female"),
+            Voice("Sin-ji", "zh-HK", "Chinese (Hong Kong) - Female"),
+            Voice("Mei-Jia", "zh-TW", "Chinese (Traditional) - Female"),
+            Voice("Li-mu", "zh-CN", "Chinese (Simplified) - Male"),
+            Voice("Yu-shu", "zh-CN", "Chinese (Simplified) - Female")
+        )
     }
 
     override fun isSpeaking(): Boolean {
