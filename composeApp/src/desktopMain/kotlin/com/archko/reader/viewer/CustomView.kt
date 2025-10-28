@@ -653,6 +653,7 @@ fun CustomView(
 
 suspend fun speakFromCurrentPage(startPage: Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
     if (speechService.isSpeaking()) {
+        println("TTS: 正在朗读，停止当前朗读")
         speechService.stop()
         return
     }
@@ -675,7 +676,7 @@ suspend fun speakFromCurrentPage(startPage: Int, imageDecoder: ImageDecoder, spe
                         if (textArray.isNotEmpty() && textArray[0].isNotBlank()) {
                             val pageText = textArray[0].trim()
                             if (pageText.length > 10) { // 只添加有意义的文本
-                                println("TTS: 添加第${currentPage + 1}页文本到队列，长度: ${pageText.length}")
+                                //println("TTS: 添加第${currentPage + 1}页文本到队列，长度: ${pageText.length}")
                                 speechService.addToQueue(pageText)
                                 addedPages++
                             } else {
