@@ -144,21 +144,25 @@ class TtsQueueService : SpeechService {
                 }
                 
                 currentProcess = TtsUtils.createManagedProcess(isWindows, command)
-                val timeoutSeconds = (text.length / 10).coerceIn(10, 60)
+                println("TTS: Process started for text: ${text.take(30)}...")
                 
-                val exitCode = withTimeoutOrNull(timeoutSeconds * 1000L) {
-                    while (currentProcess?.isAlive == true && scope.isActive) {
-                        delay(100)
-                    }
+                // 等待进程完成，但定期检查协程是否被取消
+                while (currentProcess?.isAlive == true && scope.isActive) {
+                    delay(100) // 每100ms检查一次
+                }
+                
+                // 检查进程退出状态
+                val exitCode = if (scope.isActive && currentProcess?.isAlive == false) {
                     currentProcess?.exitValue() ?: -1
+                } else {
+                    // 协程被取消或进程仍在运行，强制终止
+                    currentProcess?.destroyForcibly()
+                    -1
                 }
                 
-                if (exitCode == null) {
-                    currentProcess?.destroyForcibly()
-                    false
-                } else {
-                    exitCode == 0
-                }
+                println("TTS: Process finished with exit code: $exitCode")
+                exitCode == 0
+                
             } catch (e: Exception) {
                 println("TTS: attemptSpeak error: ${e.message}")
                 currentProcess?.destroyForcibly()
@@ -238,38 +242,36 @@ class TtsQueueService : SpeechService {
         println("TTS: Speak requested: ${text.take(50)}...")
         
         GlobalScope.launch {
-            // 完全重启：先销毁旧的工作器，再创建新的
+            // 完全重启：先销毁旧的工作器
             destroyWorker()
             
             // 清空队列并添加新任务
             clearQueueSync()
-            addToQueue(text, priority = 1)
+            queueMutex.withLock {
+                taskQueue.add(TtsTask(text, priority = 1))
+            }
             
-            // 启动工作器
-            startWorker()
+            // 创建并启动新工作器
+            val worker = ensureWorker()
+            worker.notifyNewTask()
+            
+            println("TTS: Speak task added and worker started")
         }
     }
 
     override fun addToQueue(text: String) {
-        addToQueue(text, priority = 0)
-    }
-    
-    /**
-     * 添加任务到队列 - 线程安全，快速执行
-     */
-    private fun addToQueue(text: String, priority: Int = 0) {
         if (text.isBlank()) return
         
-        // 使用 runBlocking 确保同步执行，避免并发问题
-        runBlocking {
+        GlobalScope.launch {
             var queueSize = 0
             queueMutex.withLock {
-                taskQueue.add(TtsTask(text, priority))
+                taskQueue.add(TtsTask(text, priority = 0))
                 queueSize = taskQueue.size
             }
             
-            // 通知工作器有新任务（如果工作器存在）
-            ttsWorker?.notifyNewTask()
+            // 确保工作器存在并通知有新任务
+            val worker = ensureWorker()
+            worker.notifyNewTask()
             
             println("TTS: Added to queue: ${text.take(50)}... (Queue size: $queueSize)")
         }
@@ -291,14 +293,7 @@ class TtsQueueService : SpeechService {
         println("TTS: Queue cleared")
     }
     
-    /**
-     * 启动工作器开始朗读
-     */
-    fun startWorker() {
-        GlobalScope.launch {
-            ensureWorker()
-        }
-    }
+
 
     override fun stop() {
         GlobalScope.launch {

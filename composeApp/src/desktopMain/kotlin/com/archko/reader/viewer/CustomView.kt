@@ -675,16 +675,9 @@ suspend fun speakFromCurrentPage(
 
                 val queueSize = speechService.getQueueSize()
                 println("TTS: 添加完成,队列中共有$queueSize 个文本段落")
-
-                if (queueSize > 0 && speechService is TtsQueueService) {
-                    speechService.startWorker()
-                }
             } catch (e: Exception) {
                 println("TTS: 批量解码失败: ${e.message}")
                 speechService.addToQueue("文本解码失败，无法朗读")
-                if (speechService is TtsQueueService) {
-                    speechService.startWorker()
-                }
             }
         }
     }
