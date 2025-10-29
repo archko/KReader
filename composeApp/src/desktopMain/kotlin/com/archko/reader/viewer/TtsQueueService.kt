@@ -27,15 +27,21 @@ class TtsQueueService : SpeechService {
     private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
     private val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
 
-    // TTS 工作器 - 可以完全重启的独立组件
+    // 外部公用队列 - 线程安全
+    private val taskQueue = mutableListOf<TtsTask>()
+    private val queueMutex = Mutex()
+    private val isSpeaking = AtomicBoolean(false)
+    private val currentText = AtomicReference<String?>(null)
+
+    // TTS 工作器 - 只负责朗读，不管理队列
     @Volatile
     private var ttsWorker: TtsWorker? = null
     private val workerMutex = Mutex()
 
     /**
-     * TTS 工作器 - 独立的协程作用域，可以完全销毁和重建
+     * TTS 工作器 - 只负责朗读，从外部队列获取任务
      */
-    private class TtsWorker(
+    private inner class TtsWorker(
         private val isWindows: Boolean,
         private val voice: String,
         private val rate: Float,
@@ -44,11 +50,7 @@ class TtsQueueService : SpeechService {
         @Volatile
         private var currentProcess: Process? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
-        private val taskQueue = mutableListOf<TtsTask>()
-        private val queueMutex = Mutex()
         private val taskChannel = Channel<Unit>(Channel.UNLIMITED)
-        private val currentText = AtomicReference<String?>(null)
-        private val isSpeaking = AtomicBoolean(false)
         
         init {
             scope.launch {
@@ -58,22 +60,32 @@ class TtsQueueService : SpeechService {
         
         private suspend fun processLoop() {
             while (scope.isActive) {
-                // 1. 处理队列中的任务
+                // 1. 从外部队列获取任务
                 val task = selectNextTask()
                 if (task != null) {
                     currentText.set(task.text)
                     executeTask(task)
                     currentText.set(null)
+                    
+                    // 检查队列是否为空，如果为空则重置状态
+                    val queueSize = queueMutex.withLock { taskQueue.size }
+                    if (queueSize == 0) {
+                        isSpeaking.set(false)
+                    }
                     continue
                 }
                 
-                // 2. 等待新任务
+                // 2. 等待新任务通知
                 try {
                     taskChannel.receive()
                 } catch (_: Exception) {
                     break
                 }
             }
+            
+            // 循环结束时重置状态
+            isSpeaking.set(false)
+            currentText.set(null)
         }
         
         private suspend fun selectNextTask(): TtsTask? {
@@ -154,24 +166,9 @@ class TtsQueueService : SpeechService {
             }
         }
         
-        suspend fun addTask(task: TtsTask) {
-            queueMutex.withLock {
-                taskQueue.add(task)
-            }
+        // 通知工作器有新任务
+        fun notifyNewTask() {
             taskChannel.trySend(Unit)
-        }
-        
-        suspend fun clearQueue() {
-            queueMutex.withLock {
-                taskQueue.clear()
-            }
-        }
-        
-        fun getCurrentText(): String? = currentText.get()
-        fun isSpeaking(): Boolean = isSpeaking.get()
-        
-        suspend fun getQueueSize(): Int {
-            return queueMutex.withLock { taskQueue.size }
         }
         
         fun destroy() {
@@ -244,26 +241,62 @@ class TtsQueueService : SpeechService {
             // 完全重启：先销毁旧的工作器，再创建新的
             destroyWorker()
             
-            val worker = ensureWorker()
-            worker.clearQueue()
-            worker.addTask(TtsTask(text, priority = 1))
+            // 清空队列并添加新任务
+            clearQueueSync()
+            addToQueue(text, priority = 1)
+            
+            // 启动工作器
+            startWorker()
         }
     }
 
     override fun addToQueue(text: String) {
+        addToQueue(text, priority = 0)
+    }
+    
+    /**
+     * 添加任务到队列 - 线程安全，快速执行
+     */
+    private fun addToQueue(text: String, priority: Int = 0) {
         if (text.isBlank()) return
         
-        GlobalScope.launch {
-            val worker = ensureWorker()
-            worker.addTask(TtsTask(text, priority = 0))
-            println("TTS: Added to queue: ${text.take(50)}... (Queue size: ${worker.getQueueSize()})")
+        // 使用 runBlocking 确保同步执行，避免并发问题
+        runBlocking {
+            var queueSize = 0
+            queueMutex.withLock {
+                taskQueue.add(TtsTask(text, priority))
+                queueSize = taskQueue.size
+            }
+            
+            // 通知工作器有新任务（如果工作器存在）
+            ttsWorker?.notifyNewTask()
+            
+            println("TTS: Added to queue: ${text.take(50)}... (Queue size: $queueSize)")
         }
     }
 
     override fun clearQueue() {
         GlobalScope.launch {
-            ttsWorker?.clearQueue()
-            println("TTS: Queue cleared")
+            clearQueueSync()
+        }
+    }
+    
+    /**
+     * 同步清空队列
+     */
+    private suspend fun clearQueueSync() {
+        queueMutex.withLock {
+            taskQueue.clear()
+        }
+        println("TTS: Queue cleared")
+    }
+    
+    /**
+     * 启动工作器开始朗读
+     */
+    fun startWorker() {
+        GlobalScope.launch {
+            ensureWorker()
         }
     }
 
@@ -271,6 +304,14 @@ class TtsQueueService : SpeechService {
         GlobalScope.launch {
             // 完全销毁工作器，这会立即停止所有朗读
             destroyWorker()
+            
+            // 重置状态标志
+            isSpeaking.set(false)
+            currentText.set(null)
+            
+            // 清空队列
+            clearQueueSync()
+            
             println("TTS: Stopped")
         }
     }
@@ -279,6 +320,11 @@ class TtsQueueService : SpeechService {
         GlobalScope.launch {
             // 暂停也是完全销毁工作器
             destroyWorker()
+            
+            // 重置状态标志
+            isSpeaking.set(false)
+            currentText.set(null)
+            
             println("TTS: Paused")
         }
     }
@@ -320,7 +366,7 @@ class TtsQueueService : SpeechService {
     }
 
     override fun isSpeaking(): Boolean {
-        return ttsWorker?.isSpeaking() ?: false
+        return isSpeaking.get()
     }
 
     override fun isPaused(): Boolean {
@@ -329,12 +375,12 @@ class TtsQueueService : SpeechService {
 
     override fun getQueueSize(): Int {
         return runBlocking {
-            ttsWorker?.getQueueSize() ?: 0
+            queueMutex.withLock { taskQueue.size }
         }
     }
 
     override fun getCurrentText(): String? {
-        return ttsWorker?.getCurrentText()
+        return currentText.get()
     }
 
     override fun getDefaultVoice(): Voice {

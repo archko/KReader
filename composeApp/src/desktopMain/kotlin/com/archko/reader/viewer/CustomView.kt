@@ -317,7 +317,7 @@ fun CustomView(
                     )
                     Spacer(Modifier.weight(1f))
 
-                    IconButton(onClick = { 
+                    IconButton(onClick = {
                         scope.launch {
                             speakFromCurrentPage(currentPage, decoder!!, speechService)
                         }
@@ -650,38 +650,41 @@ fun CustomView(
     }
 }
 
-suspend fun speakFromCurrentPage(startPage: Int, imageDecoder: ImageDecoder, speechService: SpeechService) {
+suspend fun speakFromCurrentPage(
+    startPage: Int,
+    imageDecoder: ImageDecoder,
+    speechService: SpeechService
+) {
     if (speechService.isSpeaking()) {
         println("TTS: 正在朗读，停止当前朗读")
         speechService.stop()
         return
     }
-    
+
     if (imageDecoder is PdfDecoder) {
         withContext(Dispatchers.IO) {
             try {
                 speechService.clearQueue()
+
                 val list = imageDecoder.decodeReflow(startPage)
-                
-                for (textArray in list) {
-                    try {
-                        if (textArray.isNotEmpty() && textArray.isNotBlank()) {
-                            val pageText = textArray.trim()
-                            if (pageText.length > 10) { // 只添加有意义的文本
-                                //println("TTS: 添加第${currentPage + 1}页文本到队列，长度: ${pageText.length}")
-                                speechService.addToQueue(pageText)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        println("TTS: 解码失败: ${e.message}")
-                    }
+                println("TTS: 解码完成共:${list.size} 页")
+
+                for (pageText in list) {
+                    speechService.addToQueue(pageText)
                 }
-                
+
                 val queueSize = speechService.getQueueSize()
-                println("TTS: 解码完成，成功添加 ${list.size} 页，队列中共有 $queueSize 个文本段落")
+                println("TTS: 添加完成,队列中共有$queueSize 个文本段落")
+
+                if (queueSize > 0 && speechService is TtsQueueService) {
+                    speechService.startWorker()
+                }
             } catch (e: Exception) {
                 println("TTS: 批量解码失败: ${e.message}")
                 speechService.addToQueue("文本解码失败，无法朗读")
+                if (speechService is TtsQueueService) {
+                    speechService.startWorker()
+                }
             }
         }
     }
