@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 class TtsQueueService : SpeechService {
     private var rate: Float = 0.20f
     private var volume: Float = 0.8f
-    private var selectedVoice: String = "Meijia"
+    private var selectedVoice: String = "Tingting"
 
     // Flow for selected voice
     private val _selectedVoiceFlow = MutableStateFlow<Voice?>(null)
@@ -51,7 +51,6 @@ class TtsQueueService : SpeechService {
         private val isSpeaking = AtomicBoolean(false)
         
         init {
-            // 启动处理循环
             scope.launch {
                 processLoop()
             }
@@ -113,7 +112,7 @@ class TtsQueueService : SpeechService {
                             return
                         }
                     } catch (e: Exception) {
-                        println("TTS: Attempt ${index + 1} error: ${e.message}")
+                        println("TTS: Attempt.error ${index + 1} error: ${e.message}")
                     }
                 }
                 
@@ -186,8 +185,6 @@ class TtsQueueService : SpeechService {
             
             // 强制终止所有TTS进程
             TtsUtils.forceKillAllTtsProcesses(isWindows)
-            
-            println("TTS: Worker destroyed")
         }
     }
 
@@ -271,8 +268,6 @@ class TtsQueueService : SpeechService {
     }
 
     override fun stop() {
-        println("TTS: Stop requested")
-        
         GlobalScope.launch {
             // 完全销毁工作器，这会立即停止所有朗读
             destroyWorker()
@@ -281,8 +276,6 @@ class TtsQueueService : SpeechService {
     }
 
     override fun pause() {
-        println("TTS: Pause requested")
-        
         GlobalScope.launch {
             // 暂停也是完全销毁工作器
             destroyWorker()
@@ -291,9 +284,6 @@ class TtsQueueService : SpeechService {
     }
 
     override fun resume() {
-        println("TTS: Resume requested")
-        // 恢复时不需要做任何事，下次添加任务时会自动创建新的工作器
-        println("TTS: Resumed")
     }
 
     override fun setRate(rate: Float) {
@@ -311,11 +301,6 @@ class TtsQueueService : SpeechService {
             val availableVoices = getAvailableVoices()
             val voice = availableVoices.find { it.name == voiceId }
             _selectedVoiceFlow.value = voice
-            
-            // 如果有正在运行的工作器，重启它以应用新的语音设置
-            if (ttsWorker != null) {
-                destroyWorker()
-            }
         }
     }
 
@@ -357,10 +342,10 @@ class TtsQueueService : SpeechService {
 
         var voice: Voice? = null
         if (isMacOS) {
-            // 对于 macOS，优先查找 Mei-Jia 或 Meijia
+            // 对于 macOS，优先查找 Ting-ting 或 Tingting
             voice = availableVoices.find { voice ->
-                voice.name.equals("Mei-Jia", ignoreCase = true) ||
-                        voice.name.equals("Meijia", ignoreCase = true)
+                voice.name.equals("Ting-ting", ignoreCase = true) ||
+                        voice.name.equals("Tingting", ignoreCase = true)
             }
         }
 

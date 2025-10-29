@@ -11,7 +11,6 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
-import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.CropUtils
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
@@ -710,25 +709,45 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             return reflowBeans
         }
 
-        try {
-            val page = getPage(pageIndex)
+        val totalPages = originalPageSizes.size
+        println("TTS: 开始从第${pageIndex + 1}页解码到第${totalPages}页，共${totalPages - pageIndex}页")
 
-            // 提取文本内容
-            val result = page.textAsText("preserve-whitespace,inhibit-spaces")
-            val text = if (null != result) {
-                ParseTextMain.parseAsText(result)
-            } else null
+        var addedPages = 0
+        var skippedPages = 0
 
-            if (text != null && text.isNotEmpty()) {
-                reflowBeans.add(text)
+        for (currentPage in pageIndex until totalPages) {
+            try {
+                val page = getPage(pageIndex)
+                // 提取文本内容
+                val result = page.textAsText("preserve-whitespace,inhibit-spaces")
+                val text = if (null != result) {
+                    ParseTextMain.parseAsText(result)
+                } else null
+                if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                    val pageText = text.trim()
+                    if (pageText.length > 10) { // 只添加有意义的文本
+                        reflowBeans.add(text)
+                        addedPages++
+                    } else {
+                        println("TTS: 跳过第${currentPage + 1}页，文本太短: ${pageText.length}")
+                        skippedPages++
+                    }
+                } else {
+                    println("TTS: 跳过第${currentPage + 1}页，无文本内容")
+                    skippedPages++
+                }
+            } catch (e: Exception) {
+                println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                skippedPages++
+                // 继续处理下一页
             }
 
-            // 注意：这里不调用page.destroy()，因为页面被缓存了
-        } catch (e: Exception) {
-            println("decodeReflow error for page $pageIndex: $e")
-            // 如果解析失败，返回空列表
+            // 每处理10页输出一次进度
+            //if ((currentPage - pageIndex + 1) % 10 == 0) {
+            //    println("TTS: 已处理 ${currentPage - pageIndex + 1}/${totalPages - pageIndex} 页")
+            //}
         }
-
+        // 注意：这里不调用page.destroy()，因为页面被缓存了
         return reflowBeans
     }
 
