@@ -60,7 +60,7 @@ compile_project() {
         exit 1
     fi
     
-    # 编译项目
+    # 编译项目（包含所有 dylib）
     ./gradlew :composeApp:createDistributable
     
     # 检查构建产物
@@ -75,7 +75,6 @@ compile_project() {
     fi
     
     print_info "找到构建产物: $COMPOSE_BUILD_DIR/app"
-    
     print_success "项目编译完成"
 }
 
@@ -143,13 +142,21 @@ build_platform_specific() {
     local resources_dir="$output_dir/${PROJECT_NAME}.app/Contents/Resources"
     mkdir -p "$resources_dir"
     
-    # 只复制对应架构的 dylib
-    local dylib_dir="composeApp/src/commonMain/resources/macos-${arch}"
-    if [ -d "$dylib_dir" ]; then
-        cp -R "$dylib_dir" "$resources_dir/"
-        print_info "已复制 ${arch} dylib"
-    else
-        print_warning "找不到 ${arch} dylib 目录: $dylib_dir"
+    # 移除不需要的架构的 dylib
+    if [ "$arch" = "x64" ]; then
+        # Intel 包：保留 x64，移除 aarch64
+        if [ -d "$resources_dir/macos-aarch64" ]; then
+            rm -rf "$resources_dir/macos-aarch64"
+            print_info "已移除 aarch64 dylib"
+        fi
+        print_info "保留 x64 dylib"
+    elif [ "$arch" = "aarch64" ]; then
+        # ARM 包：保留 aarch64，移除 x64
+        if [ -d "$resources_dir/macos-x64" ]; then
+            rm -rf "$resources_dir/macos-x64"
+            print_info "已移除 x64 dylib"
+        fi
+        print_info "保留 aarch64 dylib"
     fi
     
     # 运行时已经在 createDistributable 时包含了，不需要额外处理
@@ -187,16 +194,23 @@ show_help() {
     echo "用法: $0 [选项]"
     echo ""
     echo "选项:"
-    echo "  universal    构建 Universal 包（无运行时 + 双架构dylib）"
-    echo "  intel        构建 Intel 包（含运行时 + 仅x64 dylib）"
-    echo "  arm          构建 ARM 包（含运行时 + 仅aarch64 dylib）"
-    echo "  all          构建所有类型的包"
-    echo "  help         显示此帮助信息"
+    echo "  universal         构建 Universal 包（无运行时 + 双架构dylib）"
+    echo "  intel             构建 Intel 包（含运行时 + 仅x64 dylib）"
+    echo "  arm               构建 ARM 包（含运行时 + 仅aarch64 dylib）"
+    echo "  platform-specific 构建当前平台的包（自动检测架构）"
+    echo "  all               构建所有类型的包"
+    echo "  help              显示此帮助信息"
     echo ""
     echo "示例:"
-    echo "  $0 all           # 构建所有包"
-    echo "  $0 universal     # 只构建 Universal 包"
-    echo "  $0 intel arm     # 构建 Intel 和 ARM 包"
+    echo "  $0 all               # 构建所有包"
+    echo "  $0 universal         # 只构建 Universal 包"
+    echo "  $0 intel arm         # 构建 Intel 和 ARM 包"
+    echo "  $0 platform-specific # 构建当前平台的包"
+    echo ""
+    echo "注意:"
+    echo "  - Universal 包需要用户安装 Java 17+"
+    echo "  - 平台特定包包含运行时，开箱即用"
+    echo "  - 每种包类型会单独编译，确保 dylib 架构正确"
 }
 
 # 显示构建结果
@@ -226,6 +240,8 @@ main() {
     fi
     
     clean_build
+    
+    # 只编译一次
     compile_project
     
     # 处理参数
@@ -239,6 +255,15 @@ main() {
                 ;;
             arm)
                 build_platform_specific "aarch64" "ARM"
+                ;;
+            platform-specific)
+                # 构建当前平台的包
+                local current_arch=$(uname -m)
+                if [[ "$current_arch" == "arm64" ]]; then
+                    build_platform_specific "aarch64" "ARM"
+                else
+                    build_platform_specific "x64" "Intel"
+                fi
                 ;;
             all)
                 build_universal
