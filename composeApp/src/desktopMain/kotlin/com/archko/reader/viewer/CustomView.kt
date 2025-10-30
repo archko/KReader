@@ -266,6 +266,24 @@ fun CustomView(
         var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
         var isReflow by remember { mutableStateOf(reflow == 1L) }
 
+        // 对于图片文件，根据尺寸自动调整滚动方向
+        LaunchedEffect(decoder) {
+            decoder?.let { dec ->
+                if (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(currentPath)) {
+                    if (dec.originalPageSizes.isNotEmpty()) {
+                        val firstPageSize = dec.originalPageSizes[0]
+                        val width = firstPageSize.width
+                        val height = firstPageSize.height
+                        println("isVertical:$isVertical, width:$width-$height, $currentPath")
+                        // 如果图片的高度小于宽度的1/3，则切换为横向滚动
+                        if (height < width / 3) {
+                            isVertical = false
+                        }
+                    }
+                }
+            }
+        }
+
         // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
         val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
         // 当前页与总页数
@@ -317,16 +335,18 @@ fun CustomView(
                     )
                     Spacer(Modifier.weight(1f))
 
-                    IconButton(onClick = {
-                        scope.launch {
-                            speakFromCurrentPage(currentPage, decoder!!, speechService)
+                    if (FileTypeUtils.isDocumentFile(currentPath)) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                speakFromCurrentPage(currentPage, decoder!!, speechService)
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_tts),
+                                contentDescription = stringResource(Res.string.tts),
+                                tint = if (speechService.isSpeaking()) Color.Green else Color.White
+                            )
                         }
-                    }) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_tts),
-                            contentDescription = stringResource(Res.string.tts),
-                            tint = if (speechService.isSpeaking()) Color.Green else Color.White
-                        )
                     }
 
                     // 方向按钮 - 文档和图片都显示

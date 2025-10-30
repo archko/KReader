@@ -1,7 +1,8 @@
 package com.archko.reader.viewer
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -10,7 +11,12 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -293,6 +299,7 @@ private fun Dp.toIntPx(): Int {
     return with(LocalDensity.current) { this@toIntPx.roundToPx() }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun RecentItem(
     recent: Recent,
@@ -304,10 +311,14 @@ private fun RecentItem(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .combinedClickable(
-                onClick = { onClick(recent) },
-                onLongClick = { showMenu = true }
-            )
+            .onPointerEvent(PointerEventType.Press) { event ->
+                val button = event.button
+                if (button == PointerButton.Primary) {
+                    onClick(recent)
+                } else if (button == PointerButton.Secondary) {
+                    showMenu = true
+                }
+            }
     ) {
         BoxWithConstraints(
             modifier = Modifier.fillMaxWidth()
