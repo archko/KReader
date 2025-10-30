@@ -449,10 +449,7 @@ fun CustomView(
                         state = decoder!!,
                         jumpToPage = jumpToPage,
                         initialOrientation = orientation,
-                        onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder && FileTypeUtils.isDocumentFile(
-                                currentPath
-                            )
-                        ) onSaveDocument else null,
+                        onSaveDocument = onSaveDocument,
                         onCloseDocument = {
                             println("onCloseDocument.isReflow:$isReflow")
                             if (!isReflow) {
