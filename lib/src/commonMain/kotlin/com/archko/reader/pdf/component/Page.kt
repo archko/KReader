@@ -171,7 +171,7 @@ public class Page(
                     }
 
                     override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                        return !pdfViewState.isShutdown() && isPageVisible(pageNumber)
+                        return !pdfViewState.isShutdown() && isPageInRenderList(pageNumber)
                     }
                 }
             )
@@ -181,8 +181,21 @@ public class Page(
         }
     }
 
-    private fun isPageVisible(pageNumber: Int): Boolean {
+    private fun isPageInRenderList(pageNumber: Int): Boolean {
         return pdfViewState.pageToRender.any { it.aPage.index == pageNumber }
+    }
+
+    private fun isPageVisible(drawScope: DrawScope, offset: Offset, bounds: Rect): Boolean {
+        // 获取画布的可视区域
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScope.size.width - offset.x,
+            bottom = drawScope.size.height - offset.y
+        )
+
+        // 检查页面是否与可视区域相交
+        return bounds.overlaps(visibleRect)
     }
 
     private fun isScopeActive(): Boolean {
@@ -235,7 +248,11 @@ public class Page(
             bounds.bottom * scaleRatio
         )
 
-        if (!isVisible(drawScope, offset, currentBounds, aPage.index)) {
+        // 检查页面是否真正可见（用于绘制判断）
+        val isActuallyVisible = isPageVisible(drawScope, offset, currentBounds)
+        
+        // 如果页面不在可见区域且不在预加载列表中，直接返回
+        if (!isActuallyVisible && !isPageInRenderList(aPage.index)) {
             return
         }
 
@@ -260,45 +277,49 @@ public class Page(
             thumbBitmapState = null
         }
 
-        //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
-
-        // 优先绘制缩略图
-        thumbBitmapState?.let { state ->
-            val currentWidth = width * scaleRatio
-            val currentHeight = height * scaleRatio
-            drawScope.drawImage(
-                image = state.bitmap,
-                dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
-                dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
-            )
-
-            // 再绘制高清块
-            nodes.forEach { node ->
-                node.draw(
-                    drawScope,
-                    offset,
-                    currentWidth,
-                    currentHeight,
-                    currentBounds.left,
-                    currentBounds.top,
-                )
-            }
-
-            // 加载链接（在缩略图加载完成后）
-            if (!linksLoaded) {
-                loadLinks()
-            }
-
-            // 绘制链接区域（调试用，可以注释掉）
-            drawLinks(drawScope, currentBounds, scaleRatio)
-        } ?: run {
-            if (!thumbDecoding) {
-                loadThumbnail()
-            }
+        // 始终尝试加载缩略图（包括预加载页面）
+        if (thumbBitmapState == null && !thumbDecoding) {
+            loadThumbnail()
         }
 
-        // 绘制分割线
-        drawSeparator(drawScope, currentBounds)
+        // 只有真正可见的页面才进行绘制
+        if (isActuallyVisible) {
+            //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
+
+            // 优先绘制缩略图
+            thumbBitmapState?.let { state ->
+                val currentWidth = width * scaleRatio
+                val currentHeight = height * scaleRatio
+                drawScope.drawImage(
+                    image = state.bitmap,
+                    dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
+                    dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
+                )
+
+                // 再绘制高清块
+                nodes.forEach { node ->
+                    node.draw(
+                        drawScope,
+                        offset,
+                        currentWidth,
+                        currentHeight,
+                        currentBounds.left,
+                        currentBounds.top,
+                    )
+                }
+
+                // 加载链接（在缩略图加载完成后）
+                if (!linksLoaded) {
+                    loadLinks()
+                }
+
+                // 绘制链接区域（调试用，可以注释掉）
+                drawLinks(drawScope, currentBounds, scaleRatio)
+            }
+
+            // 绘制分割线
+            drawSeparator(drawScope, currentBounds)
+        }
     }
 
     /**

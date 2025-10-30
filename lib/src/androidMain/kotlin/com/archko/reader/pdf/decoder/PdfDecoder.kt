@@ -26,6 +26,7 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.BitmapUtils
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.SmartCropUtils
@@ -128,21 +129,23 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            val fontSize = FontCSSGenerator.getDefFontSize()
-            val fs = fontSize.toInt().toFloat()
-            val w: Float =
-                Utils.getScreenWidthPixelWithOrientation(PdfApp.app as Context).toFloat()
-            val h: Float =
-                Utils.getScreenHeightPixelWithOrientation(PdfApp.app as Context).toFloat()
-            System.out.printf(
-                "width:%s, height:%s, font:%s->%s, open:%s",
-                w,
-                h,
-                fontSize,
-                fs,
-                file.absolutePath
-            );
-            doc.layout(w, h, fontSize)
+            if (FileTypeUtils.isReflowable(file.absolutePath)) {
+                val fontSize = FontCSSGenerator.getDefFontSize()
+                val fs = fontSize.toInt().toFloat()
+                val w: Float =
+                    Utils.getScreenWidthPixelWithOrientation(PdfApp.app as Context).toFloat()
+                val h: Float =
+                    Utils.getScreenHeightPixelWithOrientation(PdfApp.app as Context).toFloat()
+                System.out.printf(
+                    "width:%s, height:%s, font:%s->%s, open:%s\n",
+                    w,
+                    h,
+                    fontSize,
+                    fs,
+                    file.absolutePath
+                );
+                doc.layout(w, h, fontSize)
+            }
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()
@@ -495,7 +498,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val height = scale * cropBounds.height
                 val bitmap =
                     acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
-                println("PdfDecoder.renderPage:page=$index, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
+                println("PdfDecoder.renderPage:croped page=$index, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
                 val imageBitmap = bitmap.asImageBitmap()
@@ -512,6 +515,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val scale = minOf(scaleX, scaleY)
                 val height = scale * aPage.getHeight(crop)
                 val bitmap = acquireReusableBitmap(outWidth, height.toInt())
+                println("PdfDecoder.renderPage:page=$index, 目标尺寸=$outWidth-$outHeight, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX, patchY, true)
                 val imageBitmap = bitmap.asImageBitmap()

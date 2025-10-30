@@ -34,6 +34,9 @@ public class PdfViewState(
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
 
+    // 预加载配置
+    private var preloadScreens: Float = 0.6f // 预加载1屏的距离
+
     // 全局单线程解码作用域
     public val decodeScope: CoroutineScope =
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
@@ -74,7 +77,20 @@ public class PdfViewState(
      */
     public fun isCropEnabled(): Boolean = cropEnabled
 
-    //todo cropEnabled
+    /**
+     * 设置预加载距离
+     * @param screens 预加载的屏幕数量，默认1.0表示预加载一屏的距离
+     */
+    public fun setPreloadScreens(screens: Float) {
+        preloadScreens = screens.coerceAtLeast(0f)
+    }
+
+    /**
+     * 获取当前预加载距离
+     * @return 预加载的屏幕数量
+     */
+    public fun getPreloadScreens(): Float = preloadScreens
+
     public fun isTileVisible(spec: TileSpec): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
@@ -122,7 +138,7 @@ public class PdfViewState(
             isCropEnabled = { cropEnabled }
         )
         decodeService = DecodeService(decoder)
-        
+
         // 如果启用切边，生成切边任务
         if (cropEnabled) {
             decodeScope.launch {
@@ -276,6 +292,90 @@ public class PdfViewState(
         }
     }
 
+    // 二分查找第一个可见页面
+    private fun findVerticalFirstVisible(top: Float, currentVZoom: Float): Int {
+        var low = 0
+        var high = pages.size - 1
+        var result = pages.size
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val page = pages[mid]
+            // 在缩放过程中，需要考虑当前缩放比例
+            val scaleRatio = currentVZoom / this.vZoom
+            val currentBottom = page.bounds.bottom * scaleRatio
+            if (currentBottom > top) {
+                result = mid
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+        return result
+    }
+
+    // 二分查找最后一个可见页面
+    private fun findVerticalLastVisible(bottom: Float, currentVZoom: Float): Int {
+        var low = 0
+        var high = pages.size - 1
+        var result = -1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val page = pages[mid]
+            // 在缩放过程中，需要考虑当前缩放比例
+            val scaleRatio = currentVZoom / this.vZoom
+            val currentTop = page.bounds.top * scaleRatio
+            if (currentTop < bottom) {
+                result = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return result
+    }
+
+    // 二分查找第一个可见页面
+    private fun findHorizontalFirstVisible(left: Float, currentVZoom: Float): Int {
+        var low = 0
+        var high = pages.size - 1
+        var result = pages.size
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val page = pages[mid]
+            // 在缩放过程中，需要考虑当前缩放比例
+            val scaleRatio = currentVZoom / this.vZoom
+            val currentRight = page.bounds.right * scaleRatio
+            if (currentRight > left) {
+                result = mid
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+        return result
+    }
+
+    // 二分查找最后一个可见页面
+    private fun findHorizontalLastVisible(right: Float, currentVZoom: Float): Int {
+        var low = 0
+        var high = pages.size - 1
+        var result = -1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            val page = pages[mid]
+            // 在缩放过程中，需要考虑当前缩放比例
+            val scaleRatio = currentVZoom / this.vZoom
+            val currentLeft = page.bounds.left * scaleRatio
+            if (currentLeft < right) {
+                result = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return result
+    }
+
     public fun updateVisiblePages(offset: Offset, viewSize: IntSize, currentVZoom: Float = vZoom) {
         // 优化：使用二分查找定位可见页面范围
         if (pages.isEmpty()) {
@@ -286,56 +386,19 @@ public class PdfViewState(
         if (orientation == Vertical) {
             val visibleTop = -offset.y
             val visibleBottom = viewSize.height - offset.y
+            // 预加载区域：向下扩展一屏
+            val preloadBottom = visibleBottom + viewSize.height * preloadScreens
 
-            // 二分查找第一个可见页面
-            fun findFirstVisible(): Int {
-                var low = 0
-                var high = pages.size - 1
-                var result = pages.size
-                while (low <= high) {
-                    val mid = (low + high) ushr 1
-                    val page = pages[mid]
-                    // 在缩放过程中，需要考虑当前缩放比例
-                    val scaleRatio = currentVZoom / this.vZoom
-                    val currentBottom = page.bounds.bottom * scaleRatio
-                    if (currentBottom > visibleTop) {
-                        result = mid
-                        high = mid - 1
-                    } else {
-                        low = mid + 1
-                    }
-                }
-                return result
-            }
+            val first = findVerticalFirstVisible(visibleTop, currentVZoom)
+            val last = findVerticalLastVisible(preloadBottom, currentVZoom)
 
-            // 二分查找最后一个可见页面
-            fun findLastVisible(): Int {
-                var low = 0
-                var high = pages.size - 1
-                var result = -1
-                while (low <= high) {
-                    val mid = (low + high) ushr 1
-                    val page = pages[mid]
-                    // 在缩放过程中，需要考虑当前缩放比例
-                    val scaleRatio = currentVZoom / this.vZoom
-                    val currentTop = page.bounds.top * scaleRatio
-                    if (currentTop < visibleBottom) {
-                        result = mid
-                        low = mid + 1
-                    } else {
-                        high = mid - 1
-                    }
-                }
-                return result
-            }
-
-            val first = findFirstVisible()
-            val last = findLastVisible()
+            // pageToRender 包含可见页面 + 预加载页面
             val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
                 pages.subList(first, last + 1)
             } else {
                 emptyList()
             }
+
             // 主动移除不再可见的页面图片缓存
             val newPageKeys = tilesToRenderCopy.flatMap { page ->
                 page.nodes.map { node ->
@@ -350,62 +413,26 @@ public class PdfViewState(
                 page.recycle()
             }
             lastPageKeys = newPageKeys
+
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
             }
         } else {
             val visibleLeft = -offset.x
             val visibleRight = viewSize.width - offset.x
+            // 预加载区域：向右扩展一屏
+            val preloadRight = visibleRight + viewSize.width * preloadScreens
 
-            // 二分查找第一个可见页面
-            fun findFirstVisible(): Int {
-                var low = 0
-                var high = pages.size - 1
-                var result = pages.size
-                while (low <= high) {
-                    val mid = (low + high) ushr 1
-                    val page = pages[mid]
-                    // 在缩放过程中，需要考虑当前缩放比例
-                    val scaleRatio = currentVZoom / this.vZoom
-                    val currentRight = page.bounds.right * scaleRatio
-                    if (currentRight > visibleLeft) {
-                        result = mid
-                        high = mid - 1
-                    } else {
-                        low = mid + 1
-                    }
-                }
-                return result
-            }
+            val first = findHorizontalFirstVisible(visibleLeft, currentVZoom)
+            val last = findHorizontalLastVisible(preloadRight, currentVZoom) // 直接使用预加载范围
 
-            // 二分查找最后一个可见页面
-            fun findLastVisible(): Int {
-                var low = 0
-                var high = pages.size - 1
-                var result = -1
-                while (low <= high) {
-                    val mid = (low + high) ushr 1
-                    val page = pages[mid]
-                    // 在缩放过程中，需要考虑当前缩放比例
-                    val scaleRatio = currentVZoom / this.vZoom
-                    val currentLeft = page.bounds.left * scaleRatio
-                    if (currentLeft < visibleRight) {
-                        result = mid
-                        low = mid + 1
-                    } else {
-                        high = mid - 1
-                    }
-                }
-                return result
-            }
-
-            val first = findFirstVisible()
-            val last = findLastVisible()
+            // pageToRender 包含可见页面 + 预加载页面
             val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
                 pages.subList(first, last + 1)
             } else {
                 emptyList()
             }
+
             // 主动移除不再可见的页面图片缓存
             val newPageKeys = tilesToRenderCopy.flatMap { page ->
                 page.nodes.map { node ->
@@ -420,6 +447,7 @@ public class PdfViewState(
                 page.recycle()
             }
             lastPageKeys = newPageKeys
+
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
             }

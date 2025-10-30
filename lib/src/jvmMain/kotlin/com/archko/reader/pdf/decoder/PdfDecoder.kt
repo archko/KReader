@@ -111,19 +111,21 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            val fontSize = FontCSSGenerator.getDefFontSize()
-            val fs = fontSize.toInt().toFloat()
-            val w = 1280f
-            val h = 1024f
-            System.out.printf(
-                "width:%s, height:%s, font:%s->%s, open:%s",
-                w,
-                h,
-                fontSize,
-                fs,
-                file.absolutePath
-            )
-            doc.layout(w, h, fontSize)
+            if (FileTypeUtils.isReflowable(file.absolutePath)) {
+                val fontSize = FontCSSGenerator.getDefFontSize()
+                val fs = fontSize.toInt().toFloat()
+                val w = 1280f
+                val h = 1024f
+                System.out.printf(
+                    "width:%s, height:%s, font:%s->%s, open:%s",
+                    w,
+                    h,
+                    fontSize,
+                    fs,
+                    file.absolutePath
+                )
+                doc.layout(w, h, fontSize)
+            }
             pageCount = doc.countPages()
             originalPageSizes = prepareSizes()
             outlineItems = prepareOutlines()

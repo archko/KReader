@@ -48,7 +48,7 @@ public class PdfDecoderAdapter(
             val aPage = task.aPage
             val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height, 240)
 
-            println("decodePage:$thumbWidth-$thumbHeight")
+            //println("decodePage.page:${task.pageIndex}, $thumbWidth-$thumbHeight")
             imageDecoder.renderPage(
                 aPage = aPage,
                 viewSize = viewSize,
