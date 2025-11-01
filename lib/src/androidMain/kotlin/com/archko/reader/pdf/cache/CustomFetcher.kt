@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import coil3.BitmapImage
@@ -18,6 +19,7 @@ import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.util.BitmapUtils
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
@@ -48,6 +50,7 @@ public class CustomImageFetcher(
                 bitmap.height,
                 bitmap.config!!
             )
+            bitmap.eraseColor(android.graphics.Color.WHITE)
             val buffer = ByteBuffer.allocate(bitmap.getByteCount())
             bitmap.copyPixelsToBuffer(buffer)
             buffer.position(0)
@@ -83,20 +86,28 @@ public class CustomImageFetcher(
             val bitmap = BitmapFactory.decodeFile(key)
             return bitmap
         }
+
+        public fun createWhiteBitmap(width: Int, height: Int): Bitmap {
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            bitmap.eraseColor(android.graphics.Color.WHITE)
+            return bitmap
+        }
     }
 
     override suspend fun fetch(): FetchResult {
         var bitmap = loadBitmapFromCache(data)
         if (bitmap == null) {
-            //bitmap = decodePdfSys()
-            bitmap = decodeMuPdf()
-            if (bitmap != null) {
-                cacheBitmap(bitmap, data.path)
+            if (FileTypeUtils.isDocumentFile(data.path)) {
+                //bitmap = decodePdfSys()
+                bitmap = decodeMuPdf()
+                if (bitmap != null) {
+                    cacheBitmap(bitmap, data.path)
+                }
             }
         }
 
         if (bitmap == null) {
-            bitmap = Bitmap.createBitmap(data.width, data.height, Bitmap.Config.RGB_565)
+            bitmap = createWhiteBitmap(data.width, data.height)
         }
 
         val imageBitmap: BitmapImage = bitmap.asImage()

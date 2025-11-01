@@ -152,7 +152,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun cacheCoverIfNeeded() {
         val path = file.absolutePath
-        if (FileTypeUtils.isImageFile(path) || FileTypeUtils.isTiffFile(path)) {
+        if (FileTypeUtils.isTiffFile(path)) {
             return
         }
         try {
@@ -181,25 +181,31 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         // 检查是否为极端长宽比的图片（某边大于8000）
         return if (pWidth > 8000 || pHeight > 8000) {
-            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
+            // 对于极端长宽比，截取前面部分，避免过度缩放
             val scale = if (pWidth > pHeight) {
-                targetWidth.toFloat() / pWidth
-            } else {
+                // 横向长条：以高度为基准，截取左侧部分
                 targetHeight.toFloat() / pHeight
+            } else {
+                // 纵向长条：以宽度为基准，截取顶部部分
+                targetWidth.toFloat() / pWidth
             }
 
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
+            // 计算截取区域
+            val cropWidth = if (pWidth > pHeight) {
+                minOf(pWidth, targetWidth / scale)
+            } else {
+                pWidth
+            }
+            val cropHeight = if (pWidth > pHeight) {
+                pHeight
+            } else {
+                minOf(pHeight, targetHeight / scale)
+            }
 
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-            println("large.width-height:$cropWidth-$cropHeight")
-            val bbox = com.artifex.mupdf.fitz.Rect(
-                0f,
-                0f,
-                cropWidth.toFloat(),
-                cropHeight.toFloat()
-            )
+            println("large.pdf crop: ${cropWidth}x${cropHeight} from ${pWidth}x${pHeight}, scale=$scale")
+
+            // 创建裁剪后的渲染区域
+            val bbox = com.artifex.mupdf.fitz.Rect(0f, 0f, cropWidth, cropHeight)
             val pixmap = com.artifex.mupdf.fitz.Pixmap(
                 com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
                 bbox,
@@ -223,20 +229,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 对于宽大于高的页面，按最大比例缩放后截取
             val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
 
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
+            println("wide.pdf scale: $scale")
 
-            // 确保裁剪区域不超过目标尺寸
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-
-            println("wide.width-height:$cropWidth-$cropHeight")
-            val bbox = com.artifex.mupdf.fitz.Rect(
-                0f,
-                0f,
-                cropWidth.toFloat(),
-                cropHeight.toFloat()
-            )
+            val bbox = com.artifex.mupdf.fitz.Rect(0f, 0f, pWidth, pHeight)
             val pixmap = com.artifex.mupdf.fitz.Pixmap(
                 com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
                 bbox,
@@ -264,20 +259,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 使用最大比例以确保填充整个目标区域
             val scale = maxOf(xscale, yscale)
 
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
+            println("normal.pdf scale: $scale")
 
-            // 确保裁剪区域不超过目标尺寸
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-
-            println("width-height:$cropWidth-$cropHeight")
-            val bbox = com.artifex.mupdf.fitz.Rect(
-                0f,
-                0f,
-                cropWidth.toFloat(),
-                cropHeight.toFloat()
-            )
+            val bbox = com.artifex.mupdf.fitz.Rect(0f, 0f, pWidth, pHeight)
             val pixmap = com.artifex.mupdf.fitz.Pixmap(
                 com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
                 bbox,
@@ -530,7 +514,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         crop: Boolean
     ): ImageBitmap {
         if (document == null || (!isAuthenticated && needsPassword)) {
-            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
 
         try {
@@ -603,8 +587,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             }
         } catch (e: Exception) {
             println("PdfDecoder.renderPage error: $e")
-            // 返回一个空的位图，避免崩溃
-            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
 
@@ -683,7 +666,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         outHeight: Int
     ): ImageBitmap {
         if (document == null || (!isAuthenticated && needsPassword)) {
-            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
 
         try {
@@ -695,8 +678,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             return decode(index, scale, bitmap, patchX, patchY, false)
         } catch (e: Exception) {
             println("PdfDecoder.renderPageRegion error: $e")
-            // 返回一个空的位图，避免崩溃
-            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
 

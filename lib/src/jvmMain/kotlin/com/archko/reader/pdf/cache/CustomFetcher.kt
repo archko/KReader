@@ -13,6 +13,7 @@ import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
 import coil3.request.Options
 import com.archko.reader.pdf.entity.CustomImageData
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.artifex.mupdf.fitz.ColorSpace
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
@@ -114,6 +115,15 @@ public class CustomImageFetcher(
 
             return null
         }
+
+        public fun createWhiteBitmap(width: Int, height: Int): ImageBitmap {
+            val whiteImage = BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR)
+            val graphics = whiteImage.createGraphics()
+            graphics.color = java.awt.Color.WHITE
+            graphics.fillRect(0, 0, width, height)
+            graphics.dispose()
+            return whiteImage.toComposeImageBitmap()
+        }
     }
 
     override suspend fun fetch(): FetchResult? {
@@ -121,16 +131,19 @@ public class CustomImageFetcher(
             // 先检查缓存
             var bitmap = loadImageFromCache(data)
             if (bitmap == null) {
-                val doc = Document.openDocument(data.path)
-                val image = renderPage(doc, 0, data.width, data.height)
+                if (FileTypeUtils.isDocumentFile(data.path)) {
+                    val doc = Document.openDocument(data.path)
+                    val image = renderPage(doc, 0, data.width, data.height)
 
-                if (image != null) {
-                    bitmap = image
-                    cacheBitmap(bitmap, data.path)
+                    if (image != null) {
+                        bitmap = image
+                        cacheBitmap(bitmap, data.path)
+                    }
                 }
             }
             if (bitmap == null) {
-                bitmap = ImageBitmap(data.width, data.height, ImageBitmapConfig.Rgb565)
+                // 创建白色背景的 bitmap
+                bitmap = createWhiteBitmap(data.width, data.height)
             }
 
             ImageFetchResult(
@@ -181,7 +194,9 @@ public class CustomImageFetcher(
             System.err.println(("Error loading page " + (index + 1)) + ": " + e)
         }
 
-        return ImageBitmap(viewWidth, viewHeight, ImageBitmapConfig.Rgb565)
+        // 创建白色背景的 bitmap
+        val whiteImage = createWhiteBitmap(data.width, data.height)
+        return whiteImage
     }
 
     public class Factory : Fetcher.Factory<CustomImageData> {

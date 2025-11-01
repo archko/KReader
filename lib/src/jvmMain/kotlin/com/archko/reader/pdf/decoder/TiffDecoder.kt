@@ -6,12 +6,16 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
+import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.artifex.mupdf.fitz.Matrix
+import com.artifex.mupdf.fitz.Page
+import java.awt.image.BufferedImage
 import java.io.File
 
 /**
@@ -47,6 +51,85 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
         tiffLoader = TiffLoader()
 
         originalPageSizes = prepareSizes()
+
+        cacheCoverIfNeeded()
+    }
+
+    /**
+     * 检查并缓存封面图片
+     */
+    private fun cacheCoverIfNeeded() {
+        try {
+            if (null != ImageCache.acquirePage(file.absolutePath)) {
+                return
+            }
+            val bitmap = renderCoverPage()
+
+            CustomImageFetcher.cacheBitmap(bitmap, file.absolutePath)
+        } catch (e: Exception) {
+            println("缓存封面失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 渲染封面页面，根据高宽比进行特殊处理
+     */
+    private fun renderCoverPage(): ImageBitmap {
+        val originalSize = originalPageSizes[0]
+        val pWidth = originalSize.width
+        val pHeight = originalSize.height
+
+        // 目标尺寸
+        val targetWidth = 160
+        val targetHeight = 200
+
+        // 检查是否为极端长宽比的图片（某边大于8000）
+        return if (pWidth > 8000 || pHeight > 8000) {
+            // 对于极端长宽比，截取前面部分，避免过度缩放
+            val scale = if (pWidth > pHeight) {
+                targetWidth.toFloat() / targetWidth  // 保持原始比例，截取前面部分
+            } else {
+                targetHeight.toFloat() / targetHeight
+            }
+
+            // 截取区域：从左上角开始截取目标尺寸的区域
+            val cropWidth = minOf(pWidth, (targetWidth / scale).toInt())
+            val cropHeight = minOf(pHeight, (targetHeight / scale).toInt())
+            
+            println("large.tiff crop: ${cropWidth}x${cropHeight} from ${pWidth}x${pHeight}")
+            
+            val bitmap = tiffLoader!!.decodeRegionToBitmap(
+                0, 0, cropWidth, cropHeight, scale
+            )
+            
+            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(targetWidth, targetHeight)
+        } else if (pWidth > pHeight) {
+            // 对于宽大于高的页面，按最大比例缩放后截取
+            val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
+
+            println("wide.tiff scale: $scale")
+            
+            val bitmap = tiffLoader!!.decodeRegionToBitmap(
+                0, 0, pWidth, pHeight, scale
+            )
+            
+            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(targetWidth, targetHeight)
+        } else {
+            // 原始逻辑处理其他情况
+            val xscale = targetWidth.toFloat() / pWidth
+            val yscale = targetHeight.toFloat() / pHeight
+
+            // 使用最大比例以确保填充整个目标区域
+            val scale = maxOf(xscale, yscale)
+
+            println("normal.tiff scale: $scale")
+            
+            val bitmap = tiffLoader!!.decodeRegionToBitmap(
+                0, 0, pWidth, pHeight, scale
+            )
+            
+            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(targetWidth, targetHeight)
+        }
     }
 
     override fun size(viewportSize: IntSize): IntSize {
@@ -145,11 +228,11 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
             if (null != bitmap) {
                 return bitmap.toComposeImageBitmap()
             } else {
-                return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
             }
         } catch (e: Exception) {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
-            ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
 
@@ -179,14 +262,10 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
                 scale,
             )
 
-            if (null != bitmap) {
-                return bitmap.toComposeImageBitmap()
-            } else {
-                return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
-            }
+            return bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         } catch (e: Exception) {
             println("renderPage error: $e")
-            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
 

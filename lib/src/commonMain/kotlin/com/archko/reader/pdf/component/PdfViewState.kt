@@ -35,7 +35,7 @@ public class PdfViewState(
     public var vZoom: Float by mutableFloatStateOf(1f)
 
     // 预加载配置
-    private var preloadScreens: Float = 0.6f // 预加载1屏的距离
+    private var preloadScreens: Float = 0.7f // 预加载1屏的距离
 
     // 全局单线程解码作用域
     public val decodeScope: CoroutineScope =
@@ -91,7 +91,7 @@ public class PdfViewState(
      */
     public fun getPreloadScreens(): Float = preloadScreens
 
-    public fun isTileVisible(spec: TileSpec): Boolean {
+    public fun isTileVisible(spec: TileSpec, strictMode: Boolean = false): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
         val xOffset = page.xOffset
@@ -110,7 +110,11 @@ public class PdfViewState(
                 bottom = spec.bounds.bottom * spec.pageHeight
             )
         }
-        return isVisible(viewSize, viewOffset, pixelRect, spec.page)
+        return if (strictMode) {
+            isVisible(viewSize, viewOffset, pixelRect, spec.page)
+        } else {
+            isVisibleWithPreload(viewSize, viewOffset, pixelRect, spec.page)
+        }
     }
 
     private fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
@@ -124,7 +128,37 @@ public class PdfViewState(
 
         // 检查页面是否与可视区域相交
         val visible = bounds.overlaps(visibleRect)
-        //println("page.draw.isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
+        //println("page.draw.isStrictlyVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
+        return visible
+    }
+
+    private fun isVisibleWithPreload(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
+        val preloadDistance = if (orientation == Vertical) {
+            viewSize.height * preloadScreens
+        } else {
+            viewSize.width * preloadScreens
+        }
+        
+        // 获取包含预加载区域的可视区域
+        val preloadRect = if (orientation == Vertical) {
+            Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = viewSize.width - offset.x,
+                bottom = viewSize.height - offset.y + preloadDistance  // 向下扩展
+            )
+        } else {
+            Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = viewSize.width - offset.x + preloadDistance,   // 向右扩展
+                bottom = viewSize.height - offset.y
+            )
+        }
+
+        // 检查页面是否与预加载区域相交
+        val visible = bounds.overlaps(preloadRect)
+        //println("page.draw.isVisibleWithPreload:$visible, offset:$offset, bounds:$bounds, preloadRect:$preloadRect, $page")
         return visible
     }
 

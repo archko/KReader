@@ -280,33 +280,24 @@ public class Page(
         // 始终尝试加载缩略图（包括预加载页面）
         if (thumbBitmapState == null && !thumbDecoding) {
             loadThumbnail()
+            return
         }
 
-        // 只有真正可见的页面才进行绘制
+        // 计算当前尺寸（无论是否可见都需要，因为node需要这些参数）
+        val currentWidth = width * scaleRatio
+        val currentHeight = height * scaleRatio
+
+        // 只有真正可见的页面才绘制缩略图和UI元素
         if (isActuallyVisible) {
             //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
 
             // 优先绘制缩略图
             thumbBitmapState?.let { state ->
-                val currentWidth = width * scaleRatio
-                val currentHeight = height * scaleRatio
                 drawScope.drawImage(
                     image = state.bitmap,
                     dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
                     dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
                 )
-
-                // 再绘制高清块
-                nodes.forEach { node ->
-                    node.draw(
-                        drawScope,
-                        offset,
-                        currentWidth,
-                        currentHeight,
-                        currentBounds.left,
-                        currentBounds.top,
-                    )
-                }
 
                 // 加载链接（在缩略图加载完成后）
                 if (!linksLoaded) {
@@ -319,6 +310,19 @@ public class Page(
 
             // 绘制分割线
             drawSeparator(drawScope, currentBounds)
+        }
+
+        // 无论是否可见，都要调用node.draw（包括预加载区域）
+        // node.draw内部会判断是否真正绘制
+        nodes.forEach { node ->
+            node.draw(
+                drawScope,
+                offset,
+                currentWidth,
+                currentHeight,
+                currentBounds.left,
+                currentBounds.top,
+            )
         }
     }
 

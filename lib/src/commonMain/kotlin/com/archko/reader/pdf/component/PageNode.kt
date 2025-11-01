@@ -85,29 +85,55 @@ public class PageNode(
             recycle()
             return
         }
-        if (!isVisible(drawScope, offset, pixelRect, aPage.index)) {
-            recycle()
+        
+        val width = aPage.getWidth(pdfViewState.isCropEnabled())
+        val height = aPage.getHeight(pdfViewState.isCropEnabled())
+        val scale = pageWidth / width
+        val tileSpec = TileSpec(
+            aPage.index,
+            scale,
+            bounds,
+            pageWidth.toInt(),
+            pageHeight.toInt(),
+            pdfViewState.viewSize,
+            cacheKey,
+            null
+        )
+        
+        // 1. 首先检查是否在预加载区域内
+        val isInPreloadArea = pdfViewState.isTileVisible(tileSpec, strictMode = false)
+        if (!isInPreloadArea) {
+            recycle()  // 完全超出预加载区域，回收
             return
         }
-
+        
+        // 2. 检查是否在严格可见区域内
+        val isStrictlyVisible = pdfViewState.isTileVisible(tileSpec, strictMode = true)
+        
         if (null != bitmapState && bitmapState!!.isRecycled()) {
             bitmapState = null
         }
+        
+        // 3. 只有严格可见才绘制
+        if (isStrictlyVisible) {
+            bitmapState?.let { state ->
+                //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${state.bitmap.width}x${state.bitmap.height}")
+                // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
+                val dstLeft = floor(pixelRect.left).toInt()
+                val dstTop = floor(pixelRect.top).toInt()
+                val dstWidth = ceil(pixelRect.width).toInt()
+                val dstHeight = ceil(pixelRect.height).toInt()
 
-        bitmapState?.let { state ->
-            //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${state.bitmap.width}x${state.bitmap.height}")
-            // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
-            val dstLeft = floor(pixelRect.left).toInt()
-            val dstTop = floor(pixelRect.top).toInt()
-            val dstWidth = ceil(pixelRect.width).toInt()
-            val dstHeight = ceil(pixelRect.height).toInt()
-
-            drawScope.drawImage(
-                state.bitmap,
-                dstOffset = IntOffset(dstLeft, dstTop),
-                dstSize = IntSize(dstWidth, dstHeight)
-            )
-        } ?: run {
+                drawScope.drawImage(
+                    state.bitmap,
+                    dstOffset = IntOffset(dstLeft, dstTop),
+                    dstSize = IntSize(dstWidth, dstHeight)
+                )
+            }
+        }
+        
+        // 4. 无论是否绘制，都尝试解码（预加载区域内）
+        if (bitmapState == null) {
             decode(pageWidth, pageHeight)
         }
 
@@ -154,7 +180,8 @@ public class PageNode(
                     null
                 )
 
-                if (!pdfViewState.isTileVisible(tileSpec)) {
+                // 使用预加载区域判断（包含可见区域）
+                if (!pdfViewState.isTileVisible(tileSpec, strictMode = false)) {
                     isDecoding = false
                     return@launch
                 }
@@ -190,7 +217,7 @@ public class PageNode(
                             if (bitmap != null && !pdfViewState.isShutdown()) {
                                 val newState = ImageCache.putNode(cacheKey, bitmap)
                                 pdfViewState.decodeScope.launch(Dispatchers.Main) {
-                                    if (pdfViewState.isTileVisible(tileSpec) && !pdfViewState.isShutdown()) {
+                                    if (pdfViewState.isTileVisible(tileSpec, strictMode = false) && !pdfViewState.isShutdown()) {
                                         bitmapState?.let { ImageCache.releaseNode(it) }
                                         bitmapState = newState
                                     } else {
@@ -216,12 +243,8 @@ public class PageNode(
                                 return false
                             }
                             
-                            // 对于节点任务，还需要检查具体的tile是否可见
-                            if (!isFullPage) {
-                                return pdfViewState.isTileVisible(tileSpec)
-                            }
-                            
-                            return true
+                            // 对于节点任务，还需要检查具体的tile是否在预加载区域
+                            return pdfViewState.isTileVisible(tileSpec, strictMode = false)
                         }
                     }
                 )

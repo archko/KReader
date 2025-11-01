@@ -15,8 +15,11 @@ object NativeLibraryLoader {
         
         try {
             val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-            if (osName.contains("mac")) {
-                setupMacOSLibraryPath()
+            when {
+                osName.contains("mac") -> setupMacOSLibraryPath()
+                osName.contains("win") -> setupWindowsLibraryPath()
+                osName.contains("linux") -> setupLinuxLibraryPath()
+                else -> println("不支持的操作系统: $osName")
             }
             initialized = true
             println("原生库路径初始化完成")
@@ -29,9 +32,8 @@ object NativeLibraryLoader {
     private fun setupMacOSLibraryPath() {
         val arch = System.getProperty("os.arch").lowercase(Locale.getDefault())
         val isArm64 = arch.contains("aarch64") || arch.contains("arm64")
-        val isX64 = arch.contains("x86_64") || arch.contains("amd64")
         
-        println("检测到系统架构: $arch (ARM64: $isArm64, X64: $isX64)")
+        println("检测到 macOS 系统架构: $arch (ARM64: $isArm64)")
         
         // 获取应用包中的资源路径
         val baseResourcePath = System.getProperty("com.archko.reader.native.lib.path")
@@ -49,34 +51,14 @@ object NativeLibraryLoader {
                 "$baseResourcePath/macos-aarch64"
             }
             
-            // 检查主要路径是否存在
-            val primaryDir = File(primaryPath)
-            val fallbackDir = File(fallbackPath)
-            
-            val finalPath = when {
-                primaryDir.exists() && primaryDir.isDirectory -> {
-                    println("使用主要库路径: $primaryPath")
-                    "$primaryPath:$fallbackPath"
-                }
-                fallbackDir.exists() && fallbackDir.isDirectory -> {
-                    println("使用备用库路径: $fallbackPath")
-                    fallbackPath
-                }
-                else -> {
-                    println("警告: 未找到原生库目录")
-                    return
-                }
-            }
-            
-            // 更新 java.library.path
-            updateLibraryPath(finalPath)
+            setupLibraryPath(primaryPath, fallbackPath, "macOS")
         } else {
-            // 开发环境，从源码目录加载
-            setupDevelopmentLibraryPath(isArm64)
+            // 开发环境
+            setupDevelopmentLibraryPathMacOS(isArm64)
         }
     }
     
-    private fun setupDevelopmentLibraryPath(isArm64: Boolean) {
+    private fun setupDevelopmentLibraryPathMacOS(isArm64: Boolean) {
         val userDir = System.getProperty("user.dir")
         val resourcesPath = "$userDir/composeApp/src/commonMain/resources"
         
@@ -92,20 +74,126 @@ object NativeLibraryLoader {
             "$resourcesPath/macos-aarch64"
         }
         
+        setupLibraryPath(primaryPath, fallbackPath, "macOS 开发环境")
+    }
+    
+    private fun setupWindowsLibraryPath() {
+        val arch = System.getProperty("os.arch").lowercase(Locale.getDefault())
+        val isX64 = arch.contains("amd64") || arch.contains("x86_64")
+        val isX86 = arch.contains("x86") && !arch.contains("x86_64")
+        
+        println("检测到 Windows 系统架构: $arch (X64: $isX64, X86: $isX86)")
+        
+        // 获取应用包中的资源路径
+        val baseResourcePath = System.getProperty("com.archko.reader.native.lib.path")
+        if (baseResourcePath != null) {
+            // 运行在打包的应用中
+            val primaryPath = when {
+                isX64 -> "$baseResourcePath/windows-x64"
+                isX86 -> "$baseResourcePath/windows-x86"
+                else -> "$baseResourcePath/windows-x64" // 默认使用 x64
+            }
+            
+            val fallbackPath = if (isX64) {
+                "$baseResourcePath/windows-x86"
+            } else {
+                "$baseResourcePath/windows-x64"
+            }
+            
+            setupLibraryPath(primaryPath, fallbackPath, "Windows")
+        } else {
+            // 开发环境
+            setupDevelopmentLibraryPathWindows(isX64, isX86)
+        }
+    }
+    
+    private fun setupLinuxLibraryPath() {
+        val arch = System.getProperty("os.arch").lowercase(Locale.getDefault())
+        val isX64 = arch.contains("amd64") || arch.contains("x86_64")
+        val isArm64 = arch.contains("aarch64") || arch.contains("arm64")
+        
+        println("检测到 Linux 系统架构: $arch (X64: $isX64, ARM64: $isArm64)")
+        
+        // 获取应用包中的资源路径
+        val baseResourcePath = System.getProperty("com.archko.reader.native.lib.path")
+        if (baseResourcePath != null) {
+            // 运行在打包的应用中
+            val primaryPath = when {
+                isArm64 -> "$baseResourcePath/linux-aarch64"
+                isX64 -> "$baseResourcePath/linux-x64"
+                else -> "$baseResourcePath/linux-x64" // 默认使用 x64
+            }
+            
+            val fallbackPath = if (isArm64) {
+                "$baseResourcePath/linux-x64"
+            } else {
+                "$baseResourcePath/linux-aarch64"
+            }
+            
+            setupLibraryPath(primaryPath, fallbackPath, "Linux")
+        } else {
+            // 开发环境
+            setupDevelopmentLibraryPathLinux(isX64, isArm64)
+        }
+    }
+    
+    private fun setupDevelopmentLibraryPathWindows(isX64: Boolean, isX86: Boolean) {
+        val userDir = System.getProperty("user.dir")
+        val resourcesPath = "$userDir/composeApp/src/commonMain/resources"
+        
+        val primaryPath = when {
+            isX64 -> "$resourcesPath/windows-x64"
+            isX86 -> "$resourcesPath/windows-x86"
+            else -> "$resourcesPath/windows-x64"
+        }
+        
+        val fallbackPath = if (isX64) {
+            "$resourcesPath/windows-x86"
+        } else {
+            "$resourcesPath/windows-x64"
+        }
+        
+        setupLibraryPath(primaryPath, fallbackPath, "Windows 开发环境")
+    }
+    
+    private fun setupDevelopmentLibraryPathLinux(isX64: Boolean, isArm64: Boolean) {
+        val userDir = System.getProperty("user.dir")
+        val resourcesPath = "$userDir/composeApp/src/commonMain/resources"
+        
+        val primaryPath = if (isArm64) {
+            "$resourcesPath/linux-aarch64"
+        } else {
+            "$resourcesPath/linux-x64"
+        }
+        
+        val fallbackPath = if (isArm64) {
+            "$resourcesPath/linux-x64"
+        } else {
+            "$resourcesPath/linux-aarch64"
+        }
+        
+        setupLibraryPath(primaryPath, fallbackPath, "Linux 开发环境")
+    }
+    
+    private fun setupLibraryPath(primaryPath: String, fallbackPath: String, platform: String) {
         val primaryDir = File(primaryPath)
         val fallbackDir = File(fallbackPath)
         
         val finalPath = when {
             primaryDir.exists() && primaryDir.isDirectory -> {
-                println("开发环境使用主要库路径: $primaryPath")
-                "$primaryPath:$fallbackPath"
+                println("$platform 使用主要库路径: $primaryPath")
+                if (fallbackDir.exists() && fallbackDir.isDirectory) {
+                    "$primaryPath${File.pathSeparator}$fallbackPath"
+                } else {
+                    primaryPath
+                }
             }
             fallbackDir.exists() && fallbackDir.isDirectory -> {
-                println("开发环境使用备用库路径: $fallbackPath")
+                println("$platform 使用备用库路径: $fallbackPath")
                 fallbackPath
             }
             else -> {
-                println("警告: 开发环境未找到原生库目录")
+                println("警告: $platform 未找到原生库目录")
                 return
             }
         }
@@ -116,10 +204,11 @@ object NativeLibraryLoader {
     private fun updateLibraryPath(newPath: String) {
         try {
             val currentPath = System.getProperty("java.library.path")
+            val pathSeparator = File.pathSeparator
             val updatedPath = if (currentPath.isNullOrEmpty()) {
                 newPath
             } else {
-                "$newPath:$currentPath"
+                "$newPath$pathSeparator$currentPath"
             }
             
             System.setProperty("java.library.path", updatedPath)
