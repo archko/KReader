@@ -50,7 +50,6 @@ public class CustomImageFetcher(
                 bitmap.height,
                 bitmap.config!!
             )
-            bitmap.eraseColor(android.graphics.Color.WHITE)
             val buffer = ByteBuffer.allocate(bitmap.getByteCount())
             bitmap.copyPixelsToBuffer(buffer)
             buffer.position(0)
