@@ -136,6 +136,7 @@ public class Page(
             pdfY = relativeY * aPage.height
         }
 
+        //println("Page.screenToPdfPoint: screen($screenX, $screenY) -> page($pageX, $pageY) -> pdf($pdfX, $pdfY), bounds: $bounds, aPage: ${aPage.width}x${aPage.height}")
         return Offset(pdfX, pdfY)
     }
 
@@ -149,23 +150,21 @@ public class Page(
         val startPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
         
         val structText = structuredText ?: return false
-        val quads = structText.highlight(startPoint, startPoint)
         
-        if (quads.isNotEmpty()) {
-            isSelecting = true
-            selectionStartPoint = Offset(screenX, screenY)
-            
-            val selectedText = structText.copy(startPoint, startPoint)
-            currentSelection = TextSelection(
-                startPoint = startPoint,
-                endPoint = startPoint,
-                text = selectedText,
-                quads = quads
-            )
-            return true
-        }
+        // 开始选择时不立即高亮，等待拖拽
+        isSelecting = true
+        selectionStartPoint = Offset(screenX, screenY)
         
-        return false
+        // 创建初始选择状态，但不包含任何高亮区域
+        currentSelection = TextSelection(
+            startPoint = startPoint,
+            endPoint = startPoint,
+            text = "",
+            quads = emptyArray()
+        )
+        
+        //println("startTextSelection: 开始选择，起始点: $startPoint")
+        return true
     }
 
     /**
@@ -180,9 +179,11 @@ public class Page(
         val pdfPoint = screenToPdfPoint(screenX, screenY)
         val endPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
         
-        val quads = structText.highlight(startPoint, endPoint)
-        
-        if (quads.isNotEmpty()) {
+        // 只有当起始点和结束点不同时才进行高亮
+        if (startPoint.x != endPoint.x || startPoint.y != endPoint.y) {
+            val quads = structText.highlight(startPoint, endPoint)
+            //println("updateTextSelection.highlight: startPoint=$startPoint, endPoint=$endPoint, quads.size=${quads.size}")
+            
             val selectedText = structText.copy(startPoint, endPoint)
             currentSelection = TextSelection(
                 startPoint = startPoint,
@@ -190,6 +191,8 @@ public class Page(
                 text = selectedText,
                 quads = quads
             )
+            
+            //println("updateTextSelection: 选中文本: '$selectedText'")
         }
     }
 
@@ -199,10 +202,17 @@ public class Page(
     public fun endTextSelection(): TextSelection? {
         isSelecting = false
         selectionStartPoint = null
-        return currentSelection
+        
+        val selection = currentSelection
+        // 只有当有实际选中的文本时才返回选择结果
+        return if (selection != null && selection.text.isNotBlank() && selection.quads.isNotEmpty()) {
+            println("endTextSelection: 返回选择结果: '${selection.text}'")
+            selection
+        } else {
+            println("endTextSelection: 没有选中文本，返回null")
+            null
+        }
     }
-
-
 
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {

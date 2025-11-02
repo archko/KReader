@@ -86,8 +86,13 @@ public fun DesktopDocumentView(
     // 创建文本选择器
     val textSelector = remember {
         MuPdfTextSelector { pageIndex ->
-            // 简单的测试实现：为每个页面创建一个测试用的StructuredText
-            MuPdfStructuredTextImpl("test_page_$pageIndex")
+            // 从PdfDecoder获取真实的StructuredText
+            val structuredText = state.getStructuredText(pageIndex)
+            if (structuredText != null) {
+                MuPdfStructuredTextImpl(structuredText)
+            } else {
+                null
+            }
         }
     }
 
@@ -589,6 +594,7 @@ public fun DesktopDocumentView(
                                 if (clickedPage != null) {
                                     val contentX = startPos.x - offset.x
                                     val contentY = startPos.y - offset.y
+                                    //println("DocumentView: 开始文本选择 - startPos: $startPos, offset: $offset, contentPos: ($contentX, $contentY)")
                                     clickedPage.startTextSelection(contentX, contentY)
                                     selectedPage = clickedPage
                                 }
@@ -599,12 +605,14 @@ public fun DesktopDocumentView(
                             if (isTextSelectionMode) {
                                 // 文本选择模式：只处理文本选择，不处理拖拽滚动
                                 if (isTextSelecting && dragStartPos != null) {
-                                    currentDragPos = currentDragPos!! + Offset(change.x, change.y)
+                                    // 累积拖拽位置：从起始位置开始累加所有变化
+                                    currentDragPos = (currentDragPos ?: dragStartPos!!) + change
                                     selectionEndPos = currentDragPos
                                     
                                     selectedPage?.let { page ->
                                         val contentX = currentDragPos!!.x - offset.x
                                         val contentY = currentDragPos!!.y - offset.y
+                                        //println("DocumentView: 更新文本选择 - currentDragPos: $currentDragPos, offset: $offset, contentPos: ($contentX, $contentY)")
                                         page.updateTextSelection(contentX, contentY)
                                     }
                                 }
