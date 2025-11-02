@@ -28,6 +28,8 @@ import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.pdf.tts.SpeechService
+import com.archko.reader.viewer.tts.TtsQueueService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

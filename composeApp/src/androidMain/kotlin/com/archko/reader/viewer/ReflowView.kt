@@ -181,7 +181,7 @@ private fun ReflowPageItem(
         withContext(Dispatcher.DECODE) {
             pageContents = when (decoder) {
                 is PdfDecoder -> {
-                    decoder.decodeReflow(pageIndex)
+                    decoder.decodeReflowItem(pageIndex)
                 }
 
                 else -> {

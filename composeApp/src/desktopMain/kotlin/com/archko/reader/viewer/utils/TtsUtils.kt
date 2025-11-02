@@ -1,7 +1,7 @@
 package com.archko.reader.viewer.utils
 
 import com.archko.reader.pdf.cache.FileUtils.Companion.getCacheDirectory
-import com.archko.reader.viewer.Voice
+import com.archko.reader.pdf.tts.Voice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json

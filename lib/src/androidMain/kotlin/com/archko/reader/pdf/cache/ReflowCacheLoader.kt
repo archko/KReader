@@ -1,6 +1,6 @@
 package com.archko.reader.pdf.cache
 
-import com.archko.reader.pdf.cache.FileUtils.Companion.getCacheDirectory
+import com.archko.reader.pdf.util.FileUtils
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -134,7 +134,7 @@ public object ReflowCacheLoader {
      * @return 缓存文件
      */
     public fun getCacheFile(file: File): File {
-        val cacheDir = getCacheDirectory("reflow")
+        val cacheDir = FileUtils.getStorageDir("reflow")
         val fileName = "${file.nameWithoutExtension}_reflow.json"
         return File(cacheDir, fileName)
     }

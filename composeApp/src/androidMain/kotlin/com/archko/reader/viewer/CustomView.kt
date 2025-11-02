@@ -39,9 +39,11 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.viewer.tts.TtsQueueService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,6 +127,8 @@ fun CustomView(
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
 
+    val speechService: SpeechService = remember { TtsQueueService() }
+
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
@@ -189,6 +193,12 @@ fun CustomView(
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
             decoder?.close()
+            // 清理 TTS 服务
+            if (speechService is TtsQueueService) {
+                speechService.destroy()
+            } else {
+                speechService.stop()
+            }
         }
     }
 
@@ -460,7 +470,9 @@ fun CustomView(
                         Spacer(Modifier.weight(1f))
 
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            /*IconButton(onClick = {
+                            val isSpeaking by speechService.isSpeakingFlow.collectAsState()
+
+                            IconButton(onClick = {
                                 scope.launch {
                                     speakFromCurrentPage(currentPage, decoder!!, speechService)
                                 }
@@ -468,9 +480,9 @@ fun CustomView(
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_tts),
                                     contentDescription = stringResource(Res.string.tts),
-                                    tint = if (speechService.isSpeaking()) Color.Green else Color.White
+                                    tint = if (isSpeaking) Color.Green else Color.White
                                 )
-                            }*/
+                            }
                             IconButton(onClick = {
                                 isTextSelectionMode = !isTextSelectionMode
                             }) {
@@ -663,7 +675,7 @@ fun CustomView(
                 FontDialog(
                     onDismiss = { showFontDialog = false },
                     onFontSelected = { fontPath ->
-                        println( "选择了字体: ${File(fontPath).name}")
+                        println("选择了字体: ${File(fontPath).name}")
                         FontCSSGenerator.setFontFace(fontPath)
                         showFontDialog = false
                     }
@@ -756,15 +768,15 @@ fun FontDialog(
 ) {
     var fontFiles by remember { mutableStateOf<List<File>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    
+
     // 扫描字体文件
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val fontsDir = File("/sdcard/fonts")
             val files = if (fontsDir.exists() && fontsDir.isDirectory) {
                 fontsDir.listFiles { file ->
-                    file.extension.equals("ttf", ignoreCase = true) || 
-                    file.extension.equals("otf", ignoreCase = true)
+                    file.extension.equals("ttf", ignoreCase = true) ||
+                            file.extension.equals("otf", ignoreCase = true)
                 }?.toList() ?: emptyList()
             } else {
                 emptyList()
@@ -891,7 +903,12 @@ fun FontDialog(
                                             )
                                         )
                                         Text(
-                                            text = "${fontFile.extension.uppercase()} • ${String.format("%.1f KB", fontFile.length() / 1024.0)}",
+                                            text = "${fontFile.extension.uppercase()} • ${
+                                                String.format(
+                                                    "%.1f KB",
+                                                    fontFile.length() / 1024.0
+                                                )
+                                            }",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             fontFamily = FontFamily(
@@ -908,6 +925,39 @@ fun FontDialog(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+suspend fun speakFromCurrentPage(
+    startPage: Int,
+    imageDecoder: ImageDecoder,
+    speechService: SpeechService
+) {
+    if (speechService.isSpeaking()) {
+        println("TTS: 正在朗读，停止当前朗读")
+        speechService.stop()
+        return
+    }
+
+    if (imageDecoder is PdfDecoder) {
+        withContext(Dispatchers.IO) {
+            try {
+                speechService.clearQueue()
+
+                val list = imageDecoder.decodeReflow(startPage)
+                println("TTS: 解码完成共:${list.size} 页")
+
+                for (pageText in list) {
+                    speechService.addToQueue(pageText)
+                }
+
+                val queueSize = speechService.getQueueSize()
+                println("TTS: 添加完成,队列中共有$queueSize 个文本段落")
+            } catch (e: Exception) {
+                println("TTS: 批量解码失败: ${e.message}")
+                speechService.addToQueue("文本解码失败，无法朗读")
             }
         }
     }

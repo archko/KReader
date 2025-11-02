@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.viewer.tts
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.archko.reader.pdf.tts.SpeechService
+import com.archko.reader.pdf.tts.Voice
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
