@@ -8,6 +8,9 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -55,6 +58,7 @@ public fun DesktopDocumentView(
     initialZoom: Double = 1.0, // 初始缩放比例
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
+    isTextSelectionMode: Boolean = false, // 是否为文本选择模式
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -79,10 +83,25 @@ public fun DesktopDocumentView(
     val minZoom = 0.5f
     val maxZoom = 5.0f
 
+    // 创建文本选择器
+    val textSelector = remember {
+        MuPdfTextSelector { pageIndex ->
+            // 简单的测试实现：为每个页面创建一个测试用的StructuredText
+            MuPdfStructuredTextImpl("test_page_$pageIndex")
+        }
+    }
+
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PdfViewState(list, state, orientation, crop)
+        PdfViewState(list, state, orientation, crop, textSelector)
     }
+
+    // 文本选择相关状态
+    var isTextSelecting by remember { mutableStateOf(false) }
+    var selectedPage by remember { mutableStateOf<Page?>(null) }
+    var showTextActionToolbar by remember { mutableStateOf(false) }
+    var selectionStartPos by remember { mutableStateOf<Offset?>(null) }
+    var selectionEndPos by remember { mutableStateOf<Offset?>(null) }
 
     // 处理键盘和鼠标滚轮事件的函数
     val handleKeyboardEvent = { event: KeyEvent ->
@@ -489,6 +508,17 @@ public fun DesktopDocumentView(
                     detectTapGestures(
                         onTap = { offsetTap ->
                             focusRequester.requestFocus()
+                            
+                            // 如果有文本选择工具栏显示，先隐藏它
+                            if (showTextActionToolbar) {
+                                showTextActionToolbar = false
+                                selectedPage?.clearTextSelection()
+                                selectedPage = null
+                                selectionStartPos = null
+                                selectionEndPos = null
+                                return@detectTapGestures
+                            }
+                            
                             // 将点击坐标转换为相对于内容的位置
                             val contentX = offsetTap.x - offset.x
                             val contentY = offsetTap.y - offset.y
@@ -521,7 +551,11 @@ public fun DesktopDocumentView(
                                     onTapNonPageArea?.invoke(clickedPage)
                                 }
                             }
-                        },
+                        }
+                    )
+                }
+                .pointerInput("double_tap_gestures") {
+                    detectTapGestures(
                         onDoubleTap = { offsetTap ->
                             focusRequester.requestFocus()
                             val y = offsetTap.y
@@ -532,22 +566,81 @@ public fun DesktopDocumentView(
                         }
                     )
                 }
-                .pointerInput("drag_gestures") {
+                .pointerInput("drag_gestures", isTextSelectionMode) {
+                    var dragStartPos: Offset? = null
+                    var currentDragPos: Offset? = null
+                    
                     detectDragGestures(
-                        onDragStart = { 
+                        onDragStart = { startPos ->
                             focusRequester.requestFocus()
+                            dragStartPos = startPos
+                            currentDragPos = startPos
+                            
+                            if (isTextSelectionMode) {
+                                // 文本选择模式：开始文本选择
+                                isTextSelecting = true
+                                selectionStartPos = startPos
+                                selectionEndPos = startPos
+                                showTextActionToolbar = false
+                                
+                                // 找到点击的页面并开始选择
+                                val clickedPageIndex = calculateClickedPage(startPos, offset, orientation, pdfViewState)
+                                val clickedPage = pdfViewState.pages.getOrNull(clickedPageIndex)
+                                if (clickedPage != null) {
+                                    val contentX = startPos.x - offset.x
+                                    val contentY = startPos.y - offset.y
+                                    clickedPage.startTextSelection(contentX, contentY)
+                                    selectedPage = clickedPage
+                                }
+                            }
+                            // 非文本选择模式：不做任何特殊处理，等待拖拽
                         },
                         onDrag = { change ->
-                            // 计算边界限制
-                            val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                            val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            if (isTextSelectionMode) {
+                                // 文本选择模式：只处理文本选择，不处理拖拽滚动
+                                if (isTextSelecting && dragStartPos != null) {
+                                    currentDragPos = currentDragPos!! + Offset(change.x, change.y)
+                                    selectionEndPos = currentDragPos
+                                    
+                                    selectedPage?.let { page ->
+                                        val contentX = currentDragPos!!.x - offset.x
+                                        val contentY = currentDragPos!!.y - offset.y
+                                        page.updateTextSelection(contentX, contentY)
+                                    }
+                                }
+                            } else {
+                                // 非文本选择模式：普通拖拽滚动
+                                val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                                val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                                
+                                val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
+                                val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
+                                
+                                offset = Offset(newX, newY)
+                                pdfViewState.updateOffset(offset)
+                            }
+                        },
+                        onDragEnd = {
+                            if (isTextSelectionMode && isTextSelecting) {
+                                // 文本选择模式：结束文本选择
+                                val selection = selectedPage?.endTextSelection()
+                                isTextSelecting = false
+                                
+                                if (selection != null && selection.text.isNotBlank()) {
+                                    showTextActionToolbar = true
+                                    println("文本选择完成: ${selection.text}")
+                                } else {
+                                    // 如果没有选中文本，清理状态
+                                    selectedPage?.clearTextSelection()
+                                    selectedPage = null
+                                    selectionStartPos = null
+                                    selectionEndPos = null
+                                }
+                            }
                             
-                            // 应用拖拽偏移量
-                            val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
-                            val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
-                            
-                            offset = Offset(newX, newY)
-                            pdfViewState.updateOffset(offset)
+                            // 重置拖拽状态
+                            dragStartPos = null
+                            currentDragPos = null
                         }
                     )
                 }
@@ -594,6 +687,22 @@ public fun DesktopDocumentView(
                     size = visibleRect.size
                 )*/
                 pdfViewState.drawVisiblePages(this, offset, vZoom, viewSize)
+                
+                // 绘制选择区域的调试可视化
+                if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {
+                    val start = selectionStartPos!!
+                    val end = selectionEndPos!!
+                    val left = minOf(start.x, end.x) - offset.x
+                    val top = minOf(start.y, end.y) - offset.y
+                    val right = maxOf(start.x, end.x) - offset.x
+                    val bottom = maxOf(start.y, end.y) - offset.y
+                    
+                    drawRect(
+                        color = Color.Blue.copy(alpha = 0.3f),
+                        topLeft = Offset(left, top),
+                        size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
+                    )
+                }
             }
         }
     }
@@ -601,6 +710,35 @@ public fun DesktopDocumentView(
     // 自动请求焦点，确保键盘事件能被捕获
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    // 文本操作工具栏
+    if (showTextActionToolbar && selectedPage?.currentSelection != null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            TextActionToolbar(
+                selection = selectedPage!!.currentSelection!!,
+                onCopy = { text ->
+                    // 复制到剪贴板
+                    println("复制文本: $text")
+                    // 这里需要实现剪贴板操作
+                    showTextActionToolbar = false
+                    selectedPage?.clearTextSelection()
+                    selectedPage = null
+                    selectionStartPos = null
+                    selectionEndPos = null
+                },
+                onDismiss = {
+                    showTextActionToolbar = false
+                    selectedPage?.clearTextSelection()
+                    selectedPage = null
+                    selectionStartPos = null
+                    selectionEndPos = null
+                }
+            )
+        }
     }
 }
 
@@ -776,6 +914,57 @@ private fun handleTapGesture(
             }
 
             else -> false // 点击中间区域，不是翻页
+        }
+    }
+}
+
+/**
+ * 文本操作工具栏
+ */
+@Composable
+private fun TextActionToolbar(
+    selection: TextSelection,
+    onCopy: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.Surface(
+        modifier = Modifier.wrapContentSize(),
+        color = Color.Black.copy(alpha = 0.8f),
+        shape = androidx.compose.material3.MaterialTheme.shapes.medium
+    ) {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            androidx.compose.material3.Text(
+                text = "选中文本: ${selection.text}",
+                color = Color.White,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+            )
+            
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+            
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+            ) {
+                androidx.compose.material3.TextButton(
+                    onClick = { onCopy(selection.text) },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = Color.White
+                    )
+                ) {
+                    androidx.compose.material3.Text("复制")
+                }
+                
+                androidx.compose.material3.TextButton(
+                    onClick = onDismiss,
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = Color.White
+                    )
+                ) {
+                    androidx.compose.material3.Text("取消")
+                }
+            }
         }
     }
 }

@@ -265,6 +265,8 @@ fun CustomView(
         // 横竖切换、重排等按钮内部状态
         var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
         var isReflow by remember { mutableStateOf(reflow == 1L) }
+        // 文本选择模式状态
+        var isTextSelectionMode by remember { mutableStateOf(false) }
 
         // 对于图片文件，根据尺寸自动调整滚动方向
         LaunchedEffect(decoder) {
@@ -345,6 +347,15 @@ fun CustomView(
                                 painter = painterResource(Res.drawable.ic_tts),
                                 contentDescription = stringResource(Res.string.tts),
                                 tint = if (speechService.isSpeaking()) Color.Green else Color.White
+                            )
+                        }
+                        IconButton(onClick = {
+                            isTextSelectionMode = !isTextSelectionMode
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_select),
+                                contentDescription = "文本选择",
+                                tint = if (isTextSelectionMode) Color.Green else Color.White
                             )
                         }
                     }
@@ -470,6 +481,7 @@ fun CustomView(
                         initialScrollY = initialScrollY,
                         initialZoom = vZoom,
                         crop = isCrop,
+                        isTextSelectionMode = isTextSelectionMode,
                     )
                 }
 

@@ -50,12 +50,38 @@ public class Page(
     public var links: List<Hyperlink> = emptyList()
     private var linksLoaded = false
 
+    // 文本选择相关
+    private var structuredText: StructuredText? = null
+    private var textLoaded = false
+    public var currentSelection: TextSelection? by mutableStateOf(null)
+    private var isSelecting = false
+    private var selectionStartPoint: Offset? = null
+
     public fun recycleThumb() {
         thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
         thumbDecoding = false
         thumbJob?.cancel()
         thumbJob = null
+    }
+
+    /**
+     * 加载页面文本结构
+     */
+    public fun loadText() {
+        if (textLoaded || pdfViewState.textSelector == null) return
+
+        structuredText = pdfViewState.textSelector.getStructuredText(aPage.index)
+        textLoaded = true
+    }
+
+    /**
+     * 清理文本选择状态
+     */
+    public fun clearTextSelection() {
+        currentSelection = null
+        isSelecting = false
+        selectionStartPoint = null
     }
 
     /**
@@ -76,9 +102,18 @@ public class Page(
             return null
         }
 
+        val pdfPoint = screenToPdfPoint(x, y)
+        val foundLink = Hyperlink.findLinkAtPoint(links, pdfPoint.x, pdfPoint.y)
+        return foundLink
+    }
+
+    /**
+     * 将屏幕坐标转换为PDF坐标
+     */
+    private fun screenToPdfPoint(screenX: Float, screenY: Float): Offset {
         // 将点击坐标转换为页面相对坐标
-        val pageX = x - bounds.left
-        val pageY = y - bounds.top
+        val pageX = screenX - bounds.left
+        val pageY = screenY - bounds.top
 
         // 转换为原始PDF坐标
         val pdfX: Float
@@ -101,11 +136,73 @@ public class Page(
             pdfY = relativeY * aPage.height
         }
 
-        //println("Page.findLinkAtPoint: 页面 ${aPage.index}, 点击坐标($x, $y), 页面坐标($pageX, $pageY), PDF坐标($pdfX, $pdfY), 链接数量: ${links.size}, hasCrop:${aPage.hasCrop()}")
-
-        val foundLink = Hyperlink.findLinkAtPoint(links, pdfX, pdfY)
-        return foundLink
+        return Offset(pdfX, pdfY)
     }
+
+    /**
+     * 开始文本选择
+     */
+    public fun startTextSelection(screenX: Float, screenY: Float): Boolean {
+        loadText()
+        
+        val pdfPoint = screenToPdfPoint(screenX, screenY)
+        val startPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
+        
+        val structText = structuredText ?: return false
+        val quads = structText.highlight(startPoint, startPoint)
+        
+        if (quads.isNotEmpty()) {
+            isSelecting = true
+            selectionStartPoint = Offset(screenX, screenY)
+            
+            val selectedText = structText.copy(startPoint, startPoint)
+            currentSelection = TextSelection(
+                startPoint = startPoint,
+                endPoint = startPoint,
+                text = selectedText,
+                quads = quads
+            )
+            return true
+        }
+        
+        return false
+    }
+
+    /**
+     * 更新文本选择
+     */
+    public fun updateTextSelection(screenX: Float, screenY: Float) {
+        if (!isSelecting || selectionStartPoint == null) return
+        
+        val structText = structuredText ?: return
+        val startPoint = currentSelection?.startPoint ?: return
+        
+        val pdfPoint = screenToPdfPoint(screenX, screenY)
+        val endPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
+        
+        val quads = structText.highlight(startPoint, endPoint)
+        
+        if (quads.isNotEmpty()) {
+            val selectedText = structText.copy(startPoint, endPoint)
+            currentSelection = TextSelection(
+                startPoint = startPoint,
+                endPoint = endPoint,
+                text = selectedText,
+                quads = quads
+            )
+        }
+    }
+
+    /**
+     * 结束文本选择
+     */
+    public fun endTextSelection(): TextSelection? {
+        isSelecting = false
+        selectionStartPoint = null
+        return currentSelection
+    }
+
+
 
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {
@@ -306,6 +403,9 @@ public class Page(
 
                 // 绘制链接区域（调试用，可以注释掉）
                 drawLinks(drawScope, currentBounds, scaleRatio)
+                
+                // 绘制文本选择高亮
+                drawTextSelection(drawScope, currentBounds, scaleRatio)
             }
 
             // 绘制分割线
@@ -392,6 +492,58 @@ public class Page(
     }
 
     /**
+     * 绘制文本选择高亮
+     */
+    private fun drawTextSelection(drawScope: DrawScope, currentBounds: Rect, scaleRatio: Float) {
+        val selection = currentSelection ?: return
+        val textSelector = pdfViewState.textSelector ?: return
+        val selectionColor = Color(0x6633B5E5) // 半透明蓝色
+
+        selection.quads.forEach { quad ->
+            // 使用TextSelector将PDF坐标的Quad转换为屏幕坐标
+            val screenQuad = textSelector.quadToScreenQuad(quad) { pdfX, pdfY ->
+                pdfPointToScreenPoint(pdfX, pdfY, currentBounds)
+            }
+            
+            // 绘制高亮矩形（简化处理，使用quad的边界框）
+            val left = minOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
+            val top = minOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
+            val right = maxOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
+            val bottom = maxOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
+            
+            drawScope.drawRect(
+                color = selectionColor,
+                topLeft = Offset(left, top),
+                size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
+            )
+        }
+    }
+
+    /**
+     * 将PDF坐标点转换为屏幕坐标点
+     */
+    private fun pdfPointToScreenPoint(pdfX: Float, pdfY: Float, currentBounds: Rect): Offset {
+        return if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
+            val cropBounds = aPage.cropBounds!!
+            val relativeX = (pdfX - cropBounds.left) / cropBounds.width
+            val relativeY = (pdfY - cropBounds.top) / cropBounds.height
+            
+            Offset(
+                currentBounds.left + relativeX * currentBounds.width,
+                currentBounds.top + relativeY * currentBounds.height
+            )
+        } else {
+            val relativeX = pdfX / aPage.width
+            val relativeY = pdfY / aPage.height
+            
+            Offset(
+                currentBounds.left + relativeX * currentBounds.width,
+                currentBounds.top + relativeY * currentBounds.height
+            )
+        }
+    }
+
+    /**
      * 绘制分割线
      */
     private fun drawSeparator(drawScope: DrawScope, currentBounds: Rect) {
@@ -429,6 +581,7 @@ public class Page(
     public fun recycle() {
         //println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
         recycleThumb()
+        clearTextSelection()
         nodes.forEach { it.recycle() }
     }
 
@@ -581,3 +734,4 @@ public fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: I
     //println("page.draw.page:$page, isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect")
     return visible
 }
+

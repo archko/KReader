@@ -313,4 +313,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
         ImageCache.clear()
     }
+
+    override fun getStructuredText(index: Int): Any? {
+        return null
+    }
 } 

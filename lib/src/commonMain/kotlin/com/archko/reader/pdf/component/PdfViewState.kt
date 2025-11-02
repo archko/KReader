@@ -22,7 +22,8 @@ public class PdfViewState(
     public val list: List<APage>,
     public val state: ImageDecoder,
     public var orientation: Int = Vertical,
-    crop: Boolean
+    crop: Boolean,
+    public val textSelector: TextSelector? = null
 ) {
     public var viewOffset: Offset = Offset.Zero
     public var init: Boolean by mutableStateOf(false)
@@ -35,7 +36,7 @@ public class PdfViewState(
     public var vZoom: Float by mutableFloatStateOf(1f)
 
     // 预加载配置
-    private var preloadScreens: Float = 0.7f // 预加载1屏的距离
+    private var preloadScreens: Float = 0.8f // 预加载1屏的距离
 
     // 全局单线程解码作用域
     public val decodeScope: CoroutineScope =

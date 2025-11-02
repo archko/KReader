@@ -55,4 +55,6 @@ public interface ImageDecoder {
     ): ImageBitmap
 
     public fun close()
+
+    public fun getStructuredText(index: Int): Any?
 }
