@@ -64,6 +64,7 @@ fun TtsTestScreen() {
     DisposableEffect(Unit) {
         onDispose {
             isRunning = false
+            speechService.destroy()
         }
     }
 
