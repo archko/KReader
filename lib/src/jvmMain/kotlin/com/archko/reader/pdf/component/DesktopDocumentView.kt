@@ -8,9 +8,6 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -31,11 +28,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import kotlin.math.max
-import kotlin.math.min
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 桌面端文档视图，专注于鼠标滚轮和键盘事件
@@ -83,13 +80,13 @@ public fun DesktopDocumentView(
     val minZoom = 0.5f
     val maxZoom = 5.0f
 
-    // 创建文本选择器
+    // 创建文本选择器 - 使用expect/actual模式
     val textSelector = remember {
-        MuPdfTextSelector { pageIndex ->
+        createTextSelector { pageIndex ->
             // 从PdfDecoder获取真实的StructuredText
             val structuredText = state.getStructuredText(pageIndex)
             if (structuredText != null) {
-                MuPdfStructuredTextImpl(structuredText)
+                createStructuredTextImpl(structuredText)
             } else {
                 null
             }
@@ -922,57 +919,6 @@ private fun handleTapGesture(
             }
 
             else -> false // 点击中间区域，不是翻页
-        }
-    }
-}
-
-/**
- * 文本操作工具栏
- */
-@Composable
-private fun TextActionToolbar(
-    selection: TextSelection,
-    onCopy: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    androidx.compose.material3.Surface(
-        modifier = Modifier.wrapContentSize(),
-        color = Color.Black.copy(alpha = 0.8f),
-        shape = androidx.compose.material3.MaterialTheme.shapes.medium
-    ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            androidx.compose.material3.Text(
-                text = "选中文本: ${selection.text}",
-                color = Color.White,
-                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
-            )
-            
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
-            
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
-            ) {
-                androidx.compose.material3.TextButton(
-                    onClick = { onCopy(selection.text) },
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = Color.White
-                    )
-                ) {
-                    androidx.compose.material3.Text("复制")
-                }
-                
-                androidx.compose.material3.TextButton(
-                    onClick = onDismiss,
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = Color.White
-                    )
-                ) {
-                    androidx.compose.material3.Text("取消")
-                }
-            }
         }
     }
 }

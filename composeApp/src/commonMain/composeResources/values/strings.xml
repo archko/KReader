@@ -43,6 +43,10 @@
     <string name="incorrect_password">Incorrect password. Please try again.</string>
     <string name="ok">OK</string>
 
+    <string name="select_result">Selection: </string>
+    <string name="select_copy">Copy</string>
+    <string name="select_cancel">Cancel</string>
+
     <string name="encrypt_decrypt_title">Encrypt/Decrypt</string>
     <string name="encrypt_decrypt_tips">Pdf info</string>
     <string name="encrypt_decrypt_add">Select Pdf</string>

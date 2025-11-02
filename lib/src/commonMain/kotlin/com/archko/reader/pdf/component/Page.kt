@@ -417,9 +417,6 @@ public class Page(
                 // 绘制文本选择高亮
                 drawTextSelection(drawScope, currentBounds, scaleRatio)
             }
-
-            // 绘制分割线
-            drawSeparator(drawScope, currentBounds)
         }
 
         // 无论是否可见，都要调用node.draw（包括预加载区域）
@@ -433,6 +430,11 @@ public class Page(
                 currentBounds.left,
                 currentBounds.top,
             )
+        }
+
+        // 绘制分割线
+        if (isActuallyVisible) {
+            drawSeparator(drawScope, currentBounds)
         }
     }
 

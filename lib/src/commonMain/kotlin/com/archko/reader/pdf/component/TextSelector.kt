@@ -110,3 +110,13 @@ public object TextSelectionConstants {
     public const val SELECT_WORDS: Int = 1
     public const val SELECT_LINES: Int = 2
 }
+
+/**
+ * 平台特定的TextSelector创建函数
+ */
+public expect fun createTextSelector(getStructuredTextCallback: (Int) -> StructuredText?): TextSelector
+
+/**
+ * 平台特定的StructuredText实现创建函数
+ */
+public expect fun createStructuredTextImpl(nativeStructuredText: Any): StructuredText

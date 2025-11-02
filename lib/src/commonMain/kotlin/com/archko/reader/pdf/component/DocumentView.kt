@@ -6,8 +6,8 @@ import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -60,6 +60,7 @@ public fun DocumentView(
     initialZoom: Double = 1.0, // 初始缩放比例
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
+    isTextSelectionMode: Boolean = false, // 是否为文本选择模式
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -82,10 +83,30 @@ public fun DocumentView(
     var lastTapTime by remember { mutableLongStateOf(0L) } // 上次点击时间
     var tapDelayJob by remember { mutableStateOf<Job?>(null) } // 延迟处理点击的Job
 
+    // 创建文本选择器 - 使用expect/actual模式
+    val textSelector = remember {
+        createTextSelector { pageIndex ->
+            // 从PdfDecoder获取真实的StructuredText
+            val structuredText = state.getStructuredText(pageIndex)
+            if (structuredText != null) {
+                createStructuredTextImpl(structuredText)
+            } else {
+                null
+            }
+        }
+    }
+
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PdfViewState(list, state, orientation, crop)
+        PdfViewState(list, state, orientation, crop, textSelector)
     }
+
+    // 文本选择相关状态
+    var isTextSelecting by remember { mutableStateOf(false) }
+    var selectedPage by remember { mutableStateOf<Page?>(null) }
+    var showTextActionToolbar by remember { mutableStateOf(false) }
+    var selectionStartPos by remember { mutableStateOf<Offset?>(null) }
+    var selectionEndPos by remember { mutableStateOf<Offset?>(null) }
 
     // 设置页面跳转回调
     LaunchedEffect(pdfViewState) {
@@ -302,7 +323,7 @@ public fun DocumentView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Transparent)
-                .pointerInput(Unit) {
+                .pointerInput("gestures", isTextSelectionMode) {
                     awaitEachGesture {
                         var zooming = false
                         var dragging = false
@@ -387,33 +408,61 @@ public fun DocumentView(
                                 } else {
                                     // 单指拖动
                                     if (!zooming) {
-                                        offset += panChange
-                                        if (orientation == Vertical) {
-                                            val scaledWidth = viewSize.width * vZoom
-                                            val scaledHeight = pdfViewState.totalHeight
-                                            val minX = minOf(0f, viewSize.width - scaledWidth)
-                                            val maxX = 0f
-                                            val minY =
-                                                if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
-                                            val maxY = 0f
-                                            offset = Offset(
-                                                offset.x.coerceIn(minX, maxX),
-                                                offset.y.coerceIn(minY, maxY)
-                                            )
+                                        if (isTextSelectionMode && !isTextSelecting) {
+                                            // 文本选择模式：开始文本选择
+                                            isTextSelecting = true
+                                            selectionStartPos = down.position
+                                            selectionEndPos = down.position + totalDrag
+                                            showTextActionToolbar = false
+                                            
+                                            // 找到点击的页面并开始选择
+                                            val clickedPageIndex = calculateClickedPage(down.position, offset, orientation, pdfViewState)
+                                            val clickedPage = pdfViewState.pages.getOrNull(clickedPageIndex)
+                                            if (clickedPage != null) {
+                                                val contentX = down.position.x - offset.x
+                                                val contentY = down.position.y - offset.y
+                                                clickedPage.startTextSelection(contentX, contentY)
+                                                selectedPage = clickedPage
+                                            }
+                                        } else if (isTextSelectionMode && isTextSelecting) {
+                                            // 文本选择模式：更新文本选择
+                                            selectionEndPos = down.position + totalDrag
+                                            
+                                            selectedPage?.let { page ->
+                                                val contentX = (down.position + totalDrag).x - offset.x
+                                                val contentY = (down.position + totalDrag).y - offset.y
+                                                page.updateTextSelection(contentX, contentY)
+                                            }
                                         } else {
-                                            val scaledHeight = viewSize.height * vZoom
-                                            val scaledWidth = pdfViewState.totalWidth
-                                            val minY = minOf(0f, viewSize.height - scaledHeight)
-                                            val maxY = 0f
-                                            val minX =
-                                                if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
-                                            val maxX = 0f
-                                            offset = Offset(
-                                                offset.x.coerceIn(minX, maxX),
-                                                offset.y.coerceIn(minY, maxY)
-                                            )
+                                            // 普通拖拽模式：滚动页面
+                                            offset += panChange
+                                            if (orientation == Vertical) {
+                                                val scaledWidth = viewSize.width * vZoom
+                                                val scaledHeight = pdfViewState.totalHeight
+                                                val minX = minOf(0f, viewSize.width - scaledWidth)
+                                                val maxX = 0f
+                                                val minY =
+                                                    if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                                val maxY = 0f
+                                                offset = Offset(
+                                                    offset.x.coerceIn(minX, maxX),
+                                                    offset.y.coerceIn(minY, maxY)
+                                                )
+                                            } else {
+                                                val scaledHeight = viewSize.height * vZoom
+                                                val scaledWidth = pdfViewState.totalWidth
+                                                val minY = minOf(0f, viewSize.height - scaledHeight)
+                                                val maxY = 0f
+                                                val minX =
+                                                    if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                                                val maxX = 0f
+                                                offset = Offset(
+                                                    offset.x.coerceIn(minX, maxX),
+                                                    offset.y.coerceIn(minY, maxY)
+                                                )
+                                            }
+                                            pdfViewState.updateOffset(offset)
                                         }
-                                        pdfViewState.updateOffset(offset)
                                     }
                                 }
                                 event.changes.fastForEach { if (it.positionChanged()) it.consume() }
@@ -423,6 +472,23 @@ public fun DocumentView(
                             // 缩放结束后调用 updateViewSize 重新计算页面
                             if (zooming) {
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                            }
+                            
+                            // 处理文本选择结束
+                            if (isTextSelectionMode && isTextSelecting) {
+                                val selection = selectedPage?.endTextSelection()
+                                isTextSelecting = false
+                                
+                                if (selection != null && selection.text.isNotBlank()) {
+                                    showTextActionToolbar = true
+                                    println("文本选择完成: ${selection.text}")
+                                } else {
+                                    // 如果没有选中文本，清理状态
+                                    selectedPage?.clearTextSelection()
+                                    selectedPage = null
+                                    selectionStartPos = null
+                                    selectionEndPos = null
+                                }
                             }
 
                             // 如果没有拖拽和缩放，且按下时没有fling动画，处理点击事件
@@ -448,6 +514,16 @@ public fun DocumentView(
                                     tapDelayJob?.cancel()
                                     tapDelayJob = scope.launch {
                                         delay(300) // 等待300ms
+
+                                        // 如果有文本选择工具栏显示，先隐藏它
+                                        if (showTextActionToolbar) {
+                                            showTextActionToolbar = false
+                                            selectedPage?.clearTextSelection()
+                                            selectedPage = null
+                                            selectionStartPos = null
+                                            selectionEndPos = null
+                                            return@launch
+                                        }
 
                                         // 将点击坐标转换为相对于内容的位置
                                         val contentX = tapOffset.x - offset.x
@@ -620,7 +696,52 @@ public fun DocumentView(
                     size = visibleRect.size
                 )*/
                 pdfViewState.drawVisiblePages(this, offset, vZoom, viewSize)
+
+                // 绘制选择区域的调试可视化
+                if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {
+                    val start = selectionStartPos!!
+                    val end = selectionEndPos!!
+                    val left = minOf(start.x, end.x) - offset.x
+                    val top = minOf(start.y, end.y) - offset.y
+                    val right = maxOf(start.x, end.x) - offset.x
+                    val bottom = maxOf(start.y, end.y) - offset.y
+
+                    drawRect(
+                        color = Color.Blue.copy(alpha = 0.3f),
+                        topLeft = Offset(left, top),
+                        size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
+                    )
+                }
             }
+        }
+    }
+
+    // 文本操作工具栏
+    if (showTextActionToolbar && selectedPage?.currentSelection != null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            TextActionToolbar(
+                selection = selectedPage!!.currentSelection!!,
+                onCopy = { text ->
+                    // 复制到剪贴板
+                    println("复制文本: $text")
+                    // 这里需要实现剪贴板操作
+                    showTextActionToolbar = false
+                    selectedPage?.clearTextSelection()
+                    selectedPage = null
+                    selectionStartPos = null
+                    selectionEndPos = null
+                },
+                onDismiss = {
+                    showTextActionToolbar = false
+                    selectedPage?.clearTextSelection()
+                    selectedPage = null
+                    selectionStartPos = null
+                    selectionEndPos = null
+                }
+            )
         }
     }
 }
@@ -755,6 +876,57 @@ private fun handleTapGesture(
             }
 
             else -> false // 点击中间区域，不是翻页
+        }
+    }
+}
+
+/**
+ * 文本操作工具栏
+ */
+@Composable
+public fun TextActionToolbar(
+    selection: TextSelection,
+    onCopy: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.wrapContentSize(),
+        color = Color.Black.copy(alpha = 0.8f),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Selection: ${selection.text}",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = { onCopy(selection.text) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Copy")
+                }
+
+                TextButton(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            }
         }
     }
 }

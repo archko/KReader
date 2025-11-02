@@ -683,6 +683,14 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         return (bitmap.asImageBitmap())
     }
 
+    public override fun getStructuredText(index: Int): Any? {
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return null
+        }
+        val page = getPage(index)
+        return page.toStructuredText()
+    }
+
     /**
      * 解析PDF页面为reflow内容（文本和图片）
      * 注意：此方法必须在主线程调用，MuPDF不支持多线程

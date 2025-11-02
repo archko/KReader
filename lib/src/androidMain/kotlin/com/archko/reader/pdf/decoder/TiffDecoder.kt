@@ -184,4 +184,8 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
 
         ImageCache.clear()
     }
+
+    override fun getStructuredText(index: Int): Any? {
+        return null
+    }
 }

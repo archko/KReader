@@ -3,21 +3,20 @@ package com.archko.reader.pdf.component
 import androidx.compose.ui.geometry.Offset
 
 /**
- * JVM平台的actual实现
+ * Android平台的actual实现
  */
 public actual fun createTextSelector(getStructuredTextCallback: (Int) -> StructuredText?): TextSelector {
-    return MuPdfTextSelector(getStructuredTextCallback)
+    return AndroidTextSelector(getStructuredTextCallback)
 }
 
 public actual fun createStructuredTextImpl(nativeStructuredText: Any): StructuredText {
-    return MuPdfStructuredTextImpl(nativeStructuredText)
+    return AndroidStructuredTextImpl(nativeStructuredText)
 }
 
 /**
- * MuPDF文本选择器的JVM实现
- * 这个类需要根据实际的MuPDF Java绑定来实现
+ * Android平台的文本选择器实现
  */
-public class MuPdfTextSelector(
+public class AndroidTextSelector(
     private val getStructuredTextCallback: (Int) -> StructuredText?
 ) : TextSelector {
 
@@ -35,10 +34,9 @@ public class MuPdfTextSelector(
 }
 
 /**
- * MuPDF StructuredText的JVM实现
- * 这个类包装实际的MuPDF StructuredText对象
+ * Android平台的StructuredText实现
  */
-public class MuPdfStructuredTextImpl(
+public class AndroidStructuredTextImpl(
     private val nativeStructuredText: Any // 实际的MuPDF StructuredText对象
 ) : StructuredText {
 
