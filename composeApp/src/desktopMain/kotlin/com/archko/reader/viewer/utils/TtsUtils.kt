@@ -1,5 +1,6 @@
 package com.archko.reader.viewer.utils
 
+import com.archko.reader.pdf.cache.FileUtils.Companion.getCacheDirectory
 import com.archko.reader.viewer.Voice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,20 +34,15 @@ class TtsUtils {
             }
         }
 
-        fun getConfigFilePath(isWindows: Boolean): String {
-            val userHome = System.getProperty("user.home")
-            return if (isWindows) {
-                val appData = System.getenv("APPDATA") ?: "$userHome\\AppData\\Roaming"
-                "$appData\\KReader\\tts_voice_setting.json"
-            } else {
-                // macOS
-                "$userHome/Library/Application Support/KReader/tts_voice_setting.json"
-            }
+        fun getConfigFilePath(): String {
+            val cacheDir = getCacheDirectory()
+            val fileName = "tts_voice_setting.json"
+            return File(cacheDir, fileName).absolutePath
         }
 
-        suspend fun saveVoiceSetting(voice: Voice, isWindows: Boolean) = withContext(Dispatchers.IO) {
+        suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
             try {
-                val configFile = File(getConfigFilePath(isWindows))
+                val configFile = File(getConfigFilePath())
                 configFile.parentFile?.mkdirs()
 
                 // 添加调试信息

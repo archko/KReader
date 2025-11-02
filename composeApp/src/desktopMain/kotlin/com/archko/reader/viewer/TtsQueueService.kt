@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -414,12 +413,12 @@ class TtsQueueService : SpeechService {
     }
 
     override suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
-        TtsUtils.saveVoiceSetting(voice, isWindows)
+        TtsUtils.saveVoiceSetting(voice)
     }
 
     override suspend fun getVoiceSetting(): Voice = withContext(Dispatchers.IO) {
         try {
-            val configFile = File(TtsUtils.getConfigFilePath(isWindows))
+            val configFile = File(TtsUtils.getConfigFilePath())
             if (!configFile.exists()) {
                 println("TTS: No voice setting file found")
                 return@withContext getDefaultVoice()

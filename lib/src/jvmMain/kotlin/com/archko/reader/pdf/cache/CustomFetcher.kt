@@ -31,26 +31,6 @@ public class CustomImageFetcher(
     private val options: Options
 ) : Fetcher {
     public companion object {
-        private fun getCacheDirectory(): File {
-            val osName = System.getProperty("os.name").lowercase()
-            val cacheDir = if (osName.contains("mac")) {
-                // macOS: ~/Library/Caches/com.archko.reader.viewer/image
-                val userHome = System.getProperty("user.home")
-                File(userHome, "Library/Caches/com.archko.reader.viewer/image")
-            } else if (osName.contains("win")) {
-                // Windows: %APPDATA%/com.archko.reader.viewer/cache/image
-                val appData = System.getenv("APPDATA") ?: System.getProperty("user.home")
-                File(appData, "com.archko.reader.viewer/cache/image")
-            } else {
-                // 其他系统：使用用户主目录下的隐藏应用目录
-                val userHome = System.getProperty("user.home")
-                File(userHome, ".kreader/cache/image")
-            }
-            if (!cacheDir.exists()) {
-                cacheDir.mkdirs()
-            }
-            return cacheDir
-        }
 
         public fun cacheBitmap(image: ImageBitmap?, path: String) {
             if (null == image) {
@@ -59,7 +39,7 @@ public class CustomImageFetcher(
             // 内存缓存使用ImageCache存储ImageBitmap
             ImageCache.putPage(path, image)
 
-            val cacheDir = getCacheDirectory()
+            val cacheDir = FileUtils.getImageCacheDirectory()
             val cacheFile = File(cacheDir, "${path.hashCode()}.png")
 
             // 将ImageBitmap转换为BufferedImage，然后使用ImageIO保存为PNG
@@ -75,7 +55,7 @@ public class CustomImageFetcher(
             ImageCache.removePage(path)
 
             // 删除磁盘缓存
-            val cacheDir = getCacheDirectory()
+            val cacheDir = FileUtils.getImageCacheDirectory()
             val cacheFile = File(cacheDir, "${path.hashCode()}.png")
             if (cacheFile.exists()) {
                 cacheFile.delete()
@@ -90,7 +70,7 @@ public class CustomImageFetcher(
             }
 
             // 检查磁盘缓存 - 使用包名作为缓存目录
-            val cacheDir = getCacheDirectory()
+            val cacheDir = FileUtils.getImageCacheDirectory()
 
             val cacheFile = File(cacheDir, "${data.path.hashCode()}.png")
 

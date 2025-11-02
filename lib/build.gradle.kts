@@ -40,6 +40,7 @@ kotlin {
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)
                 implementation(libs.androidx.room.runtime)
+                implementation(libs.ktor.serialization.kotlinx.json)
 
                 api(libs.jsoup)
             }

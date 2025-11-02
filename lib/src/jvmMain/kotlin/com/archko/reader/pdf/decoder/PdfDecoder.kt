@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -695,19 +696,27 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * 注意：此方法必须在主线程调用，MuPDF不支持多线程
      */
     public fun decodeReflow(pageIndex: Int): List<String> {
-        val reflowBeans = mutableListOf<String>()
-
         if (document == null || (!isAuthenticated && needsPassword)) {
-            return reflowBeans
+            return emptyList()
         }
 
         val totalPages = originalPageSizes.size
-        println("TTS: 开始从第${pageIndex + 1}页解码到第${totalPages}页，共${totalPages - pageIndex}页")
+        
+        // 先尝试从缓存加载
+        val cacheBean = com.archko.reader.pdf.cache.ReflowCacheLoader.loadReflowFromFile(totalPages, file)
+        if (cacheBean != null) {
+            println("TTS: 从缓存获取文本，从第${pageIndex + 1}页开始")
+            return ReflowCacheLoader.getTextsFromPage(cacheBean, pageIndex)
+        }
 
+        // 缓存不存在或无效，重新解析所有页面
+        println("TTS: 缓存无效，开始解析所有页面，共${totalPages}页")
+        val allTexts = mutableListOf<String>()
+        
         var addedPages = 0
         var skippedPages = 0
 
-        for (currentPage in pageIndex until totalPages) {
+        for (currentPage in 0 until totalPages) {
             try {
                 val page = getPage(currentPage)
                 // 提取文本内容
@@ -715,32 +724,53 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val text = if (null != result) {
                     ParseTextMain.parseAsText(result)
                 } else null
+                
                 if (null != text && text.isNotEmpty() && text.isNotBlank()) {
                     val pageText = text.trim()
                     if (pageText.length > 10) { // 只添加有意义的文本
-                        reflowBeans.add(text)
+                        allTexts.add(text)
                         addedPages++
                     } else {
-                        println("TTS: 跳过第${currentPage + 1}页，文本太短: ${pageText.length}")
+                        // 即使是短文本也要添加空字符串占位，保持页码对应关系
+                        allTexts.add("")
+                        println("TTS: 第${currentPage + 1}页文本太短: ${pageText.length}")
                         skippedPages++
                     }
                 } else {
-                    println("TTS: 跳过第${currentPage + 1}页，无文本内容")
+                    // 添加空字符串占位，保持页码对应关系
+                    allTexts.add("")
+                    println("TTS: 第${currentPage + 1}页无文本内容")
                     skippedPages++
                 }
             } catch (e: Exception) {
                 println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                // 添加空字符串占位，保持页码对应关系
+                allTexts.add("")
                 skippedPages++
                 // 继续处理下一页
             }
 
             // 每处理10页输出一次进度
-            //if ((currentPage - pageIndex + 1) % 10 == 0) {
-            //    println("TTS: 已处理 ${currentPage - pageIndex + 1}/${totalPages - pageIndex} 页")
-            //}
+            if ((currentPage + 1) % 10 == 0) {
+                println("TTS: 已处理 ${currentPage + 1}/${totalPages} 页")
+            }
         }
-        // 注意：这里不调用page.destroy()，因为页面被缓存了
-        return reflowBeans
+        
+        println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
+        
+        // 保存到缓存
+        try {
+            ReflowCacheLoader.saveReflowToFile(file, allTexts)
+        } catch (e: Exception) {
+            println("TTS: 保存缓存失败: ${e.message}")
+        }
+        
+        // 返回从指定页码开始的文本
+        return if (pageIndex < allTexts.size) {
+            allTexts.subList(pageIndex, allTexts.size)
+        } else {
+            emptyList()
+        }
     }
 
     /**

@@ -45,12 +45,12 @@ kotlin {
             api(libs.coil.kt)
             api(libs.coil.kt.compose)
             api(libs.coil.kt.okhttp)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
         desktopMain.dependencies {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
-            implementation(libs.ktor.serialization.kotlinx.json)
         }
     }
 }
