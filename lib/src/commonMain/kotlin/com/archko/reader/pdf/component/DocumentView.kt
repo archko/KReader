@@ -19,8 +19,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -889,6 +891,8 @@ public fun TextActionToolbar(
     onCopy: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
+
     Surface(
         modifier = Modifier.wrapContentSize(),
         color = Color.Black.copy(alpha = 0.8f),
@@ -899,9 +903,9 @@ public fun TextActionToolbar(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Selection: ${selection.text}",
+                text = "Selected: ${selection.text}",
                 color = Color.White,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -910,7 +914,10 @@ public fun TextActionToolbar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TextButton(
-                    onClick = { onCopy(selection.text) },
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(selection.text))
+                        onCopy(selection.text)
+                    },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = Color.White
                     )
