@@ -338,6 +338,8 @@ fun CustomView(
                     Spacer(Modifier.weight(1f))
 
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
+                        val isSpeaking by speechService.isSpeakingFlow.collectAsState()
+                        
                         IconButton(onClick = {
                             scope.launch {
                                 speakFromCurrentPage(currentPage, decoder!!, speechService)
@@ -346,7 +348,7 @@ fun CustomView(
                             Icon(
                                 painter = painterResource(Res.drawable.ic_tts),
                                 contentDescription = stringResource(Res.string.tts),
-                                tint = if (speechService.isSpeaking()) Color.Green else Color.White
+                                tint = if (isSpeaking) Color.Green else Color.White
                             )
                         }
                         IconButton(onClick = {

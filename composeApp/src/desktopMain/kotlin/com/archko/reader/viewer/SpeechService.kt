@@ -1,5 +1,6 @@
 package com.archko.reader.viewer
 
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 
 data class TtsTask(
@@ -21,6 +22,8 @@ data class Voice(
 }
 
 interface SpeechService {
+    val isSpeakingFlow: StateFlow<Boolean>
+    
     fun speak(text: String)
     fun addToQueue(text: String)
     fun clearQueue()

@@ -23,6 +23,10 @@ class TtsQueueService : SpeechService {
     private val _selectedVoiceFlow = MutableStateFlow<Voice?>(null)
     val selectedVoiceFlow: StateFlow<Voice?> = _selectedVoiceFlow.asStateFlow()
 
+    // Flow for speaking state
+    private val _isSpeakingFlow = MutableStateFlow(false)
+    override val isSpeakingFlow: StateFlow<Boolean> = _isSpeakingFlow.asStateFlow()
+
     // 平台检测
     private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
     private val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
@@ -30,7 +34,6 @@ class TtsQueueService : SpeechService {
     // 外部公用队列 - 线程安全
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
-    private val isSpeaking = AtomicBoolean(false)
     private val currentText = AtomicReference<String?>(null)
 
     // TTS 工作器 - 只负责朗读，不管理队列
@@ -70,7 +73,7 @@ class TtsQueueService : SpeechService {
                     // 检查队列是否为空，如果为空则重置状态
                     val queueSize = queueMutex.withLock { taskQueue.size }
                     if (queueSize == 0) {
-                        isSpeaking.set(false)
+                        _isSpeakingFlow.value = false
                     }
                     continue
                 }
@@ -84,7 +87,7 @@ class TtsQueueService : SpeechService {
             }
             
             // 循环结束时重置状态
-            isSpeaking.set(false)
+            _isSpeakingFlow.value = false
             currentText.set(null)
         }
         
@@ -101,7 +104,7 @@ class TtsQueueService : SpeechService {
         
         private suspend fun executeTask(task: TtsTask) {
             try {
-                isSpeaking.set(true)
+                _isSpeakingFlow.value = true
                 
                 val textVariants = listOf(
                     TtsUtils.cleanTextForTts(task.text),
@@ -130,7 +133,7 @@ class TtsQueueService : SpeechService {
                 
                 println("TTS: All attempts failed")
             } finally {
-                isSpeaking.set(false)
+                _isSpeakingFlow.value = false
                 currentProcess = null
             }
         }
@@ -292,8 +295,6 @@ class TtsQueueService : SpeechService {
         }
         println("TTS: Queue cleared")
     }
-    
-
 
     override fun stop() {
         GlobalScope.launch {
@@ -301,7 +302,7 @@ class TtsQueueService : SpeechService {
             destroyWorker()
             
             // 重置状态标志
-            isSpeaking.set(false)
+            _isSpeakingFlow.value = false
             currentText.set(null)
             
             // 清空队列
@@ -317,7 +318,7 @@ class TtsQueueService : SpeechService {
             destroyWorker()
             
             // 重置状态标志
-            isSpeaking.set(false)
+            _isSpeakingFlow.value = false
             currentText.set(null)
             
             println("TTS: Paused")
@@ -361,7 +362,7 @@ class TtsQueueService : SpeechService {
     }
 
     override fun isSpeaking(): Boolean {
-        return isSpeaking.get()
+        return _isSpeakingFlow.value
     }
 
     override fun isPaused(): Boolean {
