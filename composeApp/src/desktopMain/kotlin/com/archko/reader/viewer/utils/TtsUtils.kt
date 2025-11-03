@@ -133,10 +133,9 @@ class TtsUtils {
 
         fun filterChineseAndEnglishVoices(voices: List<Voice>): List<Voice> {
             return voices.filter { voice ->
-                val countryCode = voice.countryCode.lowercase()
-                // 中文：zh-cn, zh-tw, zh-hk, zh-sg 等
-                // 英文：en-us, en-gb, en-au, en-ca 等
-                countryCode.startsWith("zh") || countryCode.startsWith("en")
+                val countryCode = voice.countryCode.lowercase().replace("_", "-")
+                // 只保留中文简体和美式英文
+                countryCode == "zh-cn" || countryCode == "en-us"
             }
         }
 
