@@ -1,26 +1,39 @@
 package com.archko.reader.viewer.tts
 
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsTask
 import com.archko.reader.pdf.tts.Voice
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
 
+/**
+ * Android版本的TTS队列服务，使用Android TextToSpeech引擎
+ */
 @OptIn(DelicateCoroutinesApi::class)
-class TtsQueueService : SpeechService {
-    private var rate: Float = 0.20f
-    private var volume: Float = 0.8f
-    private var selectedVoice: String = "Tingting"
+class TtsQueueService(
+    private val textToSpeech: TextToSpeech
+) : SpeechService {
 
-    // Flow for selected voice
-    private val _selectedVoiceFlow = MutableStateFlow<Voice?>(null)
-    val selectedVoiceFlow: StateFlow<Voice?> = _selectedVoiceFlow.asStateFlow()
+    private var rate: Float = 0.8f
+    private var volume: Float = 0.8f
+    private var selectedVoice: String = "default"
 
     // Flow for speaking state
     private val _isSpeakingFlow = MutableStateFlow(false)
@@ -34,15 +47,40 @@ class TtsQueueService : SpeechService {
     private var ttsWorker: TtsWorker? = null
     private val workerMutex = Mutex()
 
-    private inner class TtsWorker(
-        private val voice: String,
-        private val rate: Float,
-        private val volume: Float
-    ) {
-        @Volatile
-        private var currentProcess: Process? = null
+    @Volatile
+    private var isCurrentlySpeaking = false
+
+    init {
+        setupTtsListener()
+        textToSpeech.setSpeechRate(rate)
+    }
+
+    private fun setupTtsListener() {
+        textToSpeech.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                isCurrentlySpeaking = true
+                _isSpeakingFlow.value = true
+            }
+
+            override fun onDone(utteranceId: String?) {
+                isCurrentlySpeaking = false
+                // 通知worker继续处理下一个任务
+                ttsWorker?.onTtsComplete()
+            }
+
+            override fun onError(utteranceId: String?) {
+                isCurrentlySpeaking = false
+                println("TTS: Error occurred for utterance: $utteranceId")
+                // 通知worker继续处理下一个任务
+                ttsWorker?.onTtsComplete()
+            }
+        })
+    }
+
+    private inner class TtsWorker {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
         private val taskChannel = Channel<Unit>(Channel.UNLIMITED)
+        private val completeChannel = Channel<Unit>(Channel.UNLIMITED)
 
         init {
             scope.launch {
@@ -57,6 +95,10 @@ class TtsQueueService : SpeechService {
                 if (task != null) {
                     currentText.set(task.text)
                     executeTask(task)
+
+                    // 等待TTS完成
+                    completeChannel.receive()
+
                     currentText.set(null)
 
                     // 检查队列是否为空，如果为空则重置状态
@@ -93,38 +135,24 @@ class TtsQueueService : SpeechService {
 
         private suspend fun executeTask(task: TtsTask) {
             try {
-                _isSpeakingFlow.value = true
+                if (!scope.isActive) return
+                if (task.text.isBlank()) return
 
-                val textVariants = listOf(
-                    task.text
-                )
+                println("TTS: Speaking text: ${task.text.take(50)}...")
 
-                for ((index, text) in textVariants.withIndex()) {
-                    if (!scope.isActive) return
-                    if (text.isBlank()) continue
-
-                    try {
-                        println("TTS: Attempt ${index + 1} - text: ${text.take(50)}...")
-
-                        val success = attemptSpeak(text)
-                        if (success) {
-                            println("TTS: Successfully spoke text on attempt ${index + 1}")
-                            return
-                        }
-                    } catch (e: Exception) {
-                        println("TTS: Attempt.error ${index + 1} error: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    val params = hashMapOf<String, String>().apply {
+                        put(
+                            TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
+                            "utterance_${System.currentTimeMillis()}"
+                        )
                     }
+                    textToSpeech.speak(task.text, TextToSpeech.QUEUE_FLUSH, params)
                 }
-
-                println("TTS: All attempts failed")
-            } finally {
+            } catch (e: Exception) {
+                println("TTS: Error executing task: ${e.message}")
                 _isSpeakingFlow.value = false
-                currentProcess = null
             }
-        }
-
-        private suspend fun attemptSpeak(text: String): Boolean {
-            return false
         }
 
         // 通知工作器有新任务
@@ -132,31 +160,14 @@ class TtsQueueService : SpeechService {
             taskChannel.trySend(Unit)
         }
 
+        // TTS完成回调
+        fun onTtsComplete() {
+            completeChannel.trySend(Unit)
+        }
+
         fun destroy() {
             println("TTS: Destroying worker...")
-
             scope.cancel()
-        }
-    }
-
-    init {
-        // 初始化语音设置
-        GlobalScope.launch {
-            initializeVoiceSetting()
-        }
-    }
-
-    private suspend fun initializeVoiceSetting() {
-        try {
-            // 尝试加载保存的语音设置
-            val savedVoice = getVoiceSetting()
-            selectedVoice = savedVoice.name
-            rate = savedVoice.rate
-            volume = savedVoice.volume
-            _selectedVoiceFlow.value = savedVoice
-            println("TTS: Loaded saved voice: ${savedVoice.name} with rate=${savedVoice.rate}, volume=${savedVoice.volume}")
-        } catch (e: Exception) {
-            println("TTS: Failed to initialize voice setting: ${e.message}")
         }
     }
 
@@ -164,7 +175,7 @@ class TtsQueueService : SpeechService {
         return workerMutex.withLock {
             if (ttsWorker == null) {
                 println("TTS: Creating new worker...")
-                ttsWorker = TtsWorker(selectedVoice, rate, volume)
+                ttsWorker = TtsWorker()
             }
             ttsWorker!!
         }
@@ -175,6 +186,11 @@ class TtsQueueService : SpeechService {
             ttsWorker?.destroy()
             ttsWorker = null
         }
+        // 停止当前的TTS
+        withContext(Dispatchers.Main) {
+            textToSpeech.stop()
+        }
+        isCurrentlySpeaking = false
     }
 
     override fun speak(text: String) {
@@ -259,10 +275,18 @@ class TtsQueueService : SpeechService {
     }
 
     override fun resume() {
+        // Android TTS没有直接的resume功能，需要重新开始队列
+        GlobalScope.launch {
+            if (taskQueue.isNotEmpty()) {
+                val worker = ensureWorker()
+                worker.notifyNewTask()
+            }
+        }
     }
 
     override fun setRate(rate: Float) {
-        this.rate = rate.coerceIn(0.1f, 1.0f)
+        this.rate = rate.coerceIn(0.1f, 2.0f)
+        textToSpeech.setSpeechRate(this.rate)
     }
 
     override fun setVolume(volume: Float) {
@@ -271,24 +295,18 @@ class TtsQueueService : SpeechService {
 
     override fun setVoice(voiceId: String) {
         this.selectedVoice = voiceId
-        // 更新 Flow
-        GlobalScope.launch {
-            val availableVoices = getAvailableVoices()
-            val voice = availableVoices.find { it.name == voiceId }
-            _selectedVoiceFlow.value = voice
-        }
     }
 
     override fun getAvailableVoices(): List<Voice> {
-        return emptyList()
+        return listOf(getDefaultVoice())
     }
 
     override fun isSpeaking(): Boolean {
-        return _isSpeakingFlow.value
+        return _isSpeakingFlow.value || isCurrentlySpeaking
     }
 
     override fun isPaused(): Boolean {
-        return ttsWorker == null
+        return ttsWorker == null && taskQueue.isNotEmpty()
     }
 
     override fun getQueueSize(): Int {
@@ -302,28 +320,18 @@ class TtsQueueService : SpeechService {
     }
 
     override fun getDefaultVoice(): Voice {
-        val availableVoices = getAvailableVoices()
-
-        var voice: Voice? = null
-
-        if (availableVoices.isNotEmpty()) {
-            voice = availableVoices.first()
-        }
-        if (null == voice) {
-            voice = Voice(selectedVoice, "zh_CN", "中文", rate, volume)
-        }
-        return voice
+        return Voice(selectedVoice, "zh_CN", "中文", rate, volume)
     }
 
     fun destroy() {
         runBlocking {
             destroyWorker()
         }
-
         println("TTS: Service destroyed")
     }
 
     override suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
+        // 可以在这里保存设置到SharedPreferences
     }
 
     override suspend fun getVoiceSetting(): Voice = withContext(Dispatchers.IO) {

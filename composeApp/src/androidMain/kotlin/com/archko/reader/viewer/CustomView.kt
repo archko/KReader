@@ -44,6 +44,7 @@ import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.tts.TtsQueueService
+import com.archko.reader.viewer.tts.TtsServiceBinder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -127,7 +128,23 @@ fun CustomView(
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
 
-    val speechService: SpeechService = remember { TtsQueueService() }
+    // TTS服务绑定器 - 只有文档文件才初始化
+    var ttsServiceBinder by remember { mutableStateOf<TtsServiceBinder?>(null) }
+    
+    // 初始化TTS服务（仅文档文件）
+    LaunchedEffect(currentPath) {
+        if (FileTypeUtils.isDocumentFile(currentPath)) {
+            ttsServiceBinder = TtsServiceBinder(context)
+            ttsServiceBinder?.bindService()
+        }
+    }
+    
+    // 清理TTS服务
+    DisposableEffect(currentPath) {
+        onDispose {
+            ttsServiceBinder?.unbindService()
+        }
+    }
 
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
@@ -193,12 +210,6 @@ fun CustomView(
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
             decoder?.close()
-            // 清理 TTS 服务
-            if (speechService is TtsQueueService) {
-                speechService.destroy()
-            } else {
-                speechService.stop()
-            }
         }
     }
 
@@ -470,19 +481,32 @@ fun CustomView(
                         Spacer(Modifier.weight(1f))
 
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            /*val isSpeaking by speechService.isSpeakingFlow.collectAsState()
+                            // TTS控制按钮
+                            ttsServiceBinder?.let { binder ->
+                                val isSpeaking by binder.isSpeakingFlow.collectAsState()
+                                val isConnected by binder.isConnected.collectAsState()
 
-                            IconButton(onClick = {
-                                scope.launch {
-                                    speakFromCurrentPage(currentPage, decoder!!, speechService)
+                                IconButton(
+                                    onClick = {
+                                        if (isConnected && binder.isServiceInitialized()) {
+                                            if (isSpeaking) {
+                                                binder.pause()
+                                            } else {
+                                                scope.launch {
+                                                    speakFromCurrentPage(currentPage, decoder!!, binder)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    enabled = isConnected && binder.isServiceInitialized()
+                                ) {
+                                    Icon(
+                                        painter = painterResource(Res.drawable.ic_tts),
+                                        contentDescription = if (isSpeaking) "暂停朗读" else "开始朗读",
+                                        tint = if (isSpeaking) Color.Green else Color.White
+                                    )
                                 }
-                            }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_tts),
-                                    contentDescription = stringResource(Res.string.tts),
-                                    tint = if (isSpeaking) Color.Green else Color.White
-                                )
-                            }*/
+                            }
                             IconButton(onClick = {
                                 isTextSelectionMode = !isTextSelectionMode
                             }) {
@@ -933,31 +957,31 @@ fun FontDialog(
 suspend fun speakFromCurrentPage(
     startPage: Int,
     imageDecoder: ImageDecoder,
-    speechService: SpeechService
+    ttsServiceBinder: TtsServiceBinder
 ) {
-    if (speechService.isSpeaking()) {
+    if (ttsServiceBinder.isSpeaking()) {
         println("TTS: 正在朗读，停止当前朗读")
-        speechService.stop()
+        ttsServiceBinder.stop()
         return
     }
 
     if (imageDecoder is PdfDecoder) {
         withContext(Dispatchers.IO) {
             try {
-                speechService.clearQueue()
+                ttsServiceBinder.clearQueue()
 
                 val list = imageDecoder.decodeReflow(startPage)
                 println("TTS: 解码完成共:${list.size} 页")
 
                 for (pageText in list) {
-                    speechService.addToQueue(pageText)
+                    ttsServiceBinder.addToQueue(pageText)
                 }
 
-                val queueSize = speechService.getQueueSize()
+                val queueSize = ttsServiceBinder.getQueueSize()
                 println("TTS: 添加完成,队列中共有$queueSize 个文本段落")
             } catch (e: Exception) {
                 println("TTS: 批量解码失败: ${e.message}")
-                speechService.addToQueue("文本解码失败，无法朗读")
+                ttsServiceBinder.addToQueue("文本解码失败，无法朗读")
             }
         }
     }
