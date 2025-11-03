@@ -182,38 +182,28 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         // 检查是否为极端长宽比的图片（某边大于8000）
         return if (pWidth > 8000 || pHeight > 8000) {
-            // 对于极端长宽比，截取前面部分，避免过度缩放
+            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
             val scale = if (pWidth > pHeight) {
-                // 横向长条：以高度为基准，截取左侧部分
-                targetHeight.toFloat() / pHeight
-            } else {
-                // 纵向长条：以宽度为基准，截取顶部部分
                 targetWidth.toFloat() / pWidth
-            }
-
-            // 计算截取区域
-            val cropWidth = if (pWidth > pHeight) {
-                minOf(pWidth, targetWidth / scale)
             } else {
-                pWidth
-            }
-            val cropHeight = if (pWidth > pHeight) {
-                pHeight
-            } else {
-                minOf(pHeight, targetHeight / scale)
+                targetHeight.toFloat() / pHeight
             }
 
-            println("large.pdf crop: ${cropWidth}x${cropHeight} from ${pWidth}x${pHeight}, scale=$scale")
+            val scaledWidth = (pWidth * scale).toInt()
+            val scaledHeight = (pHeight * scale).toInt()
 
-            // 创建裁剪后的渲染区域
-            val bbox = com.artifex.mupdf.fitz.Rect(0f, 0f, cropWidth, cropHeight)
-            val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                bbox,
-                true
+            val cropWidth = maxOf(targetWidth, scaledWidth)
+            val cropHeight = maxOf(targetHeight, scaledHeight)
+            println("large.width-height:$cropWidth-$cropHeight")
+            val bbox = com.artifex.mupdf.fitz.Rect(
+                0f,
+                0f,
+                cropWidth.toFloat(),
+                cropHeight.toFloat()
             )
+            val pixmap = com.artifex.mupdf.fitz.Pixmap(com.artifex.mupdf.fitz.ColorSpace.DeviceBGR, bbox, true)
             pixmap.clear(255)
-            com.artifex.mupdf.fitz.Context.disableICC()
+            com.artifex.mupdf.fitz.Context.disableICC();
             val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
@@ -230,16 +220,23 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 对于宽大于高的页面，按最大比例缩放后截取
             val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
 
-            println("wide.pdf scale: $scale")
+            val scaledWidth = (pWidth * scale).toInt()
+            val scaledHeight = (pHeight * scale).toInt()
 
-            val bbox = com.artifex.mupdf.fitz.Rect(0f, 0f, pWidth, pHeight)
-            val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                bbox,
-                true
+            // 确保裁剪区域不超过目标尺寸
+            val cropWidth = maxOf(targetWidth, scaledWidth)
+            val cropHeight = maxOf(targetHeight, scaledHeight)
+
+            println("wide.width-height:$cropWidth-$cropHeight")
+            val bbox = com.artifex.mupdf.fitz.Rect(
+                0f,
+                0f,
+                cropWidth.toFloat(),
+                cropHeight.toFloat()
             )
+            val pixmap = com.artifex.mupdf.fitz.Pixmap(com.artifex.mupdf.fitz.ColorSpace.DeviceBGR, bbox, true)
             pixmap.clear(255)
-            com.artifex.mupdf.fitz.Context.disableICC()
+            com.artifex.mupdf.fitz.Context.disableICC();
             val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
@@ -260,16 +257,23 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 使用最大比例以确保填充整个目标区域
             val scale = maxOf(xscale, yscale)
 
-            println("normal.pdf scale: $scale")
+            val scaledWidth = (pWidth * scale).toInt()
+            val scaledHeight = (pHeight * scale).toInt()
 
-            val bbox = com.artifex.mupdf.fitz.Rect(0f, 0f, pWidth, pHeight)
-            val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                bbox,
-                true
+            // 确保裁剪区域不超过目标尺寸
+            val cropWidth = maxOf(targetWidth, scaledWidth)
+            val cropHeight = maxOf(targetHeight, scaledHeight)
+
+            println("width-height:$cropWidth-$cropHeight")
+            val bbox = com.artifex.mupdf.fitz.Rect(
+                0f,
+                0f,
+                cropWidth.toFloat(),
+                cropHeight.toFloat()
             )
+            val pixmap = com.artifex.mupdf.fitz.Pixmap(com.artifex.mupdf.fitz.ColorSpace.DeviceBGR, bbox, true)
             pixmap.clear(255)
-            com.artifex.mupdf.fitz.Context.disableICC()
+            com.artifex.mupdf.fitz.Context.disableICC();
             val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
@@ -701,9 +705,10 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
 
         val totalPages = originalPageSizes.size
-        
+
         // 先尝试从缓存加载
-        val cacheBean = com.archko.reader.pdf.cache.ReflowCacheLoader.loadReflowFromFile(totalPages, file)
+        val cacheBean =
+            com.archko.reader.pdf.cache.ReflowCacheLoader.loadReflowFromFile(totalPages, file)
         if (cacheBean != null) {
             println("TTS: 从缓存获取文本，从第${pageIndex + 1}页开始")
             return ReflowCacheLoader.getTextsFromPage(cacheBean, pageIndex)
@@ -712,7 +717,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         // 缓存不存在或无效，重新解析所有页面
         println("TTS: 缓存无效，开始解析所有页面，共${totalPages}页")
         val allTexts = mutableListOf<String>()
-        
+
         var addedPages = 0
         var skippedPages = 0
 
@@ -724,7 +729,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val text = if (null != result) {
                     ParseTextMain.parseAsText(result)
                 } else null
-                
+
                 if (null != text && text.isNotEmpty() && text.isNotBlank()) {
                     val pageText = text.trim()
                     if (pageText.length > 10) { // 只添加有意义的文本
@@ -755,16 +760,16 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 println("TTS: 已处理 ${currentPage + 1}/${totalPages} 页")
             }
         }
-        
+
         println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
-        
+
         // 保存到缓存
         try {
             ReflowCacheLoader.saveReflowToFile(file, allTexts)
         } catch (e: Exception) {
             println("TTS: 保存缓存失败: ${e.message}")
         }
-        
+
         // 返回从指定页码开始的文本
         return if (pageIndex < allTexts.size) {
             allTexts.subList(pageIndex, allTexts.size)
