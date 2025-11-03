@@ -138,13 +138,6 @@ fun CustomView(
             ttsServiceBinder?.bindService()
         }
     }
-    
-    // 清理TTS服务
-    DisposableEffect(currentPath) {
-        onDispose {
-            ttsServiceBinder?.unbindService()
-        }
-    }
 
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
@@ -209,6 +202,7 @@ fun CustomView(
     DisposableEffect(currentPath) {
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
+            ttsServiceBinder?.unbindService()
             decoder?.close()
         }
     }
