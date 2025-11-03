@@ -10,7 +10,6 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.speech.tts.TextToSpeech
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +39,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         fun getService(): AndroidTtsForegroundService = this@AndroidTtsForegroundService
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -75,37 +73,46 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         textToSpeech?.shutdown()
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "TTS朗读服务",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "文档朗读服务"
-            setSound(null, null)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "TTS朗读服务",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "文档朗读服务"
+                setSound(null, null)
+            }
 
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(channel)
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
     }
 
     private fun createNotification(): Notification {
         val playPauseIntent = Intent(this, AndroidTtsForegroundService::class.java).apply {
             action = ACTION_PLAY_PAUSE
         }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        
         val playPausePendingIntent = PendingIntent.getService(
             this,
             0,
             playPauseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            flags
         )
 
         val stopIntent = Intent(this, AndroidTtsForegroundService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
-            this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            this, 1, stopIntent, flags
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)

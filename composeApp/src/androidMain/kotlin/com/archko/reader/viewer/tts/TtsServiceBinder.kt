@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
-import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,11 +62,15 @@ class TtsServiceBinder(private val context: Context) {
     /**
      * 绑定TTS服务
      */
-    @RequiresApi(Build.VERSION_CODES.O)
     fun bindService() {
         if (!isBound) {
             val intent = Intent(context, AndroidTtsForegroundService::class.java)
-            context.startForegroundService(intent) // 启动前台服务
+            // 处理API 30+的前台服务限制
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
             context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
     }
