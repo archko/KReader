@@ -46,7 +46,7 @@ class TtsServiceBinder(private val context: Context) {
                 while (service?.isSpeakingFlow == null && service?.isServiceInitialized() != true) {
                     kotlinx.coroutines.delay(100)
                 }
-                
+
                 service?.isSpeakingFlow?.let { serviceFlow ->
                     println("TtsServiceBinder: 服务初始化完成，开始监听朗读状态Flow")
                     serviceFlow.collect { isSpeaking ->
@@ -89,6 +89,7 @@ class TtsServiceBinder(private val context: Context) {
      * 解绑TTS服务
      */
     fun unbindService() {
+        service?.stop()
         if (isBound) {
             println("TtsServiceBinder: 解绑服务")
             context.unbindService(serviceConnection)
