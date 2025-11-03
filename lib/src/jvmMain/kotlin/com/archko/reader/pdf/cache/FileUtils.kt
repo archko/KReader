@@ -11,9 +11,11 @@ public class FileUtils {
     public companion object {
 
         public fun getImageCacheDirectory(): File {
-            val cacheDir = getCacheDirectory()
-            val fileName = "image"
-            return File(cacheDir, fileName)
+            val cacheDir = File(getCacheDirectory(), "image")
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs()
+            }
+            return cacheDir
         }
 
         public fun getCacheDirectory(dir: String): File {
