@@ -337,6 +337,11 @@ fun CustomView(
         var isReflow by remember { mutableStateOf(reflow == 1L) }
         // 文本选择模式状态
         var isTextSelectionMode by remember { mutableStateOf(false) }
+        
+        // 朗读工具条相关状态
+        var showTtsToolbar by remember { mutableStateOf(false) }
+        var showSleepDialog by remember { mutableStateOf(false) }
+        var showQueueDialog by remember { mutableStateOf(false) }
 
         // 对于单图片文件，根据尺寸自动调整滚动方向
         LaunchedEffect(decoder) {
@@ -373,6 +378,22 @@ fun CustomView(
         // 获取字符串资源
         val currentPageString = stringResource(Res.string.current_page)
 
+        // 监听TTS状态，自动显示/隐藏朗读工具条
+        ttsServiceBinder?.let { binder ->
+            val isSpeaking by binder.isSpeakingFlow.collectAsState()
+            LaunchedEffect(isSpeaking) {
+                if (isSpeaking) {
+                    showTtsToolbar = true
+                } else {
+                    // 朗读停止时，延迟3秒后自动隐藏工具条（如果用户没有手动操作）
+                    kotlinx.coroutines.delay(3000)
+                    if (!isSpeaking) {
+                        showTtsToolbar = false
+                    }
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -396,7 +417,7 @@ fun CustomView(
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page -> currentPage = page },
                     onTapNonPageArea = { clickedPageIndex ->
-                        // 点击非翻页区域时隐藏工具栏
+                        // 点击非翻页区域时隐藏工具栏，但朗读时保持朗读工具条显示
                         if (showToolbar) {
                             showToolbar = false
                         }
@@ -427,7 +448,7 @@ fun CustomView(
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page -> currentPage = page },
                     onTapNonPageArea = { clickedPageIndex ->
-                        // 点击非翻页区域时隐藏工具栏
+                        // 点击非翻页区域时隐藏工具栏，但朗读时保持朗读工具条显示
                         if (showToolbar) {
                             showToolbar = false
                         } else {
@@ -494,6 +515,7 @@ fun CustomView(
                                                         scope.launch {
                                                             speakFromCurrentPage(currentPage, decoder!!, binder)
                                                         }
+                                                        showTtsToolbar = true
                                                     }
                                                 }
                                             },
@@ -592,6 +614,172 @@ fun CustomView(
                                             painter = painterResource(Res.drawable.ic_search),
                                             contentDescription = stringResource(Res.string.search),
                                             tint = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 朗读工具条 - 在主工具栏下方
+            AnimatedVisibility(
+                visible = showTtsToolbar && FileTypeUtils.isDocumentFile(currentPath),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp) // 在主工具栏下方
+            ) {
+                Surface(
+                    color = Color(0xCC333333),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        ttsServiceBinder?.let { binder ->
+                            val isSpeaking by binder.isSpeakingFlow.collectAsState()
+                            val isConnected by binder.isConnected.collectAsState()
+
+                            // 暂停/开始按钮
+                            IconButton(
+                                onClick = {
+                                    if (isConnected && binder.isServiceInitialized()) {
+                                        if (isSpeaking) {
+                                            binder.pause()
+                                        } else {
+                                            scope.launch {
+                                                speakFromCurrentPage(currentPage, decoder!!, binder)
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = isConnected && binder.isServiceInitialized()
+                            ) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_tts),
+                                    contentDescription = if (isSpeaking) "暂停" else "开始",
+                                    tint = if (isSpeaking) Color.Red else Color.Green,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            // 睡眠按钮
+                            IconButton(
+                                onClick = { showSleepDialog = true }
+                            ) {
+                                Text(
+                                    text = "💤",
+                                    color = Color.White,
+                                    fontSize = 16.sp
+                                )
+                            }
+
+                            // 队列按钮
+                            IconButton(
+                                onClick = { showQueueDialog = true }
+                            ) {
+                                Text(
+                                    text = "📋",
+                                    color = Color.White,
+                                    fontSize = 16.sp
+                                )
+                            }
+
+                            // 关闭按钮
+                            IconButton(
+                                onClick = {
+                                    binder.stop()
+                                    showTtsToolbar = false
+                                }
+                            ) {
+                                Text(
+                                    text = "✕",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 队列列表弹窗
+            if (showQueueDialog) {
+                Dialog(onDismissRequest = { showQueueDialog = false }) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 600.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Column {
+                            // 标题栏
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = { showQueueDialog = false }) {
+                                    Icon(
+                                        painter = painterResource(Res.drawable.ic_back),
+                                        contentDescription = "返回",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Text(
+                                    text = "朗读队列",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            // 队列列表
+                            ttsServiceBinder?.let { binder ->
+                                val queueSize = binder.getQueueSize()
+                                if (queueSize > 0) {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        items(queueSize) { index ->
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                )
+                                            ) {
+                                                Text(
+                                                    text = "第 ${index + currentPage + 1} 页",
+                                                    modifier = Modifier.padding(16.dp),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "队列为空",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }

@@ -430,7 +430,7 @@ public object ParseTextMain {
      * 最大的页面是30页,如果是30页前的,一行小于25字,认为可能是目录.在这之后的,文本重排时不认为是目录.合并为一行.
      */
     internal const val MAX_PAGEINDEX = 20
-    private const val LINE_END = "  "//"&nbsp;<br>"
+    private const val LINE_END = ""//"&nbsp;<br>"
 
     //========================== decode image ==========================
     private const val IMAGE_HEADER = "base64,"
