@@ -6,9 +6,14 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * TTS服务绑定器，用于在Compose中管理TTS服务连接
@@ -18,6 +23,9 @@ class TtsServiceBinder(private val context: Context) {
     private var service: AndroidTtsForegroundService? = null
     private var isBound = false
     
+    // 创建协程作用域
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     
@@ -26,38 +34,40 @@ class TtsServiceBinder(private val context: Context) {
     
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+            println("TtsServiceBinder: 服务连接成功")
             val serviceBinder = binder as? AndroidTtsForegroundService.TtsServiceBinder
             service = serviceBinder?.getService()
             isBound = true
             _isConnected.value = true
             
-            // 开始监听服务的朗读状态
-            service?.isSpeakingFlow?.let { flow ->
-                // 这里需要在协程中收集，但为了简化，我们先用轮询方式
-                startMonitoringSpeakingState()
+            // 等待服务初始化完成后再监听Flow
+            scope.launch {
+                // 轮询等待服务初始化完成
+                while (service?.isSpeakingFlow == null && service?.isServiceInitialized() != true) {
+                    kotlinx.coroutines.delay(100)
+                }
+                
+                service?.isSpeakingFlow?.let { serviceFlow ->
+                    println("TtsServiceBinder: 服务初始化完成，开始监听朗读状态Flow")
+                    serviceFlow.collect { isSpeaking ->
+                        println("TtsServiceBinder: 朗读状态变化: $isSpeaking")
+                        _isSpeakingFlow.value = isSpeaking
+                    }
+                } ?: run {
+                    println("TtsServiceBinder: 服务初始化超时，isSpeakingFlow仍为null")
+                }
             }
         }
         
         override fun onServiceDisconnected(name: ComponentName?) {
+            println("TtsServiceBinder: 服务连接断开")
             service = null
             isBound = false
             _isConnected.value = false
             _isSpeakingFlow.value = false
         }
     }
-    
-    private fun startMonitoringSpeakingState() {
-        // 简化版本：定期检查朗读状态
-        // 在实际项目中，应该使用协程来收集Flow
-        android.os.Handler(android.os.Looper.getMainLooper()).post(object : Runnable {
-            override fun run() {
-                if (isBound && service != null) {
-                    _isSpeakingFlow.value = service?.isSpeaking() ?: false
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this, 500)
-                }
-            }
-        })
-    }
+
     
     /**
      * 绑定TTS服务
@@ -80,17 +90,21 @@ class TtsServiceBinder(private val context: Context) {
      */
     fun unbindService() {
         if (isBound) {
+            println("TtsServiceBinder: 解绑服务")
             context.unbindService(serviceConnection)
             isBound = false
             _isConnected.value = false
             _isSpeakingFlow.value = false
         }
+        // 取消协程作用域
+        scope.cancel()
     }
     
     /**
      * 开始朗读文本
      */
     fun speak(text: String) {
+        println("TtsServiceBinder: speak called")
         service?.speak(text)
     }
     
@@ -98,6 +112,7 @@ class TtsServiceBinder(private val context: Context) {
      * 添加文本到朗读队列
      */
     fun addToQueue(text: String) {
+        println("TtsServiceBinder: addToQueue called")
         service?.addToQueue(text)
     }
     
@@ -105,6 +120,7 @@ class TtsServiceBinder(private val context: Context) {
      * 暂停朗读
      */
     fun pause() {
+        println("TtsServiceBinder: pause called")
         service?.pause()
     }
     
@@ -112,6 +128,7 @@ class TtsServiceBinder(private val context: Context) {
      * 停止朗读
      */
     fun stop() {
+        println("TtsServiceBinder: stop called")
         service?.stop()
     }
     

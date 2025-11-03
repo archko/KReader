@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
@@ -39,11 +40,9 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
-import com.archko.reader.viewer.tts.TtsQueueService
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -130,15 +129,8 @@ fun CustomView(
 
     // TTS服务绑定器 - 只有文档文件才初始化
     var ttsServiceBinder by remember { mutableStateOf<TtsServiceBinder?>(null) }
-    
-    // 初始化TTS服务（仅文档文件）
-    LaunchedEffect(currentPath) {
-        if (FileTypeUtils.isDocumentFile(currentPath)) {
-            ttsServiceBinder = TtsServiceBinder(context)
-            ttsServiceBinder?.bindService()
-        }
-    }
 
+    // 初始化TTS服务（仅文档文件）
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
@@ -162,6 +154,9 @@ fun CustomView(
                     } else {
                         // 单文件模式：检查文件类型
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            ttsServiceBinder = TtsServiceBinder(context)
+                            ttsServiceBinder?.bindService()
+
                             // 文档文件：创建PdfDecoder
                             val pdfDecoder = PdfDecoder(File(currentPath))
 
@@ -199,6 +194,7 @@ fun CustomView(
             }
         }
     }
+
     DisposableEffect(currentPath) {
         onDispose {
             println("CustomView.onDispose:$currentPath, $decoder")
@@ -460,9 +456,10 @@ fun CustomView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // 固定的返回按钮
                         IconButton(onClick = {
                             onCloseDocument?.invoke()
                         }) {
@@ -472,104 +469,132 @@ fun CustomView(
                                 tint = Color.White
                             )
                         }
-                        Spacer(Modifier.weight(1f))
 
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            // TTS控制按钮
-                            ttsServiceBinder?.let { binder ->
-                                val isSpeaking by binder.isSpeakingFlow.collectAsState()
-                                val isConnected by binder.isConnected.collectAsState()
+                        // 可滚动的按钮区域
+                        LazyRow(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                                // TTS控制按钮
+                                ttsServiceBinder?.let { binder ->
+                                    item {
+                                        val isSpeaking by binder.isSpeakingFlow.collectAsState()
+                                        val isConnected by binder.isConnected.collectAsState()
 
-                                IconButton(
-                                    onClick = {
-                                        if (isConnected && binder.isServiceInitialized()) {
-                                            if (isSpeaking) {
-                                                binder.pause()
-                                            } else {
-                                                scope.launch {
-                                                    speakFromCurrentPage(currentPage, decoder!!, binder)
+                                        IconButton(
+                                            onClick = {
+                                                if (isConnected && binder.isServiceInitialized()) {
+                                                    if (isSpeaking) {
+                                                        binder.pause()
+                                                    } else {
+                                                        scope.launch {
+                                                            speakFromCurrentPage(currentPage, decoder!!, binder)
+                                                        }
+                                                    }
                                                 }
-                                            }
+                                            },
+                                            enabled = isConnected && binder.isServiceInitialized()
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_tts),
+                                                contentDescription = if (isSpeaking) "暂停朗读" else "开始朗读",
+                                                tint = if (isSpeaking) Color.Green else Color.White
+                                            )
                                         }
-                                    },
-                                    enabled = isConnected && binder.isServiceInitialized()
-                                ) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_tts),
-                                        contentDescription = if (isSpeaking) "暂停朗读" else "开始朗读",
-                                        tint = if (isSpeaking) Color.Green else Color.White
-                                    )
+                                    }
+                                }
+
+                                item {
+                                    IconButton(onClick = {
+                                        isTextSelectionMode = !isTextSelectionMode
+                                    }) {
+                                        Icon(
+                                            painter = painterResource(Res.drawable.ic_select),
+                                            contentDescription = "文本选择",
+                                            tint = if (isTextSelectionMode) Color.Green else Color.White
+                                        )
+                                    }
                                 }
                             }
-                            IconButton(onClick = {
-                                isTextSelectionMode = !isTextSelectionMode
-                            }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_select),
-                                    contentDescription = "文本选择",
-                                    tint = if (isTextSelectionMode) Color.Green else Color.White
-                                )
-                            }
-                        }
 
-                        // 方向按钮 - 文档和图片都显示
-                        IconButton(onClick = {
-                            isVertical = !isVertical
-                            showToolbar = false
-                        }) {
-                            Icon(
-                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                    Res.string.horizontal
-                                ),
-                                tint = Color.White
-                            )
-                        }
-
-                        // 只有文档文件才显示其他按钮
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            IconButton(onClick = { isCrop = !isCrop }) {
-                                Icon(
-                                    painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                    contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                        Res.string.no_crop
-                                    ),
-                                    tint = Color.White
-                                )
-                            }
-                            // 只有单文档文件才显示大纲按钮
-                            if (FileTypeUtils.shouldShowOutline(paths)) {
-                                IconButton(onClick = { showOutlineDialog = true }) {
+                            // 方向按钮 - 文档和图片都显示
+                            item {
+                                IconButton(onClick = {
+                                    isVertical = !isVertical
+                                    showToolbar = false
+                                }) {
                                     Icon(
-                                        painter = painterResource(Res.drawable.ic_toc),
-                                        contentDescription = stringResource(Res.string.outline),
+                                        painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                                        contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                            Res.string.horizontal
+                                        ),
                                         tint = Color.White
                                     )
                                 }
                             }
-                            if (!IntentFile.isReflowable(currentPath)) {
-                                IconButton(onClick = { isReflow = !isReflow }) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_reflow),
-                                        contentDescription = stringResource(Res.string.reflow),
-                                        tint = if (isReflow) Color.Green else Color.White
-                                    )
+
+                            // 只有文档文件才显示其他按钮
+                            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                                item {
+                                    IconButton(onClick = { isCrop = !isCrop }) {
+                                        Icon(
+                                            painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                            contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                                Res.string.no_crop
+                                            ),
+                                            tint = Color.White
+                                        )
+                                    }
                                 }
-                            } else {
-                                IconButton(onClick = { showFontDialog = true }) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_font),
-                                        contentDescription = stringResource(Res.string.font),
-                                        tint = Color.White
-                                    )
+
+                                // 只有单文档文件才显示大纲按钮
+                                if (FileTypeUtils.shouldShowOutline(paths)) {
+                                    item {
+                                        IconButton(onClick = { showOutlineDialog = true }) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_toc),
+                                                contentDescription = stringResource(Res.string.outline),
+                                                tint = Color.White
+                                            )
+                                        }
+                                    }
                                 }
-                            }
-                            IconButton(onClick = { /* TODO: 搜索功能 */ }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_search),
-                                    contentDescription = stringResource(Res.string.search),
-                                    tint = Color.White
-                                )
+
+                                if (!IntentFile.isReflowable(currentPath)) {
+                                    item {
+                                        IconButton(onClick = { isReflow = !isReflow }) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_reflow),
+                                                contentDescription = stringResource(Res.string.reflow),
+                                                tint = if (isReflow) Color.Green else Color.White
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    item {
+                                        IconButton(onClick = { showFontDialog = true }) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_font),
+                                                contentDescription = stringResource(Res.string.font),
+                                                tint = Color.White
+                                            )
+                                        }
+                                    }
+                                }
+
+                                item {
+                                    IconButton(onClick = { /* TODO: 搜索功能 */ }) {
+                                        Icon(
+                                            painter = painterResource(Res.drawable.ic_search),
+                                            contentDescription = stringResource(Res.string.search),
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
