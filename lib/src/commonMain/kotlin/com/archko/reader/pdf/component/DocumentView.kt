@@ -7,6 +7,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -892,26 +895,53 @@ public fun TextActionToolbar(
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val scrollState = rememberScrollState()
 
     Surface(
-        modifier = Modifier.wrapContentSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 80.dp, horizontal = 32.dp), // 顶部和底部保留空白
         color = Color.Black.copy(alpha = 0.8f),
         shape = MaterialTheme.shapes.medium
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Selected: ${selection.text}",
+                text = "Selected Text",
                 color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = selection.text,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(scrollState) // 添加垂直滚动
+                            .padding(8.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
             ) {
                 TextButton(
                     onClick = {
