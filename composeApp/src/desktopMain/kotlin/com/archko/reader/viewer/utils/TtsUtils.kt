@@ -10,8 +10,9 @@ import java.io.File
 class TtsUtils {
 
     companion object {
-        fun forceKillAllTtsProcesses(isWindows: Boolean) {
+        fun forceKillAllTtsProcesses() {
             try {
+                val isWindows = System.getProperty("os.name").lowercase().contains("windows")
                 if (isWindows) {
                     // Windows: 更精确地终止 TTS 相关的 PowerShell 进程
                     ProcessBuilder(
@@ -254,7 +255,12 @@ class TtsUtils {
             )
         }
 
-        fun createWindowsCommand(text: String, voice: String, rate: Float, volume: Float): Array<String> {
+        fun createWindowsCommand(
+            text: String,
+            voice: String,
+            rate: Float,
+            volume: Float
+        ): Array<String> {
             val rateValue = (rate * 10).toInt() // Windows rate range 0-10
             val volumeValue = (volume * 100).toInt() // Windows volume 0-100
 

@@ -39,35 +39,28 @@ class TtsQueueService : SpeechService {
     private val _isSpeakingFlow = MutableStateFlow(false)
     override val isSpeakingFlow: StateFlow<Boolean> = _isSpeakingFlow.asStateFlow()
 
-    // 平台检测
-    private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
-    private val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
-
-    // 外部公用队列 - 线程安全
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
     private val currentText = AtomicReference<String?>(null)
 
-    // TTS 工作器 - 只负责朗读，不管理队列
     @Volatile
     private var ttsWorker: TtsWorker? = null
     private val workerMutex = Mutex()
 
-    /**
-     * TTS 工作器 - 只负责朗读，从外部队列获取任务
-     */
     private inner class TtsWorker(
-        private val isWindows: Boolean,
         private val voice: String,
         private val rate: Float,
         private val volume: Float
     ) {
+        private var isWindows = false
+
         @Volatile
         private var currentProcess: Process? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
         private val taskChannel = Channel<Unit>(Channel.Factory.UNLIMITED)
 
         init {
+            isWindows = System.getProperty("os.name").lowercase().contains("windows")
             scope.launch {
                 processLoop()
             }
@@ -120,7 +113,8 @@ class TtsQueueService : SpeechService {
 
                 val textVariants = listOf(
                     TtsUtils.Companion.cleanTextForTts(task.text),
-                    task.text.replace(Regex("-{2,}"), "").replace(Regex("[^\\p{L}\\p{N}\\s，。！？:/.\\-]"), ""),
+                    task.text.replace(Regex("-{2,}"), "")
+                        .replace(Regex("[^\\p{L}\\p{N}\\s，。！？:/.\\-]"), ""),
                     task.text.replace(Regex("[^\\u4e00-\\u9fff\\w\\s:/.\\-]"), ""),
                     TtsUtils.Companion.extractMeaningfulText(task.text),
                     "跳过无法朗读的内容"
@@ -185,7 +179,6 @@ class TtsQueueService : SpeechService {
             }
         }
 
-        // 通知工作器有新任务
         fun notifyNewTask() {
             taskChannel.trySend(Unit)
         }
@@ -200,7 +193,7 @@ class TtsQueueService : SpeechService {
             scope.cancel()
 
             // 强制终止所有TTS进程
-            TtsUtils.Companion.forceKillAllTtsProcesses(isWindows)
+            TtsUtils.Companion.forceKillAllTtsProcesses()
         }
     }
 
@@ -212,7 +205,7 @@ class TtsQueueService : SpeechService {
         // 添加 JVM 关闭钩子，确保应用退出时清理 TTS 进程
         Runtime.getRuntime().addShutdownHook(Thread {
             println("TTS: JVM shutdown hook triggered, cleaning up...")
-            TtsUtils.Companion.forceKillAllTtsProcesses(isWindows)
+            TtsUtils.Companion.forceKillAllTtsProcesses()
         })
     }
 
@@ -230,22 +223,16 @@ class TtsQueueService : SpeechService {
         }
     }
 
-    /**
-     * 确保工作器存在，如果不存在则创建新的
-     */
     private suspend fun ensureWorker(): TtsWorker {
         return workerMutex.withLock {
             if (ttsWorker == null) {
                 println("TTS: Creating new worker...")
-                ttsWorker = TtsWorker(isWindows, selectedVoice, rate, volume)
+                ttsWorker = TtsWorker(selectedVoice, rate, volume)
             }
             ttsWorker!!
         }
     }
 
-    /**
-     * 销毁当前工作器
-     */
     private suspend fun destroyWorker() {
         workerMutex.withLock {
             ttsWorker?.destroy()
@@ -298,9 +285,6 @@ class TtsQueueService : SpeechService {
         }
     }
 
-    /**
-     * 同步清空队列
-     */
     private suspend fun clearQueueSync() {
         queueMutex.withLock {
             taskQueue.clear()
@@ -359,6 +343,7 @@ class TtsQueueService : SpeechService {
     }
 
     override fun getAvailableVoices(): List<Voice> {
+        val isWindows = System.getProperty("os.name").lowercase().contains("windows")
         return try {
             val allVoices = if (isWindows) {
                 TtsUtils.Companion.getWindowsVoices()
@@ -393,7 +378,7 @@ class TtsQueueService : SpeechService {
 
     override fun getDefaultVoice(): Voice {
         val availableVoices = getAvailableVoices()
-
+        val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
         var voice: Voice? = null
         if (isMacOS) {
             // 对于 macOS，优先查找 Ting-ting 或 Tingting
@@ -420,7 +405,7 @@ class TtsQueueService : SpeechService {
         }
 
         // 强制终止所有可能的 TTS 进程
-        TtsUtils.Companion.forceKillAllTtsProcesses(isWindows)
+        TtsUtils.Companion.forceKillAllTtsProcesses()
 
         println("TTS: Service destroyed")
     }

@@ -470,7 +470,7 @@ fun CustomView(
                         Spacer(Modifier.weight(1f))
 
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            val isSpeaking by speechService.isSpeakingFlow.collectAsState()
+                            /*val isSpeaking by speechService.isSpeakingFlow.collectAsState()
 
                             IconButton(onClick = {
                                 scope.launch {
@@ -482,7 +482,7 @@ fun CustomView(
                                     contentDescription = stringResource(Res.string.tts),
                                     tint = if (isSpeaking) Color.Green else Color.White
                                 )
-                            }
+                            }*/
                             IconButton(onClick = {
                                 isTextSelectionMode = !isTextSelectionMode
                             }) {

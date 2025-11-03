@@ -29,8 +29,8 @@ android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "35"
 
-versionCode = "1"
-versionName = "1.1"
+versionCode = "10"
+versionName = "1.2.0"
 
 [libraries]
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
