@@ -17,7 +17,11 @@ public class FileUtils {
         }
 
         public fun getCacheDirectory(dir: String): File {
-            return File(getCacheDirectory(), dir)
+            val cacheDir = File(getCacheDirectory(), dir)
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs()
+            }
+            return cacheDir
         }
 
         public fun getCacheDirectory(): File {
