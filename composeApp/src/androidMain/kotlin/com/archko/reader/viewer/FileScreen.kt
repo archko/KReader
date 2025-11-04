@@ -46,9 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -62,6 +60,7 @@ import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
+import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
@@ -461,11 +460,6 @@ fun FileScreen(
             }
         }
     }
-}
-
-@Composable
-fun Dp.toIntPx(): Int {
-    return with(LocalDensity.current) { this@toIntPx.roundToPx() }
 }
 
 @Composable

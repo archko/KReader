@@ -493,7 +493,7 @@ fun CustomView(
                                     )
                                 }
                                 Text(
-                                    text = "朗读队列",
+                                    text = stringResource(Res.string.tts_queue_title),
                                     style = MaterialTheme.typography.titleLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
@@ -523,7 +523,11 @@ fun CustomView(
                                             )
                                         ) {
                                             Text(
-                                                text = "第 ${item.page} 页 ${item.data?.take(10)}",
+                                                    text = stringResource(Res.string.tts_page_item)
+                                                        .format(
+                                                            item.page,
+                                                            item.data?.take(10)
+                                                        ),
                                                 modifier = Modifier.padding(16.dp),
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onSurface
@@ -539,7 +543,7 @@ fun CustomView(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "队列为空",
+                                        text = stringResource(Res.string.tts_empty_queue),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

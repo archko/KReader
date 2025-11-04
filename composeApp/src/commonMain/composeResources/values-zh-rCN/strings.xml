@@ -77,4 +77,7 @@
     <string name="encrypt_decrypt_modification_time">修改时间: %s</string>
 
     <string name="tts_setting_title">语音设置</string>
+    <string name="tts_queue_title">朗读队列</string>
+    <string name="tts_empty_queue">队列为空</string>
+    <string name="tts_page_item">第 %s页, %s ...</string>
 </resources>

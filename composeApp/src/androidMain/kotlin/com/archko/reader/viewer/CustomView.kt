@@ -340,7 +340,6 @@ fun CustomView(
         // 文本选择模式状态
         var isTextSelectionMode by remember { mutableStateOf(false) }
 
-        // 朗读工具条相关状态
         var showTtsToolbar by remember { mutableStateOf(false) }
         var showSleepDialog by remember { mutableStateOf(false) }
         var showQueueDialog by remember { mutableStateOf(false) }
@@ -388,7 +387,7 @@ fun CustomView(
                     showTtsToolbar = true
                 } else {
                     // 朗读停止时，延迟3秒后自动隐藏工具条（如果用户没有手动操作）
-                    kotlinx.coroutines.delay(3000)
+                    kotlinx.coroutines.delay(1000)
                     if (!isSpeaking) {
                         showTtsToolbar = false
                     }
@@ -737,7 +736,7 @@ fun CustomView(
                                     )
                                 }
                                 Text(
-                                    text = "朗读队列",
+                                    text = stringResource(Res.string.tts_queue_title),
                                     style = MaterialTheme.typography.titleLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
@@ -768,7 +767,11 @@ fun CustomView(
                                                 )
                                             ) {
                                                 Text(
-                                                    text = "第 ${item.page} 页 ${item.data?.take(10)}",
+                                                    text = stringResource(Res.string.tts_page_item)
+                                                        .format(
+                                                            item.page,
+                                                            item.data?.take(10)
+                                                        ),
                                                     modifier = Modifier.padding(16.dp),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurface
@@ -784,7 +787,7 @@ fun CustomView(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = "队列为空",
+                                            text = stringResource(Res.string.tts_empty_queue),
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

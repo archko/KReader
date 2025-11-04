@@ -1,26 +1,48 @@
 package com.archko.reader.viewer
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -28,13 +50,22 @@ import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.inferName
+import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.clear_history
+import kreader.composeapp.generated.resources.components_thumbnail_corner
+import kreader.composeapp.generated.resources.components_thumbnail_left
+import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.delete_history
+import kreader.composeapp.generated.resources.load_more
+import kreader.composeapp.generated.resources.select_pdf
+import kreader.composeapp.generated.resources.setting
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -61,7 +92,7 @@ fun FileScreen(
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
         }
-        
+
         // 监听文件路径变化
         LaunchedEffect(initialFilePath) {
             initialFilePath?.let { filePath ->
@@ -71,9 +102,10 @@ fun FileScreen(
 
                 val path = file.absolutePath
                 if (file.exists() && (FileTypeUtils.isImageFile(path)
-                    || FileTypeUtils.isDocumentFile(path)
-                    || FileTypeUtils.isTiffFile(path))) {
-                    
+                            || FileTypeUtils.isDocumentFile(path)
+                            || FileTypeUtils.isTiffFile(path))
+                ) {
+
                     println("FileScreen: 文件类型支持，准备打开")
                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                     viewModel.getProgress(path)
@@ -124,7 +156,7 @@ fun FileScreen(
                         }
                     }
 
-                    Row (
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 32.dp)
@@ -292,11 +324,6 @@ fun FileScreen(
             )
         }
     }
-}
-
-@Composable
-private fun Dp.toIntPx(): Int {
-    return with(LocalDensity.current) { this@toIntPx.roundToPx() }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)

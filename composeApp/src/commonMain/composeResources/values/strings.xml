@@ -76,4 +76,7 @@
     <string name="encrypt_decrypt_modification_time">Modification time: %s</string>
 
     <string name="tts_setting_title">Tts Setting</string>
+    <string name="tts_queue_title">Queue</string>
+    <string name="tts_empty_queue">Empty Queue</string>
+    <string name="tts_page_item">Page %s, %s ...</string>
 </resources>

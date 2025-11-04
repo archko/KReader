@@ -155,7 +155,7 @@ public object ReflowCacheLoader {
      * @return 缓存文件
      */
     public fun getCacheFile(file: File): File {
-        val cacheDir = FileUtils.getStorageDir("reflow")
+        val cacheDir = FileUtils.getStorageDir("amupdf/reflow")
         val fileName = "${file.nameWithoutExtension}_reflow.json"
         return File(cacheDir, fileName)
     }
