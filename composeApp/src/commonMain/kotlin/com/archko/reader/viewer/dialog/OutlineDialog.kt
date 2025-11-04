@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.entity.Item
 import kreader.composeapp.generated.resources.Res
@@ -78,16 +77,16 @@ fun OutlineDialog(
                             Icon(
                                 painter = painterResource(Res.drawable.ic_back),
                                 contentDescription = stringResource(Res.string.back),
-                                tint = Color.Black
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Spacer(Modifier.weight(1f))
                     }
                     Text(
                         stringResource(Res.string.document_outline),
-                        color = Color.Black,
                         modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
 
@@ -99,7 +98,11 @@ fun OutlineDialog(
                             .padding(bottom = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(stringResource(Res.string.no_outline), color = Color.Gray)
+                        Text(
+                            stringResource(Res.string.no_outline),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                 } else {
                     LazyColumn(
@@ -125,10 +128,10 @@ fun OutlineDialog(
                             ) {
                                 Text(
                                     text = item.title ?: "",
-                                    color = Color.Black,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
-                                    fontSize = 15.sp,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
@@ -137,8 +140,8 @@ fun OutlineDialog(
                                     ),
                                     maxLines = 1,
                                     softWrap = false,
-                                    color = Color.Gray,
-                                    fontSize = 12.sp
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
