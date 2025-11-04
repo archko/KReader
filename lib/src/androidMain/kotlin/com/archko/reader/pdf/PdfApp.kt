@@ -12,6 +12,8 @@ import coil3.request.bitmapConfig
 import coil3.request.crossfade
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.util.CrashHandler
+import com.tencent.bugly.library.Bugly
+import com.tencent.bugly.library.BuglyBuilder
 import com.tencent.mmkv.MMKV
 
 /**
@@ -25,6 +27,11 @@ public class PdfApp : Application(), SingletonImageLoader.Factory {
 
         MMKV.initialize(this)
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler())
+
+        val appId = "d34dc863a0"
+        val appKey = "3bb5b51f-0626-4267-9f7b-2d2fc468fbdd"
+        val builder = BuglyBuilder(appId, appKey)
+        Bugly.init(applicationContext, builder, false)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {

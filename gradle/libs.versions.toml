@@ -24,6 +24,7 @@ core = "1.17.0"
 lifecycleViewmodelComposeAndroid = "2.9.3"
 tiff-loader = "1.1.2"
 jsoup = "1.21.2"
+crashreport = "4.4.6.2"
 
 android-compileSdk = "36"
 android-minSdk = "24"
@@ -69,6 +70,8 @@ androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
 tiff-loader = { module = "com.archko.reader.image:library-android", version.ref = "tiff-loader" }
 tiff-loader-jar = { module = "com.archko.reader.image:tiff-desktop", version.ref = "tiff-loader" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+
+crashreport = { module = "com.tencent.bugly_16kb:bugly-pro", version.ref = "crashreport" }
 
 [plugins]
 #kotlin-native-cocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
