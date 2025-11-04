@@ -1,19 +1,20 @@
 package com.archko.reader.pdf.cache
 
 import com.archko.reader.pdf.cache.FileUtils.Companion.getCacheDirectory
-import kotlinx.serialization.Serializable
+import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.entity.ReflowCacheBean
 import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
  * Reflow文本缓存加载器，类似于APageSizeLoader的逻辑
  * 用于缓存PDF文档的文本内容，避免重复解析
- * 
+ *
  * @author: archko 2025/11/2
  */
 public object ReflowCacheLoader {
 
-    private val json = Json { 
+    private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
     }
@@ -28,36 +29,31 @@ public object ReflowCacheLoader {
         return try {
             val fileSize = file.length()
             val cacheFile = getCacheFile(file)
-            
+
             if (!cacheFile.exists()) {
                 println("ReflowCache: 缓存文件不存在: ${cacheFile.absolutePath}")
                 return null
             }
-            
+
             val content = cacheFile.readText(Charsets.UTF_8)
             if (content.isEmpty()) {
                 println("ReflowCache: 缓存文件为空")
                 return null
             }
-            
+
             val cacheBean = json.decodeFromString<ReflowCacheBean>(content)
-            
+
             // 验证缓存有效性
             if (cacheBean.pageCount != pageCount) {
-                println("ReflowCache: 页数不匹配，缓存页数=${cacheBean.pageCount}, 实际页数=$pageCount")
+                println("ReflowCache: 页数不匹配，缓存文档总页数=${cacheBean.pageCount}, 实际页数=$pageCount")
                 return null
             }
-            
+
             if (cacheBean.fileSize != fileSize) {
                 println("ReflowCache: 文件大小不匹配，缓存大小=${cacheBean.fileSize}, 实际大小=$fileSize")
                 return null
             }
-            
-            if (cacheBean.reflowTexts.size != pageCount) {
-                println("ReflowCache: 文本页数不匹配，缓存文本页数=${cacheBean.reflowTexts.size}, 实际页数=$pageCount")
-                return null
-            }
-            
+
             println("ReflowCache: 成功加载缓存，页数=$pageCount")
             cacheBean
         } catch (e: Exception) {
@@ -72,30 +68,37 @@ public object ReflowCacheLoader {
      * @param file 原始PDF文件
      * @param reflowTexts 每页的文本内容列表
      */
-    public fun saveReflowToFile(file: File, reflowTexts: List<String>) {
+    public fun saveReflowToFile(
+        totalPages: Int,
+        file: File,
+        reflowTexts: List<ReflowBean>
+    ): ReflowCacheBean? {
         try {
             val cacheFile = getCacheFile(file)
             val cacheDir = cacheFile.parentFile
-            
-            // 确保缓存目录存在
-            if (!cacheDir.exists()) {
-                cacheDir.mkdirs()
+
+            if (cacheDir != null) {
+                if (!cacheDir.exists()) {
+                    cacheDir.mkdirs()
+                }
             }
-            
+
             val cacheBean = ReflowCacheBean(
-                pageCount = reflowTexts.size,
+                pageCount = totalPages,
                 fileSize = file.length(),
                 reflowTexts = reflowTexts
             )
-            
+
             val content = json.encodeToString(cacheBean)
             cacheFile.writeText(content, Charsets.UTF_8)
-            
+
             println("ReflowCache: 成功保存缓存，页数=${reflowTexts.size}, 文件=${cacheFile.absolutePath}")
+            cacheBean
         } catch (e: Exception) {
             println("ReflowCache: 保存缓存失败: ${e.message}")
             e.printStackTrace()
         }
+        return null
     }
 
     /**
@@ -121,11 +124,29 @@ public object ReflowCacheLoader {
      * @param startPage 起始页码（从0开始）
      * @return 从指定页码开始的文本列表
      */
-    public fun getTextsFromPage(cacheBean: ReflowCacheBean, startPage: Int): List<String> {
-        if (startPage < 0 || startPage >= cacheBean.reflowTexts.size) {
+    public fun getTextsFromPage(cacheBean: ReflowCacheBean, startPage: Int): List<ReflowBean> {
+        if (startPage < 0 || cacheBean.reflowTexts.isEmpty()) {
             return emptyList()
         }
-        return cacheBean.reflowTexts.subList(startPage, cacheBean.reflowTexts.size)
+
+        // 找到第一个页码大于等于startPage的ReflowBean的索引位置
+        val startIndex = cacheBean.reflowTexts.indexOfFirst { reflowBean ->
+            try {
+                val pageNumber = reflowBean.page?.toIntOrNull() ?: -1
+                pageNumber >= startPage
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        // 如果没有找到匹配的页码，返回空列表
+        if (startIndex == -1) {
+            println("ReflowCache: 未找到页码 >= $startPage 的内容")
+            return emptyList()
+        }
+
+        println("ReflowCache: 从索引 $startIndex 开始返回内容，对应页码 >= $startPage")
+        return cacheBean.reflowTexts.subList(startIndex, cacheBean.reflowTexts.size)
     }
 
     /**
@@ -137,19 +158,5 @@ public object ReflowCacheLoader {
         val cacheDir = getCacheDirectory("reflow")
         val fileName = "${file.nameWithoutExtension}_reflow.json"
         return File(cacheDir, fileName)
-    }
-
-    /**
-     * Reflow缓存数据类
-     */
-    @Serializable
-    public data class ReflowCacheBean(
-        val pageCount: Int,
-        val fileSize: Long,
-        val reflowTexts: List<String>
-    ) {
-        override fun toString(): String {
-            return "ReflowCacheBean(pageCount=$pageCount, fileSize=$fileSize, textsSize=${reflowTexts.size})"
-        }
     }
 }

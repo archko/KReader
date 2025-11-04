@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
+import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.tts.TtsTask
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,19 +21,19 @@ import kotlinx.coroutines.launch
  * TTS服务绑定器，用于在Compose中管理TTS服务连接
  */
 class TtsServiceBinder(private val context: Context) {
-    
+
     private var service: AndroidTtsForegroundService? = null
     private var isBound = false
-    
+
     // 创建协程作用域
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    
+
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
-    
+
     private val _isSpeakingFlow = MutableStateFlow(false)
     val isSpeakingFlow: StateFlow<Boolean> = _isSpeakingFlow.asStateFlow()
-    
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             println("TtsServiceBinder: 服务连接成功")
@@ -39,7 +41,7 @@ class TtsServiceBinder(private val context: Context) {
             service = serviceBinder?.getService()
             isBound = true
             _isConnected.value = true
-            
+
             // 等待服务初始化完成后再监听Flow
             scope.launch {
                 // 轮询等待服务初始化完成
@@ -58,7 +60,7 @@ class TtsServiceBinder(private val context: Context) {
                 }
             }
         }
-        
+
         override fun onServiceDisconnected(name: ComponentName?) {
             println("TtsServiceBinder: 服务连接断开")
             service = null
@@ -68,7 +70,7 @@ class TtsServiceBinder(private val context: Context) {
         }
     }
 
-    
+
     /**
      * 绑定TTS服务
      */
@@ -84,7 +86,7 @@ class TtsServiceBinder(private val context: Context) {
             context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
     }
-    
+
     /**
      * 解绑TTS服务
      */
@@ -100,23 +102,23 @@ class TtsServiceBinder(private val context: Context) {
         // 取消协程作用域
         scope.cancel()
     }
-    
+
     /**
-     * 开始朗读文本
+     * 开始朗读ReflowBean
      */
-    fun speak(text: String) {
+    fun speak(reflowBean: ReflowBean) {
         println("TtsServiceBinder: speak called")
-        service?.speak(text)
+        service?.speak(reflowBean)
     }
-    
+
     /**
-     * 添加文本到朗读队列
+     * 添加ReflowBean到朗读队列
      */
-    fun addToQueue(text: String) {
+    fun addToQueue(reflowBean: ReflowBean) {
         println("TtsServiceBinder: addToQueue called")
-        service?.addToQueue(text)
+        service?.addToQueue(reflowBean)
     }
-    
+
     /**
      * 暂停朗读
      */
@@ -124,7 +126,7 @@ class TtsServiceBinder(private val context: Context) {
         println("TtsServiceBinder: pause called")
         service?.pause()
     }
-    
+
     /**
      * 停止朗读
      */
@@ -132,35 +134,39 @@ class TtsServiceBinder(private val context: Context) {
         println("TtsServiceBinder: stop called")
         service?.stop()
     }
-    
+
     /**
      * 清空朗读队列
      */
     fun clearQueue() {
         service?.clearQueue()
     }
-    
+
     /**
      * 是否正在朗读
      */
     fun isSpeaking(): Boolean {
         return service?.isSpeaking() ?: false
     }
-    
+
     /**
      * 获取队列大小
      */
     fun getQueueSize(): Int {
         return service?.getQueueSize() ?: 0
     }
-    
-    /**
-     * 获取当前朗读的文本
-     */
-    fun getCurrentText(): String? {
-        return service?.getCurrentText()
+
+    fun getQueue(): List<TtsTask>? {
+        return service?.getQueue()
     }
-    
+
+    /**
+     * 获取当前朗读的ReflowBean
+     */
+    fun getCurrentReflowBean(): ReflowBean? {
+        return service?.getCurrentReflowBean()
+    }
+
     /**
      * 服务是否已初始化
      */

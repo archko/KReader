@@ -1,8 +1,11 @@
 package com.archko.reader.pdf.entity
 
+import kotlinx.serialization.Serializable
+
 /**
  * Reflow页面中的内容项
  */
+@Serializable
 public data class ReflowBean(
     var data: String?,
     var type: Int = TYPE_STRING,

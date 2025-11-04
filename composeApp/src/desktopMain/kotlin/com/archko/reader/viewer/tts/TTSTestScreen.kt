@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.Voice
 import kotlinx.coroutines.delay
@@ -44,7 +45,6 @@ fun TtsTestScreen() {
     var isSpeaking by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
     var queueSize by remember { mutableStateOf(0) }
-    var currentText by remember { mutableStateOf<String?>(null) }
     var rate by remember { mutableStateOf(0.25f) }
     var volume by remember { mutableStateOf(0.8f) }
     var availableVoices by remember { mutableStateOf(emptyList<Voice>()) }
@@ -76,7 +76,6 @@ fun TtsTestScreen() {
             isSpeaking = speechService.isSpeaking()
             isPaused = speechService.isPaused()
             queueSize = speechService.getQueueSize()
-            currentText = speechService.getCurrentText()
             delay(200)
         }
     }
@@ -102,7 +101,13 @@ fun TtsTestScreen() {
                     speechService.setRate(rate)
                     speechService.setVolume(volume)
                     selectedVoice?.let { speechService.setVoice(it.name) }
-                    speechService.speak(textToSpeak)
+                    speechService.speak(
+                        ReflowBean(
+                            data = textToSpeak,
+                            type = ReflowBean.TYPE_STRING,
+                            page = "0"
+                        )
+                    )
                 }
             ) {
                 Text("Speak")
@@ -113,7 +118,13 @@ fun TtsTestScreen() {
                     speechService.setRate(rate)
                     speechService.setVolume(volume)
                     selectedVoice?.let { speechService.setVoice(it.name) }
-                    speechService.addToQueue(textToSpeak)
+                    speechService.addToQueue(
+                        ReflowBean(
+                            data = textToSpeak,
+                            type = ReflowBean.TYPE_STRING,
+                            page = "0"
+                        )
+                    )
                 }
             ) {
                 Text("Add to Queue")

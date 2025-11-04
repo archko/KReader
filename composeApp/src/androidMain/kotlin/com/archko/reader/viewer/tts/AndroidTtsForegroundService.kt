@@ -11,12 +11,15 @@ import android.os.Build
 import android.os.IBinder
 import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
+import com.archko.reader.pdf.tts.TtsTask
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import java.util.Locale
 
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
@@ -100,7 +103,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         } else {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
-        
+
         val playPausePendingIntent = PendingIntent.getService(
             this,
             0,
@@ -157,16 +160,15 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
-    // 对外提供的API
-    fun speak(text: String) {
+    fun speak(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
         if (isInitialized) {
-            ttsQueueService?.speak(text)
+            ttsQueueService?.speak(reflowBean)
         }
     }
 
-    fun addToQueue(text: String) {
+    fun addToQueue(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
         if (isInitialized) {
-            ttsQueueService?.addToQueue(text)
+            ttsQueueService?.addToQueue(reflowBean)
         }
     }
 
@@ -192,8 +194,12 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         return ttsQueueService?.getQueueSize() ?: 0
     }
 
-    fun getCurrentText(): String? {
-        return ttsQueueService?.getCurrentText()
+    fun getQueue(): List<TtsTask>? {
+        return ttsQueueService?.getQueue()
+    }
+
+    fun getCurrentReflowBean(): com.archko.reader.pdf.entity.ReflowBean? {
+        return ttsQueueService?.getCurrentReflowBean()
     }
 
     val isSpeakingFlow: StateFlow<Boolean>?

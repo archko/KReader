@@ -41,7 +41,7 @@ class TtsQueueService(
 
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
-    private val currentText = AtomicReference<String?>(null)
+    private val currentReflowBean = AtomicReference<com.archko.reader.pdf.entity.ReflowBean?>(null)
 
     @Volatile
     private var ttsWorker: TtsWorker? = null
@@ -93,13 +93,13 @@ class TtsQueueService(
                 // 1. 从外部队列获取任务
                 val task = selectNextTask()
                 if (task != null) {
-                    currentText.set(task.text)
+                    currentReflowBean.set(task.reflowBean)
                     executeTask(task)
 
                     // 等待TTS完成
                     completeChannel.receive()
 
-                    currentText.set(null)
+                    currentReflowBean.set(null)
 
                     // 检查队列是否为空，如果为空则重置状态
                     val queueSize = queueMutex.withLock { taskQueue.size }
@@ -119,7 +119,7 @@ class TtsQueueService(
 
             // 循环结束时重置状态
             _isSpeakingFlow.value = false
-            currentText.set(null)
+            currentReflowBean.set(null)
         }
 
         private suspend fun selectNextTask(): TtsTask? {
@@ -136,9 +136,10 @@ class TtsQueueService(
         private suspend fun executeTask(task: TtsTask) {
             try {
                 if (!scope.isActive) return
-                if (task.text.isBlank()) return
+                val text = task.reflowBean.data ?: ""
+                if (text.isBlank()) return
 
-                println("TTS: Speaking text: ${task.text.take(50)}...")
+                println("TTS: Speaking text: ${text.take(50)}...")
 
                 withContext(Dispatchers.Main) {
                     val params = hashMapOf<String, String>().apply {
@@ -147,7 +148,7 @@ class TtsQueueService(
                             "utterance_${System.currentTimeMillis()}"
                         )
                     }
-                    textToSpeech.speak(task.text, TextToSpeech.QUEUE_FLUSH, params)
+                    textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params)
                 }
             } catch (e: Exception) {
                 println("TTS: Error executing task: ${e.message}")
@@ -193,7 +194,8 @@ class TtsQueueService(
         isCurrentlySpeaking = false
     }
 
-    override fun speak(text: String) {
+    override fun speak(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
+        val text = reflowBean.data ?: ""
         println("TTS: Speak requested: ${text.take(50)}...")
 
         GlobalScope.launch {
@@ -203,7 +205,7 @@ class TtsQueueService(
             // 清空队列并添加新任务
             clearQueueSync()
             queueMutex.withLock {
-                taskQueue.add(TtsTask(text, priority = 1))
+                taskQueue.add(TtsTask(reflowBean, priority = 1))
             }
 
             // 创建并启动新工作器
@@ -214,13 +216,14 @@ class TtsQueueService(
         }
     }
 
-    override fun addToQueue(text: String) {
+    override fun addToQueue(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
+        val text = reflowBean.data ?: ""
         if (text.isBlank()) return
 
         GlobalScope.launch {
             var queueSize = 0
             queueMutex.withLock {
-                taskQueue.add(TtsTask(text, priority = 0))
+                taskQueue.add(TtsTask(reflowBean, priority = 0))
                 queueSize = taskQueue.size
             }
 
@@ -228,7 +231,7 @@ class TtsQueueService(
             val worker = ensureWorker()
             worker.notifyNewTask()
 
-            println("TTS: Added to queue: ${text.take(50)}... (Queue size: $queueSize)")
+            //println("TTS: Added to queue: ${text.take(50)}... (Queue size: $queueSize)")
         }
     }
 
@@ -252,7 +255,7 @@ class TtsQueueService(
 
             // 重置状态标志
             _isSpeakingFlow.value = false
-            currentText.set(null)
+            currentReflowBean.set(null)
 
             // 清空队列
             clearQueueSync()
@@ -268,7 +271,7 @@ class TtsQueueService(
 
             // 重置状态标志
             _isSpeakingFlow.value = false
-            currentText.set(null)
+            currentReflowBean.set(null)
 
             println("TTS: Paused")
         }
@@ -315,8 +318,14 @@ class TtsQueueService(
         }
     }
 
-    override fun getCurrentText(): String? {
-        return currentText.get()
+    override fun getQueue(): List<TtsTask> {
+        return runBlocking {
+            queueMutex.withLock { taskQueue }
+        }
+    }
+
+    override fun getCurrentReflowBean(): com.archko.reader.pdf.entity.ReflowBean? {
+        return currentReflowBean.get()
     }
 
     override fun getDefaultVoice(): Voice {

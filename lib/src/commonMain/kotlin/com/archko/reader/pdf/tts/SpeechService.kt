@@ -1,10 +1,11 @@
 package com.archko.reader.pdf.tts
 
+import com.archko.reader.pdf.entity.ReflowBean
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 
 public data class TtsTask(
-    val text: String,
+    val reflowBean: ReflowBean,
     val priority: Int = 0 // 0 = normal, 1 = high priority
 )
 
@@ -23,9 +24,9 @@ public data class Voice(
 
 public interface SpeechService {
     public val isSpeakingFlow: StateFlow<Boolean>
-    
-    public fun speak(text: String)
-    public fun addToQueue(text: String)
+
+    public fun speak(reflowBean: ReflowBean)
+    public fun addToQueue(reflowBean: ReflowBean)
     public fun clearQueue()
     public fun stop()
     public fun pause()
@@ -37,7 +38,8 @@ public interface SpeechService {
     public fun isSpeaking(): Boolean
     public fun isPaused(): Boolean
     public fun getQueueSize(): Int
-    public fun getCurrentText(): String?
+    public fun getQueue(): List<TtsTask>
+    public fun getCurrentReflowBean(): ReflowBean?
     public fun getDefaultVoice(): Voice
     public suspend fun saveVoiceSetting(voice: Voice)
     public suspend fun getVoiceSetting(): Voice

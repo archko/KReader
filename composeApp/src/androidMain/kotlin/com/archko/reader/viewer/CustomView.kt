@@ -41,6 +41,7 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
@@ -722,7 +723,6 @@ fun CustomView(
                         color = MaterialTheme.colorScheme.surface
                     ) {
                         Column {
-                            // 标题栏
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -744,10 +744,9 @@ fun CustomView(
                                 )
                             }
 
-                            // 队列列表
                             ttsServiceBinder?.let { binder ->
-                                val queueSize = binder.getQueueSize()
-                                if (queueSize > 0) {
+                                val decoder = decoder as PdfDecoder
+                                if (decoder.cacheBean != null) {
                                     LazyColumn(
                                         modifier = Modifier.fillMaxWidth(),
                                         contentPadding = PaddingValues(
@@ -755,11 +754,13 @@ fun CustomView(
                                             vertical = 8.dp
                                         )
                                     ) {
-                                        items(queueSize) { index ->
+                                        itemsIndexed(
+                                            decoder.cacheBean!!.reflowTexts,
+                                            key = { index, item -> index }) { index, item ->
                                             Card(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
+                                                    .padding(vertical = 2.dp),
                                                 colors = CardDefaults.cardColors(
                                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
                                                         alpha = 0.5f
@@ -767,7 +768,7 @@ fun CustomView(
                                                 )
                                             ) {
                                                 Text(
-                                                    text = "第 ${index + currentPage + 1} 页",
+                                                    text = "第 ${item.page} 页",
                                                     modifier = Modifier.padding(16.dp),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurface
@@ -1186,12 +1187,16 @@ suspend fun speakFromCurrentPage(
                 speechService.clearQueue()
 
                 val totalPages = imageDecoder.originalPageSizes.size
-                val cacheBean = ReflowCacheLoader.loadReflowFromFile(
-                    totalPages,
-                    imageDecoder.file
-                )
+                var cacheBean = imageDecoder.cacheBean
+                if (cacheBean != null) {
+                    cacheBean = ReflowCacheLoader.loadReflowFromFile(
+                        totalPages,
+                        imageDecoder.file
+                    )
+                }
 
                 if (cacheBean != null) {
+                    imageDecoder.cacheBean = cacheBean
                     println("TTS: 从缓存获取文本，从第${startPage + 1}页开始")
                     val cachedTexts = ReflowCacheLoader.getTextsFromPage(
                         cacheBean,
@@ -1199,39 +1204,43 @@ suspend fun speakFromCurrentPage(
                     )
 
                     for (pageText in cachedTexts) {
-                        if (pageText.isNotEmpty() && pageText.isNotBlank()) {
-                            speechService.addToQueue(pageText)
-                        }
+                        speechService.addToQueue(pageText)
                     }
 
                     val queueSize = speechService.getQueueSize()
                     println("TTS: 从缓存添加完成,队列中共有$queueSize 个文本段落")
                 } else {
                     try {
-                        val currentPageText = imageDecoder.decodeReflowSinglePage(startPage)
-                        if (currentPageText.isNotEmpty() && currentPageText.isNotBlank()) {
-                            speechService.addToQueue(currentPageText)
+                        val reflowBean = imageDecoder.decodeReflowSinglePage(startPage)
+                        if (reflowBean != null) {
+                            speechService.addToQueue(reflowBean)
                             println("TTS: 当前页解析完成，立即开始朗读")
                         }
                     } catch (e: Exception) {
                         println("TTS: 当前页解析失败: ${e.message}")
-                        speechService.addToQueue("当前页解析失败")
+                        speechService.addToQueue(
+                            ReflowBean(
+                                data = "当前页解析失败",
+                                type = ReflowBean.TYPE_STRING,
+                                page = startPage.toString()
+                            )
+                        )
                     }
 
                     try {
                         println("TTS: 开始后台解析整个文档，共${totalPages}页")
                         val allTexts = imageDecoder.decodeReflowAllPages()
 
-                        ReflowCacheLoader.saveReflowToFile(
+                        cacheBean = ReflowCacheLoader.saveReflowToFile(
+                            totalPages,
                             imageDecoder.file,
                             allTexts
                         )
+                        imageDecoder.cacheBean = cacheBean
 
                         for (pageIndex in (startPage + 1) until allTexts.size) {
                             val pageText = allTexts[pageIndex]
-                            if (pageText.isNotEmpty() && pageText.isNotBlank()) {
-                                speechService.addToQueue(pageText)
-                            }
+                            speechService.addToQueue(pageText)
                         }
 
                         val queueSize = speechService.getQueueSize()
@@ -1242,7 +1251,13 @@ suspend fun speakFromCurrentPage(
                 }
             } catch (e: Exception) {
                 println("TTS: 朗读初始化失败: ${e.message}")
-                speechService.addToQueue("文本解码失败，无法朗读")
+                speechService.addToQueue(
+                    ReflowBean(
+                        data = "文本解码失败，无法朗读",
+                        type = ReflowBean.TYPE_STRING,
+                        page = startPage.toString()
+                    )
+                )
             }
         }
     }
