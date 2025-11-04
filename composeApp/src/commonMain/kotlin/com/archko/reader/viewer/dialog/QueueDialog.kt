@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.entity.ReflowCacheBean
@@ -51,7 +52,7 @@ fun QueueDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onDismiss) {
@@ -73,7 +74,7 @@ fun QueueDialog(
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(
-                            horizontal = 16.dp,
+                            horizontal = 8.dp,
                             vertical = 8.dp
                         )
                     ) {
@@ -94,9 +95,11 @@ fun QueueDialog(
                                     text = stringResource(Res.string.tts_page_item)
                                         .format(
                                             item.page,
-                                            item.data?.take(20)
+                                            item.data?.take(14)
                                         ),
-                                    modifier = Modifier.padding(16.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Clip,
+                                    modifier = Modifier.padding(12.dp),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
