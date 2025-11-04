@@ -31,7 +31,7 @@ class TtsQueueService(
     private val textToSpeech: TextToSpeech
 ) : SpeechService {
 
-    private var rate: Float = 0.8f
+    private var rate: Float = 1.0f
     private var volume: Float = 0.8f
     private var selectedVoice: String = "default"
 

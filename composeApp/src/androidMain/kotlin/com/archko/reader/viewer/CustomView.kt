@@ -629,6 +629,7 @@ fun CustomView(
                                             binder.pause()
                                         } else {
                                             scope.launch {
+                                                binder.clearQueue()
                                                 speakFromCurrentPage(currentPage, decoder!!, binder)
                                             }
                                         }
