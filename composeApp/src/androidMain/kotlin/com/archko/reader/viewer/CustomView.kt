@@ -357,7 +357,6 @@ fun CustomView(
         val pageCount: Int = list.size
         // 跳转页面状态
         var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
-        val outlineList = decoder?.outlineItems ?: emptyList()
 
         val currentPageString = stringResource(Res.string.current_page)
 
@@ -738,6 +737,7 @@ fun CustomView(
 
             // 大纲弹窗（最上层）- 只有单文档文件才显示
             if (showOutlineDialog && FileTypeUtils.shouldShowOutline(paths)) {
+                val outlineList = decoder?.outlineItems ?: emptyList()
                 OutlineDialog(
                     currentPage,
                     outlineList,
