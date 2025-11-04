@@ -80,4 +80,11 @@
     <string name="tts_queue_title">朗读队列</string>
     <string name="tts_empty_queue">队列为空</string>
     <string name="tts_page_item">第%s页, %s ...</string>
+    <string name="tts_sleep_dialog_title">睡眠定时</string>
+    <string name="tts_sleep_dialog_minutes">分钟</string>
+    <string name="tts_sleep_dialog_reset">重置时间</string>
+    <string name="tts_sleep_dialog_cancel">取消</string>
+    <string name="tts_sleep_dialog_ok">确定</string>
+    <string name="tts_sleep_set_time">已设置睡眠定时%s分钟</string>
+    <string name="tts_sleep_set_cancel">已取消睡眠定时</string>
 </resources>

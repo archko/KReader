@@ -639,7 +639,7 @@ fun CustomView(
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_tts),
                                     contentDescription = if (isSpeaking) "暂停" else "开始",
-                                    tint = if (isSpeaking) Color.Red else Color.Green,
+                                    tint = if (isSpeaking) Color.Green else Color.White,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -647,9 +647,10 @@ fun CustomView(
                             IconButton(
                                 onClick = { showSleepDialog = true }
                             ) {
+                                val hasSleepTimer = binder.hasSleepTimer()
                                 Text(
                                     text = "💤",
-                                    color = Color.White,
+                                    color = if (hasSleepTimer) Color.Yellow else Color.White,
                                     fontSize = 16.sp
                                 )
                             }
@@ -679,6 +680,29 @@ fun CustomView(
                             }
                         }
                     }
+                }
+            }
+
+            // 睡眠定时对话框
+            if (showSleepDialog) {
+                ttsServiceBinder?.let { binder ->
+                    val sleepSetTimeText = stringResource(Res.string.tts_sleep_set_time)
+                    val sleepCancelText = stringResource(Res.string.tts_sleep_set_cancel)
+
+                    SleepTimerDialog(
+                        onDismiss = { showSleepDialog = false },
+                        onTimeSelected = { minutes ->
+                            if (minutes > 0) {
+                                binder.setSleepTimer(minutes)
+                                val txt = sleepSetTimeText.format(minutes)
+                                Toast.makeText(context, txt, Toast.LENGTH_SHORT).show()
+                            } else {
+                                binder.stop()
+                                Toast.makeText(context, sleepCancelText, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        initialMinutes = binder.getSleepTimerMinutes().takeIf { it > 0 } ?: 20
+                    )
                 }
             }
 

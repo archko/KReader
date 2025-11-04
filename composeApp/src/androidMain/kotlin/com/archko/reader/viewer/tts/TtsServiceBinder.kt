@@ -115,7 +115,7 @@ class TtsServiceBinder(private val context: Context) {
      * 添加ReflowBean到朗读队列
      */
     fun addToQueue(reflowBean: ReflowBean) {
-        println("TtsServiceBinder: addToQueue called")
+        //println("TtsServiceBinder: addToQueue called")
         service?.addToQueue(reflowBean)
     }
 
@@ -172,5 +172,35 @@ class TtsServiceBinder(private val context: Context) {
      */
     fun isServiceInitialized(): Boolean {
         return service?.isServiceInitialized() ?: false
+    }
+    
+    /**
+     * 设置睡眠定时器
+     */
+    fun setSleepTimer(minutes: Int) {
+        println("TtsServiceBinder: setSleepTimer called with $minutes minutes")
+        service?.setSleepTimer(minutes)
+    }
+    
+    /**
+     * 取消睡眠定时器
+     */
+    fun cancelSleepTimer() {
+        println("TtsServiceBinder: cancelSleepTimer called")
+        service?.cancelSleepTimer()
+    }
+    
+    /**
+     * 获取剩余睡眠时间
+     */
+    fun getSleepTimerMinutes(): Int {
+        return service?.getSleepTimerMinutes() ?: 0
+    }
+    
+    /**
+     * 是否设置了睡眠定时器
+     */
+    fun hasSleepTimer(): Boolean {
+        return service?.hasSleepTimer() ?: false
     }
 }

@@ -79,4 +79,11 @@
     <string name="tts_queue_title">Queue</string>
     <string name="tts_empty_queue">Empty Queue</string>
     <string name="tts_page_item">Page %s, %s ...</string>
+    <string name="tts_sleep_dialog_title">Sleep Time</string>
+    <string name="tts_sleep_dialog_minutes">Minutes</string>
+    <string name="tts_sleep_dialog_reset">Reset time</string>
+    <string name="tts_sleep_dialog_cancel">Cancel</string>
+    <string name="tts_sleep_dialog_ok">Ok</string>
+    <string name="tts_sleep_set_time">Set %s Minutes</string>
+    <string name="tts_sleep_set_cancel">Cancel Sleep Time</string>
 </resources>

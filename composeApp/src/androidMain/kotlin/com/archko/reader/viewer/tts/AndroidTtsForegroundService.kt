@@ -1,10 +1,6 @@
 package com.archko.reader.viewer.tts
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
+import android.app.*
 import android.content.Intent
 import android.os.Binder
 import android.os.Build
@@ -12,13 +8,9 @@ import android.os.IBinder
 import android.speech.tts.TextToSpeech
 import androidx.core.app.NotificationCompat
 import com.archko.reader.pdf.tts.TtsTask
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import java.util.Locale
+import java.util.*
 
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
@@ -35,6 +27,10 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     private var isInitialized = false
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // 睡眠定时相关
+    private var sleepTimerJob: Job? = null
+    private var sleepTimerMinutes: Int = 0
 
     inner class TtsServiceBinder : Binder() {
         fun getService(): AndroidTtsForegroundService = this@AndroidTtsForegroundService
@@ -171,6 +167,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     fun stop() {
         ttsQueueService?.stop()
+        cancelSleepTimer()
         updateNotification()
     }
 
@@ -192,6 +189,50 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     fun getCurrentReflowBean(): com.archko.reader.pdf.entity.ReflowBean? {
         return ttsQueueService?.getCurrentReflowBean()
+    }
+
+    /**
+     * 设置睡眠定时器
+     * @param minutes 定时分钟数
+     */
+    fun setSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        sleepTimerMinutes = minutes
+
+        if (minutes > 0) {
+            sleepTimerJob = serviceScope.launch {
+                println("TTS: 设置睡眠定时器 $minutes 分钟")
+                delay(minutes * 60 * 1000L) // 转换为毫秒
+
+                println("TTS: 睡眠定时器到期，停止朗读")
+                stop()
+                sleepTimerMinutes = 0
+            }
+        }
+    }
+
+    /**
+     * 取消睡眠定时器
+     */
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        sleepTimerMinutes = 0
+        println("TTS: 取消睡眠定时器")
+    }
+
+    /**
+     * 获取剩余睡眠时间（分钟）
+     */
+    fun getSleepTimerMinutes(): Int {
+        return sleepTimerMinutes
+    }
+
+    /**
+     * 是否设置了睡眠定时器
+     */
+    fun hasSleepTimer(): Boolean {
+        return sleepTimerJob?.isActive == true
     }
 
     val isSpeakingFlow: StateFlow<Boolean>?
