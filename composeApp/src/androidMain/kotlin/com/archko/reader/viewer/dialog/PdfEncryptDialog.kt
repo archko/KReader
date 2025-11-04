@@ -1,5 +1,6 @@
-package com.archko.reader.viewer
+package com.archko.reader.viewer.dialog
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,30 +35,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.archko.reader.pdf.PdfApp
+import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.encrypt_decrypt_add
-import kreader.composeapp.generated.resources.encrypt_decrypt_decrypt
-import kreader.composeapp.generated.resources.encrypt_decrypt_encrypt
-import kreader.composeapp.generated.resources.encrypt_decrypt_file_name
-import kreader.composeapp.generated.resources.encrypt_decrypt_file_path
-import kreader.composeapp.generated.resources.encrypt_decrypt_file_size
-import kreader.composeapp.generated.resources.encrypt_decrypt_input_pwd
-import kreader.composeapp.generated.resources.encrypt_decrypt_modification_time
-import kreader.composeapp.generated.resources.encrypt_decrypt_title
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.ic_visibility
-import kreader.composeapp.generated.resources.ic_visibility_off
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -74,6 +67,7 @@ fun PdfEncryptDialog(
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -117,9 +111,10 @@ fun PdfEncryptDialog(
                         selectionMode = FilePickerSelectionMode.Single
                     ) { files ->
                         scope.launch {
-                            files.singleOrNull()?.let { file ->
-                                val fileObj = file.file
-                                val path = fileObj.absolutePath
+                            if (files.isNotEmpty()) {
+                                val file = files.first()
+                                val path = IntentFile.getPath(PdfApp.app!!, file.uri)
+                                    ?: file.uri.toString()
                                 pdfFilePath = path
                             }
                         }
@@ -150,7 +145,10 @@ fun PdfEncryptDialog(
                             } else {
                                 "0MB"
                             }
-                            val lastModified = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                            val lastModified = SimpleDateFormat(
+                                "yyyy-MM-dd",
+                                Locale.getDefault()
+                            )
                                 .format(Date(fileObj.lastModified()))
 
                             Text(
@@ -253,15 +251,38 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        getString(Res.string.encrypt_decrypt_encrypt_success)
+                                                            .format(
+                                                                outputPath
+                                                            ),
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
                                                 } else {
+                                                    Toast.makeText(
+                                                        context,
+                                                        getString(Res.string.encrypt_decrypt_encrypt_failed),
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
                                                 }
                                             } catch (e: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    getString(Res.string.encrypt_decrypt_encrypt_failed),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
                                             } finally {
                                                 isLoading = false
                                             }
                                         }
                                     } else {
                                         scope.launch {
+                                            Toast.makeText(
+                                                context,
+                                                getString(Res.string.encrypt_decrypt_input_pwd),
+                                                Toast.LENGTH_LONG
+                                            ).show()
                                         }
                                     }
                                 },
@@ -286,15 +307,38 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        getString(Res.string.encrypt_decrypt_decrypt_success)
+                                                            .format(
+                                                                outputPath
+                                                            ),
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
                                                 } else {
+                                                    Toast.makeText(
+                                                        context,
+                                                        getString(Res.string.encrypt_decrypt_decrypt_failed),
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
                                                 }
                                             } catch (e: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    getString(Res.string.encrypt_decrypt_decrypt_failed),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
                                             } finally {
                                                 isLoading = false
                                             }
                                         }
                                     } else {
                                         scope.launch {
+                                            Toast.makeText(
+                                                context,
+                                                getString(Res.string.encrypt_decrypt_input_pwd),
+                                                Toast.LENGTH_LONG
+                                            ).show()
                                         }
                                     }
                                 },

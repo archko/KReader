@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.viewer.utils
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -18,10 +18,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
 import java.io.File
 import java.io.FileOutputStream
-import androidx.core.graphics.createBitmap
 
+/**
+ * @author: archko 2025/11/4 :15:06
+ */
 object IconGenerator {
 
     @Composable
@@ -176,7 +179,7 @@ object IconGenerator {
 
         // 底部背景装饰圆形 - 形成正三角形（与SettingScreen一致）
         val triangleRadius = size * 0.18f  // 与SettingScreen中的0.18f对应
-        
+
         // 第一个圆形（左上角，带渐变效果，显示在最上层）
         drawCircle(
             brush = Brush.radialGradient(
@@ -185,11 +188,17 @@ object IconGenerator {
                     Color.White.copy(alpha = 0.4f), // 中间过渡
                     Color.White.copy(alpha = 0.6f)  // 下半部分深色
                 ),
-                center = Offset(centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f),
+                center = Offset(
+                    centerX - size * 0.2f - size * 0.02f,
+                    centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f
+                ),
                 radius = triangleRadius * 1.2f
             ),
             radius = triangleRadius,
-            center = Offset(centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f)
+            center = Offset(
+                centerX - size * 0.2f - size * 0.02f,
+                centerY - size * 0.2f + size * 0.02f
+            )
         )
     }
 
@@ -210,7 +219,12 @@ object IconGenerator {
         }.start()
     }
 
-    private fun generateIcon(context: Context, size: Int, fileName: String, isCircular: Boolean = true) {
+    private fun generateIcon(
+        context: Context,
+        size: Int,
+        fileName: String,
+        isCircular: Boolean = true
+    ) {
         try {
             // 创建位图
             val bitmap = createBitmap(size, size)
@@ -227,7 +241,8 @@ object IconGenerator {
 
             // 显示成功消息
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "图标已生成: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "图标已生成: ${file.absolutePath}", Toast.LENGTH_LONG)
+                    .show()
             }
             println("图标已生成: ${file.absolutePath}")
 
@@ -369,28 +384,40 @@ object IconGenerator {
 </adaptive-icon>"""
 
             // 保存文件
-            val backgroundFile = File(context.getExternalFilesDir(null), "ic_launcher_background_gradient.xml")
-            val foregroundFile = File(context.getExternalFilesDir(null), "ic_launcher_foreground.xml")
-            val adaptiveIconFile = File(context.getExternalFilesDir(null), "ic_launcher_adaptive.xml")
-            
+            val backgroundFile =
+                File(context.getExternalFilesDir(null), "ic_launcher_background_gradient.xml")
+            val foregroundFile =
+                File(context.getExternalFilesDir(null), "ic_launcher_foreground.xml")
+            val adaptiveIconFile =
+                File(context.getExternalFilesDir(null), "ic_launcher_adaptive.xml")
+
             backgroundFile.writeText(backgroundXml)
             foregroundFile.writeText(foregroundXml)
             adaptiveIconFile.writeText(adaptiveIconXml)
 
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "自适应图标XML文件已重新生成，与Canvas效果一致", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "自适应图标XML文件已重新生成，与Canvas效果一致",
+                    Toast.LENGTH_LONG
+                ).show()
             }
             println("自适应图标XML文件已重新生成，与Canvas效果一致")
 
         } catch (e: Exception) {
             e.printStackTrace()
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "生成自适应图标失败: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "生成自适应图标失败: ${e.message}", Toast.LENGTH_LONG)
+                    .show()
             }
         }
     }
 
-    private fun drawIconToCanvas(canvas: android.graphics.Canvas, size: Int, isCircular: Boolean = true) {
+    private fun drawIconToCanvas(
+        canvas: android.graphics.Canvas,
+        size: Int,
+        isCircular: Boolean = true
+    ) {
         val centerX = size / 2f
         val centerY = size / 2f
         val iconSize = size * 0.7f
@@ -549,11 +576,13 @@ object IconGenerator {
 
         // 底部背景装饰圆形 - 形成正三角形（与SettingScreen一致）
         val triangleRadius = size * 0.18f  // 与SettingScreen中的0.18f对应
-        
+
         // 第一个圆形（左上角，带渐变效果，显示在最上层）
         val trianglePaint = android.graphics.Paint().apply {
             shader = android.graphics.RadialGradient(
-                centerX - size * 0.2f - size * 0.02f, centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f, triangleRadius * 1.2f,
+                centerX - size * 0.2f - size * 0.02f,
+                centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f,
+                triangleRadius * 1.2f,
                 intArrayOf(
                     0x33FFFFFF, // 20% alpha
                     0x66FFFFFF, // 40% alpha
@@ -568,4 +597,4 @@ object IconGenerator {
             triangleRadius, trianglePaint
         )
     }
-} 
+}

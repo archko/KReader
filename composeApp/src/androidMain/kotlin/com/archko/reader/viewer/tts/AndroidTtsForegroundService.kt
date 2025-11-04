@@ -18,8 +18,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.withLock
 import java.util.Locale
 
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
@@ -96,13 +94,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         val playPauseIntent = Intent(this, AndroidTtsForegroundService::class.java).apply {
             action = ACTION_PLAY_PAUSE
         }
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val playPausePendingIntent = PendingIntent.getService(
             this,
@@ -143,7 +135,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            textToSpeech?.language = Locale.CHINESE
+            textToSpeech?.language = Locale.CHINA
             ttsQueueService = TtsQueueService(textToSpeech!!)
             isInitialized = true
 

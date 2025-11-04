@@ -6,4 +6,4 @@
     <string name="grant_all_files_permission">Grant All Files Access Permission</string>
     <string name="no_sdcard_permission">No SD card read permission obtained</string>
     <string name="grant_failed">Permission grant failed</string>
-    </resources>
+</resources>

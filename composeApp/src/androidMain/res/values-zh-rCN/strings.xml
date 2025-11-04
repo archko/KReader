@@ -6,4 +6,4 @@
     <string name="grant_all_files_permission">授予所有文件访问权限</string>
     <string name="no_sdcard_permission">没有获取sdcard的读取权限</string>
     <string name="grant_failed">权限授予失败</string>
-    </resources>
+</resources>

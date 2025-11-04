@@ -3,7 +3,7 @@ package com.archko.reader.viewer.tts
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsTask
 import com.archko.reader.pdf.tts.Voice
-import com.archko.reader.viewer.utils.TtsUtils
+import com.archko.reader.viewer.tts.TtsUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers

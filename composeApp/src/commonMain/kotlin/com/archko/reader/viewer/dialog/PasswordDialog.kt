@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.viewer.dialog
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer

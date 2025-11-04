@@ -1,6 +1,6 @@
-package com.archko.reader.viewer.utils
+package com.archko.reader.viewer.tts
 
-import com.archko.reader.pdf.cache.FileUtils.Companion.getCacheDirectory
+import com.archko.reader.pdf.cache.FileUtils
 import com.archko.reader.pdf.tts.Voice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,7 +36,7 @@ class TtsUtils {
         }
 
         fun getConfigFilePath(): String {
-            val cacheDir = getCacheDirectory()
+            val cacheDir = FileUtils.Companion.getCacheDirectory()
             val fileName = "tts_voice_setting.json"
             return File(cacheDir, fileName).absolutePath
         }

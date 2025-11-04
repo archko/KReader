@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.viewer.dialog
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,23 +34,36 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.archko.reader.pdf.PdfApp
-import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.getString
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.encrypt_decrypt_add
+import kreader.composeapp.generated.resources.encrypt_decrypt_decrypt
+import kreader.composeapp.generated.resources.encrypt_decrypt_encrypt
+import kreader.composeapp.generated.resources.encrypt_decrypt_file_name
+import kreader.composeapp.generated.resources.encrypt_decrypt_file_path
+import kreader.composeapp.generated.resources.encrypt_decrypt_file_size
+import kreader.composeapp.generated.resources.encrypt_decrypt_input_pwd
+import kreader.composeapp.generated.resources.encrypt_decrypt_modification_time
+import kreader.composeapp.generated.resources.encrypt_decrypt_title
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_visibility
+import kreader.composeapp.generated.resources.ic_visibility_off
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun PdfEncryptDialog(
@@ -61,7 +74,6 @@ fun PdfEncryptDialog(
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     Dialog(onDismissRequest = onDismiss) {
@@ -105,10 +117,9 @@ fun PdfEncryptDialog(
                         selectionMode = FilePickerSelectionMode.Single
                     ) { files ->
                         scope.launch {
-                            if (files.isNotEmpty()) {
-                                val file = files.first()
-                                val path = IntentFile.getPath(PdfApp.app!!, file.uri)
-                                    ?: file.uri.toString()
+                            files.singleOrNull()?.let { file ->
+                                val fileObj = file.file
+                                val path = fileObj.absolutePath
                                 pdfFilePath = path
                             }
                         }
@@ -130,7 +141,7 @@ fun PdfEncryptDialog(
                         )
                     ) {
                         if (pdfFilePath.isNotEmpty()) {
-                            val fileObj = java.io.File(pdfFilePath)
+                            val fileObj = File(pdfFilePath)
                             val fileName = fileObj.name
                             val fileSize = if (fileObj.exists()) {
                                 val sizeInBytes = fileObj.length()
@@ -139,11 +150,8 @@ fun PdfEncryptDialog(
                             } else {
                                 "0MB"
                             }
-                            val lastModified = java.text.SimpleDateFormat(
-                                "yyyy-MM-dd",
-                                java.util.Locale.getDefault()
-                            )
-                                .format(java.util.Date(fileObj.lastModified()))
+                            val lastModified = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                .format(Date(fileObj.lastModified()))
 
                             Text(
                                 text = stringResource(Res.string.encrypt_decrypt_file_name).format(
@@ -194,7 +202,7 @@ fun PdfEncryptDialog(
                         onValueChange = { password = it },
                         label = { Text(passwordLabel) },
                         visualTransformation = if (isPasswordVisible) {
-                            androidx.compose.ui.text.input.VisualTransformation.None
+                            VisualTransformation.None
                         } else {
                             PasswordVisualTransformation()
                         },
@@ -245,38 +253,15 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        getString(Res.string.encrypt_decrypt_encrypt_success)
-                                                            .format(
-                                                                outputPath
-                                                            ),
-                                                        android.widget.Toast.LENGTH_LONG
-                                                    ).show()
                                                 } else {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        getString(Res.string.encrypt_decrypt_encrypt_failed),
-                                                        android.widget.Toast.LENGTH_LONG
-                                                    ).show()
                                                 }
                                             } catch (e: Exception) {
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    getString(Res.string.encrypt_decrypt_encrypt_failed),
-                                                    android.widget.Toast.LENGTH_LONG
-                                                ).show()
                                             } finally {
                                                 isLoading = false
                                             }
                                         }
                                     } else {
                                         scope.launch {
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                getString(Res.string.encrypt_decrypt_input_pwd),
-                                                android.widget.Toast.LENGTH_LONG
-                                            ).show()
                                         }
                                     }
                                 },
@@ -301,38 +286,15 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        getString(Res.string.encrypt_decrypt_decrypt_success)
-                                                            .format(
-                                                                outputPath
-                                                            ),
-                                                        android.widget.Toast.LENGTH_LONG
-                                                    ).show()
                                                 } else {
-                                                    android.widget.Toast.makeText(
-                                                        context,
-                                                        getString(Res.string.encrypt_decrypt_decrypt_failed),
-                                                        android.widget.Toast.LENGTH_LONG
-                                                    ).show()
                                                 }
                                             } catch (e: Exception) {
-                                                android.widget.Toast.makeText(
-                                                    context,
-                                                    getString(Res.string.encrypt_decrypt_decrypt_failed),
-                                                    android.widget.Toast.LENGTH_LONG
-                                                ).show()
                                             } finally {
                                                 isLoading = false
                                             }
                                         }
                                     } else {
                                         scope.launch {
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                getString(Res.string.encrypt_decrypt_input_pwd),
-                                                android.widget.Toast.LENGTH_LONG
-                                            ).show()
                                         }
                                     }
                                 },

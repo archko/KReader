@@ -3,15 +3,10 @@ package com.archko.reader.viewer
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,16 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -45,6 +36,10 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.viewer.dialog.FontDialog
+import com.archko.reader.viewer.dialog.OutlineDialog
+import com.archko.reader.viewer.dialog.PasswordDialog
+import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -71,7 +66,6 @@ fun CustomView(
     reflow: Long = 0,
     crop: Boolean? = null,
 ) {
-    // 在打开文档时隐藏状态栏
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
 
@@ -132,7 +126,6 @@ fun CustomView(
     // TTS服务绑定器 - 只有文档文件才初始化
     var ttsServiceBinder by remember { mutableStateOf<TtsServiceBinder?>(null) }
 
-    // 初始化TTS服务（仅文档文件）
     LaunchedEffect(currentPath) {
         withContext(Dispatchers.IO) {
             println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
@@ -154,15 +147,12 @@ fun CustomView(
                         val files = paths.map { File(it) }
                         ImagesDecoder(files)
                     } else {
-                        // 单文件模式：检查文件类型
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
                             ttsServiceBinder = TtsServiceBinder(context)
                             ttsServiceBinder?.bindService()
 
-                            // 文档文件：创建PdfDecoder
                             val pdfDecoder = PdfDecoder(File(currentPath))
 
-                            // 检查是否需要密码
                             if (pdfDecoder.needsPassword) {
                                 showPasswordDialog = true
                                 isPasswordError = false
@@ -178,7 +168,6 @@ fun CustomView(
                             tiffDecoder
                         } else {
                             isCrop = false
-                            // 图片文件：创建ImagesDecoder（单文件图片也使用ImagesDecoder）
                             ImagesDecoder(listOf(File(currentPath)))
                         }
                     }
@@ -187,7 +176,7 @@ fun CustomView(
                     newDecoder.size(viewportSize)
                     println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
                     decoder = newDecoder
-                    loadingError = null // 清除之前的错误
+                    loadingError = null
                 }
             } catch (e: Exception) {
                 println("文档加载失败: $currentPath, 错误: ${e.message}")
@@ -212,7 +201,6 @@ fun CustomView(
                 decoder?.let { pdfDecoder ->
                     val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
                     if (success) {
-                        // 密码正确，初始化文档
                         pdfDecoder.size(viewportSize)
                         loadingError = null
                         showPasswordDialog = false
@@ -297,7 +285,6 @@ fun CustomView(
                     }
                 }
             } else {
-                // 显示加载中
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -329,15 +316,12 @@ fun CustomView(
         val list: MutableList<APage> = remember {
             createList(decoder!!)
         }
-        // 工具栏显示状态
+
         var showToolbar by remember { mutableStateOf(false) }
-        // 大纲弹窗状态
         var showOutlineDialog by remember { mutableStateOf(false) }
 
-        // 横竖切换、重排等按钮内部状态
         var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
         var isReflow by remember { mutableStateOf(reflow == 1L) }
-        // 文本选择模式状态
         var isTextSelectionMode by remember { mutableStateOf(false) }
 
         var showTtsToolbar by remember { mutableStateOf(false) }
@@ -373,10 +357,8 @@ fun CustomView(
         val pageCount: Int = list.size
         // 跳转页面状态
         var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
-        // 大纲列表
         val outlineList = decoder?.outlineItems ?: emptyList()
 
-        // 获取字符串资源
         val currentPageString = stringResource(Res.string.current_page)
 
         // 监听TTS状态，自动显示/隐藏朗读工具条
@@ -386,11 +368,9 @@ fun CustomView(
                 if (isSpeaking) {
                     showTtsToolbar = true
                 } else {
-                    // 朗读停止时，延迟3秒后自动隐藏工具条（如果用户没有手动操作）
+                    // 朗读停止时，延迟1秒后自动隐藏工具条（如果用户没有手动操作）
                     kotlinx.coroutines.delay(1000)
-                    if (!isSpeaking) {
-                        showTtsToolbar = false
-                    }
+                    showTtsToolbar = false
                 }
             }
         }
@@ -481,10 +461,7 @@ fun CustomView(
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 固定的返回按钮
-                        IconButton(onClick = {
-                            onCloseDocument?.invoke()
-                        }) {
+                        IconButton(onClick = { onCloseDocument?.invoke() }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_back),
                                 contentDescription = stringResource(Res.string.back),
@@ -492,7 +469,6 @@ fun CustomView(
                             )
                         }
 
-                        // 可滚动的按钮区域
                         LazyRow(
                             modifier = Modifier
                                 .weight(1f)
@@ -500,8 +476,23 @@ fun CustomView(
                             verticalAlignment = Alignment.CenterVertically,
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
+                            item {
+                                IconButton(onClick = {
+                                    isVertical = !isVertical
+                                    showToolbar = false
+                                }) {
+                                    Icon(
+                                        painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                                        contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                            Res.string.horizontal
+                                        ),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+
+                            // 只有文档文件才显示其他按钮
                             if (FileTypeUtils.isDocumentFile(currentPath)) {
-                                // TTS控制按钮
                                 ttsServiceBinder?.let { binder ->
                                     item {
                                         val isSpeaking by binder.isSpeakingFlow.collectAsState()
@@ -546,26 +537,7 @@ fun CustomView(
                                         )
                                     }
                                 }
-                            }
 
-                            // 方向按钮 - 文档和图片都显示
-                            item {
-                                IconButton(onClick = {
-                                    isVertical = !isVertical
-                                    showToolbar = false
-                                }) {
-                                    Icon(
-                                        painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                        contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                            Res.string.horizontal
-                                        ),
-                                        tint = Color.White
-                                    )
-                                }
-                            }
-
-                            // 只有文档文件才显示其他按钮
-                            if (FileTypeUtils.isDocumentFile(currentPath)) {
                                 item {
                                     IconButton(onClick = { isCrop = !isCrop }) {
                                         Icon(
@@ -578,7 +550,6 @@ fun CustomView(
                                     }
                                 }
 
-                                // 只有单文档文件才显示大纲按钮
                                 if (FileTypeUtils.shouldShowOutline(paths)) {
                                     item {
                                         IconButton(onClick = { showOutlineDialog = true }) {
@@ -591,17 +562,7 @@ fun CustomView(
                                     }
                                 }
 
-                                if (!IntentFile.isReflowable(currentPath)) {
-                                    item {
-                                        IconButton(onClick = { isReflow = !isReflow }) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_reflow),
-                                                contentDescription = stringResource(Res.string.reflow),
-                                                tint = if (isReflow) Color.Green else Color.White
-                                            )
-                                        }
-                                    }
-                                } else {
+                                if (IntentFile.isReflowable(currentPath)) {
                                     item {
                                         IconButton(onClick = { showFontDialog = true }) {
                                             Icon(
@@ -611,10 +572,20 @@ fun CustomView(
                                             )
                                         }
                                     }
+
+                                    /*item {
+                                        IconButton(onClick = { isReflow = !isReflow }) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_reflow),
+                                                contentDescription = stringResource(Res.string.reflow),
+                                                tint = if (isReflow) Color.Green else Color.White
+                                            )
+                                        }
+                                    }*/
                                 }
 
                                 item {
-                                    IconButton(onClick = { /* TODO: 搜索功能 */ }) {
+                                    IconButton(onClick = { }) {
                                         Icon(
                                             painter = painterResource(Res.drawable.ic_search),
                                             contentDescription = stringResource(Res.string.search),
@@ -713,202 +684,24 @@ fun CustomView(
 
             // 队列列表弹窗
             if (showQueueDialog) {
-                Dialog(onDismissRequest = { showQueueDialog = false }) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 600.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surface
-                    ) {
-                        Column {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(onClick = { showQueueDialog = false }) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_back),
-                                        contentDescription = "返回",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Text(
-                                    text = stringResource(Res.string.tts_queue_title),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            ttsServiceBinder?.let { binder ->
-                                val decoder = decoder as PdfDecoder
-                                if (decoder.cacheBean != null) {
-                                    LazyColumn(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentPadding = PaddingValues(
-                                            horizontal = 16.dp,
-                                            vertical = 8.dp
-                                        )
-                                    ) {
-                                        itemsIndexed(
-                                            decoder.cacheBean!!.reflowTexts,
-                                            key = { index, item -> index }) { index, item ->
-                                            Card(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 2.dp),
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                                        alpha = 0.5f
-                                                    )
-                                                )
-                                            ) {
-                                                Text(
-                                                    text = stringResource(Res.string.tts_page_item)
-                                                        .format(
-                                                            item.page,
-                                                            item.data?.take(10)
-                                                        ),
-                                                    modifier = Modifier.padding(16.dp),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(200.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = stringResource(Res.string.tts_empty_queue),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                ttsServiceBinder?.let {
+                    val pdfDecoder = decoder as PdfDecoder
+                    QueueDialog(pdfDecoder.cacheBean, onDismiss = { showQueueDialog = false })
                 }
             }
 
             // 大纲弹窗（最上层）- 只有单文档文件才显示
             if (showOutlineDialog && FileTypeUtils.shouldShowOutline(paths)) {
-                Dialog(onDismissRequest = {
-                    showOutlineDialog = false
-                }) {
-                    val hasOutline = outlineList.isNotEmpty()
-                    // 根据当前页码找到最接近的大纲项位置
-                    val initialOutlineIndex = outlineList.indexOfFirst { it.page >= currentPage }
-                        .takeIf { it != -1 } ?: outlineList.indexOfLast { it.page <= currentPage }
-                        .takeIf { it != -1 } ?: 0
-                    val lazyListState =
-                        rememberLazyListState(
-                            initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(
-                                0
-                            )
-                        )
-                    Surface(
-                        modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize(),
-                        color = Color.White.copy(alpha = 0.8f),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Column(
-                            modifier = if (hasOutline) Modifier.fillMaxSize() else Modifier.wrapContentSize()
-                        ) {
-
-                            Box(
-                                Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(onClick = {
-                                        showOutlineDialog = false
-                                    }) {
-                                        Icon(
-                                            painter = painterResource(Res.drawable.ic_back),
-                                            contentDescription = stringResource(Res.string.back),
-                                            tint = Color.Black
-                                        )
-                                    }
-                                    Spacer(Modifier.weight(1f))
-                                }
-                                Text(
-                                    stringResource(Res.string.document_outline),
-                                    color = Color.Black,
-                                    modifier = Modifier.align(Alignment.Center),
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                            }
-                            // 内容区
-                            if (!hasOutline) {
-                                Box(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(250.dp)
-                                        .padding(bottom = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(stringResource(Res.string.no_outline), color = Color.Gray)
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    state = lazyListState
-                                ) {
-                                    itemsIndexed(
-                                        outlineList,
-                                        key = { index, item -> index }) { index, item ->
-                                        val isSelected = index == initialOutlineIndex
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    if (isSelected) MaterialTheme.colorScheme.surfaceVariant
-                                                    else Color.Transparent
-                                                )
-                                                .clickable {
-                                                    jumpToPage = item.page
-                                                    showOutlineDialog = false
-                                                    showToolbar = false
-                                                }
-                                                .padding(vertical = 8.dp, horizontal = 16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = item.title ?: "",
-                                                color = Color.Black,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontSize = 15.sp,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Text(
-                                                text = stringResource(Res.string.page_number).format(
-                                                    item.page + 1
-                                                ),
-                                                maxLines = 1,
-                                                softWrap = false,
-                                                color = Color.Gray,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                OutlineDialog(
+                    currentPage,
+                    outlineList,
+                    onClick = { item ->
+                        jumpToPage = item.page
+                        showOutlineDialog = false
+                        showToolbar = false
+                    },
+                    onDismiss = { showOutlineDialog = false },
+                )
             }
 
             // 字体选择弹窗
@@ -992,180 +785,6 @@ fun CustomView(
                                 )
                             }
                         )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 字体选择对话框
- */
-@Composable
-fun FontDialog(
-    onDismiss: () -> Unit,
-    onFontSelected: (String) -> Unit
-) {
-    var fontFiles by remember { mutableStateOf<List<File>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    // 扫描字体文件
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val fontsDir = File("/sdcard/fonts")
-            val files = if (fontsDir.exists() && fontsDir.isDirectory) {
-                fontsDir.listFiles { file ->
-                    file.extension.equals("ttf", ignoreCase = true) ||
-                            file.extension.equals("otf", ignoreCase = true)
-                }?.toList() ?: emptyList()
-            } else {
-                emptyList()
-            }
-            fontFiles = files
-            isLoading = false
-        }
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier.wrapContentSize(),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier.wrapContentSize()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_back),
-                            contentDescription = stringResource(Res.string.back),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.font_select),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                if (isLoading) {
-                    Box(
-                        modifier = Modifier.wrapContentSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = stringResource(Res.string.font_scaning),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-                } else if (fontFiles.isEmpty()) {
-                    Box(
-                        modifier = Modifier.wrapContentSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.font_no),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(Res.string.font_storage),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .wrapContentSize()
-                            .heightIn(max = 800.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        items(fontFiles.size) { index ->
-                            val fontFile = fontFiles[index]
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        onFontSelected(fontFile.absolutePath)
-                                    },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                        alpha = 0.5f
-                                    )
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_font),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text(
-                                            text = fontFile.nameWithoutExtension,
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontFamily = FontFamily(
-                                                Font(
-                                                    fontFile,
-                                                    FontWeight.Normal,
-                                                    FontStyle.Normal
-                                                )
-                                            )
-                                        )
-                                        Text(
-                                            text = "${fontFile.extension.uppercase()} • ${
-                                                String.format(
-                                                    "%.1f KB",
-                                                    fontFile.length() / 1024.0
-                                                )
-                                            }",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontFamily = FontFamily(
-                                                Font(
-                                                    fontFile,
-                                                    FontWeight.Normal,
-                                                    FontStyle.Normal
-                                                )
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
