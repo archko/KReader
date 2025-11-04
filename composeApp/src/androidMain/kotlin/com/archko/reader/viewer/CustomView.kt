@@ -768,7 +768,7 @@ fun CustomView(
                                                 )
                                             ) {
                                                 Text(
-                                                    text = "第 ${item.page} 页",
+                                                    text = "第 ${item.page} 页 ${item.data?.take(10)}",
                                                     modifier = Modifier.padding(16.dp),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurface
@@ -1188,7 +1188,7 @@ suspend fun speakFromCurrentPage(
 
                 val totalPages = imageDecoder.originalPageSizes.size
                 var cacheBean = imageDecoder.cacheBean
-                if (cacheBean != null) {
+                if (cacheBean == null) {
                     cacheBean = ReflowCacheLoader.loadReflowFromFile(
                         totalPages,
                         imageDecoder.file
