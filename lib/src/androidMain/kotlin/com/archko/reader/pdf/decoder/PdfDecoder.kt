@@ -804,6 +804,90 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     /**
+     * 解析单个页面的文本内容（用于TTS快速启动）
+     */
+    public fun decodeReflowSinglePage(pageIndex: Int): String {
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return ""
+        }
+
+        if (pageIndex < 0 || pageIndex >= originalPageSizes.size) {
+            return ""
+        }
+
+        return try {
+            val page = getPage(pageIndex)
+            val result = page.textAsText("preserve-whitespace,inhibit-spaces")
+            val text = if (null != result) {
+                ParseTextMain.parseAsText(result)
+            } else null
+
+            if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                val pageText = text.trim()
+                if (pageText.length > 10) {
+                    pageText
+                } else {
+                    ""
+                }
+            } else {
+                ""
+            }
+        } catch (e: Exception) {
+            println("TTS: 解码第${pageIndex + 1}页失败: ${e.message}")
+            ""
+        }
+    }
+
+    /**
+     * 解析所有页面的文本内容（用于TTS后台缓存）
+     */
+    public fun decodeReflowAllPages(): List<String> {
+        if (document == null || (!isAuthenticated && needsPassword)) {
+            return emptyList()
+        }
+
+        val totalPages = originalPageSizes.size
+        println("TTS: 开始解析所有页面，共${totalPages}页")
+        val allTexts = mutableListOf<String>()
+
+        var addedPages = 0
+        var skippedPages = 0
+
+        for (currentPage in 0 until totalPages) {
+            try {
+                val page = getPage(currentPage)
+                val result = page.textAsText("preserve-whitespace,inhibit-spaces")
+                val text = if (null != result) {
+                    ParseTextMain.parseAsText(result)
+                } else null
+
+                if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                    val pageText = text.trim()
+                    if (pageText.length > 10) { // 只添加有意义的文本
+                        allTexts.add(text)
+                        addedPages++
+                    } else {
+                        allTexts.add("")
+                        println("TTS: 第${currentPage + 1}页文本太短: ${pageText.length}")
+                        skippedPages++
+                    }
+                } else {
+                    allTexts.add("")
+                    println("TTS: 第${currentPage + 1}页无文本内容")
+                    skippedPages++
+                }
+            } catch (e: Exception) {
+                println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                allTexts.add("")
+                skippedPages++
+            }
+        }
+
+        println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
+        return allTexts
+    }
+
+    /**
      * 获取或创建页面，支持缓存
      */
     private fun getPage(index: Int): Page {

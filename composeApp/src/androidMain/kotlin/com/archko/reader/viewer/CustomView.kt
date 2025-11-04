@@ -32,6 +32,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
@@ -337,7 +338,7 @@ fun CustomView(
         var isReflow by remember { mutableStateOf(reflow == 1L) }
         // 文本选择模式状态
         var isTextSelectionMode by remember { mutableStateOf(false) }
-        
+
         // 朗读工具条相关状态
         var showTtsToolbar by remember { mutableStateOf(false) }
         var showSleepDialog by remember { mutableStateOf(false) }
@@ -513,7 +514,11 @@ fun CustomView(
                                                         binder.pause()
                                                     } else {
                                                         scope.launch {
-                                                            speakFromCurrentPage(currentPage, decoder!!, binder)
+                                                            speakFromCurrentPage(
+                                                                currentPage,
+                                                                decoder!!,
+                                                                binder
+                                                            )
                                                         }
                                                         showTtsToolbar = true
                                                     }
@@ -628,7 +633,7 @@ fun CustomView(
                 visible = showTtsToolbar && FileTypeUtils.isDocumentFile(currentPath),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 48.dp) // 在主工具栏下方
+                    .padding(top = if (showToolbar) 48.dp else 0.dp)
             ) {
                 Surface(
                     color = Color(0xCC333333),
@@ -638,7 +643,7 @@ fun CustomView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(40.dp)
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
@@ -646,7 +651,6 @@ fun CustomView(
                             val isSpeaking by binder.isSpeakingFlow.collectAsState()
                             val isConnected by binder.isConnected.collectAsState()
 
-                            // 暂停/开始按钮
                             IconButton(
                                 onClick = {
                                     if (isConnected && binder.isServiceInitialized()) {
@@ -669,7 +673,6 @@ fun CustomView(
                                 )
                             }
 
-                            // 睡眠按钮
                             IconButton(
                                 onClick = { showSleepDialog = true }
                             ) {
@@ -680,7 +683,6 @@ fun CustomView(
                                 )
                             }
 
-                            // 队列按钮
                             IconButton(
                                 onClick = { showQueueDialog = true }
                             ) {
@@ -691,7 +693,6 @@ fun CustomView(
                                 )
                             }
 
-                            // 关闭按钮
                             IconButton(
                                 onClick = {
                                     binder.stop()
@@ -699,7 +700,7 @@ fun CustomView(
                                 }
                             ) {
                                 Text(
-                                    text = "✕",
+                                    text = "X",
                                     color = Color.White,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold
@@ -749,7 +750,10 @@ fun CustomView(
                                 if (queueSize > 0) {
                                     LazyColumn(
                                         modifier = Modifier.fillMaxWidth(),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                        contentPadding = PaddingValues(
+                                            horizontal = 16.dp,
+                                            vertical = 8.dp
+                                        )
                                     ) {
                                         items(queueSize) { index ->
                                             Card(
@@ -757,7 +761,9 @@ fun CustomView(
                                                     .fillMaxWidth()
                                                     .padding(vertical = 4.dp),
                                                 colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                                        alpha = 0.5f
+                                                    )
                                                 )
                                             ) {
                                                 Text(
@@ -1102,7 +1108,9 @@ fun FontDialog(
                                         onFontSelected(fontFile.absolutePath)
                                     },
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                        alpha = 0.5f
+                                    )
                                 )
                             ) {
                                 Row(
@@ -1164,31 +1172,77 @@ fun FontDialog(
 suspend fun speakFromCurrentPage(
     startPage: Int,
     imageDecoder: ImageDecoder,
-    ttsServiceBinder: TtsServiceBinder
+    speechService: TtsServiceBinder
 ) {
-    if (ttsServiceBinder.isSpeaking()) {
+    if (speechService.isSpeaking()) {
         println("TTS: 正在朗读，停止当前朗读")
-        ttsServiceBinder.stop()
+        speechService.stop()
         return
     }
 
     if (imageDecoder is PdfDecoder) {
         withContext(Dispatchers.IO) {
             try {
-                ttsServiceBinder.clearQueue()
+                speechService.clearQueue()
 
-                val list = imageDecoder.decodeReflow(startPage)
-                println("TTS: 解码完成共:${list.size} 页")
+                val totalPages = imageDecoder.originalPageSizes.size
+                val cacheBean = ReflowCacheLoader.loadReflowFromFile(
+                    totalPages,
+                    imageDecoder.file
+                )
 
-                for (pageText in list) {
-                    ttsServiceBinder.addToQueue(pageText)
+                if (cacheBean != null) {
+                    println("TTS: 从缓存获取文本，从第${startPage + 1}页开始")
+                    val cachedTexts = ReflowCacheLoader.getTextsFromPage(
+                        cacheBean,
+                        startPage
+                    )
+
+                    for (pageText in cachedTexts) {
+                        if (pageText.isNotEmpty() && pageText.isNotBlank()) {
+                            speechService.addToQueue(pageText)
+                        }
+                    }
+
+                    val queueSize = speechService.getQueueSize()
+                    println("TTS: 从缓存添加完成,队列中共有$queueSize 个文本段落")
+                } else {
+                    try {
+                        val currentPageText = imageDecoder.decodeReflowSinglePage(startPage)
+                        if (currentPageText.isNotEmpty() && currentPageText.isNotBlank()) {
+                            speechService.addToQueue(currentPageText)
+                            println("TTS: 当前页解析完成，立即开始朗读")
+                        }
+                    } catch (e: Exception) {
+                        println("TTS: 当前页解析失败: ${e.message}")
+                        speechService.addToQueue("当前页解析失败")
+                    }
+
+                    try {
+                        println("TTS: 开始后台解析整个文档，共${totalPages}页")
+                        val allTexts = imageDecoder.decodeReflowAllPages()
+
+                        ReflowCacheLoader.saveReflowToFile(
+                            imageDecoder.file,
+                            allTexts
+                        )
+
+                        for (pageIndex in (startPage + 1) until allTexts.size) {
+                            val pageText = allTexts[pageIndex]
+                            if (pageText.isNotEmpty() && pageText.isNotBlank()) {
+                                speechService.addToQueue(pageText)
+                            }
+                        }
+
+                        val queueSize = speechService.getQueueSize()
+                        println("TTS: 解析完成，队列中共有$queueSize 个文本段落")
+                    } catch (e: Exception) {
+                        println("TTS: 解析失败: ${e.message}")
+                    }
                 }
-
-                val queueSize = ttsServiceBinder.getQueueSize()
-                println("TTS: 添加完成,队列中共有$queueSize 个文本段落")
             } catch (e: Exception) {
-                println("TTS: 批量解码失败: ${e.message}")
-                ttsServiceBinder.addToQueue("文本解码失败，无法朗读")
+                println("TTS: 朗读初始化失败: ${e.message}")
+                speechService.addToQueue("文本解码失败，无法朗读")
             }
         }
     }
