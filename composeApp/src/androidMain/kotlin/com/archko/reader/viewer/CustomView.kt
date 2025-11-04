@@ -471,9 +471,9 @@ fun CustomView(
 
                         LazyRow(
                             modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
+                                .fillMaxSize(),
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End,
                             contentPadding = PaddingValues(horizontal = 4.dp)
                         ) {
                             item {
@@ -613,7 +613,7 @@ fun CustomView(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .height(36.dp)
                             .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceEvenly
