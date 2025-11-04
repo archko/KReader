@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ic_back
@@ -38,7 +39,9 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun QueueDialog(
     cacheBean: ReflowCacheBean?,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onItemClick: ((ReflowBean) -> Unit)? = null,
+    count: Int = 14,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -89,13 +92,16 @@ fun QueueDialog(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
                                         alpha = 0.5f
                                     )
-                                )
+                                ),
+                                onClick = {
+                                    onItemClick?.invoke(item)
+                                }
                             ) {
                                 Text(
                                     text = stringResource(Res.string.tts_page_item)
                                         .format(
                                             item.page,
-                                            item.data?.take(14)
+                                            item.data?.take(count)
                                         ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Clip,

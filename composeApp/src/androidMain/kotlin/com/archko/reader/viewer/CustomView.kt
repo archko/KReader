@@ -684,9 +684,30 @@ fun CustomView(
 
             // 队列列表弹窗
             if (showQueueDialog) {
-                ttsServiceBinder?.let {
+                ttsServiceBinder?.let { binder ->
                     val pdfDecoder = decoder as PdfDecoder
-                    QueueDialog(pdfDecoder.cacheBean, onDismiss = { showQueueDialog = false })
+                    QueueDialog(
+                        cacheBean = pdfDecoder.cacheBean,
+                        onDismiss = { showQueueDialog = false },
+                        onItemClick = { reflowBean ->
+                            showQueueDialog = false
+
+                            reflowBean.page?.let { pageStr ->
+                                val targetPage = pageStr.toIntOrNull() ?: 0
+                                // 跳转到目标页面
+                                jumpToPage = targetPage
+
+                                scope.launch {
+                                    binder.stop()
+
+                                    // 等待一小段时间确保停止操作完成
+                                    kotlinx.coroutines.delay(500)
+
+                                    speakFromCurrentPage(targetPage, decoder!!, binder)
+                                }
+                            }
+                        }
+                    )
                 }
             }
 
