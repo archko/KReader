@@ -324,7 +324,6 @@ fun CustomView(
         var isReflow by remember { mutableStateOf(reflow == 1L) }
         var isTextSelectionMode by remember { mutableStateOf(false) }
 
-        var showTtsToolbar by remember { mutableStateOf(false) }
         var showSleepDialog by remember { mutableStateOf(false) }
         var showQueueDialog by remember { mutableStateOf(false) }
 
@@ -360,16 +359,22 @@ fun CustomView(
 
         val currentPageString = stringResource(Res.string.current_page)
 
-        // 监听TTS状态，自动显示/隐藏朗读工具条
-        ttsServiceBinder?.let { binder ->
-            val isSpeaking by binder.isSpeakingFlow.collectAsState()
-            LaunchedEffect(isSpeaking) {
-                if (isSpeaking) {
-                    showTtsToolbar = true
-                } else {
-                    // 朗读停止时，延迟1秒后自动隐藏工具条（如果用户没有手动操作）
-                    kotlinx.coroutines.delay(1000)
-                    showTtsToolbar = false
+        var isSpeaking by remember { mutableStateOf(false) }
+
+        LaunchedEffect(ttsServiceBinder) {
+            ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
+                isSpeaking = speaking
+            }
+        }
+
+        LaunchedEffect(ttsServiceBinder) {
+            ttsServiceBinder?.setOnSpeechCompleteCallback { completedPage ->
+                completedPage?.let { pageStr ->
+                    val targetPage = pageStr.toIntOrNull()
+                    println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage")
+                    if (null != targetPage && targetPage != jumpToPage) {
+                        jumpToPage = targetPage
+                    }
                 }
             }
         }
@@ -494,7 +499,6 @@ fun CustomView(
                             if (FileTypeUtils.isDocumentFile(currentPath)) {
                                 ttsServiceBinder?.let { binder ->
                                     item {
-                                        val isSpeaking by binder.isSpeakingFlow.collectAsState()
                                         val isConnected by binder.isConnected.collectAsState()
 
                                         IconButton(
@@ -510,7 +514,6 @@ fun CustomView(
                                                                 binder
                                                             )
                                                         }
-                                                        showTtsToolbar = true
                                                     }
                                                 }
                                             },
@@ -600,7 +603,7 @@ fun CustomView(
 
             // 朗读工具条 - 在主工具栏下方
             AnimatedVisibility(
-                visible = showTtsToolbar && FileTypeUtils.isDocumentFile(currentPath),
+                visible = isSpeaking,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = if (showToolbar) 48.dp else 0.dp)
@@ -618,7 +621,6 @@ fun CustomView(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         ttsServiceBinder?.let { binder ->
-                            val isSpeaking by binder.isSpeakingFlow.collectAsState()
                             val isConnected by binder.isConnected.collectAsState()
 
                             IconButton(
@@ -665,12 +667,7 @@ fun CustomView(
                                 )
                             }
 
-                            IconButton(
-                                onClick = {
-                                    binder.stop()
-                                    showTtsToolbar = false
-                                }
-                            ) {
+                            IconButton(onClick = { binder.stop() }) {
                                 Text(
                                     text = "X",
                                     color = Color.White,
@@ -710,22 +707,22 @@ fun CustomView(
             if (showQueueDialog) {
                 ttsServiceBinder?.let { binder ->
                     val pdfDecoder = decoder as PdfDecoder
+
                     QueueDialog(
                         cacheBean = pdfDecoder.cacheBean,
+                        currentSpeakingPage = binder.getCurrentSpeakingPage(),
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->
                             showQueueDialog = false
 
                             reflowBean.page?.let { pageStr ->
                                 val targetPage = pageStr.toIntOrNull() ?: 0
-                                // 跳转到目标页面
                                 jumpToPage = targetPage
 
                                 scope.launch {
                                     binder.stop()
 
-                                    // 等待一小段时间确保停止操作完成
-                                    kotlinx.coroutines.delay(500)
+                                    kotlinx.coroutines.delay(50)
 
                                     speakFromCurrentPage(targetPage, decoder!!, binder)
                                 }

@@ -1,16 +1,30 @@
 package com.archko.reader.viewer.tts
 
-import android.app.*
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.TtsTask
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.util.*
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
@@ -23,7 +37,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private val binder = TtsServiceBinder()
     private var textToSpeech: TextToSpeech? = null
-    private var ttsQueueService: TtsQueueService? = null
     private var isInitialized = false
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -31,6 +44,17 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     // 睡眠定时相关
     private var sleepTimerJob: Job? = null
     private var sleepTimerMinutes: Int = 0
+
+    // 朗读完成回调
+    private var onSpeechCompleteCallback: ((String?) -> Unit)? = null
+
+    private val beanList = mutableListOf<ReflowBean>()
+    private var currentBean: ReflowBean? = null
+    private var currentIndex = 0
+
+    // Flow for speaking state
+    private val _isSpeakingFlow = MutableStateFlow(false)
+    val isSpeakingFlow: StateFlow<Boolean> = _isSpeakingFlow.asStateFlow()
 
     inner class TtsServiceBinder : Binder() {
         fun getService(): AndroidTtsForegroundService = this@AndroidTtsForegroundService
@@ -66,7 +90,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
-        ttsQueueService?.destroy()
         textToSpeech?.shutdown()
     }
 
@@ -87,9 +110,10 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun createNotification(): Notification {
-        val playPauseIntent = Intent(this, AndroidTtsForegroundService::class.java).apply {
-            action = ACTION_PLAY_PAUSE
-        }
+        val playPauseIntent = Intent(this, AndroidTtsForegroundService::class.java)
+            .apply {
+                action = ACTION_PLAY_PAUSE
+            }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val playPausePendingIntent = PendingIntent.getService(
@@ -131,77 +155,131 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            textToSpeech?.language = Locale.CHINA
-            ttsQueueService = TtsQueueService(textToSpeech!!)
+            textToSpeech?.language = Locale.CHINESE
+            setupTtsListener()
             isInitialized = true
 
-            // 监听朗读状态变化，更新通知
             serviceScope.launch {
-                ttsQueueService?.isSpeakingFlow?.collect { isSpeaking ->
+                isSpeakingFlow.collect { isSpeaking ->
                     updateNotification()
-                    if (!isSpeaking && getQueueSize() == 0) {
-                        // 如果没有在朗读且队列为空，可以考虑停止服务
-                        // 这里暂时不自动停止，让用户手动控制
-                    }
                 }
             }
         }
     }
 
-    fun speak(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
-        if (isInitialized) {
-            ttsQueueService?.speak(reflowBean)
+    private fun setupTtsListener() {
+        textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                _isSpeakingFlow.value = true
+            }
+
+            override fun onDone(utteranceId: String?) {
+                playNext()
+            }
+
+            override fun onError(utteranceId: String?) {
+                println("TTS: Error occurred for utterance: $utteranceId")
+                playNext()
+            }
+        })
+    }
+
+    private fun playNext() {
+        currentIndex++
+        if (currentIndex < beanList.size) {
+            val nextBean = beanList[currentIndex]
+            currentBean = nextBean
+            speakText(nextBean.data ?: "")
+        } else {
+            _isSpeakingFlow.value = false
+            currentBean = null
+        }
+        println("TTS: playNext:$currentBean")
+        currentBean?.let { bean ->
+            onSpeechCompleteCallback?.invoke(bean.page)
         }
     }
 
-    fun addToQueue(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
+    private fun speakText(text: String) {
+        if (text.isNotBlank()) {
+            val params = hashMapOf<String, String>().apply {
+                put(
+                    TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
+                    "utterance_${System.currentTimeMillis()}"
+                )
+            }
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params)
+        }
+    }
+
+    fun speak(reflowBean: ReflowBean) {
         if (isInitialized) {
-            ttsQueueService?.addToQueue(reflowBean)
+            beanList.clear()
+            beanList.add(reflowBean)
+            currentIndex = 0
+            currentBean = reflowBean
+            speakText(reflowBean.data ?: "")
+        }
+    }
+
+    fun addToQueue(reflowBean: ReflowBean) {
+        if (isInitialized) {
+            println("TTS: addToQueue:$reflowBean")
+            beanList.add(reflowBean)
+
+            // 如果当前没有在朗读，开始朗读
+            if (!isSpeaking() && beanList.size == 1) {
+                currentIndex = 0
+                currentBean = reflowBean
+                speakText(reflowBean.data ?: "")
+            }
         }
     }
 
     fun pause() {
-        ttsQueueService?.pause()
+        textToSpeech?.stop()
+        _isSpeakingFlow.value = false
         updateNotification()
     }
 
     fun stop() {
-        ttsQueueService?.stop()
+        textToSpeech?.stop()
+        beanList.clear()
+        currentBean = null
+        currentIndex = 0
+        _isSpeakingFlow.value = false
         cancelSleepTimer()
         updateNotification()
     }
 
     fun clearQueue() {
-        ttsQueueService?.clearQueue()
+        beanList.clear()
+        currentIndex = 0
     }
 
     fun isSpeaking(): Boolean {
-        return ttsQueueService?.isSpeaking() ?: false
+        return textToSpeech?.isSpeaking ?: false
     }
 
     fun getQueueSize(): Int {
-        return ttsQueueService?.getQueueSize() ?: 0
+        return beanList.size
     }
 
-    fun getQueue(): List<TtsTask>? {
-        return ttsQueueService?.getQueue()
+    fun getQueue(): List<TtsTask> {
+        return beanList.map { TtsTask(it, priority = 0) }
     }
 
-    fun getCurrentReflowBean(): com.archko.reader.pdf.entity.ReflowBean? {
-        return ttsQueueService?.getCurrentReflowBean()
+    fun getCurrentReflowBean(): ReflowBean? {
+        return currentBean
     }
 
-    /**
-     * 设置睡眠定时器
-     * @param minutes 定时分钟数
-     */
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         sleepTimerMinutes = minutes
 
         if (minutes > 0) {
             sleepTimerJob = serviceScope.launch {
-                println("TTS: 设置睡眠定时器 $minutes 分钟")
+                println("TTS: 设置睡眠定时器, $minutes 分钟")
                 delay(minutes * 60 * 1000L) // 转换为毫秒
 
                 println("TTS: 睡眠定时器到期，停止朗读")
@@ -211,9 +289,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
-    /**
-     * 取消睡眠定时器
-     */
     fun cancelSleepTimer() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
@@ -221,22 +296,17 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         println("TTS: 取消睡眠定时器")
     }
 
-    /**
-     * 获取剩余睡眠时间（分钟）
-     */
     fun getSleepTimerMinutes(): Int {
         return sleepTimerMinutes
     }
 
-    /**
-     * 是否设置了睡眠定时器
-     */
     fun hasSleepTimer(): Boolean {
         return sleepTimerJob?.isActive == true
     }
 
-    val isSpeakingFlow: StateFlow<Boolean>?
-        get() = ttsQueueService?.isSpeakingFlow
-
     fun isServiceInitialized(): Boolean = isInitialized
+
+    fun setOnSpeechCompleteCallback(callback: ((String?) -> Unit)?) {
+        onSpeechCompleteCallback = callback
+    }
 }

@@ -459,6 +459,7 @@ fun CustomView(
                 val pdfDecoder = decoder as PdfDecoder
                 QueueDialog(
                     pdfDecoder.cacheBean,
+                    currentSpeakingPage = jumpToPage.toString(),
                     count = 30,
                     onDismiss = { showQueueDialog = false },
                     onItemClick = { reflowBean ->

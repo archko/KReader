@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +44,7 @@ fun QueueDialog(
     onDismiss: () -> Unit,
     onItemClick: ((ReflowBean) -> Unit)? = null,
     count: Int = 14,
+    currentSpeakingPage: String? = null, // 当前朗读的页面
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -74,7 +77,20 @@ fun QueueDialog(
                 }
 
                 if (cacheBean != null) {
+                    val listState = rememberLazyListState()
+                    
+                    // 自动滚动到当前朗读的项目
+                    LaunchedEffect(currentSpeakingPage) {
+                        currentSpeakingPage?.let { speakingPage ->
+                            val index = cacheBean.reflowTexts.indexOfFirst { it.page == speakingPage }
+                            if (index >= 0) {
+                                listState.animateScrollToItem(index)
+                            }
+                        }
+                    }
+                    
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(
                             horizontal = 8.dp,
@@ -84,14 +100,17 @@ fun QueueDialog(
                         itemsIndexed(
                             cacheBean.reflowTexts,
                             key = { index, item -> index }) { index, item ->
+                            val isCurrentSpeaking = item.page == currentSpeakingPage
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 2.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                        alpha = 0.5f
-                                    )
+                                    containerColor = if (isCurrentSpeaking) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    }
                                 ),
                                 onClick = {
                                     onItemClick?.invoke(item)
