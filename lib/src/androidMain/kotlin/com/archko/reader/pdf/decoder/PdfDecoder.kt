@@ -145,7 +145,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                     fontSize,
                     fs,
                     file.absolutePath
-                );
+                )
                 doc.layout(w, h, fontSize)
             }
             pageCount = doc.countPages()
@@ -187,14 +187,15 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
+        val path = file.absolutePath
         try {
-            if (null != ImageCache.acquirePage(file.absolutePath)) {
+            if (null != ImageCache.acquirePage(path)) {
                 return
             }
             val page = getPage(0)
             val bitmap = renderCoverPage(page)
 
-            CustomImageFetcher.cacheBitmap(bitmap, file.absolutePath)
+            CustomImageFetcher.cacheBitmap(bitmap, path)
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
         }

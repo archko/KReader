@@ -46,6 +46,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.archko.reader.pdf.cache.APageSizeLoader
+import com.archko.reader.pdf.cache.CustomImageFetcher
+import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
@@ -62,6 +65,7 @@ import kreader.composeapp.generated.resources.clear_history
 import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.delete_cache
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
@@ -244,8 +248,10 @@ fun FileScreen(
                                     onDeleteCache = {
                                         // 异步删除缓存文件
                                         scope.launch {
-                                            //CustomImageFetcher.deleteCache(recentList[i].path)
-                                            //APageSizeLoader.deletePageSizeFromFile(recentList[i].path)
+                                            val path = recentList[i].path
+                                            CustomImageFetcher.deleteCache(path)
+                                            APageSizeLoader.deletePageSizeFromFile(path)
+                                            ReflowCacheLoader.deleteReflowCache(File(path))
                                         }
                                     }
                                 )
@@ -445,13 +451,13 @@ private fun RecentItem(
                     onDelete(recent)
                 }
             )
-            /*DropdownMenuItem(
+            DropdownMenuItem(
                 text = { Text(stringResource(Res.string.delete_cache)) },
                 onClick = {
                     showMenu = false
                     onDeleteCache(recent)
                 }
-            )*/
+            )
         }
     }
 }

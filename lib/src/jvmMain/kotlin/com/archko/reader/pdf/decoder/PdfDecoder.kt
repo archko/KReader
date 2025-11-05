@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.cache.APageSizeLoader
+import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
@@ -52,8 +54,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private val maxPageCache = 8
 
     public override val aPageList: MutableList<APage>? = ArrayList()
-
-    //private var pageSizeBean: PageSizeBean? = null
+    private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public var cacheBean: ReflowCacheBean? = null
 
@@ -141,9 +142,23 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private fun initPageSizeBean() {
         try {
             val count: Int = originalPageSizes.size
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
+            println("PdfDecoder.initPageSizeBean:$psb")
+            if (null != psb) {
+                pageSizeBean = psb
+                aPageList!!.addAll(psb.list as MutableList)
+                return
+            } else {
+                pageSizeBean = PageSizeBean()
+                pageSizeBean!!.list = aPageList
+            }
             for (i in 0..<count) {
                 val aPage = APage(i, originalPageSizes[i].width, originalPageSizes[i].height, 1f)
                 aPageList!!.add(aPage)
+            }
+
+            if (cachePage) {
+                APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
             }
         } catch (_: Exception) {
             aPageList!!.clear()
@@ -155,9 +170,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun cacheCoverIfNeeded() {
         val path = file.absolutePath
-        if (FileTypeUtils.isTiffFile(path)) {
-            return
-        }
         try {
             if (null != ImageCache.acquirePage(path)) {
                 return
@@ -209,7 +221,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 true
             )
             pixmap.clear(255)
-            com.artifex.mupdf.fitz.Context.disableICC();
+            com.artifex.mupdf.fitz.Context.disableICC()
             val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
@@ -246,7 +258,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 true
             )
             pixmap.clear(255)
-            com.artifex.mupdf.fitz.Context.disableICC();
+            com.artifex.mupdf.fitz.Context.disableICC()
             val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
@@ -287,7 +299,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 true
             )
             pixmap.clear(255)
-            com.artifex.mupdf.fitz.Context.disableICC();
+            com.artifex.mupdf.fitz.Context.disableICC()
             val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
             val cropCtm = Matrix()
             cropCtm.scale(scale, scale)
@@ -354,8 +366,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun close() {
-        if (aPageList != null && !aPageList.isEmpty()) {
-            println("PdfDecoder.close: aPageList size=${aPageList.size}")
+        if (cachePage && aPageList != null && !aPageList.isEmpty()) {
+            println("PdfDecoder.close:$aPageList")
+            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
         // 清理页面缓存

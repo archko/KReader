@@ -1,9 +1,7 @@
 package com.archko.reader.pdf.cache
 
-import android.util.Log
 import androidx.compose.ui.geometry.Rect
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.util.FileUtils
 import kotlinx.serialization.json.*
 import java.io.File
 
@@ -21,9 +19,9 @@ public object APageSizeLoader {
 
     private fun getCacheFile(file: File): File {
         val saveFile = File(
-            //FileUtils.getExternalCacheDir(App.instance).path
-            FileUtils.getStorageDirPath() + "/amupdf"
-                    + File.separator + "page" + File.separator + file.nameWithoutExtension + ".json"
+            FileUtils.getCacheDirectory("page").absolutePath
+                    + File.separator
+                    + file.nameWithoutExtension + ".json"
         )
         return saveFile
     }
@@ -36,7 +34,7 @@ public object APageSizeLoader {
         try {
             val size = file.length()
             val saveFile = getCacheFile(file)
-            if (!saveFile.exists()) {
+            if(!saveFile.exists()){
                 return null
             }
             val content = saveFile.readText(Charsets.UTF_8)
@@ -58,7 +56,7 @@ public object APageSizeLoader {
             val file = File(path)
             val size = file.length()
             val saveFile = getCacheFile(file)
-            if (!saveFile.exists()) {
+            if(!saveFile.exists()){
                 return null
             }
             val content = saveFile.readText(Charsets.UTF_8)
@@ -99,11 +97,11 @@ public object APageSizeLoader {
     private fun fromJson(pageCount: Int, fileSize: Long, jo: JsonObject): PageSizeBean? {
         val ja = jo["pagesize"]?.jsonArray
         if (null == ja || ja.size != pageCount) {
-            Log.d("TAG", "new pagecount:$pageCount")
+            //Log.d("TAG", "new pagecount:$pageCount")
             return null
         }
         if (fileSize != jo["filesize"]?.jsonPrimitive?.longOrNull) {
-            Log.d("TAG", "new filesize:$fileSize")
+            //Log.d("TAG", "new filesize:$fileSize")
             return null
         }
         val pageSizeBean = PageSizeBean()

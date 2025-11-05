@@ -86,7 +86,7 @@ public object ReflowCacheLoader {
             val cacheBean = ReflowCacheBean(
                 pageCount = totalPages,
                 fileSize = file.length(),
-                reflowTexts = reflowTexts
+                reflow = reflowTexts
             )
 
             val content = json.encodeToString(cacheBean)
@@ -125,12 +125,12 @@ public object ReflowCacheLoader {
      * @return 从指定页码开始的文本列表
      */
     public fun getTextsFromPage(cacheBean: ReflowCacheBean, startPage: Int): List<ReflowBean> {
-        if (startPage < 0 || cacheBean.reflowTexts.isEmpty()) {
+        if (startPage < 0 || cacheBean.reflow.isEmpty()) {
             return emptyList()
         }
 
         // 找到第一个页码大于等于startPage的ReflowBean的索引位置
-        val startIndex = cacheBean.reflowTexts.indexOfFirst { reflowBean ->
+        val startIndex = cacheBean.reflow.indexOfFirst { reflowBean ->
             try {
                 val pageNumber = reflowBean.page?.toIntOrNull() ?: -1
                 pageNumber >= startPage
@@ -146,7 +146,7 @@ public object ReflowCacheLoader {
         }
 
         println("ReflowCache: 从索引 $startIndex 开始返回内容，对应页码 >= $startPage")
-        return cacheBean.reflowTexts.subList(startIndex, cacheBean.reflowTexts.size)
+        return cacheBean.reflow.subList(startIndex, cacheBean.reflow.size)
     }
 
     /**

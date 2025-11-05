@@ -12,9 +12,9 @@ import kotlinx.serialization.Serializable
 public data class ReflowCacheBean(
     val pageCount: Int,
     val fileSize: Long,
-    val reflowTexts: List<ReflowBean>
+    val reflow: List<ReflowBean>
 ) {
     override fun toString(): String {
-        return "ReflowCacheBean(pageCount=$pageCount, fileSize=$fileSize, textsSize=${reflowTexts.size})"
+        return "ReflowCacheBean(pageCount=$pageCount, fileSize=$fileSize, textsSize=${reflow.size})"
     }
 }

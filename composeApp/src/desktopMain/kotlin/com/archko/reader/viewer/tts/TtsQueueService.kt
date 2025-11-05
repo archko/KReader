@@ -1,9 +1,9 @@
 package com.archko.reader.viewer.tts
 
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsTask
 import com.archko.reader.pdf.tts.Voice
-import com.archko.reader.viewer.tts.TtsUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +41,7 @@ class TtsQueueService : SpeechService {
 
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
-    private val currentReflowBean = AtomicReference<com.archko.reader.pdf.entity.ReflowBean?>(null)
+    private val currentReflowBean = AtomicReference<ReflowBean?>(null)
 
     @Volatile
     private var ttsWorker: TtsWorker? = null
@@ -241,7 +241,7 @@ class TtsQueueService : SpeechService {
         }
     }
 
-    override fun speak(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
+    override fun speak(reflowBean: ReflowBean) {
         val text = reflowBean.data ?: ""
         println("TTS: Speak requested: ${text.take(50)}...")
 
@@ -263,15 +263,15 @@ class TtsQueueService : SpeechService {
         }
     }
 
-    override fun addToQueue(reflowBean: com.archko.reader.pdf.entity.ReflowBean) {
+    override fun addToQueue(reflowBean: ReflowBean) {
         val text = reflowBean.data ?: ""
         if (text.isBlank()) return
 
         GlobalScope.launch {
-            var queueSize = 0
+            //var queueSize = 0
             queueMutex.withLock {
                 taskQueue.add(TtsTask(reflowBean, priority = 0))
-                queueSize = taskQueue.size
+                //queueSize = taskQueue.size
             }
 
             // 确保工作器存在并通知有新任务
@@ -381,7 +381,7 @@ class TtsQueueService : SpeechService {
         }
     }
 
-    override fun getCurrentReflowBean(): com.archko.reader.pdf.entity.ReflowBean? {
+    override fun getCurrentReflowBean(): ReflowBean? {
         return currentReflowBean.get()
     }
 

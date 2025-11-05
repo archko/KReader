@@ -82,7 +82,7 @@ fun QueueDialog(
                     // 自动滚动到当前朗读的项目
                     LaunchedEffect(currentSpeakingPage) {
                         currentSpeakingPage?.let { speakingPage ->
-                            val index = cacheBean.reflowTexts.indexOfFirst { it.page == speakingPage }
+                            val index = cacheBean.reflow.indexOfFirst { it.page == speakingPage }
                             if (index >= 0) {
                                 listState.animateScrollToItem(index)
                             }
@@ -98,7 +98,7 @@ fun QueueDialog(
                         )
                     ) {
                         itemsIndexed(
-                            cacheBean.reflowTexts,
+                            cacheBean.reflow,
                             key = { index, item -> index }) { index, item ->
                             val isCurrentSpeaking = item.page == currentSpeakingPage
                             Card(
