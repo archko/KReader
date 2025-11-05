@@ -86,4 +86,7 @@
     <string name="tts_sleep_dialog_ok">Ok</string>
     <string name="tts_sleep_set_time">Set %s Minutes</string>
     <string name="tts_sleep_set_cancel">Cancel Sleep Time</string>
+    
+    <string name="create_pdf">Create PDF</string>
+    <string name="export_pdf">Export PDF</string>
 </resources>

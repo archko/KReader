@@ -87,4 +87,7 @@
     <string name="tts_sleep_dialog_ok">确定</string>
     <string name="tts_sleep_set_time">已设置睡眠定时%s分钟</string>
     <string name="tts_sleep_set_cancel">已取消睡眠定时</string>
+    
+    <string name="create_pdf">创建PDF</string>
+    <string name="export_pdf">导出PDF</string>
 </resources>

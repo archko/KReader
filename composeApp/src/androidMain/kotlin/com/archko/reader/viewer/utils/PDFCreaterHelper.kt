@@ -1,5 +1,6 @@
 package com.archko.reader.viewer.utils
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
@@ -11,16 +12,19 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.util.BitmapUtils
 import com.archko.reader.pdf.util.FileUtils
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.pdf.util.StreamUtils
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Image
+import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.PDFDocument
 import com.artifex.mupdf.fitz.PDFObject
+import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.Rect
+import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
-import java.lang.StringBuilder
 
 /**
  * @author: archko 2018/12/21 :1:03 PM
@@ -34,7 +38,8 @@ public object PDFCreaterHelper {
      * A1：594×841
      * A0：841×1189 mm
      */
-    public const val OPTS: String = "compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
+    public const val OPTS: String =
+        "compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
     private const val PAPER_WIDTH = 1080f
     private const val PAPER_HEIGHT = 1800f
     private const val PAPER_PADDING = 40f
@@ -67,7 +72,8 @@ public object PDFCreaterHelper {
         }
         mDocument.save(pdfPath, OPTS)
         Log.d("TAG", String.format("save,%s,%s", mDocument.toString(), mDocument.countPages()))
-        val cacheDir = FileUtils.Companion.getExternalCacheDir(PdfApp.Companion.app!!).path + File.separator + "create"
+        val cacheDir =
+            FileUtils.Companion.getExternalCacheDir(PdfApp.Companion.app!!).path + File.separator + "create"
         val dir = File(cacheDir)
         if (dir.isDirectory) {
             dir.deleteRecursively()
@@ -217,8 +223,127 @@ public object PDFCreaterHelper {
         result.add(file.absolutePath)
     }
 
-    //================== 系统创建的api,通过打印的方式来创建 ==================
+    var canExtract: Boolean = true
 
+    fun extractToImages(
+        screenWidth: Int, dir: String, pdfPath: String,
+        start: Int,
+        end: Int
+    ): Int {
+        try {
+            Log.d(
+                "TAG",
+                "extractToImages:$screenWidth, start:$start, end:$end dir:$dir, dst:$pdfPath"
+            )
+            val mupdfDocument = Document.openDocument(pdfPath)
+            val count: Int = mupdfDocument.countPages()
+            var startPage = start
+            if (startPage < 0) {
+                startPage = 0
+            } else if (startPage >= count) {
+                startPage = 0
+            }
+            var endPage = end
+            if (end > count) {
+                endPage = count
+            } else if (endPage < 0) {
+                endPage = count
+            }
+            for (i in startPage until endPage) {
+                if (!canExtract) {
+                    Log.d("TAG", "extractToImages.stop")
+                    return i
+                }
+                val page = mupdfDocument.loadPage(i)
+                if (null != page) {
+                    val pageWidth = page.bounds.x1 - page.bounds.x0
+                    val pageHeight = page.bounds.y1 - page.bounds.y0
+
+                    var exportWidth = screenWidth
+                    if (exportWidth == -1) {
+                        exportWidth = pageWidth.toInt()
+                    }
+                    val scale = exportWidth / pageWidth
+                    val width = exportWidth
+                    val height = pageHeight * scale
+                    val bitmap = BitmapPool.acquire(width, height.toInt())
+                    val ctm = Matrix(scale)
+                    render(page, ctm, bitmap, 0, 0, 0)
+                    page.destroy()
+                    BitmapUtils.saveBitmapToFile(bitmap, File("$dir/${i + 1}.jpg"))
+                    BitmapPool.release(bitmap)
+                }
+                Log.d("TAG", "extractToImages:page:${i + 1}.jpg")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return -2
+        }
+        return 0
+    }
+
+    fun render(
+        page: Page?,
+        ctm: Matrix?,
+        bitmap: Bitmap?,
+        xOrigin: Int,
+        leftBound: Int,
+        topBound: Int
+    ) {
+        if (page == null) {
+            return
+        }
+        val dev = AndroidDrawDevice(bitmap, xOrigin + leftBound, topBound)
+        page.run(dev, ctm, null)
+        dev.close()
+        dev.destroy()
+    }
+
+    fun extractToHtml(
+        start: Int, end: Int, path: String, pdfPath: String
+    ): Boolean {
+        try {
+            val mupdfDocument = Document.openDocument(pdfPath)
+            val count: Int = mupdfDocument.countPages()
+            var startPage = start
+            if (startPage < 0) {
+                startPage = 0
+            } else if (startPage >= count) {
+                startPage = 0
+            }
+            var endPage = end
+            if (end > count) {
+                endPage = count
+            } else if (endPage < 0) {
+                endPage = count
+            }
+            val stringBuilder = StringBuilder()
+            for (i in startPage until endPage) {
+                val page = mupdfDocument.loadPage(i)
+                if (null != page) {
+                    val content =
+                        String(page.textAsHtml2("preserve-whitespace,inhibit-spaces,preserve-images"))
+                    stringBuilder.append(content)
+                    Log.d(
+                        "extractToHtml",
+                        String.format(
+                            "============%s-content:%s==========",
+                            i,
+                            content,
+                        )
+                    )
+                    page.destroy()
+                    StreamUtils.appendStringToFile(stringBuilder.toString(), path)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
+
+    //================== 系统创建的api,通过打印的方式来创建 ==================
 
     /**
      * Page width for our PDF.
@@ -546,7 +671,7 @@ public object PDFCreaterHelper {
     /**
      * 移除PDF密码保护（解密）
      */
-    public fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean  {
+    public fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {
@@ -582,7 +707,7 @@ public object PDFCreaterHelper {
     public fun changePDFPassword(
         inputFile: String?, outputFile: String?,
         oldPassword: String?, newUserPassword: String?, newOwnerPassword: String?
-    ): Boolean  {
+    ): Boolean {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {

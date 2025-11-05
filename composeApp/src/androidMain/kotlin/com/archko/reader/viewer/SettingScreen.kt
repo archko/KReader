@@ -2,11 +2,36 @@ package com.archko.reader.viewer
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,8 +47,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.archko.reader.viewer.dialog.PdfCreateDialog
 import com.archko.reader.viewer.dialog.PdfEncryptDialog
-import kreader.composeapp.generated.resources.*
+import com.archko.reader.viewer.dialog.PdfExportDialog
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.about
+import kreader.composeapp.generated.resources.about_content
+import kreader.composeapp.generated.resources.about_kreader
+import kreader.composeapp.generated.resources.app_author
+import kreader.composeapp.generated.resources.create_pdf
+import kreader.composeapp.generated.resources.encrypt_decrypt_title
+import kreader.composeapp.generated.resources.export_pdf
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.support_format
+import kreader.composeapp.generated.resources.version
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -101,7 +138,10 @@ fun Avatar() {
                         Color(0xFF1565C0), // 更深蓝色
                         Color(0xFF0D47A1)  // 最深的蓝色
                     ),
-                    center = Offset(centerX - size.minDimension * 0.1f, centerY - size.minDimension * 0.1f),
+                    center = Offset(
+                        centerX - size.minDimension * 0.1f,
+                        centerY - size.minDimension * 0.1f
+                    ),
                     radius = size.minDimension * 0.6f
                 ),
                 radius = size.minDimension / 2,
@@ -116,11 +156,17 @@ fun Avatar() {
                         Color(0xFF90CAF9).copy(alpha = 0.1f),
                         Color.Transparent
                     ),
-                    center = Offset(centerX + size.minDimension * 0.2f, centerY + size.minDimension * 0.2f),
+                    center = Offset(
+                        centerX + size.minDimension * 0.2f,
+                        centerY + size.minDimension * 0.2f
+                    ),
                     radius = size.minDimension * 0.4f
                 ),
                 radius = size.minDimension * 0.4f,
-                center = Offset(centerX + size.minDimension * 0.2f, centerY + size.minDimension * 0.2f)
+                center = Offset(
+                    centerX + size.minDimension * 0.2f,
+                    centerY + size.minDimension * 0.2f
+                )
             )
 
             // 绘制书本主体（白色，带圆角）- 横着放，宽大于高
@@ -224,7 +270,10 @@ fun Avatar() {
             drawCircle(
                 color = Color(0xFF4CAF50).copy(alpha = 0.3f), // 绿色圆点，进一步降低透明度
                 radius = dotRadius2,
-                center = Offset(bookLeft + bookWidth - 10.dp.toPx(), bookTop + bookHeight - 10.dp.toPx())  // 右下角
+                center = Offset(
+                    bookLeft + bookWidth - 10.dp.toPx(),
+                    bookTop + bookHeight - 10.dp.toPx()
+                )  // 右下角
             )
 
             // 底部背景装饰圆形 - 形成正三角形（在书本之后绘制，显示在书本上面）
@@ -285,9 +334,66 @@ fun Avatar() {
 }
 
 @Composable
+fun SettingItem(
+    title: String,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            )
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .height(44.dp)
+                .fillMaxWidth()
+        ) {
+            Text(
+                text = title,
+                style = TextStyle(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                ),
+                maxLines = 1
+            )
+
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp
+                    ),
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun SettingCategory() {
     val context = LocalContext.current
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showPdfCreateDialog by remember { mutableStateOf(false) }
+    var showPdfExportDialog by remember { mutableStateOf(false) }
+    var showPdfEncryptDialog by remember { mutableStateOf(false) }
 
     val version by remember {
         var packageInfo: PackageInfo? = null
@@ -303,152 +409,54 @@ fun SettingCategory() {
             mutableStateOf("")
         }
     }
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .height(44.dp)
-                .fillMaxWidth()
-        ) {
-            Text(
-                text = stringResource(Res.string.version),
-                style = TextStyle(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                maxLines = 1
-            )
 
-            Row(
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-            ) {
-                Text(
-                    text = version!!,
-                    style = TextStyle(
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 15.sp
-                    ),
-                    maxLines = 1
-                )
-            }
-        }
+    Column {
+        SettingItem(
+            title = stringResource(Res.string.version),
+            subtitle = version
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.create_pdf),
+            onClick = { showPdfCreateDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.export_pdf),
+            onClick = { showPdfExportDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.encrypt_decrypt_title),
+            onClick = { showPdfEncryptDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.about),
+            onClick = { showAboutDialog = true }
+        )
     }
 
-    Spacer(modifier = Modifier.height(8.dp))
-
-    // 生成图标按钮
-    /*Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xffffffff))
-            .clickable {
-                IconGenerator.generateIcons(context)
-            }
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .height(44.dp)
-                .fillMaxWidth()
-        ) {
-            Text(
-                text = "生成应用图标",
-                style = TextStyle(
-                    Color(0xff333333),
-                    fontSize = 15.sp
-                ),
-                maxLines = 1
-            )
-
-            Text(
-                text = "圆形+矩形",
-                style = TextStyle(
-                    Color(0xff666666),
-                    fontSize = 12.sp
-                ),
-                maxLines = 1
-            )
-        }
+    // PDF创建 Dialog
+    if (showPdfCreateDialog) {
+        PdfCreateDialog(
+            onDismiss = { showPdfCreateDialog = false }
+        )
     }
 
-    Spacer(modifier = Modifier.height(8.dp))*/
-
-    var showPdfEncryptDialog by remember { mutableStateOf(false) }
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable { showPdfEncryptDialog = true }
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .height(44.dp)
-                .fillMaxWidth()
-        ) {
-            Text(
-                text = stringResource(Res.string.encrypt_decrypt_title),
-                style = TextStyle(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                maxLines = 1
-            )
-        }
-    }
-
-    Spacer(modifier = Modifier.height(8.dp))
-
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable { showAboutDialog = true }
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .height(44.dp)
-                .fillMaxWidth()
-        ) {
-            Text(
-                text = stringResource(Res.string.about),
-                style = TextStyle(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                maxLines = 1
-            )
-        }
+    // PDF导出 Dialog
+    if (showPdfExportDialog) {
+        PdfExportDialog(
+            onDismiss = { showPdfExportDialog = false }
+        )
     }
 
     // About Dialog
