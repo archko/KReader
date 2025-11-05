@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -26,9 +25,9 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +54,7 @@ import coil3.compose.AsyncImage
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
+import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
@@ -88,8 +88,6 @@ data class OpenDocRequest(val paths: List<String>, val page: Int?)
 
 @Composable
 fun FileScreen(
-    screenWidthInPixels: Int,
-    screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
@@ -295,7 +293,7 @@ fun FileScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 32.dp)
+                            .padding(top = 16.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(
@@ -347,7 +345,6 @@ fun FileScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(bottom = 56.dp)
                         ) {
-                            // 顶部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 Spacer(modifier = Modifier.height(0.dp))
                             }
@@ -386,14 +383,15 @@ fun FileScreen(
                                     onDeleteCache = {
                                         // 异步删除缓存文件
                                         scope.launch {
-                                            CustomImageFetcher.deleteCache(recentList[i].path)
-                                            APageSizeLoader.deletePageSizeFromFile(recentList[i].path)
+                                            val path = recentList[i].path
+                                            CustomImageFetcher.deleteCache(path)
+                                            APageSizeLoader.deletePageSizeFromFile(path)
+                                            ReflowCacheLoader.deleteReflowCache(File(path))
                                         }
                                     }
                                 )
                             }
 
-                            // 加载更多按钮 - 占满一行
                             if (hasMoreData) {
                                 item(span = { GridItemSpan(maxLineSpan) }) {
                                     Box(
@@ -403,9 +401,10 @@ fun FileScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (isLoading) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(24.dp),
-                                                strokeWidth = 2.dp
+                                            LinearProgressIndicator(
+                                                modifier = Modifier
+                                                    .height(24.dp)
+                                                    .padding(horizontal = 16.dp),
                                             )
                                         } else {
                                             Button(
@@ -422,7 +421,6 @@ fun FileScreen(
                                 }
                             }
 
-                            // 底部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 Spacer(modifier = Modifier.height(8.dp))
                             }

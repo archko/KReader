@@ -74,8 +74,6 @@ data class OpenDocRequest(val path: String, val page: Int?)
 
 @Composable
 fun FileScreen(
-    screenWidthInPixels: Int,
-    screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     initialFilePath: String? = null,
     modifier: Modifier = Modifier,

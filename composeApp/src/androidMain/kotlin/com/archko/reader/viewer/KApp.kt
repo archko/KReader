@@ -20,11 +20,11 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -34,7 +34,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.navigation.MainDestinations
 import com.archko.reader.viewer.navigation.rememberKNavController
-import androidx.compose.ui.unit.dp
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.home
 import kreader.composeapp.generated.resources.setting
@@ -47,7 +46,6 @@ val LocalNavController = compositionLocalOf<NavHostController> {
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
-
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun KApp(
@@ -58,14 +56,14 @@ fun KApp(
 ) {
     // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
     var currentExternalPath by remember { mutableStateOf(externalPath) }
-    
+
     // 只在首次接收到 externalPath 时设置
     LaunchedEffect(externalPath) {
         if (externalPath != null && currentExternalPath == null) {
             currentExternalPath = externalPath
         }
     }
-    
+
     Theme {
         val jetsnackNavController = rememberKNavController()
         SharedTransitionLayout {
@@ -111,7 +109,7 @@ fun MainContainer(
     val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     var showBottomBar by remember { mutableStateOf(true) }
-    
+
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -152,8 +150,6 @@ fun NavGraphBuilder.addHomeGraph(
 ) {
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
-            screenWidthInPixels,
-            screenHeightInPixels,
             viewModel,
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
@@ -178,7 +174,7 @@ enum class HomeSections(
         "Home",
         //R.drawable.ic_tab_home_selected,
         //R.drawable.ic_tab_home_normal,
-        "home/buds"
+        "home/file"
     ),
     SETTING(
         "Setting",

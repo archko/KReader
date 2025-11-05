@@ -26,6 +26,7 @@ import coil3.util.DebugLogger
 import coil3.util.Logger
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.DriverFactory
+import com.archko.reader.pdf.cache.FileUtils
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.skiko.setSystemLookAndFeel
+import java.awt.Desktop
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -41,12 +43,9 @@ import java.io.RandomAccessFile
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.channels.FileLock
-import java.util.Properties
 import java.util.Locale
+import java.util.Properties
 import kotlin.system.exitProcess
-import java.awt.Desktop
-import java.awt.desktop.OpenFilesEvent
-import java.awt.desktop.OpenFilesHandler
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
@@ -57,31 +56,30 @@ object SingleInstanceManager {
     private const val LOCK_FILE = "kreader.lock"
     private const val PORT_FILE = "kreader.port"
     private const val SERVER_PORT_START = 23456
-    
+
     private var lockFile: RandomAccessFile? = null
     private var fileLock: FileLock? = null
     private var serverSocket: ServerSocket? = null
-    
-    // 文件打开事件流
+
     private val _fileOpenEvents = MutableSharedFlow<String>()
     val fileOpenEvents: SharedFlow<String> = _fileOpenEvents
-    
+
     // 发送文件打开事件的公开方法
     fun sendFileOpenEvent(filePath: String) {
         CoroutineScope(Dispatchers.Main).launch {
             _fileOpenEvents.emit(filePath)
         }
     }
-    
+
     fun tryLockInstance(): Boolean {
         return try {
             val configDir = getConfigDir()
             val lockFileObj = File(configDir, LOCK_FILE)
-            
+
             lockFile = RandomAccessFile(lockFileObj, "rw")
             val channel = lockFile!!.channel
             fileLock = channel.tryLock()
-            
+
             if (fileLock != null) {
                 // 成功获取锁，启动服务器
                 startServer()
@@ -96,7 +94,7 @@ object SingleInstanceManager {
             false
         }
     }
-    
+
     private fun startServer() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -106,24 +104,23 @@ object SingleInstanceManager {
                     try {
                         serverSocket = ServerSocket(port)
                         break
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         port++
                     }
                 }
-                
+
                 if (serverSocket == null) {
                     println("无法找到可用端口")
                     return@launch
                 }
-                
+
                 // 保存端口号到文件
                 val configDir = getConfigDir()
                 val portFile = File(configDir, PORT_FILE)
                 portFile.writeText(port.toString())
-                
+
                 println("服务器启动在端口: $port")
-                
-                // 监听连接
+
                 while (true) {
                     try {
                         val clientSocket = serverSocket!!.accept()
@@ -142,12 +139,12 @@ object SingleInstanceManager {
             }
         }
     }
-    
+
     private fun handleClient(clientSocket: Socket) {
         try {
             val reader = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
             val writer = PrintWriter(clientSocket.getOutputStream(), true)
-            
+
             val message = reader.readLine()
             if (message != null && message.isNotEmpty()) {
                 if (message == "ACTIVATE") {
@@ -186,46 +183,46 @@ object SingleInstanceManager {
         } finally {
             try {
                 clientSocket.close()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // 忽略关闭错误
             }
         }
     }
-    
+
     fun sendFileToRunningInstance(filePath: String): Boolean {
         return try {
             val configDir = getConfigDir()
             val portFile = File(configDir, PORT_FILE)
-            
+
             if (!portFile.exists()) {
                 println("端口文件不存在")
                 return false
             }
-            
+
             val port = portFile.readText().toInt()
             val socket = Socket("localhost", port)
-            
+
             val writer = PrintWriter(socket.getOutputStream(), true)
             val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-            
+
             writer.println(filePath)
             val response = reader.readLine()
-            
+
             socket.close()
-            
+
             response == "OK"
         } catch (e: Exception) {
             println("发送文件到运行实例失败: ${e.message}")
             false
         }
     }
-    
+
     fun cleanup() {
         try {
             serverSocket?.close()
             fileLock?.release()
             lockFile?.close()
-            
+
             // 清理临时文件
             val configDir = getConfigDir()
             File(configDir, LOCK_FILE).delete()
@@ -238,12 +235,7 @@ object SingleInstanceManager {
 
 // 窗口状态管理
 private fun getConfigDir(): File {
-    val userHome = System.getProperty("user.home")
-    val configDir = File(userHome, ".kreader")
-    if (!configDir.exists()) {
-        configDir.mkdirs()
-    }
-    return configDir
+    return FileUtils.getCacheDirectory()
 }
 
 private data class SavedWindowState(
@@ -254,18 +246,18 @@ private data class SavedWindowState(
 
 private fun loadWindowState(): SavedWindowState {
     val configFile = File(getConfigDir(), "window.properties")
-    
+
     return if (configFile.exists()) {
         try {
             val properties = Properties()
             properties.load(configFile.inputStream())
-            
+
             val width = properties.getProperty("width", "1024").toFloat().dp
             val height = properties.getProperty("height", "768").toFloat().dp
             val x = properties.getProperty("x", "0").toFloat().dp
             val y = properties.getProperty("y", "0").toFloat().dp
             val isMaximized = properties.getProperty("isMaximized", "true").toBoolean()
-            
+
             SavedWindowState(
                 placement = if (isMaximized) WindowPlacement.Maximized else WindowPlacement.Floating,
                 size = androidx.compose.ui.unit.DpSize(width, height),
@@ -294,7 +286,7 @@ private fun saveWindowState(windowState: WindowState) {
     try {
         val configFile = File(getConfigDir(), "window.properties")
         val properties = Properties()
-        
+
         properties.setProperty("width", windowState.size.width.value.toString())
         properties.setProperty("height", windowState.size.height.value.toString())
         // 仅在非最大化时保存位置，否则保存的可能是屏幕外的位置
@@ -307,8 +299,11 @@ private fun saveWindowState(windowState: WindowState) {
             properties.setProperty("y", "0")
         }
 
-        properties.setProperty("isMaximized", (windowState.placement == WindowPlacement.Maximized).toString())
-        
+        properties.setProperty(
+            "isMaximized",
+            (windowState.placement == WindowPlacement.Maximized).toString()
+        )
+
         properties.store(configFile.outputStream(), "KReader Window State")
         println("窗口状态已保存")
     } catch (e: Exception) {
@@ -320,32 +315,11 @@ private fun saveWindowState(windowState: WindowState) {
 fun main(args: Array<String>) {
     // 初始化原生库加载器
     NativeLibraryLoader.initialize()
-    
+
     setSystemLookAndFeel()
 
     // 详细的启动调试信息
     println("=== KReader 启动 ===")
-    println("命令行参数数量: ${args.size}")
-    args.forEachIndexed { index, arg ->
-        println("参数[$index]: '$arg'")
-    }
-    
-    // 检查所有可能的系统属性
-    val javaCommand = System.getProperty("sun.java.command")
-    println("Java命令: $javaCommand")
-    
-    // 打印所有相关的系统属性
-    val relevantProps = listOf(
-        "file.to.open", "java.awt.desktop.file", "apple.awt.application.name",
-        "com.apple.mrj.application.apple.menu.about.name", "user.dir"
-    )
-    relevantProps.forEach { prop ->
-        val value = System.getProperty(prop)
-        if (value != null) {
-            println("系统属性 $prop: $value")
-        }
-    }
-    
     // 检查环境变量
     val relevantEnvs = listOf("KREADER_FILE", "JAVA_MAIN_CLASS_PID")
     relevantEnvs.forEach { env ->
@@ -363,7 +337,7 @@ fun main(args: Array<String>) {
             val filePath = args[0]
             val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
             println("方法1 - 命令行参数: $filePath -> $cleanPath")
-            
+
             val file = File(cleanPath)
             if (file.exists() && file.isFile) {
                 println("✓ 命令行参数文件有效: ${file.absolutePath}")
@@ -372,20 +346,20 @@ fun main(args: Array<String>) {
                 println("✗ 命令行参数文件无效: ${file.absolutePath}")
             }
         }
-        
+
         // 方法2: 系统属性
         val systemProps = listOf(
             "file.to.open",
-            "java.awt.desktop.file", 
+            "java.awt.desktop.file",
             "apple.laf.useScreenMenuBar.file"
         )
-        
+
         for (prop in systemProps) {
             val filePath = System.getProperty(prop)
             if (filePath != null) {
                 val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
                 println("方法2 - 系统属性 $prop: $filePath -> $cleanPath")
-                
+
                 val file = File(cleanPath)
                 if (file.exists() && file.isFile) {
                     println("✓ 系统属性文件有效: ${file.absolutePath}")
@@ -395,13 +369,13 @@ fun main(args: Array<String>) {
                 }
             }
         }
-        
+
         // 方法3: 环境变量
         val filePath = System.getenv("KREADER_FILE")
         if (filePath != null) {
             val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
             println("方法3 - 环境变量: $filePath -> $cleanPath")
-            
+
             val file = File(cleanPath)
             if (file.exists() && file.isFile) {
                 println("✓ 环境变量文件有效: ${file.absolutePath}")
@@ -410,16 +384,23 @@ fun main(args: Array<String>) {
                 println("✗ 环境变量文件无效: ${file.absolutePath}")
             }
         }
-        
+
         // 方法4: 检查 Java 命令中是否包含文件路径
+        val javaCommand = System.getProperty("sun.java.command")
+        println("Java命令: $javaCommand")
         if (javaCommand != null && javaCommand.contains("/") && !javaCommand.endsWith(".jar")) {
             val parts = javaCommand.split(" ")
             for (part in parts) {
-                if (part.contains("/") && (part.endsWith(".pdf") || part.endsWith(".epub") || 
-                    part.endsWith(".mobi") || part.endsWith(".txt") || part.endsWith(".djvu"))) {
+                if (part.contains("/") &&
+                    (part.endsWith(".pdf")
+                            || part.endsWith(".epub")
+                            || part.endsWith(".mobi")
+                            || part.endsWith(".txt")
+                            || part.endsWith(".djvu"))
+                ) {
                     val cleanPath = part.trim('"', '\'').replace("\\", "/")
                     println("方法4 - Java命令解析: $part -> $cleanPath")
-                    
+
                     val file = File(cleanPath)
                     if (file.exists() && file.isFile) {
                         println("✓ Java命令文件有效: ${file.absolutePath}")
@@ -430,14 +411,14 @@ fun main(args: Array<String>) {
                 }
             }
         }
-        
+
         println("所有方法都未找到有效文件路径")
         return null
     }
 
     val initialFilePath = findFilePath()
     println("启动应用，最终文件路径: $initialFilePath")
-    
+
     // =======================================================
     // 启用单实例管理逻辑
     // =======================================================
@@ -469,33 +450,30 @@ fun main(args: Array<String>) {
     })
     // =======================================================
 
-
     application {
         // 设置 macOS 文件打开事件处理
         if (System.getProperty("os.name").lowercase(Locale.getDefault()).contains("mac")) {
             try {
-                if (Desktop.isDesktopSupported()) {
-                    val desktop = Desktop.getDesktop()
-                    if (desktop.isSupported(Desktop.Action.APP_OPEN_FILE)) {
-                        desktop.setOpenFileHandler { event ->
-                            println("macOS 文件打开事件触发")
-                            val files = event.files
-                            if (files.isNotEmpty()) {
-                                val file = files[0]
-                                println("通过 macOS 事件接收到文件: ${file.absolutePath}")
-                                
-                                // 发送文件打开事件到应用
-                                SingleInstanceManager.sendFileOpenEvent(file.absolutePath)
-                            }
+                val desktop = Desktop.getDesktop()
+                if (desktop.isSupported(Desktop.Action.APP_OPEN_FILE)) {
+                    desktop.setOpenFileHandler { event ->
+                        println("macOS 文件打开事件触发")
+                        val files = event.files
+                        if (files.isNotEmpty()) {
+                            val file = files[0]
+                            println("通过 macOS 事件接收到文件: ${file.absolutePath}")
+
+                            // 发送文件打开事件到应用
+                            SingleInstanceManager.sendFileOpenEvent(file.absolutePath)
                         }
-                        println("macOS 文件打开事件处理器已设置")
                     }
+                    println("macOS 文件打开事件处理器已设置")
                 }
             } catch (e: Exception) {
                 println("设置 macOS 文件打开事件处理器失败: ${e.message}")
             }
         }
-        
+
         // 加载保存的窗口状态
         val savedState = loadWindowState()
         val windowState = rememberWindowState(
@@ -504,7 +482,7 @@ fun main(args: Array<String>) {
             position = savedState.position
         )
 
-        val window = Window(
+        Window(
             title = "KReader",
             state = windowState,
             onCloseRequest = {
@@ -532,59 +510,57 @@ fun main(args: Array<String>) {
             println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
 
             val driverFactory = DriverFactory()
-            // 假设 createRoomDatabase 是一个轻量级操作或在初始化阶段进行
-            val database = driverFactory.createRoomDatabase() 
+            val database = driverFactory.createRoomDatabase()
 
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
                 viewModel.database = database
-                
+
                 // 文档管理状态
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }
                 var forceReload by remember { mutableStateOf(false) }
-                
+
                 // =======================================================
                 // 启用事件监听逻辑，处理第二个实例发送过来的文件路径
                 // =======================================================
-                LaunchedEffect(Unit) { 
+                LaunchedEffect(Unit) {
                     SingleInstanceManager.fileOpenEvents.collect { message ->
                         println("收到事件: $message")
-                        
+
                         if (message == "ACTIVATE") {
                             println("激活窗口")
                             windowState.isMinimized = false
-                            window.toFront() 
+                            window.toFront()
                             window.requestFocus()
                         } else {
                             println("收到新文件打开事件: $message")
-                            
+
                             // 检查是否是不同的文件
                             if (currentFilePath != message) {
                                 println("切换文档: $currentFilePath -> $message")
-                                
+
                                 // 如果当前有打开的文档，先关闭它
                                 if (currentFilePath != null) {
                                     println("关闭当前文档: $currentFilePath")
-                                    // 这里可以添加保存阅读进度等逻辑
                                 }
-                                
+
                                 // 更新到新文档
                                 currentFilePath = message
                                 forceReload = !forceReload // 触发重新加载
-                                
+
                                 println("已切换到新文档: $message")
                             } else {
                                 println("相同文件，只激活窗口")
                             }
-                            
+
                             windowState.isMinimized = false
                             window.toFront()
                             window.requestFocus()
                         }
                     }
                 }
-                
+
                 // 监听文件路径变化，确保 FileScreen 能响应新文件
                 LaunchedEffect(currentFilePath, forceReload) {
                     if (currentFilePath != null) {
@@ -592,11 +568,11 @@ fun main(args: Array<String>) {
                     }
                 }
                 // =======================================================
-                
+
                 // FileScreen 将使用 currentFilePath 来加载文件
                 // 使用 key 确保文档切换时正确重新加载
                 key(currentFilePath) {
-                    FileScreen(screenWidthInPixels, screenHeightInPixels, viewModel, currentFilePath)
+                    FileScreen(viewModel, currentFilePath)
                 }
             }
         }
