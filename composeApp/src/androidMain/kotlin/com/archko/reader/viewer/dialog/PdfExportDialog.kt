@@ -55,10 +55,31 @@ import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.export_pdf
 import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.select_pdf_file
+import kreader.composeapp.generated.resources.export_images
+import kreader.composeapp.generated.resources.export_html
+import kreader.composeapp.generated.resources.pdf_info
+import kreader.composeapp.generated.resources.file_label
+import kreader.composeapp.generated.resources.pages_label
+import kreader.composeapp.generated.resources.original_width_label
+import kreader.composeapp.generated.resources.page_range_label
+import kreader.composeapp.generated.resources.page_label
+import kreader.composeapp.generated.resources.single_page_document
+import kreader.composeapp.generated.resources.export_width_label
+import kreader.composeapp.generated.resources.select_pdf_to_export
+import kreader.composeapp.generated.resources.error_read_pdf_info
+import kreader.composeapp.generated.resources.please_select_pdf_first
+import kreader.composeapp.generated.resources.invalid_page_range
+import kreader.composeapp.generated.resources.images_export_success
+import kreader.composeapp.generated.resources.images_export_failed
+import kreader.composeapp.generated.resources.export_cancelled_partial
+import kreader.composeapp.generated.resources.html_export_success
+import kreader.composeapp.generated.resources.html_export_failed
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.getString
 
 @Composable
 fun PdfExportDialog(
@@ -96,7 +117,7 @@ fun PdfExportDialog(
                         }
                         doc.destroy()
                     } catch (e: Exception) {
-                        Toast.makeText(context, "无法读取PDF信息: ${e.message}", Toast.LENGTH_SHORT)
+                        Toast.makeText(context, getString(Res.string.error_read_pdf_info, e.message ?: ""), Toast.LENGTH_SHORT)
                             .show()
                     }
                 }
@@ -113,24 +134,24 @@ fun PdfExportDialog(
     }
 
     fun exportToImages() {
-        val pdfPath = selectedPdfPath
-        if (pdfPath == null) {
-            Toast.makeText(context, "请先选择PDF文件", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (startPage > endPage || startPage < 1 || endPage > pageCount) {
-            Toast.makeText(context, "页面范围无效", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val fileName = File(pdfPath).nameWithoutExtension
-        val outputDir = FileUtils.getStorageDir(fileName).absolutePath
-
-        isExporting = true
-        PDFCreaterHelper.canExtract = true
-
         scope.launch {
+            val pdfPath = selectedPdfPath
+            if (pdfPath == null) {
+                Toast.makeText(context, getString(Res.string.please_select_pdf_first), Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            if (startPage > endPage || startPage < 1 || endPage > pageCount) {
+                Toast.makeText(context, getString(Res.string.invalid_page_range), Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val fileName = File(pdfPath).nameWithoutExtension
+            val outputDir = FileUtils.getStorageDir(fileName).absolutePath
+
+            isExporting = true
+            PDFCreaterHelper.canExtract = true
+
             val result = withContext(Dispatchers.IO) {
                 PDFCreaterHelper.extractToImages(
                     exportWidth.roundToInt(), // 分辨率宽度
@@ -144,17 +165,17 @@ fun PdfExportDialog(
 
             when (result) {
                 0 -> {
-                    Toast.makeText(context, "图片导出成功！文件保存在: $outputDir", Toast.LENGTH_LONG)
+                    Toast.makeText(context, getString(Res.string.images_export_success, outputDir), Toast.LENGTH_LONG)
                         .show()
                     onDismiss()
                 }
 
                 -2 -> {
-                    Toast.makeText(context, "图片导出失败", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(Res.string.images_export_failed), Toast.LENGTH_SHORT).show()
                 }
 
                 else -> {
-                    Toast.makeText(context, "导出被取消，已导出: ${result}张", Toast.LENGTH_SHORT)
+                    Toast.makeText(context, getString(Res.string.export_cancelled_partial, result), Toast.LENGTH_SHORT)
                         .show()
                 }
             }
@@ -162,23 +183,23 @@ fun PdfExportDialog(
     }
 
     fun exportToHtml() {
-        val pdfPath = selectedPdfPath
-        if (pdfPath == null) {
-            Toast.makeText(context, "请先选择PDF文件", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (startPage > endPage || startPage < 1 || endPage > pageCount) {
-            Toast.makeText(context, "页面范围无效", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val fileName = File(pdfPath).nameWithoutExtension
-        val outputPath = FileUtils.getStorageDir(fileName).absolutePath + File.separator + "${fileName}.html"
-
-        isExporting = true
-
         scope.launch {
+            val pdfPath = selectedPdfPath
+            if (pdfPath == null) {
+                Toast.makeText(context, getString(Res.string.please_select_pdf_first), Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            if (startPage > endPage || startPage < 1 || endPage > pageCount) {
+                Toast.makeText(context, getString(Res.string.invalid_page_range), Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val fileName = File(pdfPath).nameWithoutExtension
+            val outputPath = FileUtils.getStorageDir(fileName).absolutePath + File.separator + "${fileName}.html"
+
+            isExporting = true
+
             val result = withContext(Dispatchers.IO) {
                 PDFCreaterHelper.extractToHtml(
                     startPage - 1,            // start (起始页，转换为0基索引)
@@ -190,11 +211,11 @@ fun PdfExportDialog(
             isExporting = false
 
             if (result) {
-                Toast.makeText(context, "HTML导出成功！文件保存在: $outputPath", Toast.LENGTH_LONG)
+                Toast.makeText(context, getString(Res.string.html_export_success, outputPath), Toast.LENGTH_LONG)
                     .show()
                 onDismiss()
             } else {
-                Toast.makeText(context, "HTML导出失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, getString(Res.string.html_export_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -244,7 +265,7 @@ fun PdfExportDialog(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isExporting
                     ) {
-                        Text("选择PDF文件")
+                        Text(stringResource(Res.string.select_pdf_file))
                     }
 
                     Row(
@@ -262,7 +283,7 @@ fun PdfExportDialog(
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                             } else {
-                                Text("导出图片")
+                                Text(stringResource(Res.string.export_images))
                             }
                         }
 
@@ -277,7 +298,7 @@ fun PdfExportDialog(
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                             } else {
-                                Text("导出HTML")
+                                Text(stringResource(Res.string.export_html))
                             }
                         }
                     }
@@ -290,21 +311,21 @@ fun PdfExportDialog(
                                 modifier = Modifier.padding(8.dp)
                             ) {
                                 Text(
-                                    text = "PDF信息",
+                                    text = stringResource(Res.string.pdf_info),
                                     style = TextStyle(
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("文件: ${File(selectedPdfPath!!).name}")
-                                Text("页数: $pageCount")
-                                Text("原始宽度: ${originalWidth}px")
+                                Text(stringResource(Res.string.file_label, File(selectedPdfPath!!).name))
+                                Text(stringResource(Res.string.pages_label, pageCount))
+                                Text(stringResource(Res.string.original_width_label, originalWidth))
                             }
                         }
 
                         Text(
-                            text = "页面范围: $startPage - $endPage",
+                            text = stringResource(Res.string.page_range_label, startPage, endPage),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium
@@ -327,15 +348,15 @@ fun PdfExportDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("第1页")
-                                Text("第${pageCount}页")
+                                Text(stringResource(Res.string.page_label, 1))
+                                Text(stringResource(Res.string.page_label, pageCount))
                             }
                         } else {
-                            Text("单页文档")
+                            Text(stringResource(Res.string.single_page_document))
                         }
 
                         Text(
-                            text = "导出宽度: ${exportWidth.roundToInt()}px",
+                            text = stringResource(Res.string.export_width_label, exportWidth.roundToInt()),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium
@@ -366,7 +387,7 @@ fun PdfExportDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "请选择要导出的PDF文件",
+                                text = stringResource(Res.string.select_pdf_to_export),
                                 style = TextStyle(
                                     fontSize = 16.sp,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)

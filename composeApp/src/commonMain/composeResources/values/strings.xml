@@ -89,4 +89,39 @@
     
     <string name="create_pdf">Create PDF</string>
     <string name="export_pdf">Export PDF</string>
+    
+    <!-- PDF Export Dialog -->
+    <string name="select_pdf_file">Select PDF File</string>
+    <string name="export_images">Export Images</string>
+    <string name="export_html">Export HTML</string>
+    <string name="pdf_info">PDF Info</string>
+    <string name="file_label">File: %s</string>
+    <string name="pages_label">Pages: %d</string>
+    <string name="original_width_label">Original Width: %dpx</string>
+    <string name="page_range_label">Page Range: %d - %d</string>
+    <string name="page_label">Page %d</string>
+    <string name="single_page_document">Single Page Document</string>
+    <string name="export_width_label">Export Width: %dpx</string>
+    <string name="select_pdf_to_export">Please select a PDF file to export</string>
+    <string name="error_read_pdf_info">Unable to read PDF info: %s</string>
+    <string name="please_select_pdf_first">Please select a PDF file first</string>
+    <string name="invalid_page_range">Invalid page range</string>
+    <string name="images_export_success">Images exported successfully! Files saved to: %s</string>
+    <string name="images_export_failed">Images export failed</string>
+    <string name="export_cancelled_partial">Export cancelled, exported: %d images</string>
+    <string name="html_export_success">HTML exported successfully! File saved to: %s</string>
+    <string name="html_export_failed">HTML export failed</string>
+    
+    <!-- PDF Create Dialog -->
+    <string name="pdf_filename">PDF Filename</string>
+    <string name="enter_pdf_filename">Enter PDF filename (optional)</string>
+    <string name="select_images">Select Images</string>
+    <string name="create_pdf_button">Create PDF</string>
+    <string name="creating">Creating...</string>
+    <string name="selected_images_count">Selected %d images:</string>
+    <string name="select_images_to_create_pdf">Please select images to create PDF</string>
+    <string name="delete">Delete</string>
+    <string name="please_select_images_first">Please select images first</string>
+    <string name="pdf_created_successfully">PDF created successfully</string>
+    <string name="pdf_creation_failed">PDF creation failed</string>
 </resources>

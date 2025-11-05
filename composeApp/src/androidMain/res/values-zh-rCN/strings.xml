@@ -6,4 +6,19 @@
     <string name="grant_all_files_permission">授予所有文件访问权限</string>
     <string name="no_sdcard_permission">没有获取sdcard的读取权限</string>
     <string name="grant_failed">权限授予失败</string>
+    
+    <!-- PDF Export Dialog -->
+    <string name="error_read_pdf_info">无法读取PDF信息: %s</string>
+    <string name="please_select_pdf_first">请先选择PDF文件</string>
+    <string name="invalid_page_range">页面范围无效</string>
+    <string name="images_export_success">图片导出成功！文件保存在: %s</string>
+    <string name="images_export_failed">图片导出失败</string>
+    <string name="export_cancelled_partial">导出被取消，已导出: %d张</string>
+    <string name="html_export_success">HTML导出成功！文件保存在: %s</string>
+    <string name="html_export_failed">HTML导出失败</string>
+    
+    <!-- PDF Create Dialog -->
+    <string name="please_select_images_first">请先选择图片</string>
+    <string name="pdf_created_successfully">PDF创建成功</string>
+    <string name="pdf_creation_failed">PDF创建失败</string>
 </resources>

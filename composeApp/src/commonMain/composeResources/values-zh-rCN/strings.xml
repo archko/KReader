@@ -90,4 +90,39 @@
     
     <string name="create_pdf">创建PDF</string>
     <string name="export_pdf">导出PDF</string>
+    
+    <!-- PDF Export Dialog -->
+    <string name="select_pdf_file">选择PDF文件</string>
+    <string name="export_images">导出图片</string>
+    <string name="export_html">导出HTML</string>
+    <string name="pdf_info">PDF信息</string>
+    <string name="file_label">文件: %s</string>
+    <string name="pages_label">页数: %d</string>
+    <string name="original_width_label">原始宽度: %dpx</string>
+    <string name="page_range_label">页面范围: %d - %d</string>
+    <string name="page_label">第%d页</string>
+    <string name="single_page_document">单页文档</string>
+    <string name="export_width_label">导出宽度: %dpx</string>
+    <string name="select_pdf_to_export">请选择要导出的PDF文件</string>
+    <string name="error_read_pdf_info">无法读取PDF信息: %s</string>
+    <string name="please_select_pdf_first">请先选择PDF文件</string>
+    <string name="invalid_page_range">页面范围无效</string>
+    <string name="images_export_success">图片导出成功！文件保存在: %s</string>
+    <string name="images_export_failed">图片导出失败</string>
+    <string name="export_cancelled_partial">导出被取消，已导出: %d张</string>
+    <string name="html_export_success">HTML导出成功！文件保存在: %s</string>
+    <string name="html_export_failed">HTML导出失败</string>
+    
+    <!-- PDF Create Dialog -->
+    <string name="pdf_filename">PDF文件名</string>
+    <string name="enter_pdf_filename">输入PDF文件名（可选）</string>
+    <string name="select_images">选择图片</string>
+    <string name="create_pdf_button">创建PDF</string>
+    <string name="creating">创建中...</string>
+    <string name="selected_images_count">已选择 %d 张图片:</string>
+    <string name="select_images_to_create_pdf">请选择图片来创建PDF</string>
+    <string name="delete">删除</string>
+    <string name="please_select_images_first">请先选择图片</string>
+    <string name="pdf_created_successfully">PDF创建成功</string>
+    <string name="pdf_creation_failed">PDF创建失败</string>
 </resources>

@@ -56,9 +56,21 @@ import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.create_pdf
 import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.ic_delete
+import kreader.composeapp.generated.resources.pdf_filename
+import kreader.composeapp.generated.resources.enter_pdf_filename
+import kreader.composeapp.generated.resources.select_images
+import kreader.composeapp.generated.resources.create_pdf_button
+import kreader.composeapp.generated.resources.creating
+import kreader.composeapp.generated.resources.selected_images_count
+import kreader.composeapp.generated.resources.select_images_to_create_pdf
+import kreader.composeapp.generated.resources.delete
+import kreader.composeapp.generated.resources.please_select_images_first
+import kreader.composeapp.generated.resources.pdf_created_successfully
+import kreader.composeapp.generated.resources.pdf_creation_failed
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
+import org.jetbrains.compose.resources.getString
 
 @Composable
 fun PdfCreateDialog(
@@ -70,6 +82,8 @@ fun PdfCreateDialog(
     var selectedImages by remember { mutableStateOf<List<String>>(emptyList()) }
     var pdfName by remember { mutableStateOf("") }
     var isCreating by remember { mutableStateOf(false) }
+
+
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -114,32 +128,32 @@ fun PdfCreateDialog(
     }
 
     fun createPdf() {
-        if (selectedImages.isEmpty()) {
-            Toast.makeText(context, "请先选择图片", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        var name = pdfName.trim()
-        if (name.isEmpty()) {
-            name = "new.pdf"
-        }
-        if (!name.endsWith(".pdf")) {
-            name = "$name.pdf"
-        }
-
-        val path = FileUtils.getStorageDir("book").absolutePath + File.separator + name
-
-        isCreating = true
         scope.launch {
+            if (selectedImages.isEmpty()) {
+                Toast.makeText(context, getString(Res.string.please_select_images_first), Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            var name = pdfName.trim()
+            if (name.isEmpty()) {
+                name = "new.pdf"
+            }
+            if (!name.endsWith(".pdf")) {
+                name = "$name.pdf"
+            }
+
+            val path = FileUtils.getStorageDir("book").absolutePath + File.separator + name
+
+            isCreating = true
             val result = withContext(Dispatchers.IO) {
                 PDFCreaterHelper.createPdfFromImages(path, selectedImages)
             }
             isCreating = false
             if (result) {
-                Toast.makeText(context, "PDF创建成功", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, getString(Res.string.pdf_created_successfully), Toast.LENGTH_SHORT).show()
                 onDismiss()
             } else {
-                Toast.makeText(context, "PDF创建失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, getString(Res.string.pdf_creation_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -184,8 +198,8 @@ fun PdfCreateDialog(
                     OutlinedTextField(
                         value = pdfName,
                         onValueChange = { pdfName = it },
-                        label = { Text("PDF文件名") },
-                        placeholder = { Text("输入PDF文件名（可选）") },
+                        label = { Text(stringResource(Res.string.pdf_filename)) },
+                        placeholder = { Text(stringResource(Res.string.enter_pdf_filename)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -201,7 +215,7 @@ fun PdfCreateDialog(
                             modifier = Modifier.weight(1f),
                             enabled = !isCreating
                         ) {
-                            Text("选择图片")
+                            Text(stringResource(Res.string.select_images))
                         }
 
                         Button(
@@ -215,9 +229,9 @@ fun PdfCreateDialog(
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("创建中...")
+                                Text(stringResource(Res.string.creating))
                             } else {
-                                Text("创建PDF")
+                                Text(stringResource(Res.string.create_pdf_button))
                             }
                         }
                     }
@@ -226,7 +240,7 @@ fun PdfCreateDialog(
 
                     if (selectedImages.isNotEmpty()) {
                         Text(
-                            text = "已选择 ${selectedImages.size} 张图片:",
+                            text = stringResource(Res.string.selected_images_count, selectedImages.size),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
@@ -256,7 +270,7 @@ fun PdfCreateDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "请选择图片来创建PDF",
+                                text = stringResource(Res.string.select_images_to_create_pdf),
                                 style = TextStyle(
                                     fontSize = 16.sp,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -304,7 +318,7 @@ private fun ImageItem(
         IconButton(onClick = onRemove) {
             Icon(
                 painter = painterResource(Res.drawable.ic_delete),
-                contentDescription = "删除",
+                contentDescription = stringResource(Res.string.delete),
                 tint = MaterialTheme.colorScheme.error
             )
         }

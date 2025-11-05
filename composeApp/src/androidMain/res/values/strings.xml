@@ -6,4 +6,19 @@
     <string name="grant_all_files_permission">Grant All Files Access Permission</string>
     <string name="no_sdcard_permission">No SD card read permission obtained</string>
     <string name="grant_failed">Permission grant failed</string>
+    
+    <!-- PDF Export Dialog -->
+    <string name="error_read_pdf_info">Unable to read PDF info: %s</string>
+    <string name="please_select_pdf_first">Please select a PDF file first</string>
+    <string name="invalid_page_range">Invalid page range</string>
+    <string name="images_export_success">Images exported successfully! Files saved to: %s</string>
+    <string name="images_export_failed">Images export failed</string>
+    <string name="export_cancelled_partial">Export cancelled, exported: %d images</string>
+    <string name="html_export_success">HTML exported successfully! File saved to: %s</string>
+    <string name="html_export_failed">HTML export failed</string>
+    
+    <!-- PDF Create Dialog -->
+    <string name="please_select_images_first">Please select images first</string>
+    <string name="pdf_created_successfully">PDF created successfully</string>
+    <string name="pdf_creation_failed">PDF creation failed</string>
 </resources>
