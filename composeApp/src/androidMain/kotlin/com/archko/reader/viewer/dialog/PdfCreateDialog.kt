@@ -6,35 +6,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,25 +29,11 @@ import com.archko.reader.viewer.utils.PDFCreaterHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.create_pdf
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.ic_delete
-import kreader.composeapp.generated.resources.pdf_filename
-import kreader.composeapp.generated.resources.enter_pdf_filename
-import kreader.composeapp.generated.resources.select_images
-import kreader.composeapp.generated.resources.create_pdf_button
-import kreader.composeapp.generated.resources.creating
-import kreader.composeapp.generated.resources.selected_images_count
-import kreader.composeapp.generated.resources.select_images_to_create_pdf
-import kreader.composeapp.generated.resources.delete
-import kreader.composeapp.generated.resources.please_select_images_first
-import kreader.composeapp.generated.resources.pdf_created_successfully
-import kreader.composeapp.generated.resources.pdf_creation_failed
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
-import org.jetbrains.compose.resources.getString
 
 @Composable
 fun PdfCreateDialog(
@@ -82,8 +45,6 @@ fun PdfCreateDialog(
     var selectedImages by remember { mutableStateOf<List<String>>(emptyList()) }
     var pdfName by remember { mutableStateOf("") }
     var isCreating by remember { mutableStateOf(false) }
-
-
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -240,7 +201,7 @@ fun PdfCreateDialog(
 
                     if (selectedImages.isNotEmpty()) {
                         Text(
-                            text = stringResource(Res.string.selected_images_count, selectedImages.size),
+                            text = stringResource(Res.string.selected_images_count).format(selectedImages.size),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,

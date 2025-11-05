@@ -5,38 +5,9 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,34 +23,12 @@ import com.artifex.mupdf.fitz.Document
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.export_pdf
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.select_pdf_file
-import kreader.composeapp.generated.resources.export_images
-import kreader.composeapp.generated.resources.export_html
-import kreader.composeapp.generated.resources.pdf_info
-import kreader.composeapp.generated.resources.file_label
-import kreader.composeapp.generated.resources.pages_label
-import kreader.composeapp.generated.resources.original_width_label
-import kreader.composeapp.generated.resources.page_range_label
-import kreader.composeapp.generated.resources.page_label
-import kreader.composeapp.generated.resources.single_page_document
-import kreader.composeapp.generated.resources.export_width_label
-import kreader.composeapp.generated.resources.select_pdf_to_export
-import kreader.composeapp.generated.resources.error_read_pdf_info
-import kreader.composeapp.generated.resources.please_select_pdf_first
-import kreader.composeapp.generated.resources.invalid_page_range
-import kreader.composeapp.generated.resources.images_export_success
-import kreader.composeapp.generated.resources.images_export_failed
-import kreader.composeapp.generated.resources.export_cancelled_partial
-import kreader.composeapp.generated.resources.html_export_success
-import kreader.composeapp.generated.resources.html_export_failed
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 import kotlin.math.roundToInt
-import org.jetbrains.compose.resources.getString
 
 @Composable
 fun PdfExportDialog(
@@ -117,7 +66,11 @@ fun PdfExportDialog(
                         }
                         doc.destroy()
                     } catch (e: Exception) {
-                        Toast.makeText(context, getString(Res.string.error_read_pdf_info, e.message ?: ""), Toast.LENGTH_SHORT)
+                        Toast.makeText(
+                            context,
+                            getString(Res.string.error_read_pdf_info, e.message ?: ""),
+                            Toast.LENGTH_SHORT
+                        )
                             .show()
                     }
                 }
@@ -318,14 +271,14 @@ fun PdfExportDialog(
                                     )
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(stringResource(Res.string.file_label, File(selectedPdfPath!!).name))
-                                Text(stringResource(Res.string.pages_label, pageCount))
-                                Text(stringResource(Res.string.original_width_label, originalWidth))
+                                Text(stringResource(Res.string.file_label).format(File(selectedPdfPath!!).name))
+                                Text(stringResource(Res.string.pages_label).format(pageCount))
+                                Text(stringResource(Res.string.original_width_label).format(originalWidth))
                             }
                         }
 
                         Text(
-                            text = stringResource(Res.string.page_range_label, startPage, endPage),
+                            text = stringResource(Res.string.page_range_label).format(startPage, endPage),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium
@@ -348,15 +301,15 @@ fun PdfExportDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(stringResource(Res.string.page_label, 1))
-                                Text(stringResource(Res.string.page_label, pageCount))
+                                Text(stringResource(Res.string.page_label).format(1))
+                                Text(stringResource(Res.string.page_label).format(pageCount))
                             }
                         } else {
                             Text(stringResource(Res.string.single_page_document))
                         }
 
                         Text(
-                            text = stringResource(Res.string.export_width_label, exportWidth.roundToInt()),
+                            text = stringResource(Res.string.export_width_label).format(exportWidth.roundToInt()),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium
