@@ -41,6 +41,7 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.runtime.compose)
 
             implementation(libs.filePicker)
+            implementation(libs.reorderable)
 
             api(libs.coil.kt)
             api(libs.coil.kt.compose)

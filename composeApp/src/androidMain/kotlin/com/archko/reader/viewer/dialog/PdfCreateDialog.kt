@@ -5,10 +5,10 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +33,8 @@ import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.io.File
 
 @Composable
@@ -210,17 +212,35 @@ fun PdfCreateDialog(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        val lazyListState = rememberLazyListState()
+                        val reorderableLazyListState = rememberReorderableLazyListState(
+                            lazyListState = lazyListState,
+                            onMove = { from, to ->
+                                selectedImages = selectedImages.toMutableList().apply {
+                                    add(to.index, removeAt(from.index))
+                                }
+                            }
+                        )
+
                         LazyColumn(
                             modifier = Modifier.weight(1f),
+                            state = lazyListState,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(selectedImages) { imagePath ->
-                                ImageItem(
-                                    imagePath = imagePath,
-                                    onRemove = {
-                                        selectedImages = selectedImages.filter { it != imagePath }
-                                    }
-                                )
+                            itemsIndexed(selectedImages, key = { _, item -> item }) { index, imagePath ->
+                                ReorderableItem(
+                                    state = reorderableLazyListState,
+                                    key = imagePath
+                                ) { isDragging ->
+                                    ImageItem(
+                                        imagePath = imagePath,
+                                        index = index + 1,
+                                        isDragging = isDragging,
+                                        onRemove = {
+                                            selectedImages = selectedImages.filter { it != imagePath }
+                                        }
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -248,40 +268,65 @@ fun PdfCreateDialog(
 @Composable
 private fun ImageItem(
     imagePath: String,
+    index: Int,
+    isDragging: Boolean,
     onRemove: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isDragging) 8.dp else 2.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDragging)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        AsyncImage(
-            model = File(imagePath),
-            contentDescription = null,
+        Row(
             modifier = Modifier
-                .size(60.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            contentScale = ContentScale.Crop
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Text(
-            text = File(imagePath).name,
-            modifier = Modifier.weight(1f),
-            style = TextStyle(fontSize = 14.sp),
-            maxLines = 2
-        )
-
-        IconButton(onClick = onRemove) {
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
-                painter = painterResource(Res.drawable.ic_delete),
-                contentDescription = stringResource(Res.string.delete),
-                tint = MaterialTheme.colorScheme.error
+                painter = painterResource(Res.drawable.ic_menu),
+                contentDescription = "Drag to reorder",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
             )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            AsyncImage(
+                model = File(imagePath),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "${index}. ${File(imagePath).name}",
+                    style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+                    maxLines = 2
+                )
+            }
+
+            IconButton(onClick = onRemove) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_delete),
+                    contentDescription = stringResource(Res.string.delete),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
