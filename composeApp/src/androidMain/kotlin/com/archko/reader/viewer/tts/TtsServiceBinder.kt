@@ -46,13 +46,18 @@ class TtsServiceBinder(private val context: Context) {
     fun bindService() {
         if (!isBound) {
             val intent = Intent(context, AndroidTtsForegroundService::class.java)
-            // 处理API 30+的前台服务限制
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            // 只绑定服务，不启动前台服务，避免在没有朗读时显示通知
             context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
+    }
+
+    // 当需要朗读时，启动前台服务以防止被杀死
+    private fun startForegroundServiceIfNeeded() {
+        val intent = Intent(context, AndroidTtsForegroundService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
         }
     }
 
@@ -68,11 +73,17 @@ class TtsServiceBinder(private val context: Context) {
 
     fun speak(reflowBean: ReflowBean) {
         println("TtsServiceBinder: speak called")
+        // 开始朗读时启动前台服务以防止被杀死
+        //startForegroundServiceIfNeeded()
         service?.speak(reflowBean)
     }
 
     fun addToQueue(reflowBean: ReflowBean) {
         //println("TtsServiceBinder: addToQueue called")
+        // 如果队列为空且当前没有朗读，说明要开始朗读了
+        //if (service?.getQueueSize() == 0 && !isSpeaking()) {
+        //    startForegroundServiceIfNeeded()
+        //}
         service?.addToQueue(reflowBean)
     }
 

@@ -73,6 +73,13 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             ACTION_STOP -> {
                 stop()
             }
+            //else -> {
+            //    // 当通过startForegroundService启动时，立即启动前台服务
+            //    if (!isForegroundServiceStarted) {
+            //        startForeground(NOTIFICATION_ID, createNotification())
+            //        isForegroundServiceStarted = true
+            //    }
+            //}
         }
 
         return START_STICKY
@@ -198,12 +205,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun speakText(text: String) {
         if (text.isNotBlank()) {
-            // 确保前台服务已启动
-            if (!isForegroundServiceStarted) {
-                startForeground(NOTIFICATION_ID, createNotification())
-                isForegroundServiceStarted = true
-            }
-
             val params = hashMapOf<String, String>().apply {
                 put(
                     TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
