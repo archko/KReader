@@ -31,7 +31,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "tts_service_channel"
-        const val ACTION_PLAY_PAUSE = "action_play_pause"
         const val ACTION_STOP = "action_stop"
     }
 
@@ -55,6 +54,9 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     // Flow for speaking state
     private val _isSpeakingFlow = MutableStateFlow(false)
     val isSpeakingFlow: StateFlow<Boolean> = _isSpeakingFlow.asStateFlow()
+    
+    // 前台服务状态
+    private var isForegroundServiceStarted = false
 
     inner class TtsServiceBinder : Binder() {
         fun getService(): AndroidTtsForegroundService = this@AndroidTtsForegroundService
@@ -68,16 +70,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_PLAY_PAUSE -> {
-                if (isSpeaking()) {
-                    pause()
-                } else {
-                    // 这里需要恢复播放，但由于没有保存状态，暂时不处理
-                }
-                // 只有在处理播放/暂停动作时才显示前台通知
-                startForeground(NOTIFICATION_ID, createNotification())
-            }
-
             ACTION_STOP -> {
                 stop()
             }
@@ -111,18 +103,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun createNotification(): Notification {
-        val playPauseIntent = Intent(this, AndroidTtsForegroundService::class.java)
-            .apply {
-                action = ACTION_PLAY_PAUSE
-            }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-
-        val playPausePendingIntent = PendingIntent.getService(
-            this,
-            0,
-            playPauseIntent,
-            flags
-        )
 
         val stopIntent = Intent(this, AndroidTtsForegroundService::class.java).apply {
             action = ACTION_STOP
@@ -135,19 +116,16 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             .setContentTitle("文档朗读")
             .setContentText(if (isSpeaking()) "正在朗读..." else "已暂停")
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .addAction(
-                if (isSpeaking()) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                if (isSpeaking()) "暂停" else "播放",
-                playPausePendingIntent
-            )
             .addAction(android.R.drawable.ic_delete, "停止", stopPendingIntent)
             .setOngoing(true)
             .build()
     }
 
     private fun updateNotification() {
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, createNotification())
+        if (isForegroundServiceStarted) {
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.notify(NOTIFICATION_ID, createNotification())
+        }
     }
 
     private fun initializeTts() {
@@ -196,11 +174,14 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             currentBean = null
             
             // 所有朗读完成时停止前台服务
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
+            if (isForegroundServiceStarted) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                isForegroundServiceStarted = false
             }
         }
         println("TTS: playNext:$currentBean")
@@ -211,8 +192,11 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     private fun speakText(text: String) {
         if (text.isNotBlank()) {
-            // 开始朗读时启动前台服务
-            startForeground(NOTIFICATION_ID, createNotification())
+            // 只在还没有启动前台服务时才启动
+            if (!isForegroundServiceStarted) {
+                startForeground(NOTIFICATION_ID, createNotification())
+                isForegroundServiceStarted = true
+            }
             
             val params = hashMapOf<String, String>().apply {
                 put(
@@ -253,11 +237,14 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         _isSpeakingFlow.value = false
         
         // 暂停时也停止前台服务，移除通知
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
+        if (isForegroundServiceStarted) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            isForegroundServiceStarted = false
         }
     }
 
@@ -270,11 +257,14 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         cancelSleepTimer()
         
         // 停止前台服务，移除通知
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
+        if (isForegroundServiceStarted) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            isForegroundServiceStarted = false
         }
     }
 

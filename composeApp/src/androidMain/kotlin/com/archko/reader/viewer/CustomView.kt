@@ -148,8 +148,8 @@ fun CustomView(
                         ImagesDecoder(files)
                     } else {
                         if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            // 只创建TtsServiceBinder，不立即绑定服务
                             ttsServiceBinder = TtsServiceBinder(context)
+                            ttsServiceBinder?.bindService()
 
                             val pdfDecoder = PdfDecoder(File(currentPath))
 
@@ -515,12 +515,9 @@ fun CustomView(
                                                             )
                                                         }
                                                     }
-                                                } else if (!isConnected) {
-                                                    // 第一次点击时绑定服务
-                                                    binder.bindService()
                                                 }
                                             },
-                                            enabled = true // 总是启用，让用户可以点击启动服务
+                                            enabled = true
                                         ) {
                                             Icon(
                                                 painter = painterResource(Res.drawable.ic_tts),
@@ -637,9 +634,6 @@ fun CustomView(
                                                 speakFromCurrentPage(currentPage, decoder!!, binder)
                                             }
                                         }
-                                    } else if (!isConnected) {
-                                        // 如果服务未连接，先绑定服务
-                                        binder.bindService()
                                     }
                                 },
                                 enabled = true

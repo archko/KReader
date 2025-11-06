@@ -5,17 +5,47 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.archko.reader.pdf.util.FileUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
@@ -90,12 +120,20 @@ fun PdfExportDialog(
         scope.launch {
             val pdfPath = selectedPdfPath
             if (pdfPath == null) {
-                Toast.makeText(context, getString(Res.string.please_select_pdf_first), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.please_select_pdf_first),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
 
             if (startPage > endPage || startPage < 1 || endPage > pageCount) {
-                Toast.makeText(context, getString(Res.string.invalid_page_range), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.invalid_page_range),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
 
@@ -118,17 +156,29 @@ fun PdfExportDialog(
 
             when (result) {
                 0 -> {
-                    Toast.makeText(context, getString(Res.string.images_export_success, outputDir), Toast.LENGTH_LONG)
+                    Toast.makeText(
+                        context,
+                        getString(Res.string.images_export_success, outputDir),
+                        Toast.LENGTH_LONG
+                    )
                         .show()
                     onDismiss()
                 }
 
                 -2 -> {
-                    Toast.makeText(context, getString(Res.string.images_export_failed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        getString(Res.string.images_export_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
 
                 else -> {
-                    Toast.makeText(context, getString(Res.string.export_cancelled_partial, result), Toast.LENGTH_SHORT)
+                    Toast.makeText(
+                        context,
+                        getString(Res.string.export_cancelled_partial, result),
+                        Toast.LENGTH_SHORT
+                    )
                         .show()
                 }
             }
@@ -139,17 +189,26 @@ fun PdfExportDialog(
         scope.launch {
             val pdfPath = selectedPdfPath
             if (pdfPath == null) {
-                Toast.makeText(context, getString(Res.string.please_select_pdf_first), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.please_select_pdf_first),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
 
             if (startPage > endPage || startPage < 1 || endPage > pageCount) {
-                Toast.makeText(context, getString(Res.string.invalid_page_range), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.invalid_page_range),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
 
             val fileName = File(pdfPath).nameWithoutExtension
-            val outputPath = FileUtils.getStorageDir(fileName).absolutePath + File.separator + "${fileName}.html"
+            val outputPath =
+                FileUtils.getStorageDir(fileName).absolutePath + File.separator + "${fileName}.html"
 
             isExporting = true
 
@@ -164,136 +223,196 @@ fun PdfExportDialog(
             isExporting = false
 
             if (result) {
-                Toast.makeText(context, getString(Res.string.html_export_success, outputPath), Toast.LENGTH_LONG)
+                Toast.makeText(
+                    context,
+                    getString(Res.string.html_export_success, outputPath),
+                    Toast.LENGTH_LONG
+                )
                     .show()
                 onDismiss()
             } else {
-                Toast.makeText(context, getString(Res.string.html_export_failed), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.html_export_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
             modifier = Modifier
-                .widthIn(min = 400.dp, max = 600.dp)
-                .heightIn(min = 500.dp, max = 700.dp)
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.8f),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+            Surface(
+                modifier = Modifier
+                    .width(screenWidth * 0.95f)
+                    .height(screenHeight * 0.8f),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_back),
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.export_pdf),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = 20.dp, end = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Button(
-                        onClick = { selectPdf() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isExporting
-                    ) {
-                        Text(stringResource(Res.string.select_pdf_file))
-                    }
-
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(
-                            onClick = { exportToImages() },
-                            modifier = Modifier.weight(1f),
-                            enabled = !isExporting
-                        ) {
-                            if (isExporting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Text(stringResource(Res.string.export_images))
-                            }
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-
-                        Button(
-                            onClick = { exportToHtml() },
-                            modifier = Modifier.weight(1f),
-                            enabled = !isExporting
-                        ) {
-                            if (isExporting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Text(stringResource(Res.string.export_html))
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.export_pdf),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
 
-                    if (selectedPdfPath != null) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(start = 20.dp, end = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { selectPdf() },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isExporting
                         ) {
-                            Column(
-                                modifier = Modifier.padding(8.dp)
+                            Text(stringResource(Res.string.select_pdf_file))
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = { exportToImages() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isExporting
                             ) {
-                                Text(
-                                    text = stringResource(Res.string.pdf_info),
-                                    style = TextStyle(
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium
+                                if (isExporting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
                                     )
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(stringResource(Res.string.file_label).format(File(selectedPdfPath!!).name))
-                                Text(stringResource(Res.string.pages_label).format(pageCount))
-                                Text(stringResource(Res.string.original_width_label).format(originalWidth))
+                                } else {
+                                    Text(stringResource(Res.string.export_images))
+                                }
+                            }
+
+                            Button(
+                                onClick = { exportToHtml() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isExporting
+                            ) {
+                                if (isExporting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Text(stringResource(Res.string.export_html))
+                                }
                             }
                         }
 
-                        Text(
-                            text = stringResource(Res.string.page_range_label).format(startPage, endPage),
-                            style = TextStyle(
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
+                        if (selectedPdfPath != null) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(Res.string.pdf_info),
+                                        style = TextStyle(
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        stringResource(Res.string.file_label).format(
+                                            File(
+                                                selectedPdfPath!!
+                                            ).name
+                                        )
+                                    )
+                                    Text(stringResource(Res.string.pages_label).format(pageCount))
+                                    Text(
+                                        stringResource(Res.string.original_width_label).format(
+                                            originalWidth
+                                        )
+                                    )
+                                }
+                            }
 
-                        if (pageCount > 1) {
-                            RangeSlider(
-                                value = startPage.toFloat()..endPage.toFloat(),
-                                onValueChange = { range ->
-                                    startPage = range.start.roundToInt()
-                                    endPage = range.endInclusive.roundToInt()
-                                },
-                                valueRange = 1f..pageCount.toFloat(),
-                                steps = if (pageCount > 2) pageCount - 2 else 0,
+                            Text(
+                                text = stringResource(Res.string.page_range_label).format(
+                                    startPage,
+                                    endPage
+                                ),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+
+                            if (pageCount > 1) {
+                                RangeSlider(
+                                    value = startPage.toFloat()..endPage.toFloat(),
+                                    onValueChange = { range ->
+                                        startPage = range.start.roundToInt()
+                                        endPage = range.endInclusive.roundToInt()
+                                    },
+                                    valueRange = 1f..pageCount.toFloat(),
+                                    steps = if (pageCount > 2) pageCount - 2 else 0,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(stringResource(Res.string.page_label).format(1))
+                                    Text(stringResource(Res.string.page_label).format(pageCount))
+                                }
+                            } else {
+                                Text(stringResource(Res.string.single_page_document))
+                            }
+
+                            Text(
+                                text = stringResource(Res.string.export_width_label).format(
+                                    exportWidth.roundToInt()
+                                ),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+
+                            Slider(
+                                value = exportWidth,
+                                onValueChange = { exportWidth = it },
+                                valueRange = 1080f..4000f,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
@@ -301,51 +420,26 @@ fun PdfExportDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(stringResource(Res.string.page_label).format(1))
-                                Text(stringResource(Res.string.page_label).format(pageCount))
+                                Text("1080px")
+                                Text("4000px")
                             }
+
+                            Spacer(modifier = Modifier.height(16.dp))
                         } else {
-                            Text(stringResource(Res.string.single_page_document))
-                        }
-
-                        Text(
-                            text = stringResource(Res.string.export_width_label).format(exportWidth.roundToInt()),
-                            style = TextStyle(
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-
-                        Slider(
-                            value = exportWidth,
-                            onValueChange = { exportWidth = it },
-                            valueRange = 1080f..4000f,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("1080px")
-                            Text("4000px")
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.select_pdf_to_export),
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.select_pdf_to_export),
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }

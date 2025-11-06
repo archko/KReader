@@ -208,7 +208,7 @@ fun KBottomBar(
             tabs.forEach { section ->
                 val selected = currentRoute == section.route
                 val text = when (section.route) {
-                    "home/buds" -> stringResource(Res.string.home)
+                    "home/file" -> stringResource(Res.string.home)
                     "home/setting" -> stringResource(Res.string.setting)
                     else -> section.title
                 }

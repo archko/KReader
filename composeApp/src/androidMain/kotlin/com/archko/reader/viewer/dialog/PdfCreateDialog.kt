@@ -5,23 +5,51 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.util.FileUtils
 import com.archko.reader.pdf.util.IntentFile
@@ -93,7 +121,11 @@ fun PdfCreateDialog(
     fun createPdf() {
         scope.launch {
             if (selectedImages.isEmpty()) {
-                Toast.makeText(context, getString(Res.string.please_select_images_first), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.please_select_images_first),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
 
@@ -113,22 +145,43 @@ fun PdfCreateDialog(
             }
             isCreating = false
             if (result) {
-                Toast.makeText(context, getString(Res.string.pdf_created_successfully), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.pdf_created_successfully),
+                    Toast.LENGTH_SHORT
+                ).show()
                 onDismiss()
             } else {
-                Toast.makeText(context, getString(Res.string.pdf_creation_failed), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(Res.string.pdf_creation_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.85f),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
+            Surface(
+                modifier = Modifier
+                    .width(screenWidth * 0.95f)
+                    .height(screenHeight * 0.9f),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -203,7 +256,9 @@ fun PdfCreateDialog(
 
                     if (selectedImages.isNotEmpty()) {
                         Text(
-                            text = stringResource(Res.string.selected_images_count).format(selectedImages.size),
+                            text = stringResource(Res.string.selected_images_count).format(
+                                selectedImages.size
+                            ),
                             style = TextStyle(
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
@@ -227,7 +282,9 @@ fun PdfCreateDialog(
                             state = lazyListState,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            itemsIndexed(selectedImages, key = { _, item -> item }) { index, imagePath ->
+                            itemsIndexed(
+                                selectedImages,
+                                key = { _, item -> item }) { index, imagePath ->
                                 ReorderableItem(
                                     state = reorderableLazyListState,
                                     key = imagePath
@@ -236,8 +293,10 @@ fun PdfCreateDialog(
                                         imagePath = imagePath,
                                         index = index + 1,
                                         isDragging = isDragging,
+                                        dragModifier = Modifier.draggableHandle(),
                                         onRemove = {
-                                            selectedImages = selectedImages.filter { it != imagePath }
+                                            selectedImages =
+                                                selectedImages.filter { it != imagePath }
                                         }
                                     )
                                 }
@@ -262,6 +321,7 @@ fun PdfCreateDialog(
                 }
             }
         }
+        }
     }
 }
 
@@ -270,6 +330,7 @@ private fun ImageItem(
     imagePath: String,
     index: Int,
     isDragging: Boolean,
+    dragModifier: Modifier,
     onRemove: () -> Unit
 ) {
     Card(
@@ -294,7 +355,9 @@ private fun ImageItem(
                 painter = painterResource(Res.drawable.ic_menu),
                 contentDescription = "Drag to reorder",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .size(20.dp)
+                    .then(dragModifier)
             )
 
             Spacer(modifier = Modifier.width(8.dp))
