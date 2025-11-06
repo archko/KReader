@@ -494,6 +494,7 @@ public fun DocumentView(
                                     selectionStartPos = null
                                     selectionEndPos = null
                                 }
+                                return@awaitEachGesture
                             }
 
                             // 如果没有拖拽和缩放，且按下时没有fling动画，处理点击事件
@@ -900,7 +901,7 @@ public fun TextActionToolbar(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .padding(vertical = 80.dp, horizontal = 32.dp), // 顶部和底部保留空白
+            .padding(vertical = 80.dp, horizontal = 40.dp),
         color = Color.Black.copy(alpha = 0.8f),
         shape = MaterialTheme.shapes.medium
     ) {
@@ -931,7 +932,7 @@ public fun TextActionToolbar(
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(scrollState) // 添加垂直滚动
+                            .verticalScroll(scrollState)
                             .padding(8.dp)
                     )
                 }
