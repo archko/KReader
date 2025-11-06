@@ -1,27 +1,349 @@
 package com.archko.reader.viewer.utils
 
+import com.artifex.mupdf.fitz.ColorSpace
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Image
+import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.PDFDocument
 import com.artifex.mupdf.fitz.PDFObject
 import com.artifex.mupdf.fitz.Rect
+import java.awt.image.BufferedImage
 import java.io.File
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
-import java.io.IOException
-import java.lang.StringBuilder
+import javax.imageio.ImageIO
 
 /**
  * @author: archko 2025/10/21 :1:03 PM
  */
-public object PDFCreaterHelper {
+object PDFCreaterHelper {
+
+    /**
+     * A4: 210x297
+     * A3：297×420
+     * A2：420×594
+     * A1：594×841
+     * A0：841×1189 mm
+     */
+    const val OPTS: String =
+        "compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
+    private const val PAPER_WIDTH = 1080f
+    private const val PAPER_HEIGHT = 1800f
+    private const val PAPER_PADDING = 40f
+    private const val PAPER_FONT_SIZE = 17f
+
+    /**
+     * 如果是原图的高宽,不经过缩放,pdf的页面高宽设置与图片大小一致,得到的pdf会很大.
+     * 图片是否超过指定值,都应该做一次压缩
+     */
+    fun createPdfFromImages(pdfPath: String?, imagePaths: List<String>): Boolean {
+        //Log.d("TAG", String.format("imagePaths:%s", imagePaths))
+        var mDocument: PDFDocument? = null
+        try {
+            mDocument = PDFDocument.openDocument(pdfPath) as PDFDocument
+        } catch (e: Exception) {
+            print("could not open:$pdfPath")
+        }
+        if (mDocument == null) {
+            mDocument = PDFDocument()
+        }
+
+        val resultPaths = processLargeImage(imagePaths)
+
+        //空白页面必须是-1,否则会崩溃,但插入-1的位置的页面会成为最后一个,所以追加的时候就全部用-1就行了.
+        var index = -1
+        for (path in resultPaths) {
+            val page = addPage(path, mDocument, index++)
+
+            mDocument.insertPage(-1, page)
+        }
+        mDocument.save(pdfPath, OPTS)
+        print(String.format("save,%s,%s", mDocument.toString(), mDocument.countPages()))
+        val cacheDir = getUserHomeDir() + File.separator + ".cache" + File.separator + "create"
+        val dir = File(cacheDir)
+        if (dir.isDirectory) {
+            dir.deleteRecursively()
+        }
+        return mDocument.countPages() > 0
+    }
+
+    /**
+     * used for k2pdf
+     */
+    fun createPdfFromFormatedImages(
+        pdfPath: String?, imagePaths: List<String>
+    ): Boolean {
+        print(String.format("imagePaths:%s", imagePaths))
+        var mDocument: PDFDocument? = null
+        try {
+            mDocument = PDFDocument.openDocument(pdfPath) as PDFDocument
+        } catch (e: Exception) {
+            print("could not open:$pdfPath")
+        }
+        if (mDocument == null) {
+            mDocument = PDFDocument()
+        }
+
+        var index = 0
+        for (path in imagePaths) {
+            val page = addPage(path, mDocument, index++)
+
+            mDocument.insertPage(-1, page)
+            index++
+        }
+        mDocument.save(pdfPath, OPTS)
+        return mDocument.countPages() > 0
+    }
+
+    private fun addPage(
+        path: String,
+        mDocument: PDFDocument,
+        index: Int
+    ): PDFObject? {
+        val image = Image(path)
+        val resources = mDocument.newDictionary()
+        val xobj = mDocument.newDictionary()
+        val obj = mDocument.addImage(image)
+        xobj.put("I", obj)
+        resources.put("XObject", xobj)
+
+        val w = image.width
+        val h = image.height
+        val mediabox = Rect(0f, 0f, w.toFloat(), h.toFloat())
+        val contents = "q $w 0 0 $h 0 0 cm /I Do Q\n"
+        val page = mDocument.addPage(mediabox, 0, resources, contents)
+        print(String.format("index:%s,page,%s,w:%s,h:%s", index, contents, w, h))
+        return page
+    }
+
+    /**
+     * 获取用户主目录
+     */
+    fun getUserHomeDir(): String {
+        return System.getProperty("user.home") ?: "."
+    }
+
+    /**
+     * 将大图片切割成小图片,以长图片切割,不处理宽图片
+     */
+    private fun processLargeImage(imagePaths: List<String>): List<String> {
+        val maxHeight = 6000
+
+        val result = arrayListOf<String>()
+        for (path in imagePaths) {
+            try {
+                val image = Image(path)
+                val width = image.width
+                val height = image.height
+
+                if (height > maxHeight) {
+                    //split image,maxheight=PAPER_HEIGHT
+                    splitImages(result, path, width, height)
+                } else {
+                    if (isSupportedImageForCreater(path)) {
+                        result.add(path)
+                    } else {
+                        convertImageToJpeg(result, path)
+                    }
+                }
+                image.destroy()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return result
+    }
+
+    /**
+     * 检查是否为支持的图片格式
+     */
+    private fun isSupportedImageForCreater(path: String): Boolean {
+        val extension = File(path).extension.lowercase()
+        return extension in listOf("jpg", "jpeg", "png")
+    }
+
+    /**
+     * 默认不支持bmp,svg,heic,webp这些直接转换,所以先解析为jpg
+     */
+    private fun convertImageToJpeg(result: java.util.ArrayList<String>, path: String) {
+        try {
+            val image = Image(path)
+            val pixmap = image.toPixmap()
+
+            val cacheDir = getUserHomeDir() + File.separator + ".cache" + File.separator + "create"
+            File(cacheDir).mkdirs()
+
+            val file = File(cacheDir + File.separator + System.currentTimeMillis() + ".jpg")
+            pixmap.saveAsJPEG(file.absolutePath, 90)
+
+            pixmap.destroy()
+            image.destroy()
+
+            print("convertImageToJpeg path:${file.absolutePath}")
+            result.add(file.absolutePath)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // 如果转换失败，尝试直接添加原文件
+            result.add(path)
+        }
+    }
+
+    private fun splitImages(
+        result: ArrayList<String>,
+        path: String,
+        width: Int,
+        height: Int,
+    ) {
+        try {
+            // 使用 Java BufferedImage 读取图片
+            val bufferedImage = ImageIO.read(File(path))
+
+            var top = 0
+            var bottom = PAPER_HEIGHT.toInt()
+
+            while (bottom < height) {
+                splitImage(bufferedImage, top, bottom, width, result)
+                top = bottom
+                bottom += PAPER_HEIGHT.toInt()
+            }
+
+            if (top < height) {
+                splitImage(bufferedImage, top, height, width, result)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun splitImage(
+        bufferedImage: BufferedImage,
+        top: Int,
+        bottom: Int,
+        width: Int,
+        result: ArrayList<String>
+    ) {
+        try {
+            // 使用 BufferedImage 的 getSubimage 方法裁剪
+            val croppedImage = bufferedImage.getSubimage(0, top, width, bottom - top)
+
+            val cacheDir = getUserHomeDir() + File.separator + ".cache" + File.separator + "create"
+            File(cacheDir).mkdirs()
+
+            val file = File(cacheDir + File.separator + System.currentTimeMillis() + ".jpg")
+            ImageIO.write(croppedImage, "jpg", file)
+
+            val height = bottom - top
+            print("new file:height:$height, path:${file.absolutePath}")
+            result.add(file.absolutePath)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    var canExtract: Boolean = true
+
+    fun extractToImages(
+        screenWidth: Int, dir: String, pdfPath: String,
+        start: Int,
+        end: Int
+    ): Int {
+        try {
+            print("extractToImages:$screenWidth, start:$start, end:$end dir:$dir, dst:$pdfPath")
+            val mupdfDocument = Document.openDocument(pdfPath)
+            val count: Int = mupdfDocument.countPages()
+            var startPage = start
+            if (startPage < 0) {
+                startPage = 0
+            } else if (startPage >= count) {
+                startPage = 0
+            }
+            var endPage = end
+            if (end > count) {
+                endPage = count
+            } else if (endPage < 0) {
+                endPage = count
+            }
+            for (i in startPage until endPage) {
+                if (!canExtract) {
+                    print("extractToImages.stop")
+                    return i
+                }
+                val page = mupdfDocument.loadPage(i)
+                if (null != page) {
+                    val pageWidth = page.bounds.x1 - page.bounds.x0
+                    val pageHeight = page.bounds.y1 - page.bounds.y0
+
+                    var exportWidth = screenWidth
+                    if (exportWidth == -1) {
+                        exportWidth = pageWidth.toInt()
+                    }
+                    val scale = exportWidth / pageWidth
+                    val width = exportWidth
+                    val height = pageHeight * scale
+                    val ctm = Matrix(scale)
+                    val pixmap = page.toPixmap(ctm, ColorSpace.DeviceRGB, false)
+                    page.destroy()
+                    pixmap.saveAsJPEG("$dir/${i + 1}.jpg", 90)
+                    pixmap.destroy()
+                }
+                print("extractToImages:page:${i + 1}.jpg")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return -2
+        }
+        return 0
+    }
+
+
+    fun extractToHtml(
+        start: Int, end: Int, path: String, pdfPath: String
+    ): Boolean {
+        try {
+            val mupdfDocument = Document.openDocument(pdfPath)
+            val count: Int = mupdfDocument.countPages()
+            var startPage = start
+            if (startPage < 0) {
+                startPage = 0
+            } else if (startPage >= count) {
+                startPage = 0
+            }
+            var endPage = end
+            if (end > count) {
+                endPage = count
+            } else if (endPage < 0) {
+                endPage = count
+            }
+            val stringBuilder = StringBuilder()
+            for (i in startPage until endPage) {
+                val page = mupdfDocument.loadPage(i)
+                if (null != page) {
+                    val content =
+                        String(page.textAsHtml2("preserve-whitespace,inhibit-spaces,preserve-images"))
+                    stringBuilder.append(content)
+                    print(
+                        String.format(
+                            "============%s-content:%s==========",
+                            i,
+                            content,
+                        )
+                    )
+                    page.destroy()
+                }
+            }
+            // 将所有内容写入文件
+            File(path).writeText(stringBuilder.toString())
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
 
     // =================== encrypt/decrypt ===================
 
     /**
      * 保存时添加密码保护
      */
-    public fun encryptPDF(
+    fun encryptPDF(
         inputFile: String?, outputFile: String?,
         userPassword: String?, ownerPassword: String?
     ): Boolean {
@@ -71,7 +393,7 @@ public object PDFCreaterHelper {
     /**
      * 移除PDF密码保护（解密）
      */
-    public fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean  {
+    fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {
@@ -104,10 +426,10 @@ public object PDFCreaterHelper {
     /**
      * 修改PDF密码
      */
-    public fun changePDFPassword(
+    fun changePDFPassword(
         inputFile: String?, outputFile: String?,
         oldPassword: String?, newUserPassword: String?, newOwnerPassword: String?
-    ): Boolean  {
+    ): Boolean {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {

@@ -1,6 +1,5 @@
 package com.archko.reader.viewer.utils
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
@@ -29,7 +28,7 @@ import java.io.IOException
 /**
  * @author: archko 2018/12/21 :1:03 PM
  */
-public object PDFCreaterHelper {
+object PDFCreaterHelper {
 
     /**
      * A4: 210x297
@@ -38,7 +37,7 @@ public object PDFCreaterHelper {
      * A1：594×841
      * A0：841×1189 mm
      */
-    public const val OPTS: String =
+    const val OPTS: String =
         "compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
     private const val PAPER_WIDTH = 1080f
     private const val PAPER_HEIGHT = 1800f
@@ -49,7 +48,7 @@ public object PDFCreaterHelper {
      * 如果是原图的高宽,不经过缩放,pdf的页面高宽设置与图片大小一致,得到的pdf会很大.
      * 图片是否超过指定值,都应该做一次压缩
      */
-    public fun createPdfFromImages(pdfPath: String?, imagePaths: List<String>): Boolean {
+    fun createPdfFromImages(pdfPath: String?, imagePaths: List<String>): Boolean {
         Log.d("TAG", String.format("imagePaths:%s", imagePaths))
         var mDocument: PDFDocument? = null
         try {
@@ -84,7 +83,7 @@ public object PDFCreaterHelper {
     /**
      * used for k2pdf
      */
-    public fun createPdfFromFormatedImages(
+    fun createPdfFromFormatedImages(
         pdfPath: String?, imagePaths: List<String>
     ): Boolean {
         Log.d("TAG", String.format("imagePaths:%s", imagePaths))
@@ -355,7 +354,7 @@ public object PDFCreaterHelper {
      */
     private const val PDF_PAGE_HEIGHT = 1189
 
-    /*public fun createPdfUseSystemFromTxt(
+    /* fun createPdfUseSystemFromTxt(
         context: Context?,
         parent: ViewGroup?,
         fontSize: Float,
@@ -388,7 +387,7 @@ public object PDFCreaterHelper {
      * @throws java.io.FileNotFoundException
      */
     /*@Throws(FileNotFoundException::class)
-    public fun doCreatePdfUseSystemFromTxt(
+     fun doCreatePdfUseSystemFromTxt(
         context: Context?,
         parent: ViewGroup?,
         fontSize: Float,
@@ -578,7 +577,7 @@ public object PDFCreaterHelper {
     /**
      * 通过系统api创建pdf,比mupdf创建的要小不少,测试中,14m对10m.
      */
-    /*public fun createPdfUseSystemFromImages(
+    /* fun createPdfUseSystemFromImages(
         context: Context,
         parent: ViewGroup,
         pdfPath: String?, imagePaths: List<String>
@@ -600,7 +599,7 @@ public object PDFCreaterHelper {
      * 会有内存溢出的可能,图片数量过多时.所以这个方法尽量用图片少的情况.目前无法通过追加形式添加
      * 已经处理好的图片,不再处理切割,因为切割需要再解析一次
      */
-    /*public fun createPdfUseSystemFromFormatedImages(
+    /* fun createPdfUseSystemFromFormatedImages(
         context: Context,
         parent: ViewGroup,
         pdfPath: String?, imagePaths: List<String>
@@ -621,7 +620,7 @@ public object PDFCreaterHelper {
     /**
      * 保存时添加密码保护
      */
-    public fun encryptPDF(
+    fun encryptPDF(
         inputFile: String?, outputFile: String?,
         userPassword: String?, ownerPassword: String?
     ): Boolean {
@@ -671,7 +670,7 @@ public object PDFCreaterHelper {
     /**
      * 移除PDF密码保护（解密）
      */
-    public fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean {
+    fun decryptPDF(inputFile: String?, outputFile: String?, password: String?): Boolean {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {
@@ -704,7 +703,7 @@ public object PDFCreaterHelper {
     /**
      * 修改PDF密码
      */
-    public fun changePDFPassword(
+    fun changePDFPassword(
         inputFile: String?, outputFile: String?,
         oldPassword: String?, newUserPassword: String?, newOwnerPassword: String?
     ): Boolean {
