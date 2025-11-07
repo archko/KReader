@@ -18,6 +18,7 @@ import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
+import com.archko.reader.pdf.decoder.ImagesDecoder
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -43,7 +44,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
-    currentPath: String,
+    paths: List<String>,
     progressPage: Int? = null,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -66,6 +67,9 @@ fun CustomView(
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
 
+    // 多文件支持
+    val currentPath = paths.getOrNull(0) ?: paths.first()
+
     val speechService: SpeechService = remember { TtsQueueService() }
 
     LaunchedEffect(currentPath) {
@@ -83,6 +87,12 @@ fun CustomView(
                 val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                     null
                 } else {
+                    if (paths.size > 1) {
+                        isCrop = false
+                        // 多文件模式：创建ImagesDecoder
+                        val files = paths.map { File(it) }
+                        ImagesDecoder(files)
+                } else {
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
                         val pdfDecoder = PdfDecoder(File(currentPath))
 
@@ -99,12 +109,10 @@ fun CustomView(
                         isCrop = false
                         val tiffDecoder = TiffDecoder(File(currentPath))
                         tiffDecoder
-                    } else if (FileTypeUtils.isImageFile(currentPath)) {
+                        } else {
                         isCrop = false
-                        val pdfDecoder = PdfDecoder(File(currentPath))
-                        pdfDecoder
-                    } else {
-                        null
+                            ImagesDecoder(listOf(File(currentPath)))
+                        }
                     }
                 }
                 if (newDecoder != null) {
@@ -140,7 +148,6 @@ fun CustomView(
                 decoder?.let { pdfDecoder ->
                     val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
                     if (success) {
-                        // 密码正确，初始化文档
                         pdfDecoder.size(viewportSize)
                         loadingError = null
                         showPasswordDialog = false
@@ -225,7 +232,6 @@ fun CustomView(
                     }
                 }
             } else {
-                // 显示加载中
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -267,10 +273,12 @@ fun CustomView(
 
         var showQueueDialog by remember { mutableStateOf(false) }
 
-        // 对于图片文件，根据尺寸自动调整滚动方向
+        // 对于单图片文件，根据尺寸自动调整滚动方向
         LaunchedEffect(decoder) {
             decoder?.let { dec ->
-                if (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(currentPath)) {
+                if (paths.size == 1 &&
+                    (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(currentPath))
+                ) {
                     if (dec.originalPageSizes.isNotEmpty()) {
                         val firstPageSize = dec.originalPageSizes[0]
                         val width = firstPageSize.width

@@ -296,7 +296,7 @@ fun FileScreen(
             } else {
                 onShowBottomBarChanged(false)
                 CustomView(
-                    currentPath = openDocRequest!!.path,
+                    paths = listOf(openDocRequest!!.path),
                     progressPage = openDocRequest!!.page,
                     onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
                         viewModel.updateProgress(
