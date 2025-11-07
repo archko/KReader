@@ -93,7 +93,7 @@ public object ReflowCacheLoader {
             cacheFile.writeText(content, Charsets.UTF_8)
 
             println("ReflowCache: 成功保存缓存，页数=${reflowTexts.size}, 文件=${cacheFile.absolutePath}")
-            cacheBean
+            return cacheBean
         } catch (e: Exception) {
             println("ReflowCache: 保存缓存失败: ${e.message}")
             e.printStackTrace()

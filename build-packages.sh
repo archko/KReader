@@ -90,7 +90,7 @@ compile_project() {
     fi
     
     # 清理之前的构建产物
-    ./gradlew clean
+    #./gradlew clean
     
     # 编译项目
     ./gradlew :composeApp:$task_name
