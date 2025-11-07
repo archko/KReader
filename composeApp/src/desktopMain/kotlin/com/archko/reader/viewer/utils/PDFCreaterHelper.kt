@@ -1,5 +1,6 @@
 package com.archko.reader.viewer.utils
 
+import com.archko.reader.pdf.cache.FileUtils
 import com.artifex.mupdf.fitz.ColorSpace
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Image
@@ -57,8 +58,7 @@ object PDFCreaterHelper {
         }
         mDocument.save(pdfPath, OPTS)
         print(String.format("save,%s,%s", mDocument.toString(), mDocument.countPages()))
-        val cacheDir = getUserHomeDir() + File.separator + ".cache" + File.separator + "create"
-        val dir = File(cacheDir)
+        val dir = getCacheDir("cache")
         if (dir.isDirectory) {
             dir.deleteRecursively()
         }
@@ -117,8 +117,8 @@ object PDFCreaterHelper {
     /**
      * 获取用户主目录
      */
-    fun getUserHomeDir(): String {
-        return System.getProperty("user.home") ?: "."
+    fun getCacheDir(name: String): File {
+        return FileUtils.getCacheDirectory(name)
     }
 
     /**
@@ -168,10 +168,9 @@ object PDFCreaterHelper {
             val image = Image(path)
             val pixmap = image.toPixmap()
 
-            val cacheDir = getUserHomeDir() + File.separator + ".cache" + File.separator + "create"
-            File(cacheDir).mkdirs()
+            val cacheDir = getCacheDir("cache")
 
-            val file = File(cacheDir + File.separator + System.currentTimeMillis() + ".jpg")
+            val file = File(cacheDir, System.currentTimeMillis().toString() + ".jpg")
             pixmap.saveAsJPEG(file.absolutePath, 90)
 
             pixmap.destroy()
@@ -224,10 +223,9 @@ object PDFCreaterHelper {
             // 使用 BufferedImage 的 getSubimage 方法裁剪
             val croppedImage = bufferedImage.getSubimage(0, top, width, bottom - top)
 
-            val cacheDir = getUserHomeDir() + File.separator + ".cache" + File.separator + "create"
-            File(cacheDir).mkdirs()
+            val cacheDir = getCacheDir("cache")
 
-            val file = File(cacheDir + File.separator + System.currentTimeMillis() + ".jpg")
+            val file = File(cacheDir, System.currentTimeMillis().toString() + ".jpg")
             ImageIO.write(croppedImage, "jpg", file)
 
             val height = bottom - top
