@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,6 +27,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -61,10 +63,14 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.browse_directory_message
+import kreader.composeapp.generated.resources.browse_directory_title
+import kreader.composeapp.generated.resources.cancel
 import kreader.composeapp.generated.resources.clear_history
 import kreader.composeapp.generated.resources.components_thumbnail_corner
 import kreader.composeapp.generated.resources.components_thumbnail_left
 import kreader.composeapp.generated.resources.components_thumbnail_top
+import kreader.composeapp.generated.resources.confirm
 import kreader.composeapp.generated.resources.delete_cache
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
@@ -74,7 +80,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
-data class OpenDocRequest(val path: String, val page: Int?)
+data class OpenDocRequest(val paths: List<String>, val page: Int?)
 
 @Composable
 fun FileScreen(
@@ -90,9 +96,75 @@ fun FileScreen(
         val isLoading by viewModel.isLoading.collectAsState()
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
         var showSettingDialog by remember { mutableStateOf(false) }
+        var showDirectoryDialog by remember { mutableStateOf(false) }
+        var pendingImagePath by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
             viewModel.loadRecents()
+        }
+
+        // 确认对话框
+        if (showDirectoryDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showDirectoryDialog = false
+                    pendingImagePath = null
+                },
+                title = { Text(stringResource(Res.string.browse_directory_title)) },
+                text = { Text(stringResource(Res.string.browse_directory_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDirectoryDialog = false
+                            pendingImagePath?.let { imagePath ->
+                                scope.launch {
+                                    // 扫描整个目录
+                                    val imageFile = File(imagePath)
+                                    val parentDir = imageFile.parentFile
+                                    if (parentDir != null && parentDir.exists()) {
+                                        val allImageFiles = mutableListOf<File>()
+
+                                        // 只扫描当前目录层级，不递归子目录
+                                        parentDir.listFiles()?.forEach { file ->
+                                            if (FileTypeUtils.isImageFile(file.absolutePath)) {
+                                                allImageFiles.add(file)
+                                            }
+                                        }
+
+                                        if (allImageFiles.isNotEmpty()) {
+                                            // 按修改日期倒序排列，最新修改的在最前面
+                                            allImageFiles.sortByDescending { it.lastModified() }
+
+                                            val paths = allImageFiles.map { it.absolutePath }
+                                            openDocRequest = OpenDocRequest(paths, 0)
+                                        }
+                                    } else {
+                                        // 如果父目录不存在，只打开当前图片
+                                        openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                                    }
+                                }
+                            }
+                            pendingImagePath = null
+                        }
+                    ) {
+                        Text(stringResource(Res.string.confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showDirectoryDialog = false
+                            pendingImagePath?.let { imagePath ->
+                                // 只打开单个图片
+                                openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                            }
+                            pendingImagePath = null
+                        }
+                    ) {
+                        Text(stringResource(Res.string.cancel))
+                    }
+                }
+            )
         }
 
         // 监听文件路径变化
@@ -113,7 +185,7 @@ fun FileScreen(
                     viewModel.getProgress(path)
                     val startPage = viewModel.progress?.page?.toInt() ?: 0
                     println("FileScreen: 开始页码: $startPage")
-                    openDocRequest = OpenDocRequest(path, startPage)
+                    openDocRequest = OpenDocRequest(listOf(path), startPage)
                     println("FileScreen: 已设置打开文档请求")
                 } else {
                     println("FileScreen: 文件不存在或类型不支持")
@@ -149,11 +221,21 @@ fun FileScreen(
                                     return@launch
                                 }
 
-                                // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
-                                viewModel.getProgress(file.file.absolutePath)
-                                val startPage = viewModel.progress?.page?.toInt() ?: 0
-                                openDocRequest =
-                                    OpenDocRequest(file.file.absolutePath, startPage)
+                                if (FileTypeUtils.isImageFile(path)) {
+                                    // 如果是图片文件，弹出对话框询问是否扫描目录
+                                    pendingImagePath = path
+                                    showDirectoryDialog = true
+                                } else {
+                                    // 如果是文档文件，直接打开
+                                    val paths = listOf(path)
+                                    if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                        viewModel.getProgress(path)
+                                        val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                        openDocRequest = OpenDocRequest(paths, startPage)
+                                    } else {
+                                        openDocRequest = OpenDocRequest(paths, 0)
+                                    }
+                                }
                             }
                         }
                     }
@@ -237,9 +319,13 @@ fun FileScreen(
                                         val file = KmpFile(File(it.path))
                                         val page = it.page?.toInt()
                                         scope.launch {
-                                            viewModel.getProgress(file.file.absolutePath)
-                                            openDocRequest =
-                                                OpenDocRequest(file.file.absolutePath, page)
+                                            val paths = listOf(file.file.absolutePath)
+                                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                                viewModel.getProgress(file.file.absolutePath)
+                                                openDocRequest = OpenDocRequest(paths, page)
+                                            } else {
+                                                openDocRequest = OpenDocRequest(paths, 0)
+                                            }
                                         }
                                     },
                                     onDelete = {
@@ -296,7 +382,7 @@ fun FileScreen(
             } else {
                 onShowBottomBarChanged(false)
                 CustomView(
-                    paths = listOf(openDocRequest!!.path),
+                    paths = openDocRequest!!.paths,
                     progressPage = openDocRequest!!.page,
                     onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
                         viewModel.updateProgress(
