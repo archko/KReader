@@ -143,7 +143,7 @@ class TtsServiceBinder(private val context: Context) {
         return service?.getCurrentReflowBean()?.page
     }
 
-    fun setOnSpeechCompleteCallback(callback: ((String?) -> Unit)?) {
-        service?.setOnSpeechCompleteCallback(callback)
+    fun setTtsSpeechCallback(callback: TtsSpeechCallback?) {
+        service?.setTtsSpeechCallback(callback)
     }
 }

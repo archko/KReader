@@ -26,6 +26,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+/**
+ * TTS朗读回调接口
+ */
+interface TtsSpeechCallback {
+    /**
+     * 每页朗读完成时的回调
+     * @param page 完成的页面编号
+     */
+    fun onPageComplete(page: String?)
+    
+    /**
+     * 整个朗读结束时的回调
+     * @param lastPage 最后朗读的页面编号
+     */
+    fun onSpeechStop(lastPage: String?)
+}
+
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     companion object {
@@ -44,8 +61,8 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     private var sleepTimerJob: Job? = null
     private var sleepTimerMinutes: Int = 0
 
-    // 朗读完成回调
-    private var onSpeechCompleteCallback: ((String?) -> Unit)? = null
+    // TTS朗读回调
+    private var ttsSpeechCallback: TtsSpeechCallback? = null
 
     private val beanList = mutableListOf<ReflowBean>()
     private var currentBean: ReflowBean? = null
@@ -184,6 +201,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             speakText(nextBean.data ?: "")
         } else {
             _isSpeakingFlow.value = false
+            val lastPage = currentBean?.page
             currentBean = null
 
             // 所有朗读完成时停止前台服务
@@ -196,10 +214,13 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
                 isForegroundServiceStarted = false
             }
+            
+            println("TTS: 所有朗读完成，触发停止回调，最后页面: $lastPage")
+            ttsSpeechCallback?.onSpeechStop(lastPage)
         }
         println("TTS: playNext:$currentBean")
         currentBean?.let { bean ->
-            onSpeechCompleteCallback?.invoke(bean.page)
+            ttsSpeechCallback?.onPageComplete(bean.page)
         }
     }
 
@@ -256,6 +277,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     fun stop() {
+        val lastPage = currentBean?.page
         textToSpeech?.stop()
         beanList.clear()
         currentBean = null
@@ -273,6 +295,10 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             isForegroundServiceStarted = false
         }
+        
+        // 触发朗读停止回调
+        println("TTS: 手动停止朗读，触发停止回调，最后页面: $lastPage")
+        ttsSpeechCallback?.onSpeechStop(lastPage)
     }
 
     fun clearQueue() {
@@ -329,7 +355,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     fun isServiceInitialized(): Boolean = isInitialized
 
-    fun setOnSpeechCompleteCallback(callback: ((String?) -> Unit)?) {
-        onSpeechCompleteCallback = callback
+    fun setTtsSpeechCallback(callback: TtsSpeechCallback?) {
+        ttsSpeechCallback = callback
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
@@ -40,6 +43,7 @@ import com.archko.reader.viewer.dialog.FontDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
+import com.archko.reader.viewer.tts.TtsSpeechCallback
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -365,17 +369,64 @@ fun CustomView(
             ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
                 isSpeaking = speaking
             }
-        }
 
-        LaunchedEffect(ttsServiceBinder) {
-            ttsServiceBinder?.setOnSpeechCompleteCallback { completedPage ->
-                completedPage?.let { pageStr ->
-                    val targetPage = pageStr.toIntOrNull()
-                    println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage")
-                    if (null != targetPage && targetPage != jumpToPage) {
-                        jumpToPage = targetPage
+            ttsServiceBinder?.setTtsSpeechCallback(object : TtsSpeechCallback {
+                override fun onPageComplete(page: String?) {
+                    page?.let { pageStr ->
+                        val targetPage = pageStr.toIntOrNull()
+                        println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage")
+                        if (null != targetPage && targetPage != jumpToPage) {
+                            jumpToPage = targetPage
+                        }
                     }
                 }
+
+                override fun onSpeechStop(lastPage: String?) {
+                    lastPage?.let { pageStr ->
+                        val targetPage = pageStr.toIntOrNull()
+                        println("SpeechStop: 朗读结束，保存进度，最后页面: $targetPage")
+                        if (null != targetPage) {
+                            if (null != targetPage && targetPage != jumpToPage) {
+                                jumpToPage = targetPage
+                            }
+                            onSaveDocument?.invoke(
+                                targetPage,
+                                pageCount,
+                                initialZoom,
+                                initialScrollX,
+                                initialScrollY,
+                                if (isVertical) Vertical.toLong() else Horizontal.toLong(),
+                                if (isReflow) 1L else 0L,
+                                if (isCrop) 1L else 0L
+                            )
+                        }
+                    }
+                }
+            })
+        }
+
+        // 监听生命周期，当从后台返回前台时同步到正在朗读的页面
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(lifecycleOwner, ttsServiceBinder) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    ttsServiceBinder?.let { binder ->
+                        if (binder.isSpeaking()) {
+                            val speakingPage = binder.getCurrentSpeakingPage()
+                            speakingPage?.let { pageStr ->
+                                val targetPage = pageStr.toIntOrNull()
+                                println("OnResume: 正在朗读第${targetPage}页，当前显示第${currentPage}页")
+                                if (targetPage != null && targetPage != currentPage) {
+                                    jumpToPage = targetPage
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
             }
         }
 
