@@ -1,5 +1,6 @@
 package com.archko.reader.viewer.utils
 
+import com.archko.reader.image.HeifLoader
 import com.archko.reader.pdf.cache.FileUtils
 import com.artifex.mupdf.fitz.ColorSpace
 import com.artifex.mupdf.fitz.Document
@@ -160,28 +161,71 @@ object PDFCreaterHelper {
         return extension in listOf("jpg", "jpeg", "png")
     }
 
+    private fun isHeifFormat(path: String): Boolean {
+        val extension = File(path).extension.lowercase()
+        return extension == "heic" || extension == "heif"
+    }
+
     /**
-     * 默认不支持bmp,svg,heic,webp这些直接转换,所以先解析为jpg
+     * 默认不支持bmp,svg,heic,webp这些直接转换,所以先解析为png
+     * HEIF格式使用HeifLoader解码，其他格式使用MuPDF
      */
     private fun convertImageToJpeg(result: java.util.ArrayList<String>, path: String) {
-        try {
-            val image = Image(path)
-            val pixmap = image.toPixmap()
+        val cacheDir = getCacheDir("cache")
+        val file = File(cacheDir, System.currentTimeMillis().toString() + ".png")
 
-            val cacheDir = getCacheDir("cache")
+        if (isHeifFormat(path)) {
+            // 使用HeifLoader解码HEIF图片
+            val heifLoader = HeifLoader()
+            try {
+                heifLoader.openHeif(path)
+                val heifInfo = heifLoader.heifInfo
+                if (heifInfo != null) {
+                    // 解码整个图片
+                    val bitmap = heifLoader.decodeRegionToBitmap(
+                        0,
+                        0,
+                        heifInfo.width,
+                        heifInfo.height,
+                        1.0f
+                    )
 
-            val file = File(cacheDir, System.currentTimeMillis().toString() + ".jpg")
-            pixmap.saveAsJPEG(file.absolutePath, 90)
+                    if (bitmap != null) {
+                        // 保存为PNG
+                        ImageIO.write(bitmap, "png", file)
+                        print("convertImageToJpeg (HEIF) path:${file.absolutePath}")
+                        result.add(file.absolutePath)
+                    } else {
+                        print("Failed to decode HEIF bitmap")
+                    }
+                } else {
+                    print("Failed to get HEIF info")
+                }
+            } catch (e: Exception) {
+                print("Failed to open HEIF file:$e")
+            } finally {
+                heifLoader.close()
+            }
+        } else {
+            try {
+                val image = Image(path)
+                val pixmap = image.toPixmap()
 
-            pixmap.destroy()
-            image.destroy()
+                val cacheDir = getCacheDir("cache")
 
-            print("convertImageToJpeg path:${file.absolutePath}")
-            result.add(file.absolutePath)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // 如果转换失败，尝试直接添加原文件
-            result.add(path)
+                val file = File(cacheDir, System.currentTimeMillis().toString() + ".jpg")
+                pixmap.saveAsPNG(file.absolutePath)
+
+                pixmap.destroy()
+                image.destroy()
+
+                print("convertImageToJpeg path:${file.absolutePath}")
+                result.add(file.absolutePath)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // 如果转换失败，尝试直接添加原文件
+                result.add(path)
+            }
         }
     }
 

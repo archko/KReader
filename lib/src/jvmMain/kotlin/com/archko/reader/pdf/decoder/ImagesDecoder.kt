@@ -70,7 +70,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         // 初始化原始页面尺寸
         originalPageSizes = prepareSizes()
     }
-    
+
     /**
      * 检测文件是否为HEIF格式
      */
