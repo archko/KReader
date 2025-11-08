@@ -14,9 +14,9 @@ import java.util.concurrent.Executors
  * webservice requests).
  */
 public open class AppExecutors(
-        private val diskIO: ExecutorService,
-        private val networkIO: ExecutorService,
-        private val mainThread: Executor
+    private val diskIO: ExecutorService,
+    private val networkIO: ExecutorService,
+    private val mainThread: Executor
 ) {
     private object Holder {
         val INSTANCE = AppExecutors()
@@ -27,9 +27,9 @@ public open class AppExecutors(
     }
 
     public constructor() : this(
-            Executors.newSingleThreadExecutor(),
-            Executors.newFixedThreadPool(3),
-            MainThreadExecutor()
+        Executors.newSingleThreadExecutor(),
+        Executors.newFixedThreadPool(3),
+        MainThreadExecutor()
     )
 
     public fun diskIO(): ExecutorService {

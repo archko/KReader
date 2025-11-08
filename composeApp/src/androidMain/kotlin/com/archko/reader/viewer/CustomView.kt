@@ -43,8 +43,8 @@ import com.archko.reader.viewer.dialog.FontDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
-import com.archko.reader.viewer.tts.TtsSpeechCallback
 import com.archko.reader.viewer.tts.TtsServiceBinder
+import com.archko.reader.viewer.tts.TtsSpeechCallback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

@@ -34,7 +34,7 @@ public object APageSizeLoader {
         try {
             val size = file.length()
             val saveFile = getCacheFile(file)
-            if(!saveFile.exists()){
+            if (!saveFile.exists()) {
                 return null
             }
             val content = saveFile.readText(Charsets.UTF_8)
@@ -56,7 +56,7 @@ public object APageSizeLoader {
             val file = File(path)
             val size = file.length()
             val saveFile = getCacheFile(file)
-            if(!saveFile.exists()){
+            if (!saveFile.exists()) {
                 return null
             }
             val content = saveFile.readText(Charsets.UTF_8)

@@ -85,7 +85,7 @@ public class PageNode(
             recycle()
             return
         }
-        
+
         val width = aPage.getWidth(pdfViewState.isCropEnabled())
         val height = aPage.getHeight(pdfViewState.isCropEnabled())
         val scale = pageWidth / width
@@ -99,21 +99,21 @@ public class PageNode(
             cacheKey,
             null
         )
-        
+
         // 1. 首先检查是否在预加载区域内
         val isInPreloadArea = pdfViewState.isTileVisible(tileSpec, strictMode = false)
         if (!isInPreloadArea) {
             recycle()  // 完全超出预加载区域，回收
             return
         }
-        
+
         // 2. 检查是否在严格可见区域内
         val isStrictlyVisible = pdfViewState.isTileVisible(tileSpec, strictMode = true)
-        
+
         if (null != bitmapState && bitmapState!!.isRecycled()) {
             bitmapState = null
         }
-        
+
         // 3. 只有严格可见才绘制
         if (isStrictlyVisible) {
             bitmapState?.let { state ->
@@ -131,7 +131,7 @@ public class PageNode(
                 )
             }
         }
-        
+
         // 4. 无论是否绘制，都尝试解码（预加载区域内）
         if (bitmapState == null) {
             decode(pageWidth, pageHeight)
@@ -213,11 +213,19 @@ public class PageNode(
                     outHeight,
                     crop = pdfViewState.isCropEnabled(),
                     callback = object : DecodeCallback {
-                        override fun onDecodeComplete(bitmap: ImageBitmap?, isThumb: Boolean, error: Throwable?) {
+                        override fun onDecodeComplete(
+                            bitmap: ImageBitmap?,
+                            isThumb: Boolean,
+                            error: Throwable?
+                        ) {
                             if (bitmap != null && !pdfViewState.isShutdown()) {
                                 val newState = ImageCache.putNode(cacheKey, bitmap)
                                 pdfViewState.decodeScope.launch(Dispatchers.Main) {
-                                    if (pdfViewState.isTileVisible(tileSpec, strictMode = false) && !pdfViewState.isShutdown()) {
+                                    if (pdfViewState.isTileVisible(
+                                            tileSpec,
+                                            strictMode = false
+                                        ) && !pdfViewState.isShutdown()
+                                    ) {
                                         bitmapState?.let { ImageCache.releaseNode(it) }
                                         bitmapState = newState
                                     } else {
@@ -236,13 +244,14 @@ public class PageNode(
                             if (pdfViewState.isShutdown()) {
                                 return false
                             }
-                            
+
                             // 检查页面是否在当前可见页面列表中
-                            val isPageVisible = pdfViewState.pageToRender.any { it.aPage.index == pageNumber }
+                            val isPageVisible =
+                                pdfViewState.pageToRender.any { it.aPage.index == pageNumber }
                             if (!isPageVisible) {
                                 return false
                             }
-                            
+
                             // 对于节点任务，还需要检查具体的tile是否在预加载区域
                             return pdfViewState.isTileVisible(tileSpec, strictMode = false)
                         }

@@ -133,13 +133,18 @@ public class PdfViewState(
         return visible
     }
 
-    private fun isVisibleWithPreload(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
+    private fun isVisibleWithPreload(
+        viewSize: IntSize,
+        offset: Offset,
+        bounds: Rect,
+        page: Int
+    ): Boolean {
         val preloadDistance = if (orientation == Vertical) {
             viewSize.height * preloadScreens
         } else {
             viewSize.width * preloadScreens
         }
-        
+
         // 获取包含预加载区域的可视区域
         val preloadRect = if (orientation == Vertical) {
             Rect(

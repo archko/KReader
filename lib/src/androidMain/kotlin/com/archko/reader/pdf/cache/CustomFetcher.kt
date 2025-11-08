@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import coil3.BitmapImage
@@ -56,14 +55,14 @@ public class CustomImageFetcher(
             bmp.copyPixelsFromBuffer(buffer)
             BitmapUtils.saveBitmapToFile(bmp, File(filePath))
         }
-        
+
         public fun deleteCache(path: String?) {
-            if (path==null){
+            if (path == null) {
                 return
             }
             // 删除内存缓存
             ImageCache.removePage(path)
-            
+
             // 删除磁盘缓存
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
@@ -135,14 +134,15 @@ public class CustomImageFetcher(
         val pHeight = page.bounds.y1 - page.bounds.y0
         val xscale = 1f * width / pWidth
         val yscale = 1f * height / pHeight
-        
+
         // For images with aspect ratio less than 1 (taller than wide), we crop from top-left
         return if (pWidth / pHeight < 1f) {
             // Crop to width x width from top-left
             val cropWidth = minOf(pWidth, pHeight)
             val cropHeight = cropWidth
             val cropBitmap = BitmapPool.acquire(cropWidth.toInt(), cropHeight.toInt())
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth.toInt(), cropHeight.toInt())
+            val cropDev =
+                AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth.toInt(), cropHeight.toInt())
             val cropCtm = Matrix()
             cropCtm.scale(1f, 1f)
             page.run(cropDev, cropCtm, null as Cookie?)
@@ -162,8 +162,15 @@ public class CustomImageFetcher(
             val ctm = Matrix()
             ctm.scale(xscale, yscale)
             val scaledBitmap = BitmapPool.acquire(w, h)
-            val dev =
-                AndroidDrawDevice(scaledBitmap, 0, 0, 0, 0, scaledBitmap.getWidth(), scaledBitmap.getHeight())
+            val dev = AndroidDrawDevice(
+                scaledBitmap,
+                0,
+                0,
+                0,
+                0,
+                scaledBitmap.getWidth(),
+                scaledBitmap.getHeight()
+            )
             page.run(dev, ctm, null as Cookie?)
             dev.close()
             dev.destroy()

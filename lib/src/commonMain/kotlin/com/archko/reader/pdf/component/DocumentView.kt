@@ -419,10 +419,16 @@ public fun DocumentView(
                                             selectionStartPos = down.position
                                             selectionEndPos = down.position + totalDrag
                                             showTextActionToolbar = false
-                                            
+
                                             // 找到点击的页面并开始选择
-                                            val clickedPageIndex = calculateClickedPage(down.position, offset, orientation, pdfViewState)
-                                            val clickedPage = pdfViewState.pages.getOrNull(clickedPageIndex)
+                                            val clickedPageIndex = calculateClickedPage(
+                                                down.position,
+                                                offset,
+                                                orientation,
+                                                pdfViewState
+                                            )
+                                            val clickedPage =
+                                                pdfViewState.pages.getOrNull(clickedPageIndex)
                                             if (clickedPage != null) {
                                                 val contentX = down.position.x - offset.x
                                                 val contentY = down.position.y - offset.y
@@ -432,10 +438,12 @@ public fun DocumentView(
                                         } else if (isTextSelectionMode && isTextSelecting) {
                                             // 文本选择模式：更新文本选择
                                             selectionEndPos = down.position + totalDrag
-                                            
+
                                             selectedPage?.let { page ->
-                                                val contentX = (down.position + totalDrag).x - offset.x
-                                                val contentY = (down.position + totalDrag).y - offset.y
+                                                val contentX =
+                                                    (down.position + totalDrag).x - offset.x
+                                                val contentY =
+                                                    (down.position + totalDrag).y - offset.y
                                                 page.updateTextSelection(contentX, contentY)
                                             }
                                         } else {
@@ -478,12 +486,12 @@ public fun DocumentView(
                             if (zooming) {
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
-                            
+
                             // 处理文本选择结束
                             if (isTextSelectionMode && isTextSelecting) {
                                 val selection = selectedPage?.endTextSelection()
                                 isTextSelecting = false
-                                
+
                                 if (selection != null && selection.text.isNotBlank()) {
                                     showTextActionToolbar = true
                                     println("文本选择完成: ${selection.text}")
@@ -916,9 +924,9 @@ public fun TextActionToolbar(
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium
             )
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -937,9 +945,9 @@ public fun TextActionToolbar(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)

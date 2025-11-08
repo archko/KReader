@@ -57,7 +57,10 @@ public interface TextSelector {
     /**
      * 将MuPDF Quad转换为屏幕坐标
      */
-    public fun quadToScreenQuad(quad: MuPdfQuad, pdfToScreenTransform: (Float, Float) -> Offset): ScreenQuad
+    public fun quadToScreenQuad(
+        quad: MuPdfQuad,
+        pdfToScreenTransform: (Float, Float) -> Offset
+    ): ScreenQuad
 }
 
 /**

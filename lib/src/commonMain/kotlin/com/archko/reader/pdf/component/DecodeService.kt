@@ -1,7 +1,13 @@
 package com.archko.reader.pdf.component
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -60,7 +66,7 @@ public class DecodeService(
         return queueMutex.withLock {
             // 清理不可见的任务
             //cleanupInvisibleTasks()
-            
+
             when {
                 pageTaskQueue.isNotEmpty() -> pageTaskQueue.removeAt(0)
                 nodeTaskQueue.isNotEmpty() -> nodeTaskQueue.removeAt(0)
@@ -79,7 +85,7 @@ public class DecodeService(
             }
             !shouldRender
         }
-        
+
         // 清理节点任务中不可见的任务
         nodeTaskQueue.removeAll { task ->
             val shouldRender = task.callback?.shouldRender(task.pageIndex, false) ?: true
@@ -119,7 +125,9 @@ public class DecodeService(
         if (isShutdown) return
 
         // 执行前检查任务是否仍然需要渲染
-        val shouldRender = task.callback?.shouldRender(task.pageIndex, task.type == DecodeTask.TaskType.PAGE) ?: true
+        val shouldRender =
+            task.callback?.shouldRender(task.pageIndex, task.type == DecodeTask.TaskType.PAGE)
+                ?: true
         if (!shouldRender) {
             //println("DecodeService.executeTask: 跳过不可见任务 - page: ${task.pageIndex}, type: ${task.type}")
             return

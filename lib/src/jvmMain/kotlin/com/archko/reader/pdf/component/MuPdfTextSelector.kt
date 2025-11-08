@@ -25,7 +25,10 @@ public class MuPdfTextSelector(
         return getStructuredTextCallback(pageIndex)
     }
 
-    override fun quadToScreenQuad(quad: MuPdfQuad, pdfToScreenTransform: (Float, Float) -> Offset): ScreenQuad {
+    override fun quadToScreenQuad(
+        quad: MuPdfQuad,
+        pdfToScreenTransform: (Float, Float) -> Offset
+    ): ScreenQuad {
         val ul = pdfToScreenTransform(quad.ul_x, quad.ul_y)
         val ur = pdfToScreenTransform(quad.ur_x, quad.ur_y)
         val ll = pdfToScreenTransform(quad.ll_x, quad.ll_y)
@@ -103,18 +106,18 @@ public class MuPdfStructuredTextImpl(
             val bottom = maxOf(startPoint.y, endPoint.y)
 
             // 尝试多种策略来获取精确的文本选择
-            
+
             // 策略1: 直接copy
             val directCopy = structuredText.copy(nativeStart, nativeEnd) ?: ""
-            
+
             // 策略2: 使用稍微缩小的选择区域，避免触发MuPDF的智能扩展
             val margin = 2.0f // 2个点的边距
             val shrunkStart = com.artifex.mupdf.fitz.Point(
-                startPoint.x + margin, 
+                startPoint.x + margin,
                 startPoint.y + margin
             )
             val shrunkEnd = com.artifex.mupdf.fitz.Point(
-                endPoint.x - margin, 
+                endPoint.x - margin,
                 endPoint.y - margin
             )
             val shrunkCopy = try {
@@ -126,7 +129,7 @@ public class MuPdfStructuredTextImpl(
             } catch (e: Exception) {
                 ""
             }
-            
+
             println("copy: 选择区域: ($left,$top,$right,$bottom)")
             println("copy: 直接复制长度: ${directCopy.length}, 内容: '$directCopy'")
             println("copy: 缩小复制长度: ${shrunkCopy.length}, 内容: '$shrunkCopy'")
@@ -137,10 +140,12 @@ public class MuPdfStructuredTextImpl(
                     println("copy: 使用缩小选择结果")
                     shrunkCopy
                 }
+
                 directCopy.isNotBlank() -> {
                     println("copy: 使用直接选择结果")
                     directCopy
                 }
+
                 else -> {
                     "选中区域 (${(right - left).toInt()}x${(bottom - top).toInt()})"
                 }
@@ -154,7 +159,11 @@ public class MuPdfStructuredTextImpl(
         }
     }
 
-    override fun snapSelection(startPoint: MuPdfPoint, endPoint: MuPdfPoint, mode: Int): MuPdfQuad? {
+    override fun snapSelection(
+        startPoint: MuPdfPoint,
+        endPoint: MuPdfPoint,
+        mode: Int
+    ): MuPdfQuad? {
         return try {
             // 调用实际的MuPDF StructuredText.snapSelection方法
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText

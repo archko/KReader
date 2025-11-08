@@ -23,7 +23,7 @@ public class BitmapState(
     private val mutex = Mutex()
     private var referenceCount = 0
     private var isRecycled = false
-    
+
     /**
      * 获取bitmap的使用权，增加引用计数
      */
@@ -38,7 +38,7 @@ public class BitmapState(
             }
         }
     }
-    
+
     /**
      * 释放bitmap的使用权，减少引用计数
      */
@@ -51,7 +51,7 @@ public class BitmapState(
             }
         }
     }
-    
+
     /**
      * 标记bitmap为已回收状态
      */
@@ -66,7 +66,7 @@ public class BitmapState(
             }
         }
     }
-    
+
     /**
      * 检查是否可以安全回收
      */
@@ -77,7 +77,7 @@ public class BitmapState(
             }
         }
     }
-    
+
     /**
      * 检查是否已被回收
      */
@@ -100,7 +100,7 @@ private class InnerImageCache(
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, BitmapState>()
     private val candidatePool = mutableMapOf<String, Pair<BitmapState, Long>>()
-    
+
     private var currentMemoryBytes = 0L
     private var candidateMemoryBytes = 0L
 
@@ -124,7 +124,7 @@ private class InnerImageCache(
                         return@withLock state
                     }
                 }
-                
+
                 // 检查候选池
                 candidatePool[key]?.let { (state, timestamp) ->
                     if (System.currentTimeMillis() - timestamp < CANDIDATE_TIMEOUT) {
@@ -148,7 +148,7 @@ private class InnerImageCache(
                         candidatePool.remove(key)
                     }
                 }
-                
+
                 cleanCandidatePool()
                 return@withLock null
             }
@@ -171,27 +171,27 @@ private class InnerImageCache(
         return runBlocking {
             mutex.withLock {
                 val imageSize = calculateImageSize(bitmap)
-                
+
                 // 如果已存在，先处理旧的
                 cache[key]?.let { oldState ->
                     val oldSize = calculateImageSize(oldState.bitmap)
                     addToCandidatePool(key, oldState)
                     currentMemoryBytes -= oldSize
                 }
-                
+
                 val state = BitmapState(bitmap, key)
                 cache[key] = state
                 currentMemoryBytes += imageSize
-                
+
                 // 检查内存限制，优先移除没有引用的bitmap
                 while (currentMemoryBytes > maxMemoryBytes && cache.isNotEmpty()) {
                     // 优先选择没有引用的bitmap进行移除
                     val entryToRemove = cache.entries.find { it.value.canRecycle() }
                         ?: cache.entries.first() // 如果都有引用，选择第一个
-                    
+
                     val entry = entryToRemove
                     val entrySize = calculateImageSize(entry.value.bitmap)
-                    
+
                     // 只有在没有引用时才移到候选池，否则保留在主缓存
                     if (entry.value.canRecycle()) {
                         addToCandidatePool(entry.key, entry.value)
@@ -202,7 +202,7 @@ private class InnerImageCache(
                         break
                     }
                 }
-                
+
                 cleanCandidatePool()
                 return@withLock state
             }
@@ -240,7 +240,7 @@ private class InnerImageCache(
 
     private fun addToCandidatePool(key: String, state: BitmapState) {
         val imageSize = calculateImageSize(state.bitmap)
-        
+
         // 确保候选池不超限
         while (candidateMemoryBytes + imageSize > maxCandidateMemoryBytes && candidatePool.isNotEmpty()) {
             val oldest = candidatePool.entries.minByOrNull { it.value.second }
@@ -254,7 +254,7 @@ private class InnerImageCache(
                 candidatePool.remove(oldest.key)
             }
         }
-        
+
         candidatePool[key] = Pair(state, System.currentTimeMillis())
         candidateMemoryBytes += imageSize
     }
@@ -312,7 +312,7 @@ internal expect object ImageSizeCalculator {
 public object ImageCache {
     // Node 高清图缓存（动态大小）
     private var nodeCache = InnerImageCache(MAX_MEMORY_BYTES, MAX_CANDIDATE_MEMORY_BYTES)
-    
+
     // Page 缩略图缓存（固定 32MB）
     private val pageCache = InnerImageCache(PAGE_CACHE_MEMORY_BYTES, PAGE_CANDIDATE_MEMORY_BYTES)
 

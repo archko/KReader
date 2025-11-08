@@ -87,7 +87,7 @@ public object FileTypeUtils {
     public fun filterFilesBySize(files: List<File>): List<File> {
         return files.filter { file ->
             file.exists()
-            && file.length() <= MAX_SIZE_MB
+                    && file.length() <= MAX_SIZE_MB
         }
     }
 

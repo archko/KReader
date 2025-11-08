@@ -17,12 +17,16 @@ public class Recent {
 
     @ColumnInfo(name = "path")
     public var path: String? = null
+
     @ColumnInfo(name = "updateAt")
     public var updateAt: Long? = 0
+
     @ColumnInfo(name = "page")
     public var page: Long? = 0
+
     @ColumnInfo(name = "pageCount")
     public var pageCount: Long? = 0
+
     @ColumnInfo(name = "createAt")
     public var createAt: Long? = 0
 
@@ -37,10 +41,13 @@ public class Recent {
     @ColumnInfo(name = "scrollOri")
     //0水平,1垂直
     public var scrollOri: Long? = 1
+
     @ColumnInfo(name = "zoom")
     public var zoom: Double? = 1.0
+
     @ColumnInfo(name = "scrollX")
     public var scrollX: Long? = 0
+
     @ColumnInfo(name = "scrollY")
     public var scrollY: Long? = 0
 
@@ -99,7 +106,7 @@ public class Recent {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Recent) return false
-        
+
         return path == other.path &&
                 page == other.page &&
                 pageCount == other.pageCount &&

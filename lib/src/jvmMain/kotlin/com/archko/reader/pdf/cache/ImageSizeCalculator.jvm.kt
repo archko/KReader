@@ -18,7 +18,7 @@ internal actual object ImageSizeCalculator {
             val width = bufferedImage.width
             val height = bufferedImage.height
             val type = bufferedImage.type
-            
+
             val bytesPerPixel = when (type) {
                 BufferedImage.TYPE_INT_RGB -> 4
                 BufferedImage.TYPE_INT_ARGB -> 4
@@ -37,7 +37,7 @@ internal actual object ImageSizeCalculator {
                     (pixelSize + 7) / 8 // 转换为字节数，向上取整
                 }
             }
-            
+
             (width * height * bytesPerPixel).toLong()
         } catch (e: Exception) {
             // 如果获取失败，使用估算值
@@ -45,7 +45,7 @@ internal actual object ImageSizeCalculator {
             pixels * 4L // 默认ARGB_8888
         }
     }
-    
+
     /**
      * 回收ImageBitmap，释放底层资源
      * JVM平台主要依赖GC，这里可以做一些清理工作
@@ -55,7 +55,7 @@ internal actual object ImageSizeCalculator {
             // JVM平台主要依赖垃圾回收
             // 这里可以做一些额外的清理工作，比如清除引用等
             // 但通常不需要特殊处理，GC会自动回收
-            
+
             // 如果需要，可以尝试释放BufferedImage的资源
             val bufferedImage = image.toAwtImage() as? BufferedImage
             bufferedImage?.flush()

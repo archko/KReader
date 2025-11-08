@@ -2,7 +2,6 @@ package com.archko.reader.pdf.decoder
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
@@ -13,9 +12,6 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
-import com.artifex.mupdf.fitz.Matrix
-import com.artifex.mupdf.fitz.Page
-import java.awt.image.BufferedImage
 import java.io.File
 
 /**
@@ -95,25 +91,31 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
             // 截取区域：从左上角开始截取目标尺寸的区域
             val cropWidth = minOf(pWidth, (targetWidth / scale).toInt())
             val cropHeight = minOf(pHeight, (targetHeight / scale).toInt())
-            
+
             println("large.tiff crop: ${cropWidth}x${cropHeight} from ${pWidth}x${pHeight}")
-            
+
             val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 0, 0, cropWidth, cropHeight, scale
             )
-            
-            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(targetWidth, targetHeight)
+
+            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(
+                targetWidth,
+                targetHeight
+            )
         } else if (pWidth > pHeight) {
             // 对于宽大于高的页面，按最大比例缩放后截取
             val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
 
             println("wide.tiff scale: $scale")
-            
+
             val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 0, 0, pWidth, pHeight, scale
             )
-            
-            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(targetWidth, targetHeight)
+
+            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(
+                targetWidth,
+                targetHeight
+            )
         } else {
             // 原始逻辑处理其他情况
             val xscale = targetWidth.toFloat() / pWidth
@@ -123,12 +125,15 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
             val scale = maxOf(xscale, yscale)
 
             println("normal.tiff scale: $scale")
-            
+
             val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 0, 0, pWidth, pHeight, scale
             )
-            
-            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(targetWidth, targetHeight)
+
+            bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(
+                targetWidth,
+                targetHeight
+            )
         }
     }
 
@@ -262,7 +267,10 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
                 scale,
             )
 
-            return bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
+            return bitmap?.toComposeImageBitmap() ?: CustomImageFetcher.createWhiteBitmap(
+                outWidth,
+                outHeight
+            )
         } catch (e: Exception) {
             println("renderPage error: $e")
             return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)

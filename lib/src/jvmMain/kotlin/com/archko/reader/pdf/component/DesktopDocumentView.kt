@@ -75,7 +75,7 @@ public fun DesktopDocumentView(
     var isJumping by remember { mutableStateOf(false) } // 添加跳转标志
     // 焦点请求器，用于键盘操作
     val focusRequester = remember { FocusRequester() }
-    
+
     // 缩放相关状态
     val minZoom = 0.5f
     val maxZoom = 5.0f
@@ -239,7 +239,16 @@ public fun DesktopDocumentView(
                         if (newZoom != vZoom) {
                             val centerX = viewSize.width / 2f
                             val centerY = viewSize.height / 2f
-                            handleZoom(newZoom, centerX, centerY, vZoom, offset, pdfViewState, viewSize, orientation) { newOffset, newVZoom ->
+                            handleZoom(
+                                newZoom,
+                                centerX,
+                                centerY,
+                                vZoom,
+                                offset,
+                                pdfViewState,
+                                viewSize,
+                                orientation
+                            ) { newOffset, newVZoom ->
                                 offset = newOffset
                                 vZoom = newVZoom
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
@@ -256,7 +265,16 @@ public fun DesktopDocumentView(
                         if (newZoom != vZoom) {
                             val centerX = viewSize.width / 2f
                             val centerY = viewSize.height / 2f
-                            handleZoom(newZoom, centerX, centerY, vZoom, offset, pdfViewState, viewSize, orientation) { newOffset, newVZoom ->
+                            handleZoom(
+                                newZoom,
+                                centerX,
+                                centerY,
+                                vZoom,
+                                offset,
+                                pdfViewState,
+                                viewSize,
+                                orientation
+                            ) { newOffset, newVZoom ->
                                 offset = newOffset
                                 vZoom = newVZoom
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
@@ -272,7 +290,16 @@ public fun DesktopDocumentView(
                         if (vZoom != 1.0f) {
                             val centerX = viewSize.width / 2f
                             val centerY = viewSize.height / 2f
-                            handleZoom(1.0f, centerX, centerY, vZoom, offset, pdfViewState, viewSize, orientation) { newOffset, newVZoom ->
+                            handleZoom(
+                                1.0f,
+                                centerX,
+                                centerY,
+                                vZoom,
+                                offset,
+                                pdfViewState,
+                                viewSize,
+                                orientation
+                            ) { newOffset, newVZoom ->
                                 offset = newOffset
                                 vZoom = newVZoom
                                 pdfViewState.updateViewSize(viewSize, vZoom, orientation)
@@ -510,7 +537,7 @@ public fun DesktopDocumentView(
                     detectTapGestures(
                         onTap = { offsetTap ->
                             focusRequester.requestFocus()
-                            
+
                             // 如果有文本选择工具栏显示，先隐藏它
                             if (showTextActionToolbar) {
                                 showTextActionToolbar = false
@@ -520,7 +547,7 @@ public fun DesktopDocumentView(
                                 selectionEndPos = null
                                 return@detectTapGestures
                             }
-                            
+
                             // 将点击坐标转换为相对于内容的位置
                             val contentX = offsetTap.x - offset.x
                             val contentY = offsetTap.y - offset.y
@@ -571,22 +598,27 @@ public fun DesktopDocumentView(
                 .pointerInput("drag_gestures", isTextSelectionMode) {
                     var dragStartPos: Offset? = null
                     var currentDragPos: Offset? = null
-                    
+
                     detectDragGestures(
                         onDragStart = { startPos ->
                             focusRequester.requestFocus()
                             dragStartPos = startPos
                             currentDragPos = startPos
-                            
+
                             if (isTextSelectionMode) {
                                 // 文本选择模式：开始文本选择
                                 isTextSelecting = true
                                 selectionStartPos = startPos
                                 selectionEndPos = startPos
                                 showTextActionToolbar = false
-                                
+
                                 // 找到点击的页面并开始选择
-                                val clickedPageIndex = calculateClickedPage(startPos, offset, orientation, pdfViewState)
+                                val clickedPageIndex = calculateClickedPage(
+                                    startPos,
+                                    offset,
+                                    orientation,
+                                    pdfViewState
+                                )
                                 val clickedPage = pdfViewState.pages.getOrNull(clickedPageIndex)
                                 if (clickedPage != null) {
                                     val contentX = startPos.x - offset.x
@@ -605,7 +637,7 @@ public fun DesktopDocumentView(
                                     // 累积拖拽位置：从起始位置开始累加所有变化
                                     currentDragPos = (currentDragPos ?: dragStartPos!!) + change
                                     selectionEndPos = currentDragPos
-                                    
+
                                     selectedPage?.let { page ->
                                         val contentX = currentDragPos!!.x - offset.x
                                         val contentY = currentDragPos!!.y - offset.y
@@ -615,12 +647,14 @@ public fun DesktopDocumentView(
                                 }
                             } else {
                                 // 非文本选择模式：普通拖拽滚动
-                                val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                                val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                                
+                                val maxX =
+                                    (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                                val maxY =
+                                    (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+
                                 val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
                                 val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
-                                
+
                                 offset = Offset(newX, newY)
                                 pdfViewState.updateOffset(offset)
                             }
@@ -630,7 +664,7 @@ public fun DesktopDocumentView(
                                 // 文本选择模式：结束文本选择
                                 val selection = selectedPage?.endTextSelection()
                                 isTextSelecting = false
-                                
+
                                 if (selection != null && selection.text.isNotBlank()) {
                                     showTextActionToolbar = true
                                     println("文本选择完成: ${selection.text}")
@@ -642,7 +676,7 @@ public fun DesktopDocumentView(
                                     selectionEndPos = null
                                 }
                             }
-                            
+
                             // 重置拖拽状态
                             dragStartPos = null
                             currentDragPos = null
@@ -656,15 +690,15 @@ public fun DesktopDocumentView(
 
                     // 普通滚动（鼠标滚轮和触摸板滚动）
                     val scrollMultiplier = 30f
-                    
+
                     // 计算边界限制
                     val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                     val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                    
+
                     // 支持双向滚动，特别是在缩放后
                     val newX = (offset.x + scrollAmount.x * scrollMultiplier).coerceIn(-maxX, 0f)
                     val newY = (offset.y + scrollAmount.y * scrollMultiplier).coerceIn(-maxY, 0f)
-                    
+
                     offset = Offset(newX, newY)
                     pdfViewState.updateOffset(offset)
                 }
@@ -692,7 +726,7 @@ public fun DesktopDocumentView(
                     size = visibleRect.size
                 )*/
                 pdfViewState.drawVisiblePages(this, offset, vZoom, viewSize)
-                
+
                 // 绘制选择区域的调试可视化
                 if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {
                     val start = selectionStartPos!!
@@ -701,7 +735,7 @@ public fun DesktopDocumentView(
                     val top = minOf(start.y, end.y) - offset.y
                     val right = maxOf(start.x, end.x) - offset.x
                     val bottom = maxOf(start.y, end.y) - offset.y
-                    
+
                     drawRect(
                         color = Color.Blue.copy(alpha = 0.3f),
                         topLeft = Offset(left, top),
@@ -838,28 +872,28 @@ private fun handleZoom(
     // 计算缩放前的内容坐标
     val contentX = centerX - currentOffset.x
     val contentY = centerY - currentOffset.y
-    
+
     // 计算缩放比例
     val zoomRatio = newZoom / currentZoom
-    
+
     // 计算缩放后的新偏移量，保持缩放中心点不变
     val newOffsetX = centerX - contentX * zoomRatio
     val newOffsetY = centerY - contentY * zoomRatio
-    
+
     // 更新PdfViewState的缩放
     pdfViewState.updateViewSize(viewSize, newZoom, orientation)
-    
+
     // 计算边界限制
     val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
     val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-    
+
     // 应用边界限制
     val clampedOffsetX = newOffsetX.coerceIn(-maxX, 0f)
     val clampedOffsetY = newOffsetY.coerceIn(-maxY, 0f)
-    
+
     val newOffset = Offset(clampedOffsetX, clampedOffsetY)
     pdfViewState.updateOffset(newOffset)
-    
+
     onZoomChanged(newOffset, newZoom)
 }
 

@@ -299,21 +299,22 @@ public object IntentFile {
                 // For FileProvider URIs like content://authority/external_files/path/to/file
                 // We need to reconstruct the actual file path
                 val sb = StringBuilder()
-                
+
                 // Skip the first segment if it's "external_files" or similar provider path
-                val startIndex = if (pathSegments.size > 1 && 
-                    (pathSegments[0] == "external_files" || pathSegments[0] == "files")) 1 else 0
-                
+                val startIndex = if (pathSegments.size > 1 &&
+                    (pathSegments[0] == "external_files" || pathSegments[0] == "files")
+                ) 1 else 0
+
                 for (i in startIndex until pathSegments.size) {
                     if (sb.isNotEmpty()) sb.append("/")
                     sb.append(pathSegments[i])
                 }
-                
+
                 // If it starts with external_files, prepend external storage path
                 if (pathSegments.size > 0 && pathSegments[0] == "external_files") {
                     return Environment.getExternalStorageDirectory().path + "/" + sb.toString()
                 }
-                
+
                 return sb.toString()
             }
         } catch (e: Exception) {

@@ -39,10 +39,10 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     // 缓存MuPDF Document，避免重复创建，限制数量为10个
     private val regionDecoders = mutableMapOf<Int, Document>()
     private val maxRegionDecoders = 10
-    
-    // 缓存HeifLoader，避免重复创建
+
+    // 缓存HeifLoader，避免重复创建，限制数量为10个
     private val heifLoaders = mutableMapOf<Int, HeifLoader>()
-    
+
     // 标记每个文件是否为HEIF格式
     private val isHeifFile = mutableListOf<Boolean>()
 
@@ -140,7 +140,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 heifLoader.openHeif(file.absolutePath)
                 val heifInfo = heifLoader.heifInfo
                 heifLoader.close()
-                
+
                 if (heifInfo != null) {
                     Size(
                         heifInfo.width,
@@ -169,7 +169,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 doc.destroy()
                 pageSize
             }
-            
+
             totalHeight += size.height
             list.add(size)
         }
@@ -206,8 +206,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                         pageHeight,
                         scale
                     )
-                    
-                    bitmap?.toComposeImageBitmap() 
+
+                    bitmap?.toComposeImageBitmap()
                         ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
@@ -296,8 +296,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                         originalSize.height,
                         scale
                     )
-                    
-                    bitmap?.toComposeImageBitmap() 
+
+                    bitmap?.toComposeImageBitmap()
                         ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
@@ -374,12 +374,20 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             return Document.openDocument(file.absolutePath)
         }
     }
-    
+
     /**
-     * 获取或创建HeifLoader
+     * 获取或创建HeifLoader，限制缓存数量为10个
      */
     private fun getHeifLoader(index: Int): HeifLoader? {
         if (index >= files.size) return null
+
+        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
+        if (heifLoaders.size >= maxRegionDecoders && !heifLoaders.containsKey(index)) {
+            val oldestIndex = heifLoaders.keys.first()
+            val oldestLoader = heifLoaders.remove(oldestIndex)
+            oldestLoader?.close()
+            println("Removed heif loader for index $oldestIndex to make room for index $index")
+        }
 
         return heifLoaders.getOrPut(index) {
             val file = files[index]
@@ -399,7 +407,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             }
         }
         regionDecoders.clear()
-        
+
         // 关闭所有HeifLoaders
         heifLoaders.values.forEach { loader ->
             try {

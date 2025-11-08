@@ -2,7 +2,11 @@ package com.archko.reader.pdf.util
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 智能切边工具类 - 性能优化版本
@@ -39,11 +43,22 @@ public object SmartCropUtils {
         val hLineMargin = ceil(height * 0.05).toInt()
 
         // 按需检测各边界
-        val leftBound = getLeftCropBound(bitmap, width, height, scanLimitH, vLineMargin, hLineMargin)
-        val topBound = getTopCropBound(bitmap, width, height, scanLimitV, vLineMargin, hLineMargin, leftBound)
-        val rightBound = getRightCropBound(bitmap, width, height, scanLimitH, vLineMargin, hLineMargin, topBound)
-        val bottomBound =
-            getBottomCropBound(bitmap, width, height, scanLimitV, vLineMargin, hLineMargin, leftBound, rightBound)
+        val leftBound =
+            getLeftCropBound(bitmap, width, height, scanLimitH, vLineMargin, hLineMargin)
+        val topBound =
+            getTopCropBound(bitmap, width, height, scanLimitV, vLineMargin, hLineMargin, leftBound)
+        val rightBound =
+            getRightCropBound(bitmap, width, height, scanLimitH, vLineMargin, hLineMargin, topBound)
+        val bottomBound = getBottomCropBound(
+            bitmap,
+            width,
+            height,
+            scanLimitV,
+            vLineMargin,
+            hLineMargin,
+            leftBound,
+            rightBound
+        )
 
         // 验证边界有效性，确保不超过一半
         var finalLeft = min(leftBound, 0.5f)  // 最多切到一半

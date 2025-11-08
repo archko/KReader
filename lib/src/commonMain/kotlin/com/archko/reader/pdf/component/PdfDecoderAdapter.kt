@@ -19,7 +19,11 @@ public class PdfDecoderAdapter(
     /**
      * 计算缩略图尺寸：根据宽高比选择基准边
      */
-    private fun calculateThumbnailSize(pageWidth: Int, pageHeight: Int, baseSize: Int = 240): Pair<Int, Int> {
+    private fun calculateThumbnailSize(
+        pageWidth: Int,
+        pageHeight: Int,
+        baseSize: Int = 240
+    ): Pair<Int, Int> {
         val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
         return when {
             aspectRatio <= 0.5f -> {
@@ -28,12 +32,14 @@ public class PdfDecoderAdapter(
                 val height = (baseSize / aspectRatio).toInt()
                 Pair(width, height)
             }
+
             aspectRatio >= 2.0f -> {
                 // 宽度是高度的2倍以上（横长条），以高为基准
                 val height = baseSize
                 val width = (baseSize * aspectRatio).toInt()
                 Pair(width, height)
             }
+
             else -> {
                 // 宽高比在 1:2 到 2:1 之间，以宽为基准
                 val width = baseSize
@@ -170,7 +176,7 @@ public class PdfDecoderAdapter(
                     decodeKey = "crop-$index",
                     aPage = aPage,
                     1f,
-                    Rect(0f,0f,1f,1f),
+                    Rect(0f, 0f, 1f, 1f),
                     1,
                     1,
                     crop = true

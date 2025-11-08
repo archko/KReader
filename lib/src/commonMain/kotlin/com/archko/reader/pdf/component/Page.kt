@@ -145,16 +145,16 @@ public class Page(
      */
     public fun startTextSelection(screenX: Float, screenY: Float): Boolean {
         loadText()
-        
+
         val pdfPoint = screenToPdfPoint(screenX, screenY)
         val startPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
-        
+
         val structText = structuredText ?: return false
-        
+
         // 开始选择时不立即高亮，等待拖拽
         isSelecting = true
         selectionStartPoint = Offset(screenX, screenY)
-        
+
         // 创建初始选择状态，但不包含任何高亮区域
         currentSelection = TextSelection(
             startPoint = startPoint,
@@ -162,7 +162,7 @@ public class Page(
             text = "",
             quads = emptyArray()
         )
-        
+
         //println("startTextSelection: 开始选择，起始点: $startPoint")
         return true
     }
@@ -172,18 +172,18 @@ public class Page(
      */
     public fun updateTextSelection(screenX: Float, screenY: Float) {
         if (!isSelecting || selectionStartPoint == null) return
-        
+
         val structText = structuredText ?: return
         val startPoint = currentSelection?.startPoint ?: return
-        
+
         val pdfPoint = screenToPdfPoint(screenX, screenY)
         val endPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
-        
+
         // 只有当起始点和结束点不同时才进行高亮
         if (startPoint.x != endPoint.x || startPoint.y != endPoint.y) {
             val quads = structText.highlight(startPoint, endPoint)
             //println("updateTextSelection.highlight: startPoint=$startPoint, endPoint=$endPoint, quads.size=${quads.size}")
-            
+
             val selectedText = structText.copy(startPoint, endPoint)
             currentSelection = TextSelection(
                 startPoint = startPoint,
@@ -191,7 +191,7 @@ public class Page(
                 text = selectedText,
                 quads = quads
             )
-            
+
             //println("updateTextSelection: 选中文本: '$selectedText'")
         }
     }
@@ -202,7 +202,7 @@ public class Page(
     public fun endTextSelection(): TextSelection? {
         isSelecting = false
         selectionStartPoint = null
-        
+
         val selection = currentSelection
         // 只有当有实际选中的文本时才返回选择结果
         return if (selection != null && selection.text.isNotBlank() && selection.quads.isNotEmpty()) {
@@ -257,7 +257,11 @@ public class Page(
                 height.toInt(),
                 crop = pdfViewState.isCropEnabled(),
                 callback = object : DecodeCallback {
-                    override fun onDecodeComplete(bitmap: ImageBitmap?, isThumb: Boolean, error: Throwable?) {
+                    override fun onDecodeComplete(
+                        bitmap: ImageBitmap?,
+                        isThumb: Boolean,
+                        error: Throwable?
+                    ) {
                         if (bitmap != null && !pdfViewState.isShutdown()) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
                             pdfViewState.decodeScope.launch(Dispatchers.Main) {
@@ -357,14 +361,14 @@ public class Page(
 
         // 检查页面是否真正可见（用于绘制判断）
         val isActuallyVisible = isPageVisible(drawScope, offset, currentBounds)
-        
+
         // 如果页面不在可见区域且不在预加载列表中，直接返回
         if (!isActuallyVisible && !isPageInRenderList(aPage.index)) {
             return
         }
 
         val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height)
-        
+
         val cacheKey = cachedCacheKey ?: run {
             val cacheKey =
                 "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
@@ -413,7 +417,7 @@ public class Page(
 
                 // 绘制链接区域（调试用，可以注释掉）
                 drawLinks(drawScope, currentBounds, scaleRatio)
-                
+
                 // 绘制文本选择高亮
                 drawTextSelection(drawScope, currentBounds, scaleRatio)
             }
@@ -516,13 +520,13 @@ public class Page(
             val screenQuad = textSelector.quadToScreenQuad(quad) { pdfX, pdfY ->
                 pdfPointToScreenPoint(pdfX, pdfY, currentBounds)
             }
-            
+
             // 绘制高亮矩形（简化处理，使用quad的边界框）
             val left = minOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
             val top = minOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
             val right = maxOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
             val bottom = maxOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
-            
+
             drawScope.drawRect(
                 color = selectionColor,
                 topLeft = Offset(left, top),
@@ -539,7 +543,7 @@ public class Page(
             val cropBounds = aPage.cropBounds!!
             val relativeX = (pdfX - cropBounds.left) / cropBounds.width
             val relativeY = (pdfY - cropBounds.top) / cropBounds.height
-            
+
             Offset(
                 currentBounds.left + relativeX * currentBounds.width,
                 currentBounds.top + relativeY * currentBounds.height
@@ -547,7 +551,7 @@ public class Page(
         } else {
             val relativeX = pdfX / aPage.width
             val relativeY = pdfY / aPage.height
-            
+
             Offset(
                 currentBounds.left + relativeX * currentBounds.width,
                 currentBounds.top + relativeY * currentBounds.height
@@ -701,7 +705,11 @@ public class Page(
     /**
      * 计算缩略图尺寸：根据宽高比选择基准边
      */
-    private fun calculateThumbnailSize(pageWidth: Int, pageHeight: Int, baseSize: Int = 240): Pair<Int, Int> {
+    private fun calculateThumbnailSize(
+        pageWidth: Int,
+        pageHeight: Int,
+        baseSize: Int = 240
+    ): Pair<Int, Int> {
         val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
         return when {
             aspectRatio <= 0.5f -> {
@@ -710,12 +718,14 @@ public class Page(
                 val height = (baseSize / aspectRatio).toInt()
                 Pair(width, height)
             }
+
             aspectRatio >= 2.0f -> {
                 // 宽度是高度的2倍以上（横长条），以高为基准
                 val height = baseSize
                 val width = (baseSize * aspectRatio).toInt()
                 Pair(width, height)
             }
+
             else -> {
                 // 宽高比在 1:2 到 2:1 之间，以宽为基准
                 val width = baseSize

@@ -92,25 +92,25 @@ fun CustomView(
                         // 多文件模式：创建ImagesDecoder
                         val files = paths.map { File(it) }
                         ImagesDecoder(files)
-                } else {
-                    if (FileTypeUtils.isDocumentFile(currentPath)) {
-                        val pdfDecoder = PdfDecoder(File(currentPath))
+                    } else {
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            val pdfDecoder = PdfDecoder(File(currentPath))
 
-                        if (pdfDecoder.needsPassword) {
-                            showPasswordDialog = true
-                            isPasswordError = false
-                            decoder = pdfDecoder
-                            isNeedPass = true
-                            return@withContext
-                        }
+                            if (pdfDecoder.needsPassword) {
+                                showPasswordDialog = true
+                                isPasswordError = false
+                                decoder = pdfDecoder
+                                isNeedPass = true
+                                return@withContext
+                            }
 
-                        pdfDecoder
-                    } else if (FileTypeUtils.isTiffFile(currentPath)) {
-                        isCrop = false
-                        val tiffDecoder = TiffDecoder(File(currentPath))
-                        tiffDecoder
+                            pdfDecoder
+                        } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                            isCrop = false
+                            val tiffDecoder = TiffDecoder(File(currentPath))
+                            tiffDecoder
                         } else {
-                        isCrop = false
+                            isCrop = false
                             ImagesDecoder(listOf(File(currentPath)))
                         }
                     }
@@ -478,13 +478,13 @@ fun CustomView(
                             val targetPage = pageStr.toIntOrNull() ?: 0
                             // 跳转到目标页面
                             jumpToPage = targetPage
-                            
+
                             scope.launch {
                                 speechService.stop()
 
                                 // 等待一小段时间确保停止操作完成
                                 kotlinx.coroutines.delay(500)
-                                
+
                                 speakFromCurrentPage(targetPage, decoder!!, speechService)
                             }
                         }

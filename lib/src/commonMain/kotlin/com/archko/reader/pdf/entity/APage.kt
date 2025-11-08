@@ -6,13 +6,13 @@ import androidx.compose.ui.geometry.Rect
  * @author: archko 2025/3/11 :13:56
  */
 public data class APage(
-    val index: Int, 
-    val width: Int, 
-    val height: Int, 
+    val index: Int,
+    val width: Int,
+    val height: Int,
     var scale: Float = 1f,
     var cropBounds: Rect? = null  // 切边区域结果
 ) {
-    
+
     /**
      * 获取页面宽度
      * @param useCrop 是否使用切边后的尺寸
@@ -25,7 +25,7 @@ public data class APage(
             width.toFloat()
         }
     }
-    
+
     /**
      * 获取页面高度
      * @param useCrop 是否使用切边后的尺寸
@@ -38,7 +38,7 @@ public data class APage(
             height.toFloat()
         }
     }
-    
+
     /**
      * 检查是否有切边
      * @return 是否有切边

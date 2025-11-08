@@ -35,7 +35,7 @@ interface TtsSpeechCallback {
      * @param page 完成的页面编号
      */
     fun onPageComplete(page: String?)
-    
+
     /**
      * 整个朗读结束时的回调
      * @param lastPage 最后朗读的页面编号
@@ -214,7 +214,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
                 }
                 isForegroundServiceStarted = false
             }
-            
+
             println("TTS: 所有朗读完成，触发停止回调，最后页面: $lastPage")
             ttsSpeechCallback?.onSpeechStop(lastPage)
         }
@@ -295,7 +295,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             }
             isForegroundServiceStarted = false
         }
-        
+
         // 触发朗读停止回调
         println("TTS: 手动停止朗读，触发停止回调，最后页面: $lastPage")
         ttsSpeechCallback?.onSpeechStop(lastPage)

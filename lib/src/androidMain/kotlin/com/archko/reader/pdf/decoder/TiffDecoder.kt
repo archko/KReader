@@ -80,7 +80,8 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
                 val scaledHeight = originalPage.height * scale  // 保持浮点数精度
 
                 // 创建缩放后的页面尺寸，yOffset使用当前累积的浮点数值转换为整数
-                val scaledPage = Size(scaledWidth, scaledHeight.toInt(), i, scale, totalHeight.toInt())
+                val scaledPage =
+                    Size(scaledWidth, scaledHeight.toInt(), i, scale, totalHeight.toInt())
                 scaledPageSizes.add(scaledPage)
                 totalHeight += scaledHeight  // 浮点数累积
             }
@@ -155,7 +156,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     ): ImageBitmap {
         try {
             val originalSize = originalPageSizes[aPage.index]
-            
+
             // 根据输出尺寸计算合适的缩放比例
             // 选择能够完全适应输出尺寸的缩放比例
             val scaleX = outWidth.toFloat() / originalSize.width
@@ -172,7 +173,11 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
                 scale,
             )
 
-            return bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            return bitmap?.asImageBitmap() ?: ImageBitmap(
+                outWidth,
+                outHeight,
+                ImageBitmapConfig.Rgb565
+            )
         } catch (e: Exception) {
             println("renderPage error: $e")
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
