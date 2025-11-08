@@ -1,6 +1,7 @@
 package com.archko.reader.viewer
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -374,6 +375,8 @@ fun FileScreen(
                                                     openDocRequest = OpenDocRequest(paths, 0)
                                                 }
                                             }
+                                        } else {
+                                            Toast.makeText(context, "File Not Found!", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     onDelete = {
