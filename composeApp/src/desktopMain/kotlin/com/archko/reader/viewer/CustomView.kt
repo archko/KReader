@@ -31,6 +31,7 @@ import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.tts.TtsQueueService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
@@ -78,6 +79,7 @@ fun CustomView(
     ) {
         LaunchedEffect(currentPath) {
             withContext(Dispatchers.IO) {
+                delay(20)
                 println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
                 if (!FileTypeUtils.isDocumentFile(currentPath)
                     && !FileTypeUtils.isImageFile(currentPath)
