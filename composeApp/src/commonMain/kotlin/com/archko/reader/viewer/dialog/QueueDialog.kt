@@ -78,7 +78,7 @@ fun QueueDialog(
 
                 if (cacheBean != null) {
                     val listState = rememberLazyListState()
-                    
+
                     // 自动滚动到当前朗读的项目
                     LaunchedEffect(currentSpeakingPage) {
                         currentSpeakingPage?.let { speakingPage ->
@@ -88,7 +88,7 @@ fun QueueDialog(
                             }
                         }
                     }
-                    
+
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxWidth(),
@@ -119,7 +119,7 @@ fun QueueDialog(
                                 Text(
                                     text = stringResource(Res.string.tts_page_item)
                                         .format(
-                                            item.page,
+                                            item.page + 1,
                                             item.data?.take(count)
                                         ),
                                     maxLines = 1,
