@@ -46,6 +46,7 @@ import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsSpeechCallback
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
@@ -130,123 +131,125 @@ fun CustomView(
     // TTS服务绑定器 - 只有文档文件才初始化
     var ttsServiceBinder by remember { mutableStateOf<TtsServiceBinder?>(null) }
 
-    LaunchedEffect(currentPath) {
-        withContext(Dispatchers.IO) {
-            println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
-            if (!FileTypeUtils.isDocumentFile(currentPath)
-                && !FileTypeUtils.isImageFile(currentPath)
-                && !FileTypeUtils.isTiffFile(currentPath)
-            ) {
-                loadingError = "document_open_failed"
-                decoder = null
-                return@withContext
-            }
-            try {
-                val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
-                    null
-                } else {
-                    if (paths.size > 1) {
-                        isCrop = false
-                        // 多文件模式：创建ImagesDecoder
-                        val files = paths.map { File(it) }
-                        ImagesDecoder(files)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { viewportSize = it }
+    ) {
+        LaunchedEffect(currentPath) {
+            withContext(Dispatchers.IO) {
+                delay(20)
+                println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
+                if (!FileTypeUtils.isDocumentFile(currentPath)
+                    && !FileTypeUtils.isImageFile(currentPath)
+                    && !FileTypeUtils.isTiffFile(currentPath)
+                ) {
+                    loadingError = "document_open_failed"
+                    decoder = null
+                    return@withContext
+                }
+                try {
+                    val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
+                        null
                     } else {
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            ttsServiceBinder = TtsServiceBinder(context)
-                            ttsServiceBinder?.bindService()
-
-                            val pdfDecoder = PdfDecoder(File(currentPath))
-
-                            if (pdfDecoder.needsPassword) {
-                                showPasswordDialog = true
-                                isPasswordError = false
-                                decoder = pdfDecoder
-                                isNeedPass = true
-                                return@withContext
-                            }
-
-                            pdfDecoder
-                        } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                        if (paths.size > 1) {
                             isCrop = false
-                            val tiffDecoder = TiffDecoder(File(currentPath))
-                            tiffDecoder
+                            // 多文件模式：创建ImagesDecoder
+                            val files = paths.map { File(it) }
+                            ImagesDecoder(files)
                         } else {
-                            isCrop = false
-                            ImagesDecoder(listOf(File(currentPath)))
+                            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                                ttsServiceBinder = TtsServiceBinder(context)
+                                ttsServiceBinder?.bindService()
+
+                                val pdfDecoder = PdfDecoder(File(currentPath))
+
+                                if (pdfDecoder.needsPassword) {
+                                    showPasswordDialog = true
+                                    isPasswordError = false
+                                    decoder = pdfDecoder
+                                    isNeedPass = true
+                                    return@withContext
+                                }
+
+                                pdfDecoder
+                            } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                                isCrop = false
+                                val tiffDecoder = TiffDecoder(File(currentPath))
+                                tiffDecoder
+                            } else {
+                                isCrop = false
+                                ImagesDecoder(listOf(File(currentPath)))
+                            }
+                        }
+                    }
+                    if (newDecoder != null) {
+                        newDecoder.size(viewportSize)
+                        println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
+                        decoder = newDecoder
+                        loadingError = null
+                    }
+                } catch (e: Exception) {
+                    println("文档加载失败: $currentPath, 错误: ${e.message}")
+                    loadingError = "document_open_failed"
+                    decoder = null
+                }
+            }
+        }
+
+        DisposableEffect(currentPath) {
+            onDispose {
+                println("CustomView.onDispose:$currentPath, $decoder")
+                ttsServiceBinder?.unbindService()
+                decoder?.close()
+            }
+        }
+
+        // 处理密码输入
+        fun handlePasswordEntered(password: String) {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    decoder?.let { pdfDecoder ->
+                        val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
+                        if (success) {
+                            pdfDecoder.size(viewportSize)
+                            loadingError = null
+                            showPasswordDialog = false
+                            isPasswordError = false
+                            isNeedPass = false
+                        } else {
+                            // 密码错误，重新显示对话框并显示错误信息
+                            showPasswordDialog = true
+                            isPasswordError = true
                         }
                     }
                 }
-                if (newDecoder != null) {
-                    newDecoder.size(viewportSize)
-                    println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
-                    decoder = newDecoder
-                    loadingError = null
-                }
-            } catch (e: Exception) {
-                println("文档加载失败: $currentPath, 错误: ${e.message}")
-                loadingError = "document_open_failed"
-                decoder = null
             }
         }
-    }
 
-    DisposableEffect(currentPath) {
-        onDispose {
-            println("CustomView.onDispose:$currentPath, $decoder")
-            ttsServiceBinder?.unbindService()
-            decoder?.close()
+        // 处理密码对话框取消
+        fun handlePasswordDialogDismiss() {
+            showPasswordDialog = false
+            isPasswordError = false
+            onCloseDocument?.invoke()
         }
-    }
 
-    // 处理密码输入
-    fun handlePasswordEntered(password: String) {
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                decoder?.let { pdfDecoder ->
-                    val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
-                    if (success) {
-                        pdfDecoder.size(viewportSize)
-                        loadingError = null
-                        showPasswordDialog = false
-                        isPasswordError = false
-                        isNeedPass = false
-                    } else {
-                        // 密码错误，重新显示对话框并显示错误信息
-                        showPasswordDialog = true
-                        isPasswordError = true
-                    }
-                }
-            }
+        // 显示密码输入对话框
+        if (showPasswordDialog) {
+            PasswordDialog(
+                fileName = File(currentPath).name,
+                onPasswordEntered = { password ->
+                    handlePasswordEntered(password)
+                },
+                onDismiss = {
+                    handlePasswordDialogDismiss()
+                },
+                isPasswordError = isPasswordError
+            )
         }
-    }
 
-    // 处理密码对话框取消
-    fun handlePasswordDialogDismiss() {
-        showPasswordDialog = false
-        isPasswordError = false
-        onCloseDocument?.invoke()
-    }
-
-    // 显示密码输入对话框
-    if (showPasswordDialog) {
-        PasswordDialog(
-            fileName = File(currentPath).name,
-            onPasswordEntered = { password ->
-                handlePasswordEntered(password)
-            },
-            onDismiss = {
-                handlePasswordDialogDismiss()
-            },
-            isPasswordError = isPasswordError
-        )
-    }
-
-    if (isNeedPass) {
-    } else if (null == decoder) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { viewportSize = it }) {
+        if (isNeedPass) {
+        } else if (null == decoder) {
             if (loadingError != null) {
                 // 显示错误信息
                 Column(
@@ -302,139 +305,135 @@ fun CustomView(
                     )
                 }
             }
-        }
-    } else {
-        fun createList(decoder: ImageDecoder): MutableList<APage> {
-            if (!decoder.aPageList.isNullOrEmpty()) {
-                return decoder.aPageList!!
+        } else {
+            fun createList(decoder: ImageDecoder): MutableList<APage> {
+                if (!decoder.aPageList.isNullOrEmpty()) {
+                    return decoder.aPageList!!
+                }
+                val list = mutableListOf<APage>()
+                for (i in 0 until decoder.originalPageSizes.size) {
+                    val page = decoder.originalPageSizes[i]
+                    val aPage = APage(i, page.width, page.height, 1f)
+                    list.add(aPage)
+                }
+                return list
             }
-            val list = mutableListOf<APage>()
-            for (i in 0 until decoder.originalPageSizes.size) {
-                val page = decoder.originalPageSizes[i]
-                val aPage = APage(i, page.width, page.height, 1f)
-                list.add(aPage)
+
+            val list: MutableList<APage> = remember {
+                createList(decoder!!)
             }
-            return list
-        }
 
-        val list: MutableList<APage> = remember {
-            createList(decoder!!)
-        }
+            var showToolbar by remember { mutableStateOf(false) }
+            var showOutlineDialog by remember { mutableStateOf(false) }
 
-        var showToolbar by remember { mutableStateOf(false) }
-        var showOutlineDialog by remember { mutableStateOf(false) }
+            var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
+            var isReflow by remember { mutableStateOf(reflow == 1L) }
+            var isTextSelectionMode by remember { mutableStateOf(false) }
 
-        var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
-        var isReflow by remember { mutableStateOf(reflow == 1L) }
-        var isTextSelectionMode by remember { mutableStateOf(false) }
+            var showSleepDialog by remember { mutableStateOf(false) }
+            var showQueueDialog by remember { mutableStateOf(false) }
 
-        var showSleepDialog by remember { mutableStateOf(false) }
-        var showQueueDialog by remember { mutableStateOf(false) }
-
-        // 对于单图片文件，根据尺寸自动调整滚动方向
-        LaunchedEffect(decoder) {
-            decoder?.let { dec ->
-                if (paths.size == 1 &&
-                    (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(currentPath))
-                ) {
-                    if (dec.originalPageSizes.isNotEmpty()) {
-                        val firstPageSize = dec.originalPageSizes[0]
-                        val width = firstPageSize.width
-                        val height = firstPageSize.height
-                        println("isVertical:$isVertical, width:$width-$height, $currentPath")
-                        // 如果图片的高度小于宽度的1/3，则切换为横向滚动
-                        if (height < width / 3) {
-                            isVertical = false
+            // 对于单图片文件，根据尺寸自动调整滚动方向
+            LaunchedEffect(decoder) {
+                decoder?.let { dec ->
+                    if (paths.size == 1 &&
+                        (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(
+                            currentPath
+                        ))
+                    ) {
+                        if (dec.originalPageSizes.isNotEmpty()) {
+                            val firstPageSize = dec.originalPageSizes[0]
+                            val width = firstPageSize.width
+                            val height = firstPageSize.height
+                            println("isVertical:$isVertical, width:$width-$height, $currentPath")
+                            // 如果图片的高度小于宽度的1/3，则切换为横向滚动
+                            if (height < width / 3) {
+                                isVertical = false
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
-        val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
-        // 当前页与总页数
-        var currentPage by remember { mutableIntStateOf(0) }
-        // 添加标志位以跟踪是否为外部更改
-        var isExternalChange by remember { mutableStateOf(false) }
-        val pageCount: Int = list.size
-        // 跳转页面状态
-        var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+            // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
+            val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
+            // 当前页与总页数
+            var currentPage by remember { mutableIntStateOf(0) }
+            // 添加标志位以跟踪是否为外部更改
+            var isExternalChange by remember { mutableStateOf(false) }
+            val pageCount: Int = list.size
+            // 跳转页面状态
+            var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
 
-        val currentPageString = stringResource(Res.string.current_page)
+            val currentPageString = stringResource(Res.string.current_page)
 
-        var isSpeaking by remember { mutableStateOf(false) }
+            var isSpeaking by remember { mutableStateOf(false) }
 
-        LaunchedEffect(ttsServiceBinder) {
-            ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
-                isSpeaking = speaking
-            }
-
-            ttsServiceBinder?.setTtsSpeechCallback(object : TtsSpeechCallback {
-                override fun onPageComplete(page: String?) {
-                    page?.let { pageStr ->
-                        val targetPage = pageStr.toIntOrNull()
-                        println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage")
-                        if (null != targetPage && targetPage != jumpToPage) {
-                            jumpToPage = targetPage
-                        }
-                    }
+            LaunchedEffect(ttsServiceBinder) {
+                ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
+                    isSpeaking = speaking
                 }
 
-                override fun onSpeechStop(lastPage: String?) {
-                    lastPage?.let { pageStr ->
-                        val targetPage = pageStr.toIntOrNull()
-                        println("SpeechStop: 朗读结束，保存进度，最后页面: $targetPage")
-                        if (null != targetPage) {
+                ttsServiceBinder?.setTtsSpeechCallback(object : TtsSpeechCallback {
+                    override fun onPageComplete(page: String?) {
+                        page?.let { pageStr ->
+                            val targetPage = pageStr.toIntOrNull()
+                            println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage")
                             if (null != targetPage && targetPage != jumpToPage) {
                                 jumpToPage = targetPage
                             }
-                            onSaveDocument?.invoke(
-                                targetPage,
-                                pageCount,
-                                initialZoom,
-                                initialScrollX,
-                                initialScrollY,
-                                if (isVertical) Vertical.toLong() else Horizontal.toLong(),
-                                if (isReflow) 1L else 0L,
-                                if (isCrop) 1L else 0L
-                            )
                         }
                     }
-                }
-            })
-        }
 
-        // 监听生命周期，当从后台返回前台时同步到正在朗读的页面
-        val lifecycleOwner = LocalLifecycleOwner.current
-        DisposableEffect(lifecycleOwner, ttsServiceBinder) {
-            val observer = LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    ttsServiceBinder?.let { binder ->
-                        if (binder.isSpeaking()) {
-                            val speakingPage = binder.getCurrentSpeakingPage()
-                            speakingPage?.let { pageStr ->
-                                val targetPage = pageStr.toIntOrNull()
-                                println("OnResume: 正在朗读第${targetPage}页，当前显示第${currentPage}页")
-                                if (targetPage != null && targetPage != currentPage) {
+                    override fun onSpeechStop(lastPage: String?) {
+                        lastPage?.let { pageStr ->
+                            val targetPage = pageStr.toIntOrNull()
+                            println("SpeechStop: 朗读结束，保存进度，最后页面: $targetPage")
+                            if (null != targetPage) {
+                                if (null != targetPage && targetPage != jumpToPage) {
                                     jumpToPage = targetPage
+                                }
+                                onSaveDocument?.invoke(
+                                    targetPage,
+                                    pageCount,
+                                    initialZoom,
+                                    initialScrollX,
+                                    initialScrollY,
+                                    if (isVertical) Vertical.toLong() else Horizontal.toLong(),
+                                    if (isReflow) 1L else 0L,
+                                    if (isCrop) 1L else 0L
+                                )
+                            }
+                        }
+                    }
+                })
+            }
+
+            // 监听生命周期，当从后台返回前台时同步到正在朗读的页面
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner, ttsServiceBinder) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        ttsServiceBinder?.let { binder ->
+                            if (binder.isSpeaking()) {
+                                val speakingPage = binder.getCurrentSpeakingPage()
+                                speakingPage?.let { pageStr ->
+                                    val targetPage = pageStr.toIntOrNull()
+                                    println("OnResume: 正在朗读第${targetPage}页，当前显示第${currentPage}页")
+                                    if (targetPage != null && targetPage != currentPage) {
+                                        jumpToPage = targetPage
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
             }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-            }
-        }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { viewportSize = it }
-        ) {
             val context = LocalContext.current
 
             // 根据reflow状态选择显示模式
@@ -488,7 +487,8 @@ fun CustomView(
                         if (showToolbar) {
                             showToolbar = false
                         } else {
-                            val pageText = currentPageString.format(clickedPageIndex + 1, pageCount)
+                            val pageText =
+                                currentPageString.format(clickedPageIndex + 1, pageCount)
                             Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
                         }
                     },
@@ -682,7 +682,11 @@ fun CustomView(
                                         } else {
                                             scope.launch {
                                                 binder.clearQueue()
-                                                speakFromCurrentPage(currentPage, decoder!!, binder)
+                                                speakFromCurrentPage(
+                                                    currentPage,
+                                                    decoder!!,
+                                                    binder
+                                                )
                                             }
                                         }
                                     }
@@ -746,7 +750,8 @@ fun CustomView(
                                 Toast.makeText(context, txt, Toast.LENGTH_SHORT).show()
                             } else {
                                 binder.stop()
-                                Toast.makeText(context, sleepCancelText, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, sleepCancelText, Toast.LENGTH_SHORT)
+                                    .show()
                             }
                         },
                         initialMinutes = binder.getSleepTimerMinutes().takeIf { it > 0 } ?: 20
@@ -773,7 +778,7 @@ fun CustomView(
                                 scope.launch {
                                     binder.stop()
 
-                                    kotlinx.coroutines.delay(50)
+                                    delay(50)
 
                                     speakFromCurrentPage(targetPage, decoder!!, binder)
                                 }

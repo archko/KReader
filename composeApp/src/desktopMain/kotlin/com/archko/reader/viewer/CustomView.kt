@@ -71,125 +71,125 @@ fun CustomView(
     val currentPath = paths.getOrNull(0) ?: paths.first()
 
     val speechService: SpeechService = remember { TtsQueueService() }
-
-    LaunchedEffect(currentPath) {
-        withContext(Dispatchers.IO) {
-            println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
-            if (!FileTypeUtils.isDocumentFile(currentPath)
-                && !FileTypeUtils.isImageFile(currentPath)
-                && !FileTypeUtils.isTiffFile(currentPath)
-            ) {
-                loadingError = "document_open_failed"
-                decoder = null
-                return@withContext
-            }
-            try {
-                val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
-                    null
-                } else {
-                    if (paths.size > 1) {
-                        isCrop = false
-                        // 多文件模式：创建ImagesDecoder
-                        val files = paths.map { File(it) }
-                        ImagesDecoder(files)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { viewportSize = it }
+    ) {
+        LaunchedEffect(currentPath) {
+            withContext(Dispatchers.IO) {
+                println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
+                if (!FileTypeUtils.isDocumentFile(currentPath)
+                    && !FileTypeUtils.isImageFile(currentPath)
+                    && !FileTypeUtils.isTiffFile(currentPath)
+                ) {
+                    loadingError = "document_open_failed"
+                    decoder = null
+                    return@withContext
+                }
+                try {
+                    val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
+                        null
                     } else {
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            val pdfDecoder = PdfDecoder(File(currentPath))
-
-                            if (pdfDecoder.needsPassword) {
-                                showPasswordDialog = true
-                                isPasswordError = false
-                                decoder = pdfDecoder
-                                isNeedPass = true
-                                return@withContext
-                            }
-
-                            pdfDecoder
-                        } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                        if (paths.size > 1) {
                             isCrop = false
-                            val tiffDecoder = TiffDecoder(File(currentPath))
-                            tiffDecoder
+                            // 多文件模式：创建ImagesDecoder
+                            val files = paths.map { File(it) }
+                            ImagesDecoder(files)
                         } else {
-                            isCrop = false
-                            ImagesDecoder(listOf(File(currentPath)))
+                            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                                val pdfDecoder = PdfDecoder(File(currentPath))
+
+                                if (pdfDecoder.needsPassword) {
+                                    showPasswordDialog = true
+                                    isPasswordError = false
+                                    decoder = pdfDecoder
+                                    isNeedPass = true
+                                    return@withContext
+                                }
+
+                                pdfDecoder
+                            } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                                isCrop = false
+                                val tiffDecoder = TiffDecoder(File(currentPath))
+                                tiffDecoder
+                            } else {
+                                isCrop = false
+                                ImagesDecoder(listOf(File(currentPath)))
+                            }
+                        }
+                    }
+                    if (newDecoder != null) {
+                        newDecoder.size(viewportSize)
+                        println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
+                        decoder = newDecoder
+                        loadingError = null
+                    }
+                } catch (e: Exception) {
+                    println("文档加载失败: $currentPath, 错误: ${e.message}")
+                    loadingError = "document_open_failed"
+                    decoder = null
+                }
+            }
+        }
+
+        DisposableEffect(currentPath) {
+            onDispose {
+                println("CustomView.onDispose:$currentPath, $decoder")
+                decoder?.close()
+                if (speechService is TtsQueueService) {
+                    speechService.destroy()
+                } else {
+                    speechService.stop()
+                }
+            }
+        }
+
+        // 处理密码输入
+        fun handlePasswordEntered(password: String) {
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    decoder?.let { pdfDecoder ->
+                        val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
+                        if (success) {
+                            pdfDecoder.size(viewportSize)
+                            loadingError = null
+                            showPasswordDialog = false
+                            isPasswordError = false
+                            isNeedPass = false
+                        } else {
+                            // 密码错误，重新显示对话框并显示错误信息
+                            showPasswordDialog = true
+                            isPasswordError = true
                         }
                     }
                 }
-                if (newDecoder != null) {
-                    newDecoder.size(viewportSize)
-                    println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
-                    decoder = newDecoder
-                    loadingError = null
-                }
-            } catch (e: Exception) {
-                println("文档加载失败: $currentPath, 错误: ${e.message}")
-                loadingError = "document_open_failed"
-                decoder = null
             }
         }
-    }
 
-    DisposableEffect(currentPath) {
-        onDispose {
-            println("CustomView.onDispose:$currentPath, $decoder")
-            decoder?.close()
-            if (speechService is TtsQueueService) {
-                speechService.destroy()
-            } else {
-                speechService.stop()
-            }
+        // 处理密码对话框取消
+        fun handlePasswordDialogDismiss() {
+            showPasswordDialog = false
+            isPasswordError = false
+            onCloseDocument?.invoke()
         }
-    }
 
-    // 处理密码输入
-    fun handlePasswordEntered(password: String) {
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                decoder?.let { pdfDecoder ->
-                    val success = (pdfDecoder as PdfDecoder).authenticatePassword(password)
-                    if (success) {
-                        pdfDecoder.size(viewportSize)
-                        loadingError = null
-                        showPasswordDialog = false
-                        isPasswordError = false
-                        isNeedPass = false
-                    } else {
-                        // 密码错误，重新显示对话框并显示错误信息
-                        showPasswordDialog = true
-                        isPasswordError = true
-                    }
-                }
-            }
+        // 显示密码输入对话框
+        if (showPasswordDialog) {
+            PasswordDialog(
+                fileName = File(currentPath).name,
+                onPasswordEntered = { password ->
+                    handlePasswordEntered(password)
+                },
+                onDismiss = {
+                    handlePasswordDialogDismiss()
+                },
+                isPasswordError = isPasswordError
+            )
         }
-    }
 
-    // 处理密码对话框取消
-    fun handlePasswordDialogDismiss() {
-        showPasswordDialog = false
-        isPasswordError = false
-        onCloseDocument?.invoke()
-    }
-
-    // 显示密码输入对话框
-    if (showPasswordDialog) {
-        PasswordDialog(
-            fileName = File(currentPath).name,
-            onPasswordEntered = { password ->
-                handlePasswordEntered(password)
-            },
-            onDismiss = {
-                handlePasswordDialogDismiss()
-            },
-            isPasswordError = isPasswordError
-        )
-    }
-
-    if (isNeedPass) {
-    } else if (null == decoder) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { viewportSize = it }) {
+        if (isNeedPass) {
+        } else if (null == decoder) {
             if (loadingError != null) {
                 // 显示错误信息
                 Column(
@@ -245,376 +245,376 @@ fun CustomView(
                     )
                 }
             }
-        }
-    } else {
-        fun createList(decoder: ImageDecoder): MutableList<APage> {
-            if (!decoder.aPageList.isNullOrEmpty()) {
-                return decoder.aPageList!!
+        } else {
+            fun createList(decoder: ImageDecoder): MutableList<APage> {
+                if (!decoder.aPageList.isNullOrEmpty()) {
+                    return decoder.aPageList!!
+                }
+                val list = mutableListOf<APage>()
+                for (i in 0 until decoder.originalPageSizes.size) {
+                    val page = decoder.originalPageSizes[i]
+                    val aPage = APage(i, page.width, page.height, 1f)
+                    list.add(aPage)
+                }
+                return list
             }
-            val list = mutableListOf<APage>()
-            for (i in 0 until decoder.originalPageSizes.size) {
-                val page = decoder.originalPageSizes[i]
-                val aPage = APage(i, page.width, page.height, 1f)
-                list.add(aPage)
+
+            val list: MutableList<APage> = remember {
+                createList(decoder!!)
             }
-            return list
-        }
+            // 工具栏显示状态 - 顶部工具栏始终显示，底部可以隐藏
+            var showBottomToolbar by remember { mutableStateOf(true) }
+            var showOutlineDialog by remember { mutableStateOf(false) }
 
-        val list: MutableList<APage> = remember {
-            createList(decoder!!)
-        }
-        // 工具栏显示状态 - 顶部工具栏始终显示，底部可以隐藏
-        var showBottomToolbar by remember { mutableStateOf(true) }
-        var showOutlineDialog by remember { mutableStateOf(false) }
+            var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
+            var isReflow by remember { mutableStateOf(reflow == 1L) }
+            var isTextSelectionMode by remember { mutableStateOf(false) }
 
-        var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
-        var isReflow by remember { mutableStateOf(reflow == 1L) }
-        var isTextSelectionMode by remember { mutableStateOf(false) }
+            var showQueueDialog by remember { mutableStateOf(false) }
 
-        var showQueueDialog by remember { mutableStateOf(false) }
-
-        // 对于单图片文件，根据尺寸自动调整滚动方向
-        LaunchedEffect(decoder) {
-            decoder?.let { dec ->
-                if (paths.size == 1 &&
-                    (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(currentPath))
-                ) {
-                    if (dec.originalPageSizes.isNotEmpty()) {
-                        val firstPageSize = dec.originalPageSizes[0]
-                        val width = firstPageSize.width
-                        val height = firstPageSize.height
-                        println("isVertical:$isVertical, width:$width-$height, $currentPath")
-                        // 如果图片的高度小于宽度的1/3，则切换为横向滚动
-                        if (height < width / 3) {
-                            isVertical = false
+            // 对于单图片文件，根据尺寸自动调整滚动方向
+            LaunchedEffect(decoder) {
+                decoder?.let { dec ->
+                    if (paths.size == 1 &&
+                        (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(
+                            currentPath
+                        ))
+                    ) {
+                        if (dec.originalPageSizes.isNotEmpty()) {
+                            val firstPageSize = dec.originalPageSizes[0]
+                            val width = firstPageSize.width
+                            val height = firstPageSize.height
+                            println("isVertical:$isVertical, width:$width-$height, $currentPath")
+                            // 如果图片的高度小于宽度的1/3，则切换为横向滚动
+                            if (height < width / 3) {
+                                isVertical = false
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
-        val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
-        var currentPage by remember { mutableIntStateOf(0) }
-        // 添加标志位以跟踪是否为外部更改
-        var isExternalChange by remember { mutableStateOf(false) }
-        val pageCount: Int = list.size
-        // 跳转页面状态
-        var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+            // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
+            val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
+            var currentPage by remember { mutableIntStateOf(0) }
+            // 添加标志位以跟踪是否为外部更改
+            var isExternalChange by remember { mutableStateOf(false) }
+            val pageCount: Int = list.size
+            // 跳转页面状态
+            var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
 
-        val currentPageString = stringResource(Res.string.current_page)
+            val currentPageString = stringResource(Res.string.current_page)
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { viewportSize = it }
-        ) {
-            // 顶部工具栏 - 始终显示
-            Surface(
-                color = Color(0xff000000),
-                shadowElevation = 8.dp, // 添加阴影确保层级
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Row(
+                // 顶部工具栏 - 始终显示
+                Surface(
+                    color = Color(0xff000000),
+                    shadowElevation = 8.dp, // 添加阴影确保层级
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(36.dp)
-                        .padding(horizontal = 8.dp, vertical = 0.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                 ) {
-                    IconButton(onClick = { onCloseDocument?.invoke() }) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_back),
-                            contentDescription = stringResource(Res.string.back),
-                            tint = Color.White
-                        )
-                    }
-                    Text(
-                        text = currentPath,
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Spacer(Modifier.weight(1f))
-
-                    IconButton(onClick = { isVertical = !isVertical }) {
-                        Icon(
-                            painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                            contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                Res.string.horizontal
-                            ),
-                            tint = Color.White
-                        )
-                    }
-
-                    if (FileTypeUtils.isDocumentFile(currentPath)) {
-                        val isSpeaking by speechService.isSpeakingFlow.collectAsState()
-
-                        IconButton(onClick = {
-                            scope.launch {
-                                speakFromCurrentPage(currentPage, decoder!!, speechService)
-                                if (!speechService.isSpeaking()) {
-                                    showQueueDialog = false
-                                }
-                            }
-                        }) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(36.dp)
+                            .padding(horizontal = 8.dp, vertical = 0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { onCloseDocument?.invoke() }) {
                             Icon(
-                                painter = painterResource(Res.drawable.ic_tts),
-                                contentDescription = stringResource(Res.string.tts),
-                                tint = if (isSpeaking) Color.Green else Color.White
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = stringResource(Res.string.back),
+                                tint = Color.White
                             )
                         }
-                        if (isSpeaking) {
-                            IconButton(
-                                onClick = { showQueueDialog = true }
-                            ) {
-                                Text(
-                                    text = "📋",
-                                    color = Color.White,
-                                    fontSize = 16.sp
-                                )
-                            }
-                        }
-                        IconButton(onClick = {
-                            isTextSelectionMode = !isTextSelectionMode
-                        }) {
+                        Text(
+                            text = currentPath,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Spacer(Modifier.weight(1f))
+
+                        IconButton(onClick = { isVertical = !isVertical }) {
                             Icon(
-                                painter = painterResource(Res.drawable.ic_select),
-                                contentDescription = "文本选择",
-                                tint = if (isTextSelectionMode) Color.Green else Color.White
-                            )
-                        }
-                    }
-
-                    IconButton(onClick = {
-                        val newZoom = vZoom + 0.1
-                        if (newZoom <= 5f) {
-                            vZoom = newZoom
-                        }
-                    }) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_zoom_in),
-                            contentDescription = "",
-                            tint = Color.White
-                        )
-                    }
-
-                    IconButton(onClick = {
-                        val newZoom = vZoom - 0.1
-                        if (newZoom >= 0.51f) {
-                            vZoom = newZoom
-                        }
-                    }) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_zoom_out),
-                            contentDescription = "",
-                            tint = Color.White
-                        )
-                    }
-
-                    IconButton(onClick = {
-                        vZoom = 1.0
-                    }) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_zoom_reset),
-                            contentDescription = "",
-                            tint = Color.White
-                        )
-                    }
-
-                    // 只有文档文件才显示其他按钮
-                    if (FileTypeUtils.isDocumentFile(currentPath)) {
-                        IconButton(onClick = { isCrop = !isCrop }) {
-                            Icon(
-                                painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                    Res.string.no_crop
+                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                    Res.string.horizontal
                                 ),
                                 tint = Color.White
                             )
                         }
-                        // 只有单文档文件才显示大纲按钮
-                        if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
-                            IconButton(onClick = { showOutlineDialog = true }) {
+
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            val isSpeaking by speechService.isSpeakingFlow.collectAsState()
+
+                            IconButton(onClick = {
+                                scope.launch {
+                                    speakFromCurrentPage(currentPage, decoder!!, speechService)
+                                    if (!speechService.isSpeaking()) {
+                                        showQueueDialog = false
+                                    }
+                                }
+                            }) {
                                 Icon(
-                                    painter = painterResource(Res.drawable.ic_toc),
-                                    contentDescription = stringResource(Res.string.outline),
+                                    painter = painterResource(Res.drawable.ic_tts),
+                                    contentDescription = stringResource(Res.string.tts),
+                                    tint = if (isSpeaking) Color.Green else Color.White
+                                )
+                            }
+                            if (isSpeaking) {
+                                IconButton(
+                                    onClick = { showQueueDialog = true }
+                                ) {
+                                    Text(
+                                        text = "📋",
+                                        color = Color.White,
+                                        fontSize = 16.sp
+                                    )
+                                }
+                            }
+                            IconButton(onClick = {
+                                isTextSelectionMode = !isTextSelectionMode
+                            }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_select),
+                                    contentDescription = "文本选择",
+                                    tint = if (isTextSelectionMode) Color.Green else Color.White
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = {
+                            val newZoom = vZoom + 0.1
+                            if (newZoom <= 5f) {
+                                vZoom = newZoom
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_zoom_in),
+                                contentDescription = "",
+                                tint = Color.White
+                            )
+                        }
+
+                        IconButton(onClick = {
+                            val newZoom = vZoom - 0.1
+                            if (newZoom >= 0.51f) {
+                                vZoom = newZoom
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_zoom_out),
+                                contentDescription = "",
+                                tint = Color.White
+                            )
+                        }
+
+                        IconButton(onClick = {
+                            vZoom = 1.0
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_zoom_reset),
+                                contentDescription = "",
+                                tint = Color.White
+                            )
+                        }
+
+                        // 只有文档文件才显示其他按钮
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            IconButton(onClick = { isCrop = !isCrop }) {
+                                Icon(
+                                    painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                    contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                        Res.string.no_crop
+                                    ),
+                                    tint = Color.White
+                                )
+                            }
+                            // 只有单文档文件才显示大纲按钮
+                            if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                                IconButton(onClick = { showOutlineDialog = true }) {
+                                    Icon(
+                                        painter = painterResource(Res.drawable.ic_toc),
+                                        contentDescription = stringResource(Res.string.outline),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                            //IconButton(onClick = { isReflow = !isReflow }) {
+                            //    Icon(
+                            //        painter = painterResource(Res.drawable.ic_reflow),
+                            //        contentDescription = stringResource(Res.string.reflow),
+                            //        tint = if (isReflow) Color.Green else Color.White
+                            //    )
+                            //}
+                            IconButton(onClick = { }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_search),
+                                    contentDescription = stringResource(Res.string.search),
                                     tint = Color.White
                                 )
                             }
                         }
-                        //IconButton(onClick = { isReflow = !isReflow }) {
-                        //    Icon(
-                        //        painter = painterResource(Res.drawable.ic_reflow),
-                        //        contentDescription = stringResource(Res.string.reflow),
-                        //        tint = if (isReflow) Color.Green else Color.White
-                        //    )
-                        //}
-                        IconButton(onClick = { }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_search),
-                                contentDescription = stringResource(Res.string.search),
-                                tint = Color.White
-                            )
-                        }
                     }
                 }
-            }
 
-            // 队列列表弹窗
-            if (showQueueDialog) {
-                val pdfDecoder = decoder as PdfDecoder
-                QueueDialog(
-                    pdfDecoder.cacheBean,
-                    currentSpeakingPage = jumpToPage.toString(),
-                    count = 30,
-                    onDismiss = { showQueueDialog = false },
-                    onItemClick = { reflowBean ->
-                        showQueueDialog = false
+                // 队列列表弹窗
+                if (showQueueDialog) {
+                    val pdfDecoder = decoder as PdfDecoder
+                    QueueDialog(
+                        pdfDecoder.cacheBean,
+                        currentSpeakingPage = jumpToPage.toString(),
+                        count = 30,
+                        onDismiss = { showQueueDialog = false },
+                        onItemClick = { reflowBean ->
+                            showQueueDialog = false
 
-                        // 从选中的页面重新开始朗读
-                        reflowBean.page?.let { pageStr ->
-                            val targetPage = pageStr.toIntOrNull() ?: 0
-                            // 跳转到目标页面
-                            jumpToPage = targetPage
+                            // 从选中的页面重新开始朗读
+                            reflowBean.page?.let { pageStr ->
+                                val targetPage = pageStr.toIntOrNull() ?: 0
+                                // 跳转到目标页面
+                                jumpToPage = targetPage
 
-                            scope.launch {
-                                speechService.stop()
+                                scope.launch {
+                                    speechService.stop()
 
-                                // 等待一小段时间确保停止操作完成
-                                kotlinx.coroutines.delay(500)
+                                    // 等待一小段时间确保停止操作完成
+                                    kotlinx.coroutines.delay(500)
 
-                                speakFromCurrentPage(targetPage, decoder!!, speechService)
+                                    speakFromCurrentPage(targetPage, decoder!!, speechService)
+                                }
                             }
                         }
-                    }
-                )
-            }
-
-            // 文档视图 - 占据剩余空间
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clipToBounds() // 确保内容不会绘制到边界外
-            ) {
-                if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
-                    // Reflow视图
-                } else {
-                    DesktopDocumentView(
-                        list = list,
-                        state = decoder!!,
-                        jumpToPage = jumpToPage,
-                        initialOrientation = orientation,
-                        onSaveDocument = onSaveDocument,
-                        onCloseDocument = {
-                            println("onCloseDocument.isReflow:$isReflow")
-                            if (!isReflow) {
-                                onCloseDocument?.invoke()
-                            }
-                        }, // 只在非重排模式下传递关闭回调
-                        onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
-                        onPageChanged = { page -> currentPage = page },
-                        onTapNonPageArea = { clickedPageIndex ->
-                            // 点击非翻页区域时隐藏底部工具栏
-                            if (showBottomToolbar) {
-                                showBottomToolbar = false
-                            }
-                            //val pageText = currentPageString.format(clickedPageIndex + 1)
-                            //Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
-                        },
-                        initialScrollX = initialScrollX,
-                        initialScrollY = initialScrollY,
-                        initialZoom = vZoom,
-                        crop = isCrop,
-                        isTextSelectionMode = isTextSelectionMode,
                     )
                 }
 
-                // 大纲弹窗（最上层）- 只有单文档文件才显示
-                if (showOutlineDialog && FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
-                    val outlineList = decoder?.outlineItems ?: emptyList()
-                    OutlineDialog(
-                        currentPage,
-                        outlineList,
-                        onClick = { item ->
-                            jumpToPage = item.page
-                            showOutlineDialog = false
-                        },
-                        onDismiss = { showOutlineDialog = false },
-                    )
-                }
-
-                // 底部SeekBar - 覆盖在文档上方
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showBottomToolbar,
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                // 文档视图 - 占据剩余空间
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clipToBounds() // 确保内容不会绘制到边界外
                 ) {
-                    Surface(
-                        color = Color(0xCC222222),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                    if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
+                        // Reflow视图
+                    } else {
+                        DesktopDocumentView(
+                            list = list,
+                            state = decoder!!,
+                            jumpToPage = jumpToPage,
+                            initialOrientation = orientation,
+                            onSaveDocument = onSaveDocument,
+                            onCloseDocument = {
+                                println("onCloseDocument.isReflow:$isReflow")
+                                if (!isReflow) {
+                                    onCloseDocument?.invoke()
+                                }
+                            }, // 只在非重排模式下传递关闭回调
+                            onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
+                            onPageChanged = { page -> currentPage = page },
+                            onTapNonPageArea = { clickedPageIndex ->
+                                // 点击非翻页区域时隐藏底部工具栏
+                                if (showBottomToolbar) {
+                                    showBottomToolbar = false
+                                }
+                                //val pageText = currentPageString.format(clickedPageIndex + 1)
+                                //Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                            },
+                            initialScrollX = initialScrollX,
+                            initialScrollY = initialScrollY,
+                            initialZoom = vZoom,
+                            crop = isCrop,
+                            isTextSelectionMode = isTextSelectionMode,
+                        )
+                    }
+
+                    // 大纲弹窗（最上层）- 只有单文档文件才显示
+                    if (showOutlineDialog && FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                        val outlineList = decoder?.outlineItems ?: emptyList()
+                        OutlineDialog(
+                            currentPage,
+                            outlineList,
+                            onClick = { item ->
+                                jumpToPage = item.page
+                                showOutlineDialog = false
+                            },
+                            onDismiss = { showOutlineDialog = false },
+                        )
+                    }
+
+                    // 底部SeekBar - 覆盖在文档上方
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showBottomToolbar,
+                        modifier = Modifier.align(Alignment.BottomCenter)
                     ) {
-                        var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-                        // 当currentPage变化时更新sliderValue
-                        LaunchedEffect(currentPage) {
-                            isExternalChange = true
-                            sliderValue = (currentPage + 1).toFloat()
-                            isExternalChange = false
-                        }
-                        Column(
+                        Surface(
+                            color = Color(0xCC222222),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp) // 减小垂直padding
+                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                         ) {
-                            Text(
-                                text = "${sliderValue.toInt()} / $pageCount",
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.align(Alignment.CenterHorizontally)
-                            )
-                            Slider(
-                                value = sliderValue,
-                                onValueChange = { sliderValue = it },
-                                valueRange = 1f..pageCount.toFloat(),
-                                steps = (pageCount - 2).coerceAtLeast(0),
-                                onValueChangeFinished = {
-                                    if (!isExternalChange) {
-                                        val targetPage = sliderValue.toInt() - 1
-                                        if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                            jumpToPage = targetPage
-                                        }
-                                    }
-                                },
+                            var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
+                            // 当currentPage变化时更新sliderValue
+                            LaunchedEffect(currentPage) {
+                                isExternalChange = true
+                                sliderValue = (currentPage + 1).toFloat()
+                                isExternalChange = false
+                            }
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(20.dp),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = Color.White,
-                                    inactiveTrackColor = Color.Gray
-                                ),
-                                track = { sliderState ->
-                                    SliderDefaults.Track(
-                                        sliderState = sliderState,
-                                        modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
-                                        colors = SliderDefaults.colors(
-                                            activeTrackColor = Color.White,
-                                            inactiveTrackColor = Color.Gray
+                                    .padding(horizontal = 16.dp, vertical = 4.dp) // 减小垂直padding
+                            ) {
+                                Text(
+                                    text = "${sliderValue.toInt()} / $pageCount",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                )
+                                Slider(
+                                    value = sliderValue,
+                                    onValueChange = { sliderValue = it },
+                                    valueRange = 1f..pageCount.toFloat(),
+                                    steps = (pageCount - 2).coerceAtLeast(0),
+                                    onValueChangeFinished = {
+                                        if (!isExternalChange) {
+                                            val targetPage = sliderValue.toInt() - 1
+                                            if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                                jumpToPage = targetPage
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(20.dp),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White,
+                                        activeTrackColor = Color.White,
+                                        inactiveTrackColor = Color.Gray
+                                    ),
+                                    track = { sliderState ->
+                                        SliderDefaults.Track(
+                                            sliderState = sliderState,
+                                            modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
+                                            colors = SliderDefaults.colors(
+                                                activeTrackColor = Color.White,
+                                                inactiveTrackColor = Color.Gray
+                                            )
                                         )
-                                    )
-                                },
-                                thumb = {
-                                    SliderDefaults.Thumb(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = Color.White
+                                    },
+                                    thumb = {
+                                        SliderDefaults.Thumb(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = Color.White
+                                            )
                                         )
-                                    )
-                                }
-                            )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
