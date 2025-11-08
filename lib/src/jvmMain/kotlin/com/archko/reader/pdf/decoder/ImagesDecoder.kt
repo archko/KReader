@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.image.HeifLoader
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -38,6 +39,12 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     // 缓存MuPDF Document，避免重复创建，限制数量为10个
     private val regionDecoders = mutableMapOf<Int, Document>()
     private val maxRegionDecoders = 10
+    
+    // 缓存HeifLoader，避免重复创建
+    private val heifLoaders = mutableMapOf<Int, HeifLoader>()
+    
+    // 标记每个文件是否为HEIF格式
+    private val isHeifFile = mutableListOf<Boolean>()
 
     init {
         if (files.isEmpty()) {
@@ -54,8 +61,22 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             }
         }
 
+        // 检测文件类型
+        files.forEach { file ->
+            val isHeif = isHeifFormat(file)
+            isHeifFile.add(isHeif)
+        }
+
         // 初始化原始页面尺寸
         originalPageSizes = prepareSizes()
+    }
+    
+    /**
+     * 检测文件是否为HEIF格式
+     */
+    private fun isHeifFormat(file: File): Boolean {
+        val extension = file.extension.lowercase()
+        return extension == "heic" || extension == "heif"
     }
 
     override fun size(viewportSize: IntSize): IntSize {
@@ -113,19 +134,43 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
         for (i in files.indices) {
             val file = files[i]
-            val doc = Document.openDocument(file.absolutePath)
-            val page = doc.loadPage(0) // 图片文件只有一页，索引为0
-            val bounds = page.bounds
-            val size = Size(
-                bounds.x1.toInt() - bounds.x0.toInt(),
-                bounds.y1.toInt() - bounds.y0.toInt(),
-                i,
-                scale = 1.0f,
-                totalHeight,
-            )
+            val size = if (isHeifFile[i]) {
+                // 使用HeifLoader获取尺寸
+                val heifLoader = HeifLoader()
+                heifLoader.openHeif(file.absolutePath)
+                val heifInfo = heifLoader.heifInfo
+                heifLoader.close()
+                
+                if (heifInfo != null) {
+                    Size(
+                        heifInfo.width,
+                        heifInfo.height,
+                        i,
+                        scale = 1.0f,
+                        totalHeight,
+                    )
+                } else {
+                    // 如果无法获取信息，使用默认尺寸
+                    Size(100, 100, i, scale = 1.0f, totalHeight)
+                }
+            } else {
+                // 使用MuPDF获取尺寸
+                val doc = Document.openDocument(file.absolutePath)
+                val page = doc.loadPage(0) // 图片文件只有一页，索引为0
+                val bounds = page.bounds
+                val pageSize = Size(
+                    bounds.x1.toInt() - bounds.x0.toInt(),
+                    bounds.y1.toInt() - bounds.y0.toInt(),
+                    i,
+                    scale = 1.0f,
+                    totalHeight,
+                )
+                page.destroy()
+                doc.destroy()
+                pageSize
+            }
+            
             totalHeight += size.height
-            page.destroy()
-            doc.destroy()
             list.add(size)
         }
         return list
@@ -148,53 +193,75 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             val patchY = region.top.toInt()
             println("ImagesDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
-            val document = getRegionDecoder(index)
-            if (document != null) {
-                val page = document.loadPage(0) // 图片文件只有一页
-
-                val ctm = com.artifex.mupdf.fitz.Matrix(scale)
-
-                val bbox = com.artifex.mupdf.fitz.Rect(
-                    0f,
-                    0f,
-                    outWidth.toFloat(),
-                    outHeight.toFloat()
-                )
-                val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                    com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                    bbox,
-                    true
-                )
-                pixmap.clear(255)
-                com.artifex.mupdf.fitz.Context.disableICC()
-
-                val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
-
-                // 添加偏移，使渲染区域正确
-                ctm.translate(-(patchX / scale), -(patchY / scale))
-
-                page.run(dev, ctm, null)
-
-                dev.close()
-                dev.destroy()
-                page.destroy()
-
-                // Convert pixmap to BufferedImage and then to ImageBitmap
-                val pixmapWidth = pixmap.width
-                val pixmapHeight = pixmap.height
-                val image = java.awt.image.BufferedImage(
-                    pixmapWidth,
-                    pixmapHeight,
-                    java.awt.image.BufferedImage.TYPE_3BYTE_BGR
-                )
-                image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-
-                pixmap.destroy()
-
-                image.toComposeImageBitmap()
+            if (isHeifFile[index]) {
+                // 使用HeifLoader解码HEIF图片
+                val heifLoader = getHeifLoader(index)
+                if (heifLoader != null) {
+                    val pageWidth = (region.width / scale).toInt()
+                    val pageHeight = (region.height / scale).toInt()
+                    val bitmap = heifLoader.decodeRegionToBitmap(
+                        (patchX / scale).toInt(),
+                        (patchY / scale).toInt(),
+                        pageWidth,
+                        pageHeight,
+                        scale
+                    )
+                    
+                    bitmap?.toComposeImageBitmap() 
+                        ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                } else {
+                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                }
             } else {
-                // 如果无法创建document，返回默认图片
-                ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                // 使用MuPDF解码其他格式图片
+                val document = getRegionDecoder(index)
+                if (document != null) {
+                    val page = document.loadPage(0) // 图片文件只有一页
+
+                    val ctm = com.artifex.mupdf.fitz.Matrix(scale)
+
+                    val bbox = com.artifex.mupdf.fitz.Rect(
+                        0f,
+                        0f,
+                        outWidth.toFloat(),
+                        outHeight.toFloat()
+                    )
+                    val pixmap = com.artifex.mupdf.fitz.Pixmap(
+                        com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
+                        bbox,
+                        true
+                    )
+                    pixmap.clear(255)
+                    com.artifex.mupdf.fitz.Context.disableICC()
+
+                    val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
+
+                    // 添加偏移，使渲染区域正确
+                    ctm.translate(-(patchX / scale), -(patchY / scale))
+
+                    page.run(dev, ctm, null)
+
+                    dev.close()
+                    dev.destroy()
+                    page.destroy()
+
+                    // Convert pixmap to BufferedImage and then to ImageBitmap
+                    val pixmapWidth = pixmap.width
+                    val pixmapHeight = pixmap.height
+                    val image = java.awt.image.BufferedImage(
+                        pixmapWidth,
+                        pixmapHeight,
+                        java.awt.image.BufferedImage.TYPE_3BYTE_BGR
+                    )
+                    image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+
+                    pixmap.destroy()
+
+                    image.toComposeImageBitmap()
+                } else {
+                    // 如果无法创建document，返回默认图片
+                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                }
             }
         } catch (e: Exception) {
             println("renderPageRegion error for file ${files[index].absolutePath}: $e")
@@ -217,50 +284,70 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 1f
             }
 
-            // 使用MuPDF进行整页解码，参考PdfDecoder的实现
-            val document = getRegionDecoder(index)
-            if (document != null) {
-                val page = document.loadPage(0) // 图片文件只有一页
-
-                val ctm = com.artifex.mupdf.fitz.Matrix(scale)
-
-                val bbox = com.artifex.mupdf.fitz.Rect(
-                    0f,
-                    0f,
-                    outWidth.toFloat(),
-                    outHeight.toFloat()
-                )
-                val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                    com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                    bbox,
-                    true
-                )
-                pixmap.clear(255)
-                com.artifex.mupdf.fitz.Context.disableICC()
-
-                val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
-
-                page.run(dev, ctm, null)
-
-                dev.close()
-                dev.destroy()
-                page.destroy()
-
-                // Convert pixmap to BufferedImage and then to ImageBitmap
-                val pixmapWidth = pixmap.width
-                val pixmapHeight = pixmap.height
-                val image = java.awt.image.BufferedImage(
-                    pixmapWidth,
-                    pixmapHeight,
-                    java.awt.image.BufferedImage.TYPE_3BYTE_BGR
-                )
-                image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-
-                pixmap.destroy()
-
-                image.toComposeImageBitmap()
+            if (isHeifFile[index]) {
+                // 使用HeifLoader解码HEIF图片
+                val heifLoader = getHeifLoader(index)
+                if (heifLoader != null) {
+                    val originalSize = originalPageSizes[index]
+                    val bitmap = heifLoader.decodeRegionToBitmap(
+                        0,
+                        0,
+                        originalSize.width,
+                        originalSize.height,
+                        scale
+                    )
+                    
+                    bitmap?.toComposeImageBitmap() 
+                        ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                } else {
+                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                }
             } else {
-                ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                // 使用MuPDF进行整页解码，参考PdfDecoder的实现
+                val document = getRegionDecoder(index)
+                if (document != null) {
+                    val page = document.loadPage(0) // 图片文件只有一页
+
+                    val ctm = com.artifex.mupdf.fitz.Matrix(scale)
+
+                    val bbox = com.artifex.mupdf.fitz.Rect(
+                        0f,
+                        0f,
+                        outWidth.toFloat(),
+                        outHeight.toFloat()
+                    )
+                    val pixmap = com.artifex.mupdf.fitz.Pixmap(
+                        com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
+                        bbox,
+                        true
+                    )
+                    pixmap.clear(255)
+                    com.artifex.mupdf.fitz.Context.disableICC()
+
+                    val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
+
+                    page.run(dev, ctm, null)
+
+                    dev.close()
+                    dev.destroy()
+                    page.destroy()
+
+                    // Convert pixmap to BufferedImage and then to ImageBitmap
+                    val pixmapWidth = pixmap.width
+                    val pixmapHeight = pixmap.height
+                    val image = java.awt.image.BufferedImage(
+                        pixmapWidth,
+                        pixmapHeight,
+                        java.awt.image.BufferedImage.TYPE_3BYTE_BGR
+                    )
+                    image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+
+                    pixmap.destroy()
+
+                    image.toComposeImageBitmap()
+                } else {
+                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                }
             }
         } catch (e: Exception) {
             println("ImagesDecoder.renderPage error: $e")
@@ -287,6 +374,20 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             return Document.openDocument(file.absolutePath)
         }
     }
+    
+    /**
+     * 获取或创建HeifLoader
+     */
+    private fun getHeifLoader(index: Int): HeifLoader? {
+        if (index >= files.size) return null
+
+        return heifLoaders.getOrPut(index) {
+            val file = files[index]
+            val loader = HeifLoader()
+            loader.openHeif(file.absolutePath)
+            return loader
+        }
+    }
 
     override fun close() {
         // 关闭所有MuPDF documents
@@ -298,6 +399,16 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             }
         }
         regionDecoders.clear()
+        
+        // 关闭所有HeifLoaders
+        heifLoaders.values.forEach { loader ->
+            try {
+                loader.close()
+            } catch (e: Exception) {
+                println("Error closing HeifLoader: $e")
+            }
+        }
+        heifLoaders.clear()
 
         ImageCache.clear()
     }

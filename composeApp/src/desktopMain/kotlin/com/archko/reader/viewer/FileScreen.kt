@@ -126,7 +126,7 @@ fun FileScreen(
 
                                         // 只扫描当前目录层级，不递归子目录
                                         parentDir.listFiles()?.forEach { file ->
-                                            if (FileTypeUtils.isImageFile(file.absolutePath)) {
+                                            if (FileTypeUtils.isValidImageFile(file)) {
                                                 allImageFiles.add(file)
                                             }
                                         }

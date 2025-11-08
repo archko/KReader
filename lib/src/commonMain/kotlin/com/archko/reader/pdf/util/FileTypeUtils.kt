@@ -9,7 +9,7 @@ import java.io.File
  */
 public object FileTypeUtils {
 
-    private const val MAX_SIZE_MB = 50 * 1024 * 1024L
+    private const val MAX_SIZE_MB = 100 * 1024 * 1024L
 
     /**
      * 判断是否为图片文件
