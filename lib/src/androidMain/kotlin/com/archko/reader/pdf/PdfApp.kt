@@ -10,6 +10,7 @@ import coil3.memory.MemoryCache
 import coil3.request.allowRgb565
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
+import com.archko.reader.pdf.cache.CustomImageDataKeyer
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.util.CrashHandler
 import com.tencent.bugly.crashreport.CrashReport
@@ -48,9 +49,8 @@ public class PdfApp : Application(), SingletonImageLoader.Factory {
                     .build()
             }
             .components {
-                add(
-                    CustomImageFetcher.Factory()
-                )
+                add(CustomImageFetcher.Factory())
+                add(CustomImageDataKeyer())
             }
             .build()
     }

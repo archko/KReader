@@ -24,6 +24,7 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.util.DebugLogger
 import coil3.util.Logger
+import com.archko.reader.pdf.cache.CustomImageDataKeyer
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.cache.FileUtils
@@ -493,7 +494,10 @@ fun main(args: Array<String>) {
         ) {
             setSingletonImageLoaderFactory { context ->
                 ImageLoader.Builder(context)
-                    .components { add(CustomImageFetcher.Factory()) }
+                    .components {
+                        add(CustomImageFetcher.Factory())
+                        add(CustomImageDataKeyer())
+                    }
                     .logger(DebugLogger(minLevel = Logger.Level.Warn))
                     .build()
             }

@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.HeifLoader
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -69,6 +70,157 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
         // 初始化原始页面尺寸
         originalPageSizes = prepareSizes()
+        cacheCoverIfNeeded()
+    }
+
+    /**
+     * 检查并缓存封面图片
+     */
+    private fun cacheCoverIfNeeded() {
+        if (files.size > 1) {
+            return
+        }
+        val path = files[0].absolutePath
+        try {
+            if (null != ImageCache.acquirePage(path)) {
+                return
+            }
+            val bitmap = renderCoverPage(0)
+
+            CustomImageFetcher.cacheBitmap(bitmap, path)
+        } catch (e: Exception) {
+            println("缓存封面失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 渲染封面页面，根据高宽比进行特殊处理
+     */
+    private fun renderCoverPage(index: Int): ImageBitmap {
+        if (index >= files.size) {
+            return ImageBitmap(160, 200, ImageBitmapConfig.Rgb565)
+        }
+
+        val originalSize = originalPageSizes[index]
+        val pWidth = originalSize.width.toFloat()
+        val pHeight = originalSize.height.toFloat()
+
+        // 目标尺寸
+        val targetWidth = 160
+        val targetHeight = 200
+
+        // 检查是否为极端长宽比的图片（某边大于8000）
+        return if (pWidth > 8000 || pHeight > 8000) {
+            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
+            val scale = if (pWidth > pHeight) {
+                targetWidth.toFloat() / pWidth
+            } else {
+                targetHeight.toFloat() / pHeight
+            }
+
+            val cropWidth = maxOf(targetWidth, (pWidth * scale).toInt())
+            val cropHeight = maxOf(targetHeight, (pHeight * scale).toInt())
+            println("large.width-height:$cropWidth-$cropHeight")
+            renderImageAtScale(index, scale, cropWidth, cropHeight)
+        } else if (pWidth > pHeight) {
+            // 对于宽大于高的页面，按最大比例缩放后截取
+            val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
+
+            val cropWidth = maxOf(targetWidth, (pWidth * scale).toInt())
+            val cropHeight = maxOf(targetHeight, (pHeight * scale).toInt())
+
+            println("wide.width-height:$cropWidth-$cropHeight")
+            renderImageAtScale(index, scale, cropWidth, cropHeight)
+        } else {
+            // 原始逻辑处理其他情况
+            val xscale = targetWidth.toFloat() / pWidth
+            val yscale = targetHeight.toFloat() / pHeight
+
+            // 使用最大比例以确保填充整个目标区域
+            val scale = maxOf(xscale, yscale)
+
+            val cropWidth = maxOf(targetWidth, (pWidth * scale).toInt())
+            val cropHeight = maxOf(targetHeight, (pHeight * scale).toInt())
+
+            println("width-height:$cropWidth-$cropHeight")
+            renderImageAtScale(index, scale, cropWidth, cropHeight)
+        }
+    }
+
+    /**
+     * 以指定缩放比例渲染图片
+     */
+    private fun renderImageAtScale(index: Int, scale: Float, outWidth: Int, outHeight: Int): ImageBitmap {
+        return try {
+            if (isHeifFile[index]) {
+                // 使用HeifLoader解码HEIF图片
+                val heifLoader = getHeifLoader(index)
+                if (heifLoader != null) {
+                    val originalSize = originalPageSizes[index]
+                    val bitmap = heifLoader.decodeRegionToBitmap(
+                        0,
+                        0,
+                        originalSize.width,
+                        originalSize.height,
+                        scale
+                    )
+
+                    bitmap?.toComposeImageBitmap()
+                        ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                } else {
+                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                }
+            } else {
+                // 使用MuPDF解码其他格式图片
+                val document = getRegionDecoder(index)
+                if (document != null) {
+                    val page = document.loadPage(0) // 图片文件只有一页
+
+                    val bbox = com.artifex.mupdf.fitz.Rect(
+                        0f,
+                        0f,
+                        outWidth.toFloat(),
+                        outHeight.toFloat()
+                    )
+                    val pixmap = com.artifex.mupdf.fitz.Pixmap(
+                        com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
+                        bbox,
+                        true
+                    )
+                    pixmap.clear(255)
+                    com.artifex.mupdf.fitz.Context.disableICC()
+
+                    val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
+                    val ctm = com.artifex.mupdf.fitz.Matrix()
+                    ctm.scale(scale, scale)
+
+                    page.run(dev, ctm, null)
+
+                    dev.close()
+                    dev.destroy()
+                    page.destroy()
+
+                    // Convert pixmap to BufferedImage and then to ImageBitmap
+                    val pixmapWidth = pixmap.width
+                    val pixmapHeight = pixmap.height
+                    val image = java.awt.image.BufferedImage(
+                        pixmapWidth,
+                        pixmapHeight,
+                        java.awt.image.BufferedImage.TYPE_3BYTE_BGR
+                    )
+                    image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+
+                    pixmap.destroy()
+
+                    image.toComposeImageBitmap()
+                } else {
+                    ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                }
+            }
+        } catch (e: Exception) {
+            println("renderImageAtScale error for file ${files[index].absolutePath}: $e")
+            ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
     }
 
     /**

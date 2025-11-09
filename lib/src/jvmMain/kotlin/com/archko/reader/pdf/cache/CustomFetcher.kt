@@ -11,6 +11,7 @@ import coil3.decode.DataSource
 import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
+import coil3.key.Keyer
 import coil3.request.Options
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.util.FileTypeUtils
@@ -188,5 +189,15 @@ public class CustomImageFetcher(
         ): Fetcher {
             return CustomImageFetcher(data, options)
         }
+    }
+}
+
+/**
+ * Keyer for CustomImageData to enable Coil memory caching
+ */
+public class CustomImageDataKeyer : Keyer<CustomImageData> {
+    override fun key(data: CustomImageData, options: Options): String {
+        // 生成唯一的缓存键，包含路径和尺寸信息
+        return "${data.path}_${data.width}x${data.height}"
     }
 }
