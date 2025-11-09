@@ -294,7 +294,7 @@ fun FileScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp)
+                            .padding(top = 32.dp)
                     ) {
                         if (recentList.isNotEmpty()) {
                             Button(

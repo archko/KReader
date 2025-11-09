@@ -10,9 +10,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.archko.reader.viewer</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>1.2.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.2.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -21,8 +21,6 @@
     <!-- 最低系统版本 -->
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
-    
-
     
     <!-- 文件关联配置 -->
     <key>CFBundleDocumentTypes</key>
@@ -90,28 +88,6 @@
             </array>
         </dict>
         
-        <!-- 文本文件 -->
-        <dict>
-            <key>CFBundleTypeName</key>
-            <string>Text Document</string>
-            <key>CFBundleTypeRole</key>
-            <string>Viewer</string>
-            <key>CFBundleTypeExtensions</key>
-            <array>
-                <string>txt</string>
-                <string>rtf</string>
-            </array>
-            <key>CFBundleTypeIconFile</key>
-            <string>app_icon</string>
-            <key>LSHandlerRank</key>
-            <string>Alternate</string>
-            <key>CFBundleTypeMIMETypes</key>
-            <array>
-                <string>text/plain</string>
-                <string>text/rtf</string>
-            </array>
-        </dict>
-        
         <!-- DjVu 文件 -->
         <dict>
             <key>CFBundleTypeName</key>
@@ -171,6 +147,152 @@
             <array>
                 <string>image/tiff</string>
                 <string>image/tif</string>
+            </array>
+        </dict>
+        
+        <!-- HEIC 图像文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>HEIC Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>heic</string>
+                <string>heif</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>image/heic</string>
+                <string>image/heif</string>
+            </array>
+        </dict>
+        
+        <!-- JPEG 图像文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>JPEG Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>jpg</string>
+                <string>jpeg</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>image/jpeg</string>
+            </array>
+        </dict>
+        
+        <!-- PNG 图像文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>PNG Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>png</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>image/png</string>
+            </array>
+        </dict>
+        
+        <!-- XPS 文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>XPS Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>xps</string>
+                <string>oxps</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>application/vnd.ms-xpsdocument</string>
+                <string>application/oxps</string>
+            </array>
+        </dict>
+        
+        <!-- SVG 图像文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>SVG Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>svg</string>
+                <string>svgz</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>image/svg+xml</string>
+            </array>
+        </dict>
+        
+        <!-- DOCX 文档文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Word Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>docx</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>application/vnd.openxmlformats-officedocument.wordprocessingml.document</string>
+            </array>
+        </dict>
+        
+        <!-- PPTX 演示文件 -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>PowerPoint Presentation</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>pptx</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>app_icon</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>CFBundleTypeMIMETypes</key>
+            <array>
+                <string>application/vnd.openxmlformats-officedocument.presentationml.presentation</string>
             </array>
         </dict>
     </array>

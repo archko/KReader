@@ -116,10 +116,11 @@ fun QueueDialog(
                                     onItemClick?.invoke(item)
                                 }
                             ) {
+                                val pageNumber = (item.page?.toIntOrNull() ?: 0) + 1
                                 Text(
                                     text = stringResource(Res.string.tts_page_item)
                                         .format(
-                                            item.page + 1,
+                                            pageNumber,
                                             item.data?.take(count)
                                         ),
                                     maxLines = 1,
