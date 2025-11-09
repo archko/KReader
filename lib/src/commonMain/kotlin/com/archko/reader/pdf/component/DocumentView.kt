@@ -66,6 +66,7 @@ public fun DocumentView(
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
     isTextSelectionMode: Boolean = false, // 是否为文本选择模式
+    speakingPageIndex: Int? = null, // 正在朗读的页面索引
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -104,6 +105,11 @@ public fun DocumentView(
     val pdfViewState = remember(list) {
         println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PdfViewState(list, state, orientation, crop, textSelector)
+    }
+    
+    LaunchedEffect(speakingPageIndex) {
+        flingJob?.cancel()
+        pdfViewState.updateSpeakingPageIndex(speakingPageIndex)
     }
 
     // 文本选择相关状态

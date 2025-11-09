@@ -368,41 +368,51 @@ fun CustomView(
             val currentPageString = stringResource(Res.string.current_page)
 
             var isSpeaking by remember { mutableStateOf(false) }
+            var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
+            // 监听朗读状态
             LaunchedEffect(ttsServiceBinder) {
                 ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
                     isSpeaking = speaking
                 }
+            }
 
+            // 设置TTS回调
+            LaunchedEffect(ttsServiceBinder) {
                 ttsServiceBinder?.setTtsSpeechCallback(object : TtsSpeechCallback {
                     override fun onPageComplete(page: String?) {
                         page?.let { pageStr ->
                             val targetPage = pageStr.toIntOrNull()
-                            println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage")
-                            if (null != targetPage && targetPage != jumpToPage) {
-                                jumpToPage = targetPage
+                            println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage, speaking:$speakingPageIndex")
+                            if (null != targetPage) {
+                                scope.launch {
+                                    speakingPageIndex = targetPage
+                                    if (targetPage != jumpToPage) {
+                                        jumpToPage = targetPage
+                                    }
+                                }
                             }
                         }
                     }
 
                     override fun onSpeechStop(lastPage: String?) {
-                        lastPage?.let { pageStr ->
-                            val targetPage = pageStr.toIntOrNull()
-                            println("SpeechStop: 朗读结束，保存进度，最后页面: $targetPage")
-                            if (null != targetPage) {
-                                if (null != targetPage && targetPage != jumpToPage) {
-                                    jumpToPage = targetPage
+                        scope.launch {
+                            speakingPageIndex = null
+                            lastPage?.let { pageStr ->
+                                val targetPage = pageStr.toIntOrNull()
+                                println("SpeechStop: 朗读结束，保存进度，最后页面: $targetPage")
+                                if (null != targetPage) {
+                                    onSaveDocument?.invoke(
+                                        targetPage,
+                                        pageCount,
+                                        initialZoom,
+                                        initialScrollX,
+                                        initialScrollY,
+                                        if (isVertical) Vertical.toLong() else Horizontal.toLong(),
+                                        if (isReflow) 1L else 0L,
+                                        if (isCrop) 1L else 0L
+                                    )
                                 }
-                                onSaveDocument?.invoke(
-                                    targetPage,
-                                    pageCount,
-                                    initialZoom,
-                                    initialScrollX,
-                                    initialScrollY,
-                                    if (isVertical) Vertical.toLong() else Horizontal.toLong(),
-                                    if (isReflow) 1L else 0L,
-                                    if (isCrop) 1L else 0L
-                                )
                             }
                         }
                     }
@@ -497,6 +507,7 @@ fun CustomView(
                     initialZoom = initialZoom,
                     crop = isCrop,
                     isTextSelectionMode = isTextSelectionMode,
+                    speakingPageIndex = speakingPageIndex,
                 )
             }
 
@@ -682,6 +693,7 @@ fun CustomView(
                                         } else {
                                             scope.launch {
                                                 binder.clearQueue()
+                                                speakingPageIndex = currentPage
                                                 speakFromCurrentPage(
                                                     currentPage,
                                                     decoder!!,
@@ -773,14 +785,21 @@ fun CustomView(
 
                             reflowBean.page?.let { pageStr ->
                                 val targetPage = pageStr.toIntOrNull() ?: 0
-                                jumpToPage = targetPage
-
+                                
                                 scope.launch {
+                                    jumpToPage = targetPage
+                                    
+                                    // 停止当前朗读
                                     binder.stop()
-
                                     delay(50)
-
+                                    
+                                    // 开始新的朗读
                                     speakFromCurrentPage(targetPage, decoder!!, binder)
+                                    if (speechService.isSpeaking()) {
+                                        speakingPageIndex = targetPage
+                                    } else {
+                                        speakingPageIndex = null
+                                    }
                                 }
                             }
                         }

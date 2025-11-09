@@ -439,6 +439,8 @@ public class Page(
         // 绘制分割线
         if (isActuallyVisible) {
             drawSeparator(drawScope, currentBounds)
+            
+            drawSpeakingIndicator(drawScope, currentBounds)
         }
     }
 
@@ -590,6 +592,22 @@ public class Page(
                     currentBounds.top
                 ),
                 size = androidx.compose.ui.geometry.Size(separatorWidth, separatorHeight)
+            )
+        }
+    }
+    
+    /**
+     * 绘制朗读指示边框
+     */
+    private fun drawSpeakingIndicator(drawScope: DrawScope, currentBounds: Rect) {
+        val speakingPage = pdfViewState.speakingPageIndex
+        if (speakingPage != null && aPage.index == speakingPage) {
+            // 绘制红色边框
+            drawScope.drawRect(
+                color = Color.Red,
+                topLeft = Offset(currentBounds.left, currentBounds.top),
+                size = androidx.compose.ui.geometry.Size(currentBounds.width, currentBounds.height),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8f)
             )
         }
     }

@@ -34,6 +34,10 @@ public class PdfViewState(
     internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
+    
+    // 正在朗读的页面索引，null 表示没有朗读
+    public var speakingPageIndex: Int? by mutableStateOf(null)
+        private set
 
     // 预加载配置
     private var preloadScreens: Float = 0.8f // 预加载1屏的距离
@@ -91,6 +95,15 @@ public class PdfViewState(
      * @return 预加载的屏幕数量
      */
     public fun getPreloadScreens(): Float = preloadScreens
+    
+    /**
+     * 更新正在朗读的页面索引
+     * @param pageIndex 页面索引，null 表示没有朗读
+     */
+    public fun updateSpeakingPageIndex(pageIndex: Int?) {
+        println("PdfViewState: updateSpeakingPageIndex from $speakingPageIndex to $pageIndex")
+        speakingPageIndex = pageIndex
+    }
 
     public fun isTileVisible(spec: TileSpec, strictMode: Boolean = false): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
