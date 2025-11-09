@@ -248,7 +248,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     fun addToQueue(reflowBean: ReflowBean) {
         if (isInitialized) {
-            println("TTS: addToQueue:$reflowBean")
+            //println("TTS: addToQueue:$reflowBean")
             beanList.add(reflowBean)
 
             // 如果当前没有在朗读，开始朗读

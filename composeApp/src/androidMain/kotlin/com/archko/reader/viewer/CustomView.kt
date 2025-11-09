@@ -570,6 +570,7 @@ fun CustomView(
                                                         binder.pause()
                                                     } else {
                                                         scope.launch {
+                                                            speakingPageIndex = currentPage
                                                             speakFromCurrentPage(
                                                                 currentPage,
                                                                 decoder!!,
@@ -693,7 +694,6 @@ fun CustomView(
                                         } else {
                                             scope.launch {
                                                 binder.clearQueue()
-                                                speakingPageIndex = currentPage
                                                 speakFromCurrentPage(
                                                     currentPage,
                                                     decoder!!,
@@ -795,7 +795,7 @@ fun CustomView(
                                     
                                     // 开始新的朗读
                                     speakFromCurrentPage(targetPage, decoder!!, binder)
-                                    if (speechService.isSpeaking()) {
+                                    if (binder.isSpeaking()) {
                                         speakingPageIndex = targetPage
                                     } else {
                                         speakingPageIndex = null
