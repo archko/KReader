@@ -1,7 +1,5 @@
 package com.archko.reader.viewer.dialog
 
-import NotificationDuration
-import Notify
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.viewer.utils.PDFCreaterHelper
+import com.dokar.sonner.ToastType
+import com.dokar.sonner.Toaster
+import com.dokar.sonner.rememberToasterState
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
@@ -66,6 +67,7 @@ fun PdfEncryptDialog(
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val toaster = rememberToasterState()
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -244,23 +246,23 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
-                                                    Notify(
+                                                    toaster.show(
                                                         message = getString(Res.string.encrypt_decrypt_encrypt_success)
                                                             .format(
                                                                 outputPath
                                                             ),
-                                                        duration = NotificationDuration.SHORT
+                                                        type = ToastType.Success,
                                                     )
                                                 } else {
-                                                    Notify(
+                                                    toaster.show(
                                                         message = getString(Res.string.encrypt_decrypt_encrypt_failed),
-                                                        duration = NotificationDuration.SHORT
+                                                        type = ToastType.Error,
                                                     )
                                                 }
                                             } catch (e: Exception) {
-                                                Notify(
+                                                toaster.show(
                                                     message = getString(Res.string.encrypt_decrypt_encrypt_failed),
-                                                    duration = NotificationDuration.SHORT
+                                                    type = ToastType.Error,
                                                 )
                                             } finally {
                                                 isLoading = false
@@ -268,9 +270,9 @@ fun PdfEncryptDialog(
                                         }
                                     } else {
                                         scope.launch {
-                                            Notify(
+                                            toaster.show(
                                                 message = getString(Res.string.encrypt_decrypt_input_pwd),
-                                                duration = NotificationDuration.SHORT
+                                                type = ToastType.Error,
                                             )
                                         }
                                     }
@@ -296,23 +298,23 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
-                                                    Notify(
+                                                    toaster.show(
                                                         message = getString(Res.string.encrypt_decrypt_decrypt_success)
                                                             .format(
                                                                 outputPath
                                                             ),
-                                                        duration = NotificationDuration.SHORT
+                                                        type = ToastType.Error,
                                                     )
                                                 } else {
-                                                    Notify(
+                                                    toaster.show(
                                                         message = getString(Res.string.encrypt_decrypt_decrypt_failed),
-                                                        duration = NotificationDuration.SHORT
+                                                        type = ToastType.Error,
                                                     )
                                                 }
                                             } catch (e: Exception) {
-                                                Notify(
+                                                toaster.show(
                                                     message = getString(Res.string.encrypt_decrypt_decrypt_failed),
-                                                    duration = NotificationDuration.SHORT
+                                                    type = ToastType.Error,
                                                 )
                                             } finally {
                                                 isLoading = false
@@ -320,9 +322,9 @@ fun PdfEncryptDialog(
                                         }
                                     } else {
                                         scope.launch {
-                                            Notify(
+                                            toaster.show(
                                                 message = getString(Res.string.encrypt_decrypt_input_pwd),
-                                                duration = NotificationDuration.SHORT
+                                                type = ToastType.Error,
                                             )
                                         }
                                     }
@@ -338,4 +340,9 @@ fun PdfEncryptDialog(
             }
         }
     }
+
+    Toaster(
+        state = toaster,
+        alignment = Alignment.Center,
+    )
 }

@@ -1,7 +1,5 @@
 package com.archko.reader.viewer
 
-import NotificationDuration
-import Notify
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -32,6 +30,9 @@ import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.tts.TtsQueueService
+import com.dokar.sonner.ToastType
+import com.dokar.sonner.Toaster
+import com.dokar.sonner.rememberToasterState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -68,6 +69,7 @@ fun CustomView(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val toaster = rememberToasterState()
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
 
@@ -523,11 +525,12 @@ fun CustomView(
                                     showBottomToolbar = false
                                 }
                                 scope.launch {
-                                    Notify(
-                                        message = getString(Res.string.current_page).format(
-                                            clickedPageIndex + 1
-                                        ),
-                                        duration = NotificationDuration.SHORT
+                                    toaster.show(
+                                        message = getString(Res.string.current_page)
+                                            .format(
+                                                clickedPageIndex + 1
+                                            ),
+                                        type = ToastType.Error,
                                     )
                                 }
                             },
@@ -629,6 +632,11 @@ fun CustomView(
                 }
             }
         }
+
+        Toaster(
+            state = toaster,
+            alignment = Alignment.Center,
+        )
     }
 }
 

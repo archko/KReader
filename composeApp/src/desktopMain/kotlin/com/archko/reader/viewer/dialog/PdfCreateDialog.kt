@@ -1,7 +1,5 @@
 package com.archko.reader.viewer.dialog
 
-import NotificationDuration
-import Notify
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +45,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.archko.reader.viewer.utils.PDFCreaterHelper
+import com.dokar.sonner.ToastType
+import com.dokar.sonner.Toaster
+import com.dokar.sonner.rememberToasterState
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
@@ -66,6 +67,7 @@ fun PdfCreateDialog(
     onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val toaster = rememberToasterState()
 
     var selectedImages by remember { mutableStateOf<List<String>>(emptyList()) }
     var pdfName by remember { mutableStateOf("") }
@@ -90,9 +92,9 @@ fun PdfCreateDialog(
     fun createPdf() {
         scope.launch {
             if (selectedImages.isEmpty()) {
-                Notify(
+                toaster.show(
                     message = getString(Res.string.please_select_images_first),
-                    duration = NotificationDuration.SHORT
+                    type = ToastType.Error,
                 )
                 return@launch
             }
@@ -113,19 +115,24 @@ fun PdfCreateDialog(
             }
             isCreating = false
             if (result) {
-                Notify(
+                toaster.show(
                     message = getString(Res.string.pdf_created_successfully),
-                    duration = NotificationDuration.SHORT
+                    type = ToastType.Success,
                 )
                 onDismiss()
             } else {
-                Notify(
+                toaster.show(
                     message = getString(Res.string.pdf_creation_failed),
-                    duration = NotificationDuration.SHORT
+                    type = ToastType.Error,
                 )
             }
         }
     }
+
+    Toaster(
+        state = toaster,
+        alignment = Alignment.Center,
+    )
 
     Dialog(
         onDismissRequest = onDismiss,
