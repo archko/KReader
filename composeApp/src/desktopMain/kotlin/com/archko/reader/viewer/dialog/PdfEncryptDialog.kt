@@ -343,6 +343,7 @@ fun PdfEncryptDialog(
 
     Toaster(
         state = toaster,
+        maxVisibleToasts = 1,
         alignment = Alignment.Center,
     )
 }
