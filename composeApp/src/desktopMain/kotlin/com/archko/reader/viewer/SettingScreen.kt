@@ -34,6 +34,7 @@ import androidx.compose.ui.window.Dialog
 import com.archko.reader.viewer.dialog.PdfCreateDialog
 import com.archko.reader.viewer.dialog.PdfEncryptDialog
 import com.archko.reader.viewer.dialog.PdfExportDialog
+import com.archko.reader.viewer.dialog.PdfSplitDialog
 import com.archko.reader.viewer.dialog.TtsDialog
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.about
@@ -44,6 +45,7 @@ import kreader.composeapp.generated.resources.create_pdf
 import kreader.composeapp.generated.resources.encrypt_decrypt_title
 import kreader.composeapp.generated.resources.export_pdf
 import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.split_title
 import kreader.composeapp.generated.resources.support_format
 import kreader.composeapp.generated.resources.tts_setting_title
 import org.jetbrains.compose.resources.painterResource
@@ -127,6 +129,7 @@ fun SettingCategory() {
     var showPdfCreateDialog by remember { mutableStateOf(false) }
     var showPdfExportDialog by remember { mutableStateOf(false) }
     var showPdfEncryptDialog by remember { mutableStateOf(false) }
+    var showPdfSplitDialog by remember { mutableStateOf(false) }
     var showTtsDialog by remember { mutableStateOf(false) }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -149,6 +152,13 @@ fun SettingCategory() {
         SettingItem(
             title = stringResource(Res.string.encrypt_decrypt_title),
             onClick = { showPdfEncryptDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.split_title),
+            onClick = { showPdfSplitDialog = true }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -180,17 +190,24 @@ fun SettingCategory() {
         )
     }
 
-    // About Dialog
-    if (showAboutDialog) {
-        AboutDialog(
-            onDismiss = { showAboutDialog = false }
-        )
-    }
-
     // PDF加密/解密 Dialog
     if (showPdfEncryptDialog) {
         PdfEncryptDialog(
             onDismiss = { showPdfEncryptDialog = false }
+        )
+    }
+
+    // PDF拆分 Dialog
+    if (showPdfSplitDialog) {
+        PdfSplitDialog (
+            onDismiss = { showPdfSplitDialog = false }
+        )
+    }
+
+    // About Dialog
+    if (showAboutDialog) {
+        AboutDialog(
+            onDismiss = { showAboutDialog = false }
         )
     }
 

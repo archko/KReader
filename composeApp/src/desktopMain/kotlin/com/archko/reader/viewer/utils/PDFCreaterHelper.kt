@@ -514,4 +514,147 @@ object PDFCreaterHelper {
         }
         return false
     }
+
+    // =================== split PDF ===================
+
+    /**
+     * 解析拆分范围字符串
+     * 例如: "1-10,11-20" -> [(1,10), (11,20)]
+     */
+    private fun parseRanges(rangeInput: String, maxPage: Int): List<Pair<Int, Int>>? {
+        try {
+            val ranges = mutableListOf<Pair<Int, Int>>()
+            val parts = rangeInput.split(",").map { it.trim() }
+
+            for (part in parts) {
+                if (part.isEmpty()) continue
+
+                val rangeParts = part.split("-").map { it.trim() }
+                when (rangeParts.size) {
+                    1 -> {
+                        // 单页，如 "5"
+                        val page = rangeParts[0].toInt()
+                        if (page < 1 || page > maxPage) return null
+                        ranges.add(Pair(page, page))
+                    }
+
+                    2 -> {
+                        // 范围，如 "1-10"
+                        val start = rangeParts[0].toInt()
+                        val end = rangeParts[1].toInt()
+                        if (start < 1 || end > maxPage || start > end) return null
+                        ranges.add(Pair(start, end))
+                    }
+
+                    else -> return null
+                }
+            }
+
+            return ranges
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+    /**
+     * 拆分PDF文件
+     * @param inputFile 输入PDF文件路径
+     * @param outputBaseName 输出文件基础名称
+     * @param rangeInput 拆分范围，如 "1-10,11-20"
+     * @return 成功拆分的文件数量，失败返回-1
+     */
+    fun splitPDF(
+        inputFile: String,
+        outputBaseName: String,
+        rangeInput: String
+    ): Int {
+        try {
+            val sourceDoc = Document.openDocument(inputFile)
+            if (sourceDoc !is PDFDocument) {
+                System.err.println("输入文件不是PDF格式")
+                return -1
+            }
+
+            val totalPages = sourceDoc.countPages()
+            println("源PDF总页数: $totalPages")
+
+            val ranges = parseRanges(rangeInput, totalPages)
+            if (ranges == null || ranges.isEmpty()) {
+                System.err.println("无效的页面范围")
+                sourceDoc.destroy()
+                return -1
+            }
+
+            // 直接使用用户主目录
+            val userHome = System.getProperty("user.home")
+
+            var successCount = 0
+
+            for ((index, range) in ranges.withIndex()) {
+                val (startPage, endPage) = range
+                println("处理范围: $startPage-$endPage")
+
+                try {
+                    val newDoc = PDFDocument()
+
+                    for (pageNum in startPage..endPage) {
+                        val pageIndex = pageNum - 1 // 转换为0基索引
+
+                        var copySuccess = false
+                        
+                        // 方法1: 尝试使用 graftPage 直接复制页面对象
+                        try {
+                            val insertAt = newDoc.countPages()
+                            newDoc.graftPage(insertAt, sourceDoc, pageIndex)
+                            println("使用 graftPage 复制页面 $pageNum")
+                            copySuccess = true
+                        } catch (e: Exception) {
+                            println("graftPage 方法不可用: ${e.message}")
+                        }
+                        
+                        // 方法2: 如果方法1失败，尝试 findPage + graftObject
+                        if (!copySuccess) {
+                            try {
+                                val sourcePageObj = sourceDoc.findPage(pageIndex)
+                                val copiedPageObj = newDoc.graftObject(sourcePageObj)
+                                newDoc.insertPage(-1, copiedPageObj)
+                                println("使用 graftObject 复制页面 $pageNum")
+                            } catch (e: Exception) {
+                                println("graftObject 方法失败: ${e.message}")
+                                throw Exception("无法复制页面 $pageNum")
+                            }
+                        }
+                    }
+
+                    // 保存新PDF，使用压缩选项
+                    val outputFileName = if (ranges.size == 1) {
+                        "$outputBaseName.pdf"
+                    } else {
+                        "${outputBaseName}_${index + 1}_p${startPage}-${endPage}.pdf"
+                    }
+                    val outputFile = File(userHome, outputFileName)
+                    
+                    // 使用更激进的压缩选项
+                    val compressOpts = "compress,compress-images,compress-fonts,garbage=compact,deflate"
+                    newDoc.save(outputFile.absolutePath, compressOpts)
+                    newDoc.destroy()
+
+                    println("已保存: ${outputFile.absolutePath}")
+                    successCount++
+
+                } catch (e: Exception) {
+                    System.err.println("处理范围 $startPage-$endPage 时出错: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+
+            sourceDoc.destroy()
+            return successCount
+        } catch (e: Exception) {
+            System.err.println("拆分PDF时出错: ${e.message}")
+            e.printStackTrace()
+            return -1
+        }
+    }
 }
