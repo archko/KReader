@@ -9,12 +9,13 @@ Why did I create this app? There are many PDF readers based on the Android View 
 That’s why I developed this app—a Compose-based PDF reader that supports all platforms.\n
 Currently, zooming and scrolling functions are very smooth, but the full range of features from the old reader has not yet been migrated.\n
 Due to time constraints, the app has been implemented on Android. For iOS, compiling MuPDF is required, while the desktop version of MuPDF is easy to compile, so it won’t be uploaded.\n
-At present, the only supported font is SimSun (Songti). It should be placed in the directory /sdcard/fonts/, and both TTF and OTF font formats are compatible.\n
+At present, epub/mobi supported custom font. It should be placed in the directory /sdcard/fonts/, and both TTF and OTF font formats are compatible.\n
 
 ## Features
 
 - **Smooth Zooming & Scrolling**: Optimized for fluid reading experience
 - **Rich Gestures**: Intuitive touch interactions
+- **Tts**: Use System Tts
 - **Multi-platform Support**: Android, iOS, and Desktop
 - **Modern UI**: Built with Jetpack Compose
 - **Native Performance**: Kotlin Multiplatform architecture

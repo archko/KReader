@@ -9,12 +9,13 @@
 所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n
 目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n
 时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n
-目前支持字体为宋体,放在/sdcard/fonts/,ttf与otf两种字体
+epub/mobi支持自定义字体,放在/sdcard/fonts/,ttf与otf两种字体
 
 ## 功能特性
 
 - **流畅缩放与滚动**: 优化的阅读体验
 - **丰富手势**: 直观的触摸交互
+- **语音朗读**: 使用系统语音朗读功能
 - **多平台支持**: Android、iOS 和桌面端
 - **现代界面**: 基于 Jetpack Compose 构建
 - **原生性能**: Kotlin Multiplatform 架构

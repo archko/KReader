@@ -1,5 +1,7 @@
 package com.archko.reader.viewer
 
+import NotificationDuration
+import Notify
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -35,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -305,8 +308,6 @@ fun CustomView(
             // 跳转页面状态
             var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
 
-            val currentPageString = stringResource(Res.string.current_page)
-
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -484,7 +485,7 @@ fun CustomView(
                                     speechService.stop()
 
                                     // 等待一小段时间确保停止操作完成
-                                    kotlinx.coroutines.delay(500)
+                                    delay(500)
 
                                     speakFromCurrentPage(targetPage, decoder!!, speechService)
                                 }
@@ -521,8 +522,14 @@ fun CustomView(
                                 if (showBottomToolbar) {
                                     showBottomToolbar = false
                                 }
-                                //val pageText = currentPageString.format(clickedPageIndex + 1)
-                                //Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                                scope.launch {
+                                    Notify(
+                                        message = getString(Res.string.current_page).format(
+                                            clickedPageIndex + 1
+                                        ),
+                                        duration = NotificationDuration.SHORT
+                                    )
+                                }
                             },
                             initialScrollX = initialScrollX,
                             initialScrollY = initialScrollY,

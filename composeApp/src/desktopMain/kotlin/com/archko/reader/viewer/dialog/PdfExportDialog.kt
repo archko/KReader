@@ -1,5 +1,7 @@
 package com.archko.reader.viewer.dialog
 
+import NotificationDuration
+import Notify
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -87,7 +90,10 @@ fun PdfExportDialog(
                     }
                     doc.destroy()
                 } catch (e: Exception) {
-                    println("Error reading PDF info: ${e.message}")
+                    Notify(
+                        message = getString(Res.string.error_read_pdf_info).format(e.message ?: ""),
+                        duration = NotificationDuration.SHORT
+                    )
                 }
             }
         }
@@ -101,20 +107,18 @@ fun PdfExportDialog(
         scope.launch {
             val pdfPath = selectedPdfPath
             if (pdfPath == null) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.please_select_pdf_first),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.please_select_pdf_first),
+                    duration = NotificationDuration.SHORT
+                )
                 return@launch
             }
 
             if (startPage > endPage || startPage < 1 || endPage > pageCount) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.invalid_page_range),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.invalid_page_range),
+                    duration = NotificationDuration.SHORT
+                )
                 return@launch
             }
 
@@ -137,30 +141,25 @@ fun PdfExportDialog(
 
             when (result) {
                 0 -> {
-                    //Toast.makeText(
-                    //    context,
-                    //    getString(Res.string.images_export_success, outputDir),
-                    //    Toast.LENGTH_LONG
-                    //)
-                    //    .show()
+                    Notify(
+                        message = getString(Res.string.images_export_success).format(outputDir),
+                        duration = NotificationDuration.SHORT
+                    )
                     onDismiss()
                 }
 
                 -2 -> {
-                    //Toast.makeText(
-                    //    context,
-                    //    getString(Res.string.images_export_failed),
-                    //    Toast.LENGTH_SHORT
-                    //).show()
+                    Notify(
+                        message = getString(Res.string.images_export_failed),
+                        duration = NotificationDuration.SHORT
+                    )
                 }
 
                 else -> {
-                    //Toast.makeText(
-                    //    context,
-                    //    getString(Res.string.export_cancelled_partial, result),
-                    //    Toast.LENGTH_SHORT
-                    //)
-                    //    .show()
+                    Notify(
+                        message = getString(Res.string.export_cancelled_partial).format(result),
+                        duration = NotificationDuration.SHORT
+                    )
                 }
             }
         }
@@ -170,20 +169,18 @@ fun PdfExportDialog(
         scope.launch {
             val pdfPath = selectedPdfPath
             if (pdfPath == null) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.please_select_pdf_first),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.please_select_pdf_first),
+                    duration = NotificationDuration.SHORT
+                )
                 return@launch
             }
 
             if (startPage > endPage || startPage < 1 || endPage > pageCount) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.invalid_page_range),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.invalid_page_range),
+                    duration = NotificationDuration.SHORT
+                )
                 return@launch
             }
 
@@ -203,19 +200,16 @@ fun PdfExportDialog(
             isExporting = false
 
             if (result) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.html_export_success, outputPath),
-                //    Toast.LENGTH_LONG
-                //)
-                //    .show()
+                Notify(
+                    message = getString(Res.string.html_export_success).format(outputPath),
+                    duration = NotificationDuration.SHORT
+                )
                 onDismiss()
             } else {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.html_export_failed),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.html_export_failed),
+                    duration = NotificationDuration.SHORT
+                )
             }
         }
     }

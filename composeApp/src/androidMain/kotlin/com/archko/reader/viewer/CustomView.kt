@@ -50,6 +50,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -365,8 +366,6 @@ fun CustomView(
             // 跳转页面状态
             var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
 
-            val currentPageString = stringResource(Res.string.current_page)
-
             var isSpeaking by remember { mutableStateOf(false) }
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -466,8 +465,11 @@ fun CustomView(
                         if (showToolbar) {
                             showToolbar = false
                         }
-                        val pageText = currentPageString.format(clickedPageIndex + 1, pageCount)
-                        Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            val pageText = getString(Res.string.current_page)
+                                .format(clickedPageIndex + 1, pageCount)
+                            Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                        }
                     },
                     jumpToPage = jumpToPage,
                     initialScrollX = initialScrollX,
@@ -497,9 +499,11 @@ fun CustomView(
                         if (showToolbar) {
                             showToolbar = false
                         } else {
-                            val pageText =
-                                currentPageString.format(clickedPageIndex + 1, pageCount)
-                            Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                            scope.launch {
+                                val pageText = getString(Res.string.current_page)
+                                    .format(clickedPageIndex + 1, pageCount)
+                                Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     initialScrollX = initialScrollX,
@@ -785,14 +789,14 @@ fun CustomView(
 
                             reflowBean.page?.let { pageStr ->
                                 val targetPage = pageStr.toIntOrNull() ?: 0
-                                
+
                                 scope.launch {
                                     jumpToPage = targetPage
-                                    
+
                                     // 停止当前朗读
                                     binder.stop()
                                     delay(50)
-                                    
+
                                     // 开始新的朗读
                                     speakFromCurrentPage(targetPage, decoder!!, binder)
                                     if (binder.isSpeaking()) {

@@ -1,5 +1,7 @@
 package com.archko.reader.viewer.dialog
 
+import NotificationDuration
+import Notify
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,19 +53,8 @@ import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.create_pdf
-import kreader.composeapp.generated.resources.create_pdf_button
-import kreader.composeapp.generated.resources.creating
-import kreader.composeapp.generated.resources.delete
-import kreader.composeapp.generated.resources.enter_pdf_filename
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.ic_delete
-import kreader.composeapp.generated.resources.ic_menu
-import kreader.composeapp.generated.resources.pdf_filename
-import kreader.composeapp.generated.resources.select_images
-import kreader.composeapp.generated.resources.select_images_to_create_pdf
-import kreader.composeapp.generated.resources.selected_images_count
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableItem
@@ -99,11 +90,10 @@ fun PdfCreateDialog(
     fun createPdf() {
         scope.launch {
             if (selectedImages.isEmpty()) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.please_select_images_first),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.please_select_images_first),
+                    duration = NotificationDuration.SHORT
+                )
                 return@launch
             }
 
@@ -123,18 +113,16 @@ fun PdfCreateDialog(
             }
             isCreating = false
             if (result) {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.pdf_created_successfully),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.pdf_created_successfully),
+                    duration = NotificationDuration.SHORT
+                )
                 onDismiss()
             } else {
-                //Toast.makeText(
-                //    context,
-                //    getString(Res.string.pdf_creation_failed),
-                //    Toast.LENGTH_SHORT
-                //).show()
+                Notify(
+                    message = getString(Res.string.pdf_creation_failed),
+                    duration = NotificationDuration.SHORT
+                )
             }
         }
     }

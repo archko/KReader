@@ -1,5 +1,7 @@
 package com.archko.reader.viewer.dialog
 
+import NotificationDuration
+import Notify
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,19 +47,8 @@ import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.encrypt_decrypt_add
-import kreader.composeapp.generated.resources.encrypt_decrypt_decrypt
-import kreader.composeapp.generated.resources.encrypt_decrypt_encrypt
-import kreader.composeapp.generated.resources.encrypt_decrypt_file_name
-import kreader.composeapp.generated.resources.encrypt_decrypt_file_path
-import kreader.composeapp.generated.resources.encrypt_decrypt_file_size
-import kreader.composeapp.generated.resources.encrypt_decrypt_input_pwd
-import kreader.composeapp.generated.resources.encrypt_decrypt_modification_time
-import kreader.composeapp.generated.resources.encrypt_decrypt_title
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.ic_visibility
-import kreader.composeapp.generated.resources.ic_visibility_off
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -253,15 +244,34 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
+                                                    Notify(
+                                                        message = getString(Res.string.encrypt_decrypt_encrypt_success)
+                                                            .format(
+                                                                outputPath
+                                                            ),
+                                                        duration = NotificationDuration.SHORT
+                                                    )
                                                 } else {
+                                                    Notify(
+                                                        message = getString(Res.string.encrypt_decrypt_encrypt_failed),
+                                                        duration = NotificationDuration.SHORT
+                                                    )
                                                 }
                                             } catch (e: Exception) {
+                                                Notify(
+                                                    message = getString(Res.string.encrypt_decrypt_encrypt_failed),
+                                                    duration = NotificationDuration.SHORT
+                                                )
                                             } finally {
                                                 isLoading = false
                                             }
                                         }
                                     } else {
                                         scope.launch {
+                                            Notify(
+                                                message = getString(Res.string.encrypt_decrypt_input_pwd),
+                                                duration = NotificationDuration.SHORT
+                                            )
                                         }
                                     }
                                 },
@@ -286,15 +296,34 @@ fun PdfEncryptDialog(
                                                 )
 
                                                 if (success) {
+                                                    Notify(
+                                                        message = getString(Res.string.encrypt_decrypt_decrypt_success)
+                                                            .format(
+                                                                outputPath
+                                                            ),
+                                                        duration = NotificationDuration.SHORT
+                                                    )
                                                 } else {
+                                                    Notify(
+                                                        message = getString(Res.string.encrypt_decrypt_decrypt_failed),
+                                                        duration = NotificationDuration.SHORT
+                                                    )
                                                 }
                                             } catch (e: Exception) {
+                                                Notify(
+                                                    message = getString(Res.string.encrypt_decrypt_decrypt_failed),
+                                                    duration = NotificationDuration.SHORT
+                                                )
                                             } finally {
                                                 isLoading = false
                                             }
                                         }
                                     } else {
                                         scope.launch {
+                                            Notify(
+                                                message = getString(Res.string.encrypt_decrypt_input_pwd),
+                                                duration = NotificationDuration.SHORT
+                                            )
                                         }
                                     }
                                 },
