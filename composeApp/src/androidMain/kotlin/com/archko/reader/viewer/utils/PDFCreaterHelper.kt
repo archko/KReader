@@ -901,12 +901,13 @@ object PDFCreaterHelper {
                 return -1
             }
 
-            // 创建新的空PDF文档
-            val mergedDoc = PDFDocument()
-            var successCount = 0
+            val firstPdfPath = pdfFiles[0]
+            val mergedDoc = Document.openDocument(firstPdfPath) as PDFDocument
 
-            // 一次性 graft 所有文档的页面
-            for ((index, pdfPath) in pdfFiles.withIndex()) {
+            var successCount = 0
+            println("以文件 $firstPdfPath 为基础（${mergedDoc.countPages()}页），开始合并后续文件...")
+
+            for ((index, pdfPath) in pdfFiles.withIndex().filter { it.index >= 1 }) {
                 try {
                     val sourceDoc = Document.openDocument(pdfPath)
                     if (sourceDoc !is PDFDocument) {
@@ -931,17 +932,10 @@ object PDFCreaterHelper {
                 }
             }
 
-            if (successCount == 0) {
-                System.err.println("没有成功合并任何文件")
-                mergedDoc.destroy()
-                return -1
-            }
-
-            // 保存时不使用任何压缩选项，保持原始数据
-            mergedDoc.save(outputFile, "")
+            mergedDoc.save(outputFile, "incremental")
             mergedDoc.destroy()
 
-            println("PDF合并成功: $outputFile (合并了 $successCount 个文件)")
+            println("PDF合并成功: $outputFile (合并了 ${successCount + 1} 个文件)")
             return successCount
         } catch (e: Exception) {
             System.err.println("合并PDF时出错: ${e.message}")

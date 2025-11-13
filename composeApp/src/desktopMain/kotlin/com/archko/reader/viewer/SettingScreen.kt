@@ -34,6 +34,7 @@ import androidx.compose.ui.window.Dialog
 import com.archko.reader.viewer.dialog.PdfCreateDialog
 import com.archko.reader.viewer.dialog.PdfEncryptDialog
 import com.archko.reader.viewer.dialog.PdfExportDialog
+import com.archko.reader.viewer.dialog.PdfMergeDialog
 import com.archko.reader.viewer.dialog.PdfSplitDialog
 import com.archko.reader.viewer.dialog.TtsDialog
 import kreader.composeapp.generated.resources.Res
@@ -45,6 +46,7 @@ import kreader.composeapp.generated.resources.create_pdf
 import kreader.composeapp.generated.resources.encrypt_decrypt_title
 import kreader.composeapp.generated.resources.export_pdf
 import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.merge_title
 import kreader.composeapp.generated.resources.split_title
 import kreader.composeapp.generated.resources.support_format
 import kreader.composeapp.generated.resources.tts_setting_title
@@ -130,6 +132,7 @@ fun SettingCategory() {
     var showPdfExportDialog by remember { mutableStateOf(false) }
     var showPdfEncryptDialog by remember { mutableStateOf(false) }
     var showPdfSplitDialog by remember { mutableStateOf(false) }
+    var showPdfMergeDialog by remember { mutableStateOf(false) }
     var showTtsDialog by remember { mutableStateOf(false) }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -159,6 +162,13 @@ fun SettingCategory() {
         SettingItem(
             title = stringResource(Res.string.split_title),
             onClick = { showPdfSplitDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.merge_title),
+            onClick = { showPdfMergeDialog = true }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -201,6 +211,13 @@ fun SettingCategory() {
     if (showPdfSplitDialog) {
         PdfSplitDialog (
             onDismiss = { showPdfSplitDialog = false }
+        )
+    }
+
+    // PDF合并 Dialog
+    if (showPdfMergeDialog) {
+        PdfMergeDialog (
+            onDismiss = { showPdfMergeDialog = false }
         )
     }
 

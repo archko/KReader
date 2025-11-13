@@ -648,4 +648,63 @@ object PDFCreaterHelper {
             return -1
         }
     }
+
+    /**
+     * 合并多个PDF文件
+     * @param outputFile 输出PDF文件的完整路径
+     * @param pdfFiles 要合并的PDF文件路径列表（按顺序）
+     * @return 成功合并的文件数量，失败返回-1
+     */
+    fun mergePDF(
+        outputFile: String,
+        pdfFiles: List<String>
+    ): Int {
+        try {
+            if (pdfFiles.isEmpty()) {
+                System.err.println("没有要合并的PDF文件")
+                return -1
+            }
+
+            val firstPdfPath = pdfFiles[0]
+            val mergedDoc = Document.openDocument(firstPdfPath) as PDFDocument
+
+            var successCount = 0
+            println("以文件 $firstPdfPath 为基础（${mergedDoc.countPages()}页），开始合并后续文件...")
+
+            for ((index, pdfPath) in pdfFiles.withIndex().filter { it.index >= 1 }) {
+                try {
+                    val sourceDoc = Document.openDocument(pdfPath)
+                    if (sourceDoc !is PDFDocument) {
+                        System.err.println("文件 $pdfPath 不是有效的PDF格式")
+                        sourceDoc.destroy()
+                        continue
+                    }
+
+                    val pageCount = sourceDoc.countPages()
+                    println("正在合并文件 ${index + 1}/${pdfFiles.size}: $pdfPath (${pageCount}页)")
+
+                    // 将源文档的所有页面 graft 到合并文档末尾
+                    for (pageIndex in 0 until pageCount) {
+                        mergedDoc.graftPage(-1, sourceDoc, pageIndex)
+                    }
+
+                    sourceDoc.destroy()
+                    successCount++
+                } catch (e: Exception) {
+                    System.err.println("处理文件 $pdfPath 时出错: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+
+            mergedDoc.save(outputFile, "incremental")
+            mergedDoc.destroy()
+
+            println("PDF合并成功: $outputFile (合并了 ${successCount + 1} 个文件)")
+            return successCount
+        } catch (e: Exception) {
+            System.err.println("合并PDF时出错: ${e.message}")
+            e.printStackTrace()
+            return -1
+        }
+    }
 }
