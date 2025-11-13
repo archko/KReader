@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusModifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -282,7 +283,8 @@ fun PdfSplitDialog(
                                                     390
                                                 ),
                                                 contentDescription = null,
-                                                contentScale = ContentScale.FillBounds,
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier.fillMaxSize(),
                                                 alignment = Alignment.Center
                                             )
                                         }

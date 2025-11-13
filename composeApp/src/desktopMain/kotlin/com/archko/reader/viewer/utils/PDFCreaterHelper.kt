@@ -558,7 +558,7 @@ object PDFCreaterHelper {
     }
 
     /**
-     * 拆分PDF文件
+     * 拆分PDF文件 - 使用临时文件和删除页面的方式
      * @param inputFile 输入PDF文件路径
      * @param outputBaseName 输出文件基础名称
      * @param rangeInput 拆分范围，如 "1-10,11-20"
@@ -570,25 +570,23 @@ object PDFCreaterHelper {
         rangeInput: String
     ): Int {
         try {
-            val sourceDoc = Document.openDocument(inputFile)
-            if (sourceDoc !is PDFDocument) {
+            val checkDoc = Document.openDocument(inputFile)
+            if (checkDoc !is PDFDocument) {
                 System.err.println("输入文件不是PDF格式")
                 return -1
             }
+            val totalPages = checkDoc.countPages()
+            checkDoc.destroy()
 
-            val totalPages = sourceDoc.countPages()
             println("源PDF总页数: $totalPages")
 
             val ranges = parseRanges(rangeInput, totalPages)
             if (ranges == null || ranges.isEmpty()) {
                 System.err.println("无效的页面范围")
-                sourceDoc.destroy()
                 return -1
             }
 
-            // 直接使用用户主目录
             val userHome = System.getProperty("user.home")
-
             var successCount = 0
 
             for ((index, range) in ranges.withIndex()) {
@@ -596,49 +594,43 @@ object PDFCreaterHelper {
                 println("处理范围: $startPage-$endPage")
 
                 try {
-                    val newDoc = PDFDocument()
+                    // 创建临时文件
+                    val tempFile = File.createTempFile("pdf_split_", ".pdf")
 
-                    for (pageNum in startPage..endPage) {
-                        val pageIndex = pageNum - 1 // 转换为0基索引
+                    // 先保存一份完整的副本到临时文件
+                    val sourceDoc = Document.openDocument(inputFile) as PDFDocument
+                    sourceDoc.save(tempFile.absolutePath, "compress")
+                    sourceDoc.destroy()
 
-                        var copySuccess = false
-                        
-                        // 方法1: 尝试使用 graftPage 直接复制页面对象
-                        try {
-                            val insertAt = newDoc.countPages()
-                            newDoc.graftPage(insertAt, sourceDoc, pageIndex)
-                            println("使用 graftPage 复制页面 $pageNum")
-                            copySuccess = true
-                        } catch (e: Exception) {
-                            println("graftPage 方法不可用: ${e.message}")
-                        }
-                        
-                        // 方法2: 如果方法1失败，尝试 findPage + graftObject
-                        if (!copySuccess) {
-                            try {
-                                val sourcePageObj = sourceDoc.findPage(pageIndex)
-                                val copiedPageObj = newDoc.graftObject(sourcePageObj)
-                                newDoc.insertPage(-1, copiedPageObj)
-                                println("使用 graftObject 复制页面 $pageNum")
-                            } catch (e: Exception) {
-                                println("graftObject 方法失败: ${e.message}")
-                                throw Exception("无法复制页面 $pageNum")
-                            }
+                    // 重新打开临时文件进行编辑
+                    val editDoc = Document.openDocument(tempFile.absolutePath) as PDFDocument
+
+                    // 构建要保留的页面列表（0-based index）
+                    val pagesToKeep = (startPage - 1 until endPage).toSet()
+
+                    // 从后往前删除不需要的页面
+                    for (pageIndex in totalPages - 1 downTo 0) {
+                        if (pageIndex !in pagesToKeep) {
+                            editDoc.deletePage(pageIndex)
                         }
                     }
 
-                    // 保存新PDF，使用压缩选项
+                    println("保留页面: $startPage-$endPage, 当前文档页数: ${editDoc.countPages()}")
+
+                    // 保存最终文件
                     val outputFileName = if (ranges.size == 1) {
                         "$outputBaseName.pdf"
                     } else {
                         "${outputBaseName}_${index + 1}_p${startPage}-${endPage}.pdf"
                     }
                     val outputFile = File(userHome, outputFileName)
-                    
-                    // 使用更激进的压缩选项
-                    val compressOpts = "compress,compress-images,compress-fonts,garbage=compact,deflate"
-                    newDoc.save(outputFile.absolutePath, compressOpts)
-                    newDoc.destroy()
+
+                    // 使用 clean 选项，这会清理未使用的对象
+                    editDoc.save(outputFile.absolutePath, "clean,compress,garbage")
+                    editDoc.destroy()
+
+                    // 删除临时文件
+                    tempFile.delete()
 
                     println("已保存: ${outputFile.absolutePath}")
                     successCount++
@@ -649,7 +641,6 @@ object PDFCreaterHelper {
                 }
             }
 
-            sourceDoc.destroy()
             return successCount
         } catch (e: Exception) {
             System.err.println("拆分PDF时出错: ${e.message}")
