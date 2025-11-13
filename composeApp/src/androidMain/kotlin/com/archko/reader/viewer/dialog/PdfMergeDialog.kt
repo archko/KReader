@@ -1,0 +1,391 @@
+package com.archko.reader.viewer.dialog
+
+import android.app.Activity
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.archko.reader.pdf.util.FileUtils
+import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.viewer.utils.PDFCreaterHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import java.io.File
+
+@Composable
+fun PdfMergeDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var selectedFiles by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pdfName by remember { mutableStateOf("") }
+    var isExporting by remember { mutableStateOf(false) }
+
+    val pdfPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val files = mutableListOf<String>()
+            try {
+                val oneUri = result.data?.data
+                if (oneUri != null) {
+                    val path = IntentFile.getPath(context, oneUri)
+                    if (path != null) {
+                        files.add(path)
+                    }
+                } else {
+                    // 多选图片
+                    for (index in 0 until (result.data?.clipData?.itemCount ?: 0)) {
+                        val uri = result.data?.clipData?.getItemAt(index)?.uri
+                        if (uri != null) {
+                            val path = IntentFile.getPath(context, uri)
+                            if (path != null) {
+                                files.add(path)
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            // 按修改时间倒序排序
+            files.sortByDescending { File(it).lastModified() }
+            selectedFiles = selectedFiles + files
+        }
+    }
+
+    fun selectPdf() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            type = "application/pdf"
+        }
+        pdfPickerLauncher.launch(intent)
+    }
+
+    fun createPdf() {
+        scope.launch {
+            if (selectedFiles.isEmpty()) {
+                Toast.makeText(
+                    context,
+                    getString(Res.string.please_select_pdf_first),
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+
+            var name = pdfName.trim()
+            if (name.isEmpty()) {
+                name = "new.pdf"
+            }
+            if (!name.endsWith(".pdf")) {
+                name = "$name.pdf"
+            }
+
+            isExporting = true
+            val path = FileUtils.getStorageDir("book").absolutePath + File.separator + name
+            val result = withContext(Dispatchers.IO) {
+                PDFCreaterHelper.mergePDF(path, selectedFiles)
+            }
+
+            isExporting = false
+
+            if (result > 0) {
+                Toast.makeText(
+                    context,
+                    getString(Res.string.merge_success)
+                        .format(path),
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
+                Toast.makeText(
+                    context, getString(Res.string.merge_error),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .width(screenWidth * 0.95f)
+                    .height(screenHeight * 0.9f),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.merge_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = pdfName,
+                            onValueChange = { pdfName = it },
+                            label = { Text(stringResource(Res.string.pdf_filename)) },
+                            placeholder = { Text(stringResource(Res.string.enter_pdf_filename)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Button(
+                                onClick = { selectPdf() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isExporting
+                            ) {
+                                Text(stringResource(Res.string.merge_select_pdf))
+                            }
+
+                            Button(
+                                onClick = { createPdf() },
+                                modifier = Modifier.weight(1f),
+                                enabled = selectedFiles.isNotEmpty() && !isExporting
+                            ) {
+                                if (isExporting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(Res.string.creating))
+                                } else {
+                                    Text(stringResource(Res.string.merge_btn))
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        if (selectedFiles.isNotEmpty()) {
+                            Text(
+                                text = stringResource(Res.string.selected_images_count).format(
+                                    selectedFiles.size
+                                ),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            val lazyListState = rememberLazyListState()
+                            val reorderableLazyListState = rememberReorderableLazyListState(
+                                lazyListState = lazyListState,
+                                onMove = { from, to ->
+                                    selectedFiles = selectedFiles.toMutableList().apply {
+                                        add(to.index, removeAt(from.index))
+                                    }
+                                }
+                            )
+
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                state = lazyListState,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                itemsIndexed(
+                                    selectedFiles,
+                                    key = { _, item -> item }) { index, imagePath ->
+                                    ReorderableItem(
+                                        state = reorderableLazyListState,
+                                        key = imagePath
+                                    ) { isDragging ->
+                                        ImageItem(
+                                            imagePath = imagePath,
+                                            index = index + 1,
+                                            isDragging = isDragging,
+                                            dragModifier = Modifier.draggableHandle(),
+                                            onRemove = {
+                                                selectedFiles =
+                                                    selectedFiles.filter { it != imagePath }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.merge_pdf_to_split),
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageItem(
+    imagePath: String,
+    index: Int,
+    isDragging: Boolean,
+    dragModifier: Modifier,
+    onRemove: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isDragging) 8.dp else 2.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDragging)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_menu),
+                contentDescription = "Drag to reorder",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(20.dp)
+                    .then(dragModifier)
+            )
+
+            /*Spacer(modifier = Modifier.width(8.dp))
+
+            AsyncImage(
+                model = File(imagePath),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop
+            )*/
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "${index}. ${File(imagePath).name}",
+                    style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+                    maxLines = 2
+                )
+            }
+
+            IconButton(onClick = onRemove) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_delete),
+                    contentDescription = stringResource(Res.string.delete),
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}

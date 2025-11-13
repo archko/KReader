@@ -25,6 +25,7 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 
+
 /**
  * @author: archko 2018/12/21 :1:03 PM
  */
@@ -38,7 +39,7 @@ object PDFCreaterHelper {
      * A0：841×1189 mm
      */
     const val OPTS: String =
-        "compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
+        "deduplicate,compress-images;compress;incremental;linearize;pretty;compress-fonts;garbage"
     private const val PAPER_WIDTH = 1080f
     private const val PAPER_HEIGHT = 1800f
     private const val PAPER_PADDING = 40f
@@ -879,6 +880,71 @@ object PDFCreaterHelper {
             return successCount
         } catch (e: Exception) {
             System.err.println("拆分PDF时出错: ${e.message}")
+            e.printStackTrace()
+            return -1
+        }
+    }
+
+    /**
+     * 合并多个PDF文件
+     * @param outputFile 输出PDF文件的完整路径
+     * @param pdfFiles 要合并的PDF文件路径列表（按顺序）
+     * @return 成功合并的文件数量，失败返回-1
+     */
+    fun mergePDF(
+        outputFile: String,
+        pdfFiles: List<String>
+    ): Int {
+        try {
+            if (pdfFiles.isEmpty()) {
+                System.err.println("没有要合并的PDF文件")
+                return -1
+            }
+
+            // 创建新的空PDF文档
+            val mergedDoc = PDFDocument()
+            var successCount = 0
+
+            // 一次性 graft 所有文档的页面
+            for ((index, pdfPath) in pdfFiles.withIndex()) {
+                try {
+                    val sourceDoc = Document.openDocument(pdfPath)
+                    if (sourceDoc !is PDFDocument) {
+                        System.err.println("文件 $pdfPath 不是有效的PDF格式")
+                        sourceDoc.destroy()
+                        continue
+                    }
+
+                    val pageCount = sourceDoc.countPages()
+                    println("正在合并文件 ${index + 1}/${pdfFiles.size}: $pdfPath (${pageCount}页)")
+
+                    // 将源文档的所有页面 graft 到合并文档末尾
+                    for (pageIndex in 0 until pageCount) {
+                        mergedDoc.graftPage(-1, sourceDoc, pageIndex)
+                    }
+
+                    sourceDoc.destroy()
+                    successCount++
+                } catch (e: Exception) {
+                    System.err.println("处理文件 $pdfPath 时出错: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+
+            if (successCount == 0) {
+                System.err.println("没有成功合并任何文件")
+                mergedDoc.destroy()
+                return -1
+            }
+
+            // 保存时不使用任何压缩选项，保持原始数据
+            mergedDoc.save(outputFile, "")
+            mergedDoc.destroy()
+
+            println("PDF合并成功: $outputFile (合并了 $successCount 个文件)")
+            return successCount
+        } catch (e: Exception) {
+            System.err.println("合并PDF时出错: ${e.message}")
             e.printStackTrace()
             return -1
         }

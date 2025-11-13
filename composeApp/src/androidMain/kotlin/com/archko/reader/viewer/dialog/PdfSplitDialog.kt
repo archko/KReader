@@ -36,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -45,8 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil3.compose.AsyncImage
-import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.util.FileUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
@@ -91,14 +88,6 @@ fun PdfSplitDialog(
                             val page = doc.loadPage(0)
                             val bounds = page.bounds
                             originalWidth = bounds.x1.roundToInt()
-
-                            // Generate cover image
-                            withContext(Dispatchers.Default) {
-                                try {
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
 
                             page.destroy()
                         }

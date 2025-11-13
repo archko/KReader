@@ -88,6 +88,13 @@
     <string name="split_success">Split Successfully！Save to: %s</string>
     <string name="split_error">Split Error，Please check input rule.</string>
 
+    <string name="merge_title">Merge Pdf</string>
+    <string name="merge_btn">Merge Pdf</string>
+    <string name="merge_pdf_to_split">Please select a PDF file to Merge</string>
+    <string name="merge_success">Merge Successfully！Save to: %s</string>
+    <string name="merge_error">Merge Error!</string>
+    <string name="merge_select_pdf">Select Pdf</string>
+
     <string name="tts_setting_title">Tts Setting</string>
     <string name="tts_queue_title">Queue</string>
     <string name="tts_empty_queue">Empty Queue</string>
