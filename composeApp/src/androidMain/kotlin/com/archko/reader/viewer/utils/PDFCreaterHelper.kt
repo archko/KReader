@@ -749,4 +749,138 @@ object PDFCreaterHelper {
         }
         return false
     }
+
+    // =================== split PDF ===================
+
+    /**
+     * 解析拆分范围字符串
+     * 例如: "1-10,11-20" -> [(1,10), (11,20)]
+     */
+    private fun parseRanges(rangeInput: String, maxPage: Int): List<Pair<Int, Int>>? {
+        try {
+            val ranges = mutableListOf<Pair<Int, Int>>()
+            val parts = rangeInput.split(",").map { it.trim() }
+
+            for (part in parts) {
+                if (part.isEmpty()) continue
+
+                val rangeParts = part.split("-").map { it.trim() }
+                when (rangeParts.size) {
+                    1 -> {
+                        // 单页，如 "5"
+                        val page = rangeParts[0].toInt()
+                        if (page < 1 || page > maxPage) return null
+                        ranges.add(Pair(page, page))
+                    }
+
+                    2 -> {
+                        // 范围，如 "1-10"
+                        val start = rangeParts[0].toInt()
+                        val end = rangeParts[1].toInt()
+                        if (start < 1 || end > maxPage || start > end) return null
+                        ranges.add(Pair(start, end))
+                    }
+
+                    else -> return null
+                }
+            }
+
+            return ranges
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+    /**
+     * 拆分PDF文件 - 使用临时文件和删除页面的方式
+     * @param inputFile 输入PDF文件路径
+     * @param outputBaseName 输出文件基础名称
+     * @param rangeInput 拆分范围，如 "1-10,11-20"
+     * @return 成功拆分的文件数量，失败返回-1
+     */
+    fun splitPDF(
+        outDir: File,
+        inputFile: String,
+        outputBaseName: String,
+        rangeInput: String
+    ): Int {
+        try {
+            val checkDoc = Document.openDocument(inputFile)
+            if (checkDoc !is PDFDocument) {
+                System.err.println("输入文件不是PDF格式")
+                return -1
+            }
+            val totalPages = checkDoc.countPages()
+            checkDoc.destroy()
+
+            println("源PDF总页数: $totalPages")
+
+            val ranges = parseRanges(rangeInput, totalPages)
+            if (ranges == null || ranges.isEmpty()) {
+                System.err.println("无效的页面范围")
+                return -1
+            }
+
+            var successCount = 0
+
+            for ((index, range) in ranges.withIndex()) {
+                val (startPage, endPage) = range
+                println("处理范围: $startPage-$endPage")
+
+                try {
+                    // 创建临时文件
+                    val tempFile = File.createTempFile("pdf_split_", ".pdf")
+
+                    // 先保存一份完整的副本到临时文件
+                    val sourceDoc = Document.openDocument(inputFile) as PDFDocument
+                    sourceDoc.save(tempFile.absolutePath, "compress")
+                    sourceDoc.destroy()
+
+                    // 重新打开临时文件进行编辑
+                    val editDoc = Document.openDocument(tempFile.absolutePath) as PDFDocument
+
+                    // 构建要保留的页面列表（0-based index）
+                    val pagesToKeep = (startPage - 1 until endPage).toSet()
+
+                    // 从后往前删除不需要的页面
+                    for (pageIndex in totalPages - 1 downTo 0) {
+                        if (pageIndex !in pagesToKeep) {
+                            editDoc.deletePage(pageIndex)
+                        }
+                    }
+
+                    println("保留页面: $startPage-$endPage, 当前文档页数: ${editDoc.countPages()}")
+
+                    // 保存最终文件
+                    val outputFileName = if (ranges.size == 1) {
+                        "$outputBaseName.pdf"
+                    } else {
+                        "${outputBaseName}_${index + 1}_p${startPage}-${endPage}.pdf"
+                    }
+                    val outputFile = File(outDir, outputFileName)
+
+                    // 使用 clean 选项，这会清理未使用的对象
+                    editDoc.save(outputFile.absolutePath, "clean,compress,garbage")
+                    editDoc.destroy()
+
+                    // 删除临时文件
+                    tempFile.delete()
+
+                    println("已保存: ${outputFile.absolutePath}")
+                    successCount++
+
+                } catch (e: Exception) {
+                    System.err.println("处理范围 $startPage-$endPage 时出错: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+
+            return successCount
+        } catch (e: Exception) {
+            System.err.println("拆分PDF时出错: ${e.message}")
+            e.printStackTrace()
+            return -1
+        }
+    }
 }

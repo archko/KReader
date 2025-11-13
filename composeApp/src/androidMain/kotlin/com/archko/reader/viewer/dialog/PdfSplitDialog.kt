@@ -1,5 +1,11 @@
 package com.archko.reader.viewer.dialog
 
+import android.app.Activity
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,7 +35,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,14 +47,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.archko.reader.pdf.entity.CustomImageData
+import com.archko.reader.pdf.util.FileUtils
+import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
 import com.artifex.mupdf.fitz.Document
-import com.dokar.sonner.ToastType
-import com.dokar.sonner.Toaster
-import com.dokar.sonner.rememberToasterState
-import com.mohamedrejeb.calf.picker.FilePickerFileType
-import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
-import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,8 +65,8 @@ import kotlin.math.roundToInt
 fun PdfSplitDialog(
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val toaster = rememberToasterState()
 
     var selectedPdfPath by remember { mutableStateOf<String?>(null) }
     var pageCount by remember { mutableIntStateOf(0) }
@@ -71,81 +75,86 @@ fun PdfSplitDialog(
     var outputFileName by remember { mutableStateOf("") }
     var isExporting by remember { mutableStateOf(false) }
 
-    val pdfPickerLauncher = rememberFilePickerLauncher(
-        type = FilePickerFileType.Custom(listOf("pdf")),
-        selectionMode = FilePickerSelectionMode.Single
-    ) { files ->
-        scope.launch {
-            files.singleOrNull()?.let { file ->
-                val path = file.file.absolutePath
+    val pdfPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val path = IntentFile.getPath(context, result.data?.data)
+            if (path != null) {
                 selectedPdfPath = path
-                outputFileName = File(path).nameWithoutExtension + "_split"
+                scope.launch {
+                    try {
+                        val doc = Document.openDocument(path)
+                        pageCount = doc.countPages()
 
-                try {
-                    val doc = Document.openDocument(path)
-                    pageCount = doc.countPages()
+                        if (pageCount > 0) {
+                            val page = doc.loadPage(0)
+                            val bounds = page.bounds
+                            originalWidth = bounds.x1.roundToInt()
 
-                    if (pageCount > 0) {
-                        val page = doc.loadPage(0)
-                        val bounds = page.bounds
-                        originalWidth = bounds.x1.roundToInt()
-
-                        // Generate cover image
-                        withContext(Dispatchers.Default) {
-                            try {
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+                            // Generate cover image
+                            withContext(Dispatchers.Default) {
+                                try {
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
-                        }
 
-                        page.destroy()
+                            page.destroy()
+                        }
+                        doc.destroy()
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            getString(Res.string.error_read_pdf_info)
+                                .format(e.message ?: ""),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
-                    doc.destroy()
-                } catch (e: Exception) {
-                    toaster.show(
-                        message = getString(Res.string.error_read_pdf_info)
-                            .format(e.message ?: ""),
-                        type = ToastType.Error,
-                    )
                 }
             }
         }
     }
 
     fun selectPdf() {
-        pdfPickerLauncher.launch()
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/pdf"
+        }
+        pdfPickerLauncher.launch(intent)
     }
 
     fun splitToPdfs() {
         scope.launch {
             val pdfPath = selectedPdfPath
             if (pdfPath == null) {
-                toaster.show(
-                    message = getString(Res.string.please_select_pdf_first),
-                    type = ToastType.Error,
+                Toast.makeText(
+                    context,
+                    getString(Res.string.please_select_pdf_first),
+                    Toast.LENGTH_SHORT
                 )
                 return@launch
             }
 
             if (splitRangeInput.isBlank()) {
-                toaster.show(
-                    message = getString(Res.string.split_input_rule),
-                    type = ToastType.Error,
+                Toast.makeText(
+                    context, getString(Res.string.split_input_rule),
+                    Toast.LENGTH_SHORT
                 )
                 return@launch
             }
 
             if (outputFileName.isBlank()) {
-                toaster.show(
-                    message = getString(Res.string.split_out_name_tip),
-                    type = ToastType.Error,
+                Toast.makeText(
+                    context, getString(Res.string.split_out_name_tip),
+                    Toast.LENGTH_SHORT
                 )
                 return@launch
             }
 
             isExporting = true
 
-            val userHome = System.getProperty("user.home")
+            val userHome = FileUtils.getStorageDir("book")
             val result = withContext(Dispatchers.IO) {
                 PDFCreaterHelper.splitPDF(
                     userHome,
@@ -158,71 +167,71 @@ fun PdfSplitDialog(
             isExporting = false
 
             if (result > 0) {
-                toaster.show(
-                    message = getString(Res.string.split_success)
+                Toast.makeText(
+                    context,
+                    getString(Res.string.split_success)
                         .format(userHome),
-                    type = ToastType.Success,
+                    Toast.LENGTH_LONG
                 )
             } else {
-                toaster.show(
-                    message = getString(Res.string.split_error),
-                    type = ToastType.Error,
+                Toast.makeText(
+                    context, getString(Res.string.split_error),
+                    Toast.LENGTH_LONG
                 )
             }
         }
     }
 
-    Toaster(
-        state = toaster,
-        maxVisibleToasts = 1,
-        alignment = Alignment.Center,
-    )
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
+        Box(
             modifier = Modifier
-                .widthIn(max = 1000.dp),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+            Surface(
+                modifier = Modifier
+                    .width(screenWidth * 0.95f)
+                    .height(screenHeight * 0.8f),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_back),
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurface
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.split_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.split_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
                     Column(
                         modifier = Modifier
-                            .weight(0.45f)
-                            .fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .fillMaxSize()
+                            .padding(start = 20.dp, end = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
                             onClick = { selectPdf() },
@@ -232,35 +241,51 @@ fun PdfSplitDialog(
                             Text(stringResource(Res.string.select_pdf_file))
                         }
 
+                        Button(
+                            onClick = { splitToPdfs() },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isExporting && selectedPdfPath != null
+                        ) {
+                            if (isExporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Text(
+                                    stringResource(Res.string.split_start)
+                                )
+                            }
+                        }
+
                         if (selectedPdfPath != null) {
                             Card(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding(8.dp),
                                 ) {
                                     Text(
                                         text = stringResource(Res.string.pdf_info),
                                         style = TextStyle(
-                                            fontSize = 16.sp,
+                                            fontSize = 15.sp,
                                             fontWeight = FontWeight.Medium
                                         )
                                     )
-
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     // 封面图片
-                                    selectedPdfPath?.let { image ->
+                                    /*selectedPdfPath?.let { image ->
                                         Box(
                                             modifier = Modifier
-                                                .width(300.dp)
-                                                .height(390.dp),
+                                                .width(150.dp)
+                                                .height(195.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             AsyncImage(
                                                 model = CustomImageData(
                                                     image,
-                                                    300,
-                                                    390
+                                                    150,
+                                                    195
                                                 ),
                                                 contentDescription = null,
                                                 contentScale = ContentScale.Fit,
@@ -268,7 +293,7 @@ fun PdfSplitDialog(
                                                 alignment = Alignment.Center
                                             )
                                         }
-                                    }
+                                    }*/
 
                                     Text(
                                         stringResource(Res.string.file_label)
@@ -284,6 +309,43 @@ fun PdfSplitDialog(
                                     )
                                 }
                             }
+
+                            Text(
+                                text = stringResource(Res.string.split_rule),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                            Text(
+                                text = stringResource(Res.string.split_rule_desc),
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+
+                            OutlinedTextField(
+                                value = splitRangeInput,
+                                onValueChange = { splitRangeInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("1-10,11-20") },
+                                enabled = !isExporting && selectedPdfPath != null
+                            )
+                            Text(
+                                text = stringResource(Res.string.split_out_setting),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                            OutlinedTextField(
+                                value = outputFileName,
+                                onValueChange = { outputFileName = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(stringResource(Res.string.split_out_name)) },
+                                enabled = !isExporting && selectedPdfPath != null
+                            )
                         } else {
                             Box(
                                 modifier = Modifier
@@ -299,78 +361,6 @@ fun PdfSplitDialog(
                                     )
                                 )
                             }
-                        }
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .weight(0.55f)
-                            .fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.split_rule),
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                            Text(
-                                text = stringResource(Res.string.split_rule_desc),
-                                style = TextStyle(
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                            OutlinedTextField(
-                                value = splitRangeInput,
-                                onValueChange = { splitRangeInput = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("1-10,11-20") },
-                                enabled = !isExporting && selectedPdfPath != null
-                            )
-                        }
-
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.split_out_setting),
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                            OutlinedTextField(
-                                value = outputFileName,
-                                onValueChange = { outputFileName = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text(stringResource(Res.string.split_out_name)) },
-                                enabled = !isExporting && selectedPdfPath != null
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        Button(
-                            onClick = { splitToPdfs() },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isExporting && selectedPdfPath != null
-                        ) {
-                            if (isExporting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(
-                                if (isExporting) stringResource(Res.string.split_doing)
-                                else stringResource(Res.string.split_start)
-                            )
                         }
                     }
                 }

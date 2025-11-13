@@ -565,6 +565,7 @@ object PDFCreaterHelper {
      * @return 成功拆分的文件数量，失败返回-1
      */
     fun splitPDF(
+        outDir: String,
         inputFile: String,
         outputBaseName: String,
         rangeInput: String
@@ -586,7 +587,6 @@ object PDFCreaterHelper {
                 return -1
             }
 
-            val userHome = System.getProperty("user.home")
             var successCount = 0
 
             for ((index, range) in ranges.withIndex()) {
@@ -623,7 +623,7 @@ object PDFCreaterHelper {
                     } else {
                         "${outputBaseName}_${index + 1}_p${startPage}-${endPage}.pdf"
                     }
-                    val outputFile = File(userHome, outputFileName)
+                    val outputFile = File(outDir, outputFileName)
 
                     // 使用 clean 选项，这会清理未使用的对象
                     editDoc.save(outputFile.absolutePath, "clean,compress,garbage")
