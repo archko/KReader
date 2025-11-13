@@ -99,8 +99,12 @@ fun FileScreen(
         var showDirectoryDialog by remember { mutableStateOf(false) }
         var pendingImagePath by remember { mutableStateOf<String?>(null) }
 
+        val gridState = rememberLazyGridState()
+
         LaunchedEffect(Unit) {
-            viewModel.loadRecents()
+            if (recentList.isEmpty()) {
+                viewModel.loadRecents()
+            }
         }
 
         // 确认对话框
@@ -280,8 +284,6 @@ fun FileScreen(
                     }
 
                     if (recentList.isNotEmpty()) {
-                        val gridState = rememberLazyGridState()
-
                         // 监听滚动到底部自动加载更多
                         LaunchedEffect(gridState) {
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo }

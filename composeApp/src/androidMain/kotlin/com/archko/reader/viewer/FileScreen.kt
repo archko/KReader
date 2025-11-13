@@ -105,9 +105,13 @@ fun FileScreen(
         var showDirectoryDialog by remember { mutableStateOf(false) }
         var pendingImagePath by remember { mutableStateOf<String?>(null) }
         var pendingFiles by remember { mutableStateOf<List<File>?>(null) }
+        
+        val gridState = rememberLazyGridState()
 
         LaunchedEffect(Unit) {
-            viewModel.loadRecents()
+            if (recentList.isEmpty()) {
+                viewModel.loadRecents()
+            }
         }
 
         // 处理外部路径 - 只处理一次，处理后立即清除
@@ -321,8 +325,6 @@ fun FileScreen(
                     }
 
                     if (recentList.isNotEmpty()) {
-                        val gridState = rememberLazyGridState()
-
                         // 监听滚动到底部自动加载更多
                         LaunchedEffect(gridState) {
                             snapshotFlow { gridState.layoutInfo.visibleItemsInfo }

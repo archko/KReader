@@ -70,6 +70,7 @@ fun SettingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
                             .padding(20.dp)
                     ) {
                         Row(
