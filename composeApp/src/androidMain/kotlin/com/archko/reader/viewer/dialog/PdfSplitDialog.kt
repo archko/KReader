@@ -132,7 +132,7 @@ fun PdfSplitDialog(
                     context,
                     getString(Res.string.please_select_pdf_first),
                     Toast.LENGTH_SHORT
-                )
+                ).show()
                 return@launch
             }
 
@@ -140,7 +140,7 @@ fun PdfSplitDialog(
                 Toast.makeText(
                     context, getString(Res.string.split_input_rule),
                     Toast.LENGTH_SHORT
-                )
+                ).show()
                 return@launch
             }
 
@@ -148,7 +148,7 @@ fun PdfSplitDialog(
                 Toast.makeText(
                     context, getString(Res.string.split_out_name_tip),
                     Toast.LENGTH_SHORT
-                )
+                ).show()
                 return@launch
             }
 
@@ -172,12 +172,12 @@ fun PdfSplitDialog(
                     getString(Res.string.split_success)
                         .format(userHome),
                     Toast.LENGTH_LONG
-                )
+                ).show()
             } else {
                 Toast.makeText(
                     context, getString(Res.string.split_error),
                     Toast.LENGTH_LONG
-                )
+                ).show()
             }
         }
     }
