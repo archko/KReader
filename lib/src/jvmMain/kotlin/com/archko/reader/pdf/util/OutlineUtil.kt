@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.util
 
+import com.archko.reader.image.DjvuOutline
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.OutlineLink
 import com.artifex.mupdf.fitz.Document
@@ -73,4 +74,28 @@ internal fun processOutline(outlines: List<OutlineLink>?): MutableList<Item> {
         }
     }
     return items
+}
+
+internal fun convertDjvuOutlinesToItems(djvuOutlines: List<DjvuOutline>?): List<Item> {
+    val items = mutableListOf<Item>()
+    if (djvuOutlines.isNullOrEmpty()) {
+        return items
+    }
+    
+    for (outline in djvuOutlines) {
+        flattenDjvuOutline(outline, items)
+    }
+    
+    return items
+}
+
+private fun flattenDjvuOutline(outline: DjvuOutline, items: MutableList<Item>) {
+    if (outline.page >= 0) {
+        val item = Item(outline.title, outline.page)
+        items.add(item)
+    }
+    
+    for (child in outline.children) {
+        flattenDjvuOutline(child, items)
+    }
 }

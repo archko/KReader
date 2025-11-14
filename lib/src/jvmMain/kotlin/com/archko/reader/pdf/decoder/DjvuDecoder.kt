@@ -5,7 +5,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
-import java.awt.image.BufferedImage
 import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
@@ -18,7 +17,9 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.SmartCropUtils
+import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import com.artifex.mupdf.fitz.Page
+import java.awt.image.BufferedImage
 import java.io.File
 
 /**
@@ -52,6 +53,48 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
+
+    public companion object {
+        /**
+         * 渲染封面页面，根据高宽比进行特殊处理
+         */
+        public fun renderCoverPage(
+            djvuLoader: DjvuLoader,
+            outWidth: Int,
+            outHeight: Int,
+        ): ImageBitmap? {
+            try {
+                if (!djvuLoader.isOpened || djvuLoader.djvuInfo?.pages == 0) {
+                    return null
+                }
+
+                val pageInfo = djvuLoader.getPageInfo(0) ?: return null
+                val pageWidth = pageInfo.width
+                val pageHeight = pageInfo.height
+                val scaleX = outWidth.toFloat() / pageWidth
+                val scaleY = outHeight.toFloat() / pageHeight
+                val scale = minOf(scaleX, scaleY)
+
+                println("renderDjvuPage:目标尺寸=$outWidth-$outHeight, 原始=${pageWidth}x${pageHeight}, 缩放=$scale")
+
+                val bitmap = djvuLoader.decodeRegionToBitmap(
+                    0,
+                    0,
+                    0,
+                    pageWidth,
+                    pageHeight,
+                    scale,
+                )
+
+                val imageBitmap = bitmap?.toComposeImageBitmap()
+
+                return imageBitmap
+            } catch (e: Exception) {
+                println("DjvuDecoder.renderPage error: $e")
+                return null
+            }
+        }
+    }
 
     init {
         if (!file.exists()) {
@@ -101,100 +144,18 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        /*val path = file.absolutePath
+        val path = file.absolutePath
         try {
-            if (null != ImageCache.acquirePage(path)) {
+            if (null == djvuLoader || null != ImageCache.acquirePage(path)) {
                 return
             }
-            val page = djvuLoader!!.getPageInfo(0)
-            val bitmap = renderCoverPage(page)
+            val bitmap = renderCoverPage(djvuLoader!!, 160, 200)
 
             CustomImageFetcher.cacheBitmap(bitmap, path)
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
-        }*/
-    }
-
-    /**
-     * 渲染封面页面，根据高宽比进行特殊处理
-     */
-    /*private fun renderCoverPage(page: Page): Bitmap {
-        val pWidth = page.bounds.x1 - page.bounds.x0
-        val pHeight = page.bounds.y1 - page.bounds.y0
-
-        // 目标尺寸
-        val targetWidth = 160
-        val targetHeight = 200
-
-        // 检查是否为极端长宽比的图片（某边大于8000）
-        return if (pWidth > 8000 || pHeight > 8000) {
-            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
-            val scale = if (pWidth > pHeight) {
-                targetWidth.toFloat() / pWidth
-            } else {
-                targetHeight.toFloat() / pHeight
-            }
-
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
-
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-            println("large.width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
-            val cropCtm = Matrix()
-            cropCtm.scale(scale, scale)
-            page.run(cropDev, cropCtm, null)
-            cropDev.close()
-            cropDev.destroy()
-            cropBitmap
-        } else if (pWidth > pHeight) {
-            // 对于宽大于高的页面，按最大比例缩放后截取
-            val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
-
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
-
-            // 确保裁剪区域不超过目标尺寸
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-
-            println("wide.width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
-            val cropCtm = Matrix()
-            cropCtm.scale(scale, scale)
-            page.run(cropDev, cropCtm, null)
-            cropDev.close()
-            cropDev.destroy()
-            cropBitmap
-        } else {
-            // 原始逻辑处理其他情况
-            val xscale = targetWidth.toFloat() / pWidth
-            val yscale = targetHeight.toFloat() / pHeight
-
-            // 使用最大比例以确保填充整个目标区域
-            val scale = maxOf(xscale, yscale)
-
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
-
-            // 确保裁剪区域不超过目标尺寸
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-
-            println("width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
-            val cropCtm = Matrix()
-            cropCtm.scale(scale, scale)
-            page.run(cropDev, cropCtm, null)
-            cropDev.close()
-            cropDev.destroy()
-            cropBitmap
         }
-    }*/
+    }
 
     override fun size(viewportSize: IntSize): IntSize {
         if ((imageSize == IntSize.Zero || viewSize != viewportSize)
@@ -244,6 +205,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun close() {
+        djvuLoader?.close()
         if (cachePage && aPageList != null && !aPageList.isEmpty()) {
             println("PdfDecoder.close:$aPageList")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
@@ -298,7 +260,17 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     private fun prepareOutlines(): List<Item> {
-        return emptyList()
+        if (djvuLoader == null || !djvuLoader!!.isOpened) {
+            return emptyList()
+        }
+
+        try {
+            val djvuOutlines = djvuLoader!!.getOutline()
+            return convertDjvuOutlinesToItems(djvuOutlines)
+        } catch (e: Exception) {
+            println("Failed to load DjVu outlines: ${e.message}")
+            return emptyList()
+        }
     }
 
     /**
@@ -352,7 +324,11 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
             println("PdfDecoder.renderPageRegion:index:$index, scale:$scale, patch:$patchX-$patchY-page:$pageWidth-$pageHeight, region:$region")
 
-            bitmap?.toComposeImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+            bitmap?.toComposeImageBitmap() ?: ImageBitmap(
+                outWidth,
+                outHeight,
+                ImageBitmapConfig.Rgb565
+            )
         } catch (e: Exception) {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)

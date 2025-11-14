@@ -55,6 +55,49 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
 
+    public companion object{
+
+        /**
+         * 渲染封面页面，根据高宽比进行特殊处理
+         */
+        public fun renderCoverPage(
+            djvuLoader: DjvuLoader,
+            outWidth: Int,
+            outHeight: Int,
+        ): ImageBitmap? {
+            try {
+                if (!djvuLoader.isOpened || djvuLoader.djvuInfo?.pages == 0) {
+                    return null
+                }
+
+                val pageInfo = djvuLoader.getPageInfo(0) ?: return null
+                val pageWidth = pageInfo.width
+                val pageHeight = pageInfo.height
+                val scaleX = outWidth.toFloat() / pageWidth
+                val scaleY = outHeight.toFloat() / pageHeight
+                val scale = minOf(scaleX, scaleY)
+
+                println("renderDjvuPage:目标尺寸=$outWidth-$outHeight, 原始=${pageWidth}x${pageHeight}, 缩放=$scale")
+
+                val bitmap = djvuLoader.decodeRegionToBitmap(
+                    0,
+                    0,
+                    0,
+                    pageWidth,
+                    pageHeight,
+                    scale,
+                )
+
+                val imageBitmap = bitmap?.asImageBitmap()
+
+                return imageBitmap
+            } catch (e: Exception) {
+                println("DjvuDecoder.renderPage error: $e")
+                return null
+            }
+        }
+    }
+
     init {
         if (!file.exists()) {
             throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
@@ -246,6 +289,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun close() {
+        djvuLoader?.close()
         if (cachePage && aPageList != null && !aPageList.isEmpty()) {
             println("PdfDecoder.close:$aPageList")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)

@@ -2,8 +2,6 @@ package com.archko.reader.pdf.cache
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import coil3.BitmapImage
@@ -15,16 +13,14 @@ import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
 import coil3.key.Keyer
 import coil3.request.Options
+import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.PdfApp
-import com.archko.reader.pdf.component.Size
+import com.archko.reader.pdf.decoder.DjvuDecoder
+import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.util.BitmapUtils
 import com.archko.reader.pdf.util.FileTypeUtils
-import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
-import com.artifex.mupdf.fitz.Matrix
-import com.artifex.mupdf.fitz.Page
-import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -96,9 +92,20 @@ public class CustomImageFetcher(
     override suspend fun fetch(): FetchResult {
         var bitmap = loadBitmapFromCache(data)
         if (bitmap == null) {
-            if (FileTypeUtils.isDocumentFile(data.path)) {
-                //bitmap = decodePdfSys()
-                bitmap = decodeMuPdf()
+            if (FileTypeUtils.isDjvuFile(data.path)) {
+                val djvuLoader = DjvuLoader()
+                djvuLoader.openDjvu(data.path)
+                val image =
+                    DjvuDecoder.renderCoverPage(djvuLoader, data.width, data.height)
+                if (image != null) {
+                    bitmap = image.asAndroidBitmap()
+                    cacheBitmap(bitmap, data.path)
+                }
+            } else if (FileTypeUtils.isDocumentFile(data.path)) {
+                val doc = Document.openDocument(data.path)
+                bitmap =
+                    PdfDecoder.renderCoverPage(data.path, doc.loadPage(0), data.width, data.height)
+
                 if (bitmap != null) {
                     cacheBitmap(bitmap, data.path)
                 }
@@ -118,7 +125,7 @@ public class CustomImageFetcher(
         )
     }
 
-    private fun decodeMuPdf(): Bitmap? {
+    /*private fun decodeMuPdf(): Bitmap? {
         val document: Document = Document.openDocument(data.path)
 
         val bitmap = if (document.countPages() > 0)
@@ -177,9 +184,9 @@ public class CustomImageFetcher(
             dev.destroy()
             scaledBitmap
         }
-    }
+    }*/
 
-    private fun decodePdfSys(): Bitmap? {
+    /*private fun decodePdfSys(): Bitmap? {
         val parcelFileDescriptor =
             ParcelFileDescriptor.open(File(data.path), ParcelFileDescriptor.MODE_READ_ONLY)
         val pdfRenderer = PdfRenderer(parcelFileDescriptor)
@@ -214,7 +221,7 @@ public class CustomImageFetcher(
             w = (pWidth * yscale).toInt()
         }
         return Size(w, h, 0)
-    }
+    }*/
 
     public class Factory : Fetcher.Factory<CustomImageData> {
 
