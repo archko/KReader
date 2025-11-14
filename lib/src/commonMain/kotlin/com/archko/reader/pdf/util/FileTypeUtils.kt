@@ -51,7 +51,8 @@ public object FileTypeUtils {
             filePath.endsWith(".pdf") || filePath.endsWith(".epub") ||
                     filePath.endsWith(".mobi") || filePath.endsWith(".xps") ||
                     filePath.endsWith(".fb") || filePath.endsWith(".fb2") ||
-                    filePath.endsWith(".pptx") || filePath.endsWith(".docx")
+                    filePath.endsWith(".pptx") || filePath.endsWith(".docx") ||
+                    filePath.endsWith(".djvu") || filePath.endsWith(".djv")
         }
     }
 
@@ -59,6 +60,12 @@ public object FileTypeUtils {
         return path.lowercase().let { filePath ->
             filePath.endsWith(".jfif") || filePath.endsWith(".tiff")
                     || filePath.endsWith(".tif")
+        }
+    }
+
+    public fun isDjvuFile(path: String): Boolean {
+        return path.lowercase().let { filePath ->
+            filePath.endsWith(".djvu") || filePath.endsWith(".djv")
         }
     }
 

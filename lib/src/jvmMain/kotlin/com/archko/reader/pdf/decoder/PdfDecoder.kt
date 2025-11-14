@@ -321,12 +321,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             && document != null && (isAuthenticated || !needsPassword)
         ) {
             viewSize = viewportSize
-            caculateSize(viewportSize)
+            calculateSize(viewportSize)
         }
         return imageSize
     }
 
-    private fun caculateSize(viewportSize: IntSize) {
+    private fun calculateSize(viewportSize: IntSize) {
         if (originalPageSizes.isNotEmpty()) {
             // 文档宽度直接使用viewportSize.width
             val documentWidth = viewportSize.width

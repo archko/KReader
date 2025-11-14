@@ -30,6 +30,7 @@ import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
+import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
 import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
@@ -159,7 +160,10 @@ fun CustomView(
                             val files = paths.map { File(it) }
                             ImagesDecoder(files)
                         } else {
-                            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            if (FileTypeUtils.isDjvuFile(currentPath)) {
+                                val djvuDecoder = DjvuDecoder(File(currentPath))
+                                djvuDecoder
+                            } else if (FileTypeUtils.isDocumentFile(currentPath)) {
                                 ttsServiceBinder = TtsServiceBinder(context)
                                 ttsServiceBinder?.bindService()
 
