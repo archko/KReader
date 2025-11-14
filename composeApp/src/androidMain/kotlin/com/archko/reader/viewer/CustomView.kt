@@ -161,6 +161,9 @@ fun CustomView(
                             ImagesDecoder(files)
                         } else {
                             if (FileTypeUtils.isDjvuFile(currentPath)) {
+                                ttsServiceBinder = TtsServiceBinder(context)
+                                ttsServiceBinder?.bindService()
+
                                 val djvuDecoder = DjvuDecoder(File(currentPath))
                                 djvuDecoder
                             } else if (FileTypeUtils.isDocumentFile(currentPath)) {
@@ -782,10 +785,8 @@ fun CustomView(
             // 队列列表弹窗
             if (showQueueDialog) {
                 ttsServiceBinder?.let { binder ->
-                    val pdfDecoder = decoder as PdfDecoder
-
                     QueueDialog(
-                        cacheBean = pdfDecoder.cacheBean,
+                        cacheBean = decoder!!.cacheBean,
                         currentSpeakingPage = binder.getCurrentSpeakingPage(),
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->

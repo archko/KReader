@@ -472,9 +472,8 @@ fun CustomView(
 
                 // 队列列表弹窗
                 if (showQueueDialog) {
-                    val pdfDecoder = decoder as PdfDecoder
                     QueueDialog(
-                        pdfDecoder.cacheBean,
+                        decoder!!.cacheBean,
                         currentSpeakingPage = jumpToPage.toString(),
                         count = 30,
                         onDismiss = { showQueueDialog = false },
