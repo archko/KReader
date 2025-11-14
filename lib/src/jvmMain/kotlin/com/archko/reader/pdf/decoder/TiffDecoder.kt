@@ -12,6 +12,8 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.entity.ReflowCacheBean
 import java.io.File
 
 /**
@@ -34,6 +36,8 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     public var viewSize: IntSize = IntSize.Zero
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var tiffLoader: TiffLoader? = null
+    public override var cacheBean: ReflowCacheBean? = null
+    public override var filePath: String? = null
 
     init {
         if (!file.exists()) {
@@ -285,5 +289,13 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
 
     override fun getStructuredText(index: Int): Any? {
         return null
+    }
+
+    override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
+        return null
+    }
+
+    override fun decodeReflowAllPages(): List<ReflowBean> {
+        return emptyList()
     }
 }

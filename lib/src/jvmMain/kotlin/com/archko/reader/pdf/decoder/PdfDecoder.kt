@@ -56,7 +56,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
-    public var cacheBean: ReflowCacheBean? = null
+    public override var cacheBean: ReflowCacheBean? = null
+    public override var filePath: String? = null
 
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
@@ -208,6 +209,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         }
 
         try {
+            filePath = file.absolutePath
             if (FileTypeUtils.isReflowable(file.absolutePath)) {
                 val css = FontCSSGenerator.generateFontCSS(null, "10px")
                 println("应用自定义CSS: $css")
@@ -728,7 +730,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 解析单个页面的文本内容（用于TTS快速启动）
      */
-    public fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
+    public override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
         }
@@ -767,7 +769,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 解析所有页面的文本内容（用于TTS后台缓存）
      */
-    public fun decodeReflowAllPages(): List<ReflowBean> {
+    public override fun decodeReflowAllPages(): List<ReflowBean> {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return emptyList()
         }

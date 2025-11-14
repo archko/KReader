@@ -929,84 +929,82 @@ suspend fun speakFromCurrentPage(
         return
     }
 
-    if (imageDecoder is PdfDecoder) {
-        withContext(Dispatchers.IO) {
-            try {
-                speechService.clearQueue()
+    withContext(Dispatchers.IO) {
+        try {
+            speechService.clearQueue()
 
-                val totalPages = imageDecoder.originalPageSizes.size
-                var cacheBean = imageDecoder.cacheBean
-                if (cacheBean == null) {
-                    cacheBean = ReflowCacheLoader.loadReflowFromFile(
-                        totalPages,
-                        imageDecoder.file
+            val totalPages = imageDecoder.originalPageSizes.size
+            var cacheBean = imageDecoder.cacheBean
+            if (cacheBean == null) {
+                cacheBean = ReflowCacheLoader.loadReflowFromFile(
+                    totalPages,
+                    imageDecoder.filePath
+                )
+            }
+
+            if (cacheBean != null) {
+                imageDecoder.cacheBean = cacheBean
+                println("TTS: 从缓存获取文本，从第${startPage + 1}页开始")
+                val cachedTexts = ReflowCacheLoader.getTextsFromPage(
+                    cacheBean,
+                    startPage
+                )
+
+                for (pageText in cachedTexts) {
+                    speechService.addToQueue(pageText)
+                }
+
+                val queueSize = speechService.getQueueSize()
+                println("TTS: 从缓存添加完成,队列中共有$queueSize 个文本段落")
+            } else {
+                try {
+                    val reflowBean = imageDecoder.decodeReflowSinglePage(startPage)
+                    if (reflowBean != null) {
+                        speechService.addToQueue(reflowBean)
+                        println("TTS: 当前页解析完成，立即开始朗读")
+                    }
+                } catch (e: Exception) {
+                    println("TTS: 当前页解析失败: ${e.message}")
+                    speechService.addToQueue(
+                        ReflowBean(
+                            data = "当前页解析失败",
+                            type = ReflowBean.TYPE_STRING,
+                            page = startPage.toString()
+                        )
                     )
                 }
 
-                if (cacheBean != null) {
-                    imageDecoder.cacheBean = cacheBean
-                    println("TTS: 从缓存获取文本，从第${startPage + 1}页开始")
-                    val cachedTexts = ReflowCacheLoader.getTextsFromPage(
-                        cacheBean,
-                        startPage
-                    )
+                try {
+                    println("TTS: 开始后台解析整个文档，共${totalPages}页")
+                    val allTexts = imageDecoder.decodeReflowAllPages()
 
-                    for (pageText in cachedTexts) {
+                    cacheBean = ReflowCacheLoader.saveReflowToFile(
+                        totalPages,
+                        imageDecoder.filePath,
+                        allTexts
+                    )
+                    imageDecoder.cacheBean = cacheBean
+
+                    for (pageIndex in (startPage + 1) until allTexts.size) {
+                        val pageText = allTexts[pageIndex]
                         speechService.addToQueue(pageText)
                     }
 
                     val queueSize = speechService.getQueueSize()
-                    println("TTS: 从缓存添加完成,队列中共有$queueSize 个文本段落")
-                } else {
-                    try {
-                        val reflowBean = imageDecoder.decodeReflowSinglePage(startPage)
-                        if (reflowBean != null) {
-                            speechService.addToQueue(reflowBean)
-                            println("TTS: 当前页解析完成，立即开始朗读")
-                        }
-                    } catch (e: Exception) {
-                        println("TTS: 当前页解析失败: ${e.message}")
-                        speechService.addToQueue(
-                            ReflowBean(
-                                data = "当前页解析失败",
-                                type = ReflowBean.TYPE_STRING,
-                                page = startPage.toString()
-                            )
-                        )
-                    }
-
-                    try {
-                        println("TTS: 开始后台解析整个文档，共${totalPages}页")
-                        val allTexts = imageDecoder.decodeReflowAllPages()
-
-                        cacheBean = ReflowCacheLoader.saveReflowToFile(
-                            totalPages,
-                            imageDecoder.file,
-                            allTexts
-                        )
-                        imageDecoder.cacheBean = cacheBean
-
-                        for (pageIndex in (startPage + 1) until allTexts.size) {
-                            val pageText = allTexts[pageIndex]
-                            speechService.addToQueue(pageText)
-                        }
-
-                        val queueSize = speechService.getQueueSize()
-                        println("TTS: 解析完成，队列中共有$queueSize 个文本段落")
-                    } catch (e: Exception) {
-                        println("TTS: 解析失败: ${e.message}")
-                    }
+                    println("TTS: 解析完成，队列中共有$queueSize 个文本段落")
+                } catch (e: Exception) {
+                    println("TTS: 解析失败: ${e.message}")
                 }
-            } catch (e: Exception) {
-                println("TTS: 朗读初始化失败: ${e.message}")
-                speechService.addToQueue(
-                    ReflowBean(
-                        data = "文本解码失败，无法朗读",
-                        type = ReflowBean.TYPE_STRING,
-                        page = startPage.toString()
-                    )
-                )
             }
+        } catch (e: Exception) {
+            println("TTS: 朗读初始化失败: ${e.message}")
+            speechService.addToQueue(
+                ReflowBean(
+                    data = "文本解码失败，无法朗读",
+                    type = ReflowBean.TYPE_STRING,
+                    page = startPage.toString()
+                )
+            )
         }
     }
 }

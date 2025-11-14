@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
-import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
@@ -18,8 +17,10 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.SmartCropUtils
+import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import com.artifex.mupdf.fitz.Page
 import java.io.File
 
@@ -49,14 +50,14 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
-    public var cacheBean: ReflowCacheBean? = null
+    public override var cacheBean: ReflowCacheBean? = null
+    public override var filePath: String? = null
 
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
 
-    public companion object{
-
+    public companion object {
         /**
          * 渲染封面页面，根据高宽比进行特殊处理
          */
@@ -107,6 +108,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             throw SecurityException("无法读取文档文件: ${file.absolutePath}")
         }
 
+        filePath = file.absolutePath
         djvuLoader = DjvuLoader()
 
         originalPageSizes = prepareSizes()
@@ -146,100 +148,18 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        /*val path = file.absolutePath
+        val path = file.absolutePath
         try {
-            if (null != ImageCache.acquirePage(path)) {
+            if (null == djvuLoader || null != ImageCache.acquirePage(path)) {
                 return
             }
-            val page = djvuLoader!!.getPageInfo(0)
-            val bitmap = renderCoverPage(page)
+            val bitmap = renderCoverPage(djvuLoader!!, 160, 200)
 
-            CustomImageFetcher.cacheBitmap(bitmap, path)
+            CustomImageFetcher.cacheBitmap(bitmap?.asAndroidBitmap(), path)
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
-        }*/
-    }
-
-    /**
-     * 渲染封面页面，根据高宽比进行特殊处理
-     */
-    /*private fun renderCoverPage(page: Page): Bitmap {
-        val pWidth = page.bounds.x1 - page.bounds.x0
-        val pHeight = page.bounds.y1 - page.bounds.y0
-
-        // 目标尺寸
-        val targetWidth = 160
-        val targetHeight = 200
-
-        // 检查是否为极端长宽比的图片（某边大于8000）
-        return if (pWidth > 8000 || pHeight > 8000) {
-            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
-            val scale = if (pWidth > pHeight) {
-                targetWidth.toFloat() / pWidth
-            } else {
-                targetHeight.toFloat() / pHeight
-            }
-
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
-
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-            println("large.width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
-            val cropCtm = Matrix()
-            cropCtm.scale(scale, scale)
-            page.run(cropDev, cropCtm, null)
-            cropDev.close()
-            cropDev.destroy()
-            cropBitmap
-        } else if (pWidth > pHeight) {
-            // 对于宽大于高的页面，按最大比例缩放后截取
-            val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
-
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
-
-            // 确保裁剪区域不超过目标尺寸
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-
-            println("wide.width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
-            val cropCtm = Matrix()
-            cropCtm.scale(scale, scale)
-            page.run(cropDev, cropCtm, null)
-            cropDev.close()
-            cropDev.destroy()
-            cropBitmap
-        } else {
-            // 原始逻辑处理其他情况
-            val xscale = targetWidth.toFloat() / pWidth
-            val yscale = targetHeight.toFloat() / pHeight
-
-            // 使用最大比例以确保填充整个目标区域
-            val scale = maxOf(xscale, yscale)
-
-            val scaledWidth = (pWidth * scale).toInt()
-            val scaledHeight = (pHeight * scale).toInt()
-
-            // 确保裁剪区域不超过目标尺寸
-            val cropWidth = maxOf(targetWidth, scaledWidth)
-            val cropHeight = maxOf(targetHeight, scaledHeight)
-
-            println("width-height:$cropWidth-$cropHeight")
-            val cropBitmap = BitmapPool.acquire(cropWidth, cropHeight)
-            val cropDev = AndroidDrawDevice(cropBitmap, 0, 0, 0, 0, cropWidth, cropHeight)
-            val cropCtm = Matrix()
-            cropCtm.scale(scale, scale)
-            page.run(cropDev, cropCtm, null)
-            cropDev.close()
-            cropDev.destroy()
-            cropBitmap
         }
-    }*/
+    }
 
     override fun size(viewportSize: IntSize): IntSize {
         if ((imageSize == IntSize.Zero || viewSize != viewportSize)
@@ -344,7 +264,17 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     private fun prepareOutlines(): List<Item> {
-        return emptyList()
+        if (djvuLoader == null || !djvuLoader!!.isOpened) {
+            return emptyList()
+        }
+
+        try {
+            val djvuOutlines = djvuLoader!!.getOutline()
+            return convertDjvuOutlinesToItems(djvuOutlines)
+        } catch (e: Exception) {
+            println("Failed to load DjVu outlines: ${e.message}")
+            return emptyList()
+        }
     }
 
     /**
@@ -567,5 +497,88 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     override fun getStructuredText(index: Int): Any? {
         return null
+    }
+
+    /**
+     * 解析单个页面的文本内容（用于TTS快速启动）
+     */
+    public override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
+        if (djvuLoader == null || !djvuLoader!!.isOpened) {
+            return null
+        }
+
+        if (pageIndex < 0 || pageIndex >= originalPageSizes.size) {
+            return null
+        }
+
+        return try {
+            val text = djvuLoader!!.getPageText(pageIndex)
+
+            if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                val pageText = text.trim()
+                if (pageText.length > 10) {
+                    ReflowBean(
+                        data = pageText,
+                        type = ReflowBean.TYPE_STRING,
+                        page = pageIndex.toString()
+                    )
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            println("TTS: 解码第${pageIndex + 1}页失败: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * 解析所有页面的文本内容（用于TTS后台缓存）
+     */
+    public override fun decodeReflowAllPages(): List<ReflowBean> {
+        if (djvuLoader == null || !djvuLoader!!.isOpened) {
+            return emptyList()
+        }
+
+        val totalPages = originalPageSizes.size
+        println("TTS: 开始解析所有页面，共${totalPages}页")
+        val allTexts = mutableListOf<ReflowBean>()
+
+        var addedPages = 0
+        var skippedPages = 0
+
+        for (currentPage in 0 until totalPages) {
+            try {
+                val text = djvuLoader!!.getPageText(currentPage)
+
+                if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                    val pageText = text.trim()
+                    if (pageText.length > 10) { // 只添加有意义的文本
+                        allTexts.add(
+                            ReflowBean(
+                                data = pageText,
+                                type = ReflowBean.TYPE_STRING,
+                                page = currentPage.toString()
+                            )
+                        )
+                        addedPages++
+                    } else {
+                        println("TTS: 第${currentPage + 1}页文本太短: ${pageText.length}")
+                        skippedPages++
+                    }
+                } else {
+                    println("TTS: 第${currentPage + 1}页无文本内容")
+                    skippedPages++
+                }
+            } catch (e: Exception) {
+                println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                skippedPages++
+            }
+        }
+
+        println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
+        return allTexts
     }
 }

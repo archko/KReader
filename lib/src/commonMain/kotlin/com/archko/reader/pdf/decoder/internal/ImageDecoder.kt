@@ -7,6 +7,8 @@ import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.entity.ReflowCacheBean
 
 /**
  * @author: archko 2025/4/11 :15:51
@@ -18,6 +20,8 @@ public interface ImageDecoder {
     public var originalPageSizes: List<Size>
     public var outlineItems: List<Item>?
     public val aPageList: MutableList<APage>?
+    public var cacheBean: ReflowCacheBean?
+    public var filePath: String?
 
     /** Size of the full image, without any scaling applied. */
     public var imageSize: IntSize
@@ -57,4 +61,14 @@ public interface ImageDecoder {
     public fun close()
 
     public fun getStructuredText(index: Int): Any?
+
+    /**
+     * 解析单个页面的文本内容（用于TTS快速启动）
+     */
+    public fun decodeReflowSinglePage(pageIndex: Int): ReflowBean?
+
+    /**
+     * 解析所有页面的文本内容（用于TTS后台缓存）
+     */
+    public fun decodeReflowAllPages(): List<ReflowBean>
 }

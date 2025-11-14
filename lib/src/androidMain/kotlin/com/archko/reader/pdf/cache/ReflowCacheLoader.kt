@@ -25,8 +25,9 @@ public object ReflowCacheLoader {
      * @param file 原始PDF文件
      * @return ReflowCacheBean 如果缓存有效，否则返回null
      */
-    public fun loadReflowFromFile(pageCount: Int, file: File): ReflowCacheBean? {
+    public fun loadReflowFromFile(pageCount: Int, path: String?): ReflowCacheBean? {
         return try {
+            val file = File(path)
             val fileSize = file.length()
             val cacheFile = getCacheFile(file)
 
@@ -70,10 +71,11 @@ public object ReflowCacheLoader {
      */
     public fun saveReflowToFile(
         totalPages: Int,
-        file: File,
+        path: String?,
         reflowTexts: List<ReflowBean>
     ): ReflowCacheBean? {
         try {
+            val file = File(path)
             val cacheFile = getCacheFile(file)
             val cacheDir = cacheFile.parentFile
 

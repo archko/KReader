@@ -13,6 +13,8 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.entity.ReflowCacheBean
 import java.io.File
 import java.io.FileInputStream
 
@@ -40,6 +42,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     // 缓存BitmapRegionDecoder，避免重复创建，限制数量为10个
     private val regionDecoders = mutableMapOf<Int, BitmapRegionDecoder>()
     private val maxRegionDecoders = 10
+    public override var cacheBean: ReflowCacheBean? = null
+    public override var filePath: String? = null
 
     init {
         if (files.isEmpty()) {
@@ -316,5 +320,13 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
     override fun getStructuredText(index: Int): Any? {
         return null
+    }
+
+    override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
+        return null
+    }
+
+    override fun decodeReflowAllPages(): List<ReflowBean> {
+        return emptyList()
     }
 } 

@@ -15,6 +15,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
@@ -48,7 +49,8 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
-    public var cacheBean: ReflowCacheBean? = null
+    public override var cacheBean: ReflowCacheBean? = null
+    public override var filePath: String? = null
 
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
@@ -105,6 +107,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             throw SecurityException("无法读取文档文件: ${file.absolutePath}")
         }
 
+        filePath = file.absolutePath
         djvuLoader = DjvuLoader()
 
         originalPageSizes = prepareSizes()
@@ -112,6 +115,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
         initPageSizeBean()
         cacheCoverIfNeeded()
+        decodeReflowAllPages()
     }
 
     private fun initPageSizeBean() {
@@ -511,5 +515,88 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     override fun getStructuredText(index: Int): Any? {
         return null
+    }
+
+    /**
+     * 解析单个页面的文本内容（用于TTS快速启动）
+     */
+    public override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
+        if (djvuLoader == null || !djvuLoader!!.isOpened) {
+            return null
+        }
+
+        if (pageIndex < 0 || pageIndex >= originalPageSizes.size) {
+            return null
+        }
+
+        return try {
+            val text = djvuLoader!!.getPageText(pageIndex)
+
+            if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                val pageText = text.trim()
+                if (pageText.length > 10) {
+                    ReflowBean(
+                        data = pageText,
+                        type = ReflowBean.TYPE_STRING,
+                        page = pageIndex.toString()
+                    )
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            println("TTS: 解码第${pageIndex + 1}页失败: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * 解析所有页面的文本内容（用于TTS后台缓存）
+     */
+    public override fun decodeReflowAllPages(): List<ReflowBean> {
+        if (djvuLoader == null || !djvuLoader!!.isOpened) {
+            return emptyList()
+        }
+
+        val totalPages = originalPageSizes.size
+        println("TTS: 开始解析所有页面，共${totalPages}页")
+        val allTexts = mutableListOf<ReflowBean>()
+
+        var addedPages = 0
+        var skippedPages = 0
+
+        for (currentPage in 0 until totalPages) {
+            try {
+                val text = djvuLoader!!.getPageText(currentPage)
+
+                if (null != text && text.isNotEmpty() && text.isNotBlank()) {
+                    val pageText = text.trim()
+                    if (pageText.length > 10) { // 只添加有意义的文本
+                        allTexts.add(
+                            ReflowBean(
+                                data = pageText,
+                                type = ReflowBean.TYPE_STRING,
+                                page = currentPage.toString()
+                            )
+                        )
+                        addedPages++
+                    } else {
+                        println("TTS: 第${currentPage + 1}页文本太短: ${pageText.length}")
+                        skippedPages++
+                    }
+                } else {
+                    println("TTS: 第${currentPage + 1}页无文本内容")
+                    skippedPages++
+                }
+            } catch (e: Exception) {
+                println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                skippedPages++
+            }
+        }
+
+        println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
+        return allTexts
     }
 }
