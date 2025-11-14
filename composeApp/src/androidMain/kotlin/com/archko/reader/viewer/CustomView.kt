@@ -455,7 +455,7 @@ fun CustomView(
                 ReflowView(
                     decoder = decoder!!,
                     pageCount = pageCount,
-                    onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder) onSaveDocument else null,
+                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
                     onCloseDocument = {
                         println("onCloseDocument.isReflow:$isReflow")
                         if (!isReflow) {
@@ -489,7 +489,7 @@ fun CustomView(
                     state = decoder!!,
                     jumpToPage = jumpToPage,
                     initialOrientation = orientation,
-                    onSaveDocument = if (list.isNotEmpty() && decoder is PdfDecoder) onSaveDocument else null,
+                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
                     onCloseDocument = {
                         println("onCloseDocument.isReflow:$isReflow")
                         if (!isReflow) {
