@@ -533,7 +533,7 @@ public fun DesktopDocumentView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Transparent)
-                .pointerInput("tap_gestures") {
+                .pointerInput("tap_and_double_tap_gestures") {
                     detectTapGestures(
                         onTap = { offsetTap ->
                             focusRequester.requestFocus()
@@ -580,11 +580,7 @@ public fun DesktopDocumentView(
                                     onTapNonPageArea?.invoke(clickedPage)
                                 }
                             }
-                        }
-                    )
-                }
-                .pointerInput("double_tap_gestures") {
-                    detectTapGestures(
+                        },
                         onDoubleTap = { offsetTap ->
                             focusRequester.requestFocus()
                             val y = offsetTap.y

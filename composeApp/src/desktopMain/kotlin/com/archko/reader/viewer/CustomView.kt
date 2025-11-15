@@ -530,9 +530,7 @@ fun CustomView(
                                 scope.launch {
                                     toaster.show(
                                         message = getString(Res.string.current_page)
-                                            .format(
-                                                clickedPageIndex + 1
-                                            ),
+                                            .format(clickedPageIndex + 1, pageCount),
                                         type = ToastType.Error,
                                     )
                                 }
