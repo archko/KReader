@@ -96,6 +96,17 @@
     <string name="merge_error">合并失败!</string>
     <string name="merge_select_pdf">选择Pdf</string>
 
+    <string name="convert_title">转换为Epub</string>
+    <string name="convert_tip">支持mobi, azw3转换为epub</string>
+    <string name="convert_btn">转换</string>
+    <string name="convert_to_filename">Epub文件名</string>
+    <string name="convert_select_file">选择文件</string>
+    <string name="convert_enter_epub_filename">输入Epub文件名</string>
+    <string name="convert_select_to_create_epub">请选择mobi,azw3来创建Epub</string>
+    <string name="convert_doing">转换中...</string>
+    <string name="convert_successfully">转换成功%s本, 保存在%s</string>
+    <string name="convert_error">转换失败!</string>
+
     <string name="tts_setting_title">语音设置</string>
     <string name="tts_queue_title">朗读队列</string>
     <string name="tts_empty_queue">队列为空</string>

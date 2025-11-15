@@ -334,7 +334,52 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         if (linksCache.containsKey(pageIndex)) {
             return linksCache[pageIndex]!!
         }
-        return linksCache[pageIndex]!!
+        return try {
+            val links = djvuLoader!!.getPageLinks(pageIndex)
+
+            if (links == null) {
+                linksCache[pageIndex] = emptyList()
+                return emptyList()
+            }
+
+            val hyperlinks = mutableListOf<Hyperlink>()
+
+            for (link in links) {
+                val hyperlink = Hyperlink()
+                hyperlink.bbox = androidx.compose.ui.geometry.Rect(
+                    link.x.toFloat(),
+                    link.y.toFloat(),
+                    (link.x + link.width).toFloat(),
+                    (link.y + link.height).toFloat()
+                )
+
+                if (link.page >= 0) {
+                    // 页面链接
+                    hyperlink.linkType = Hyperlink.LINKTYPE_PAGE
+                    hyperlink.page = link.page
+                    hyperlink.url = null
+                } else if (link.url != null) {
+                    // URL链接
+                    hyperlink.linkType = Hyperlink.LINKTYPE_URL
+                    hyperlink.url = link.url
+                    hyperlink.page = -1
+                } else {
+                    // 无效链接，跳过
+                    continue
+                }
+
+                hyperlinks.add(hyperlink)
+            }
+
+            // 缓存结果
+            linksCache[pageIndex] = hyperlinks
+            println("DjvuDecoder.decodePageLinks: page=$pageIndex, links=${hyperlinks.size}")
+
+            hyperlinks
+        } catch (e: Exception) {
+            println("获取页面链接失败: $e")
+            emptyList()
+        }
     }
 
     public override fun renderPageRegion(
@@ -399,6 +444,9 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                     scale,
                 )
 
+                // 在解码缩略图时同时解析链接
+                parseLinksIfNeeded(index, false, true)
+
                 return bitmap?.asImageBitmap() ?: ImageBitmap(
                     outWidth,
                     outHeight,
@@ -426,6 +474,9 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                     outHeight,
                     ImageBitmapConfig.Rgb565
                 )
+
+                // 在解码缩略图时同时解析链接
+                parseLinksIfNeeded(index, false, true)
 
                 // 如果启用了切边功能但没有cropBounds，检测并设置
                 if (crop && bitmap != null) {

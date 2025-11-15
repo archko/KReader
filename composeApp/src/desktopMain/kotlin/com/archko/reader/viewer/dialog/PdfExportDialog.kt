@@ -147,7 +147,6 @@ fun PdfExportDialog(
                         message = getString(Res.string.images_export_success).format(outputDir),
                         type = ToastType.Success,
                     )
-                    onDismiss()
                 }
 
                 -2 -> {
@@ -206,7 +205,6 @@ fun PdfExportDialog(
                     message = getString(Res.string.html_export_success).format(outputPath),
                     type = ToastType.Success,
                 )
-                onDismiss()
             } else {
                 toaster.show(
                     message = getString(Res.string.html_export_failed),

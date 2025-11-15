@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.archko.reader.viewer.dialog.ConvertToEpubDialog
 import com.archko.reader.viewer.dialog.PdfCreateDialog
 import com.archko.reader.viewer.dialog.PdfEncryptDialog
 import com.archko.reader.viewer.dialog.PdfExportDialog
@@ -42,6 +43,7 @@ import kreader.composeapp.generated.resources.about
 import kreader.composeapp.generated.resources.about_content
 import kreader.composeapp.generated.resources.about_kreader
 import kreader.composeapp.generated.resources.app_author
+import kreader.composeapp.generated.resources.convert_title
 import kreader.composeapp.generated.resources.create_pdf
 import kreader.composeapp.generated.resources.encrypt_decrypt_title
 import kreader.composeapp.generated.resources.export_pdf
@@ -134,6 +136,7 @@ fun SettingCategory() {
     var showPdfEncryptDialog by remember { mutableStateOf(false) }
     var showPdfSplitDialog by remember { mutableStateOf(false) }
     var showPdfMergeDialog by remember { mutableStateOf(false) }
+    var showPdfConvertDialog by remember { mutableStateOf(false) }
     var showTtsDialog by remember { mutableStateOf(false) }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -170,6 +173,13 @@ fun SettingCategory() {
         SettingItem(
             title = stringResource(Res.string.merge_title),
             onClick = { showPdfMergeDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.convert_title),
+            onClick = { showPdfConvertDialog = true }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -219,6 +229,13 @@ fun SettingCategory() {
     if (showPdfMergeDialog) {
         PdfMergeDialog (
             onDismiss = { showPdfMergeDialog = false }
+        )
+    }
+
+    // convert epub Dialog
+    if (showPdfConvertDialog) {
+        ConvertToEpubDialog (
+            onDismiss = { showPdfConvertDialog = false }
         )
     }
 

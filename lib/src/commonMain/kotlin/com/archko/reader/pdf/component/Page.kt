@@ -149,7 +149,7 @@ public class Page(
         val pdfPoint = screenToPdfPoint(screenX, screenY)
         val startPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
 
-        val structText = structuredText ?: return false
+        structuredText ?: return false
 
         // 开始选择时不立即高亮，等待拖拽
         isSelecting = true
@@ -410,21 +410,13 @@ public class Page(
                     dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
                 )
 
-                // 加载链接（在缩略图加载完成后）
                 if (!linksLoaded) {
                     loadLinks()
                 }
-
-                // 绘制链接区域（调试用，可以注释掉）
-                drawLinks(drawScope, currentBounds, scaleRatio)
-
-                // 绘制文本选择高亮
-                drawTextSelection(drawScope, currentBounds, scaleRatio)
             }
         }
 
         // 无论是否可见，都要调用node.draw（包括预加载区域）
-        // node.draw内部会判断是否真正绘制
         nodes.forEach { node ->
             node.draw(
                 drawScope,
@@ -438,9 +430,14 @@ public class Page(
 
         // 绘制分割线
         if (isActuallyVisible) {
-            drawSeparator(drawScope, currentBounds)
-            
-            drawSpeakingIndicator(drawScope, currentBounds)
+            thumbBitmapState?.let { _ ->
+                drawLinks(drawScope, currentBounds, scaleRatio)
+
+                // 绘制文本选择高亮
+                drawTextSelection(drawScope, currentBounds, scaleRatio)
+                drawSpeakingIndicator(drawScope, currentBounds)
+                drawSeparator(drawScope, currentBounds)
+            }
         }
     }
 
@@ -688,7 +685,7 @@ public class Page(
                 newNodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
             }
         }
-        nodes.forEach { it -> it.recycle() }
+        nodes.forEach { it.recycle() }
         nodes = newNodes
     }
 
@@ -756,7 +753,6 @@ public class Page(
     public companion object {
         private const val MIN_BLOCK_SIZE = 256f * 3f // 768
         private const val MAX_BLOCK_SIZE = 256f * 4f // 1024
-        private const val THUMB_RATIO = 4 //
     }
 }
 

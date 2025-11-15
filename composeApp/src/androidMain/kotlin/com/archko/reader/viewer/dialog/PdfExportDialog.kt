@@ -162,7 +162,6 @@ fun PdfExportDialog(
                         Toast.LENGTH_LONG
                     )
                         .show()
-                    onDismiss()
                 }
 
                 -2 -> {
@@ -229,7 +228,6 @@ fun PdfExportDialog(
                     Toast.LENGTH_LONG
                 )
                     .show()
-                onDismiss()
             } else {
                 Toast.makeText(
                     context,

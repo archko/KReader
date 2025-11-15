@@ -1,5 +1,6 @@
 package com.archko.reader.viewer.dialog
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,26 +35,39 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil3.compose.AsyncImage
+import com.archko.reader.pdf.PdfApp
+import com.archko.reader.pdf.util.FileUtils
+import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
-import com.dokar.sonner.ToastType
-import com.dokar.sonner.Toaster
-import com.dokar.sonner.rememberToasterState
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.convert_btn
+import kreader.composeapp.generated.resources.convert_doing
+import kreader.composeapp.generated.resources.convert_enter_epub_filename
+import kreader.composeapp.generated.resources.convert_error
+import kreader.composeapp.generated.resources.convert_select_file
+import kreader.composeapp.generated.resources.convert_select_to_create_epub
+import kreader.composeapp.generated.resources.convert_successfully
+import kreader.composeapp.generated.resources.convert_tip
+import kreader.composeapp.generated.resources.convert_title
+import kreader.composeapp.generated.resources.convert_to_filename
+import kreader.composeapp.generated.resources.delete
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_delete
+import kreader.composeapp.generated.resources.ic_menu
+import kreader.composeapp.generated.resources.please_select_images_first
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -63,76 +76,88 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.io.File
 
 @Composable
-fun PdfCreateDialog(
+fun ConvertToEpubDialog(
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val toaster = rememberToasterState()
 
-    var selectedImages by remember { mutableStateOf<List<String>>(emptyList()) }
-    var pdfName by remember { mutableStateOf("") }
+    var selectedFiles by remember { mutableStateOf<List<String>>(emptyList()) }
+    var outName by remember { mutableStateOf("") }
     var isCreating by remember { mutableStateOf(false) }
 
-    val imagePickerLauncher = rememberFilePickerLauncher(
-        type = FilePickerFileType.Image,
+    val filePickerLauncher = rememberFilePickerLauncher(
+        type = FilePickerFileType.All,
         selectionMode = FilePickerSelectionMode.Multiple
     ) { files ->
         scope.launch {
-            val imagePaths = files.map { it.file.absolutePath }
-            // 按修改时间倒序排序
-            val sortedPaths = imagePaths.sortedByDescending { File(it).lastModified() }
-            selectedImages = selectedImages + sortedPaths
+            val filePaths = files.mapNotNull {
+                IntentFile.getPath(PdfApp.app!!, it.uri)
+            }.filter { path ->
+                // 手动过滤 mobi 和 azw3 文件
+                path.endsWith(".mobi", ignoreCase = true) || 
+                path.endsWith(".azw3", ignoreCase = true)
+            }
+            
+            if (filePaths.isNotEmpty()) {
+                selectedFiles = selectedFiles + filePaths
+            } else {
+                Toast.makeText(
+                    context,
+                    getString(Res.string.convert_select_to_create_epub),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
     fun selectImages() {
-        imagePickerLauncher.launch()
+        filePickerLauncher.launch()
     }
 
-    fun createPdf() {
+    fun convert() {
         scope.launch {
-            if (selectedImages.isEmpty()) {
-                toaster.show(
-                    message = getString(Res.string.please_select_images_first),
-                    type = ToastType.Error,
-                )
+            if (selectedFiles.isEmpty()) {
+                Toast.makeText(
+                    context,
+                    getString(Res.string.please_select_images_first),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@launch
             }
 
-            var name = pdfName.trim()
+            var name = outName.trim()
             if (name.isEmpty()) {
-                name = "new.pdf"
+                name = "new.epub"
             }
-            if (!name.endsWith(".pdf")) {
-                name = "$name.pdf"
+            if (!name.endsWith(".epub")) {
+                name = "$name.epub"
             }
 
-            val path = System.getProperty("user.home") + File.separator + name
+            val dir = FileUtils.getStorageDir("book").absolutePath
+            val path = dir + File.separator + name
 
             isCreating = true
             val result = withContext(Dispatchers.IO) {
-                PDFCreaterHelper.createPdfFromImages(path, selectedImages)
+                PDFCreaterHelper.convertToEpub(path, selectedFiles)
             }
             isCreating = false
-            if (result) {
-                toaster.show(
-                    message = getString(Res.string.pdf_created_successfully),
-                    type = ToastType.Success,
-                )
+            if (result > 0) {
+                Toast.makeText(
+                    context,
+                    getString(Res.string.convert_successfully)
+                        .format(result, dir),
+                    Toast.LENGTH_SHORT
+                ).show()
             } else {
-                toaster.show(
-                    message = getString(Res.string.pdf_creation_failed),
-                    type = ToastType.Error,
-                )
+                Toast.makeText(
+                    context,
+                    getString(Res.string.convert_error),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
-
-    Toaster(
-        state = toaster,
-        maxVisibleToasts = 1,
-        alignment = Alignment.Center,
-    )
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -167,7 +192,7 @@ fun PdfCreateDialog(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = stringResource(Res.string.create_pdf),
+                            text = stringResource(Res.string.convert_title),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
@@ -179,10 +204,10 @@ fun PdfCreateDialog(
                             .padding(20.dp)
                     ) {
                         OutlinedTextField(
-                            value = pdfName,
-                            onValueChange = { pdfName = it },
-                            label = { Text(stringResource(Res.string.pdf_filename)) },
-                            placeholder = { Text(stringResource(Res.string.enter_pdf_filename)) },
+                            value = outName,
+                            onValueChange = { outName = it },
+                            label = { Text(stringResource(Res.string.convert_to_filename)) },
+                            placeholder = { Text(stringResource(Res.string.convert_enter_epub_filename)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -198,13 +223,13 @@ fun PdfCreateDialog(
                                 modifier = Modifier.weight(1f),
                                 enabled = !isCreating
                             ) {
-                                Text(stringResource(Res.string.select_images))
+                                Text(stringResource(Res.string.convert_select_file))
                             }
 
                             Button(
-                                onClick = { createPdf() },
+                                onClick = { convert() },
                                 modifier = Modifier.weight(1f),
-                                enabled = selectedImages.isNotEmpty() && !isCreating
+                                enabled = selectedFiles.isNotEmpty() && !isCreating
                             ) {
                                 if (isCreating) {
                                     CircularProgressIndicator(
@@ -212,20 +237,18 @@ fun PdfCreateDialog(
                                         color = MaterialTheme.colorScheme.onPrimary
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(Res.string.creating))
+                                    Text(stringResource(Res.string.convert_doing))
                                 } else {
-                                    Text(stringResource(Res.string.create_pdf_button))
+                                    Text(stringResource(Res.string.convert_btn))
                                 }
                             }
                         }
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        if (selectedImages.isNotEmpty()) {
+                        if (selectedFiles.isNotEmpty()) {
                             Text(
-                                text = stringResource(Res.string.selected_images_count).format(
-                                    selectedImages.size
-                                ),
+                                text = stringResource(Res.string.convert_tip),
                                 style = TextStyle(
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
@@ -238,7 +261,7 @@ fun PdfCreateDialog(
                             val reorderableLazyListState = rememberReorderableLazyListState(
                                 lazyListState = lazyListState,
                                 onMove = { from, to ->
-                                    selectedImages = selectedImages.toMutableList().apply {
+                                    selectedFiles = selectedFiles.toMutableList().apply {
                                         add(to.index, removeAt(from.index))
                                     }
                                 }
@@ -250,7 +273,7 @@ fun PdfCreateDialog(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 itemsIndexed(
-                                    selectedImages,
+                                    selectedFiles,
                                     key = { _, item -> item }) { index, imagePath ->
                                     ReorderableItem(
                                         state = reorderableLazyListState,
@@ -262,8 +285,8 @@ fun PdfCreateDialog(
                                             isDragging = isDragging,
                                             dragModifier = Modifier.draggableHandle(),
                                             onRemove = {
-                                                selectedImages =
-                                                    selectedImages.filter { it != imagePath }
+                                                selectedFiles =
+                                                    selectedFiles.filter { it != imagePath }
                                             }
                                         )
                                     }
@@ -277,7 +300,7 @@ fun PdfCreateDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = stringResource(Res.string.select_images_to_create_pdf),
+                                    text = stringResource(Res.string.convert_select_to_create_epub),
                                     style = TextStyle(
                                         fontSize = 16.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -328,17 +351,6 @@ private fun ImageItem(
             )
 
             Spacer(modifier = Modifier.width(8.dp))
-
-            AsyncImage(
-                model = File(imagePath),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
 
             Column(
                 modifier = Modifier.weight(1f)

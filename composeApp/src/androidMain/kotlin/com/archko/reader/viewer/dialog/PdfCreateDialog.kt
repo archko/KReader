@@ -150,7 +150,6 @@ fun PdfCreateDialog(
                     getString(Res.string.pdf_created_successfully),
                     Toast.LENGTH_SHORT
                 ).show()
-                onDismiss()
             } else {
                 Toast.makeText(
                     context,

@@ -95,6 +95,17 @@
     <string name="merge_error">Merge Error!</string>
     <string name="merge_select_pdf">Select Pdf</string>
 
+    <string name="convert_title">Convert to Epub</string>
+    <string name="convert_tip">mobi, azw3 convert to epub</string>
+    <string name="convert_btn">Convert</string>
+    <string name="convert_to_filename">Epub name</string>
+    <string name="convert_select_file">Select File</string>
+    <string name="convert_enter_epub_filename">Enter Epub Name</string>
+    <string name="convert_select_to_create_epub">Please select mobi, azw3</string>
+    <string name="convert_doing">Converting...</string>
+    <string name="convert_successfully">Convert successfully %s, Saved to:%s</string>
+    <string name="convert_error">Convert failed!</string>
+
     <string name="tts_setting_title">Tts Setting</string>
     <string name="tts_queue_title">Queue</string>
     <string name="tts_empty_queue">Empty Queue</string>

@@ -1,6 +1,8 @@
 package com.archko.reader.viewer.utils
 
 import com.archko.reader.image.HeifLoader
+import com.archko.reader.image.MobiConverter
+import com.archko.reader.image.MobiMetadata
 import com.archko.reader.pdf.cache.FileUtils
 import com.artifex.mupdf.fitz.ColorSpace
 import com.artifex.mupdf.fitz.Document
@@ -703,6 +705,66 @@ object PDFCreaterHelper {
             return successCount
         } catch (e: Exception) {
             System.err.println("合并PDF时出错: ${e.message}")
+            e.printStackTrace()
+            return -1
+        }
+    }
+
+    fun convertToEpub(
+        outputFile: String,
+        files: List<String>
+    ): Int {
+        try {
+            if (files.isEmpty()) {
+                System.err.println("没有要转换的文件")
+                return -1
+            }
+
+            var count = 0
+            for (path in files) {
+                try {
+                    val converter = MobiConverter()
+
+                    // 测试1: 验证文件
+                    println("=== 测试1: 验证 MOBI 文件 ===")
+                    val isValid: Boolean = converter.isValidMobiFile(path)
+                    println("文件有效性: " + (if (isValid) "✓ 有效" else "✗ 无效"))
+
+                    if (!isValid) {
+                        System.err.println("文件无效，退出测试")
+                        System.exit(1)
+                    }
+
+                    // 测试2: 获取元数据
+                    println("\n=== 测试2: 获取文件元数据 ===")
+                    val metadata: MobiMetadata? = converter.getMetadata(path)
+                    if (metadata != null) {
+                        println("标题: " + metadata.title)
+                        println("作者: " + metadata.author)
+                        println("出版社: " + metadata.publisher)
+                        println("语言: " + metadata.language)
+                        println("有封面: " + metadata.hasCover)
+                        //println("有目录: " + metadata.hasToc)
+                    } else {
+                        println("✗ 无法获取元数据")
+                    }
+
+                    // 测试3: 转换为 EPUB
+                    println("\n=== 测试3: 转换为 EPUB ===")
+
+                    val success: Boolean = converter.convertToEpub(path, outputFile)
+                    println("输出路径: $outputFile, 结果:$success")
+                    if (success) {
+                        count++
+                    }
+                } catch (e: Exception) {
+                    System.err.println("转换为epub时出错: ${e.message}")
+                }
+            }
+
+            return count
+        } catch (e: Exception) {
+            System.err.println("转换为epub时出错: ${e.message}")
             e.printStackTrace()
             return -1
         }
