@@ -39,7 +39,7 @@ public class APageSizeLoader {
             var pageSizeBean: PageSizeBean? = null
             try {
                 val size = file.length()
-                val saveFile = getCacheFile(file)
+                val saveFile = getPageCacheFile(file)
                 if (!saveFile.exists()) {
                     return null
                 }
@@ -61,7 +61,7 @@ public class APageSizeLoader {
             try {
                 val file = File(path)
                 val size = file.length()
-                val saveFile = getCacheFile(file)
+                val saveFile = getPageCacheFile(file)
                 if (!saveFile.exists()) {
                     return null
                 }
@@ -81,7 +81,7 @@ public class APageSizeLoader {
             list: MutableList<APage>?,
         ) {
             list?.run {
-                val saveFile = getCacheFile(file)
+                val saveFile = getPageCacheFile(file)
                 val content = toJson(crop, file.length(), list)
                 saveFile.writeText(content, Charsets.UTF_8)
             }
@@ -94,7 +94,7 @@ public class APageSizeLoader {
         ) {
             list?.run {
                 val file = File(path)
-                val saveFile = getCacheFile(file)
+                val saveFile = getPageCacheFile(file)
                 val content = toJson(crop, file.length(), list)
                 saveFile.writeText(content, Charsets.UTF_8)
             }
@@ -103,7 +103,7 @@ public class APageSizeLoader {
         public fun deletePageSizeFromFile(path: String?) {
             path?.run {
                 val file = File(path)
-                val saveFile = getCacheFile(file)
+                val saveFile = getPageCacheFile(file)
                 if (saveFile.exists()) {
                     saveFile.delete()
                 }
@@ -192,4 +192,4 @@ public class APageSizeLoader {
     }
 }
 
-public expect fun getCacheFile(file : File): File
+public expect fun getPageCacheFile(file : File): File

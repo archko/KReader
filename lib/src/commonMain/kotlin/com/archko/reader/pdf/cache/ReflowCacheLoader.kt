@@ -1,6 +1,5 @@
 package com.archko.reader.pdf.cache
 
-import com.archko.reader.pdf.cache.FileUtils.Companion.getCacheDirectory
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import kotlinx.serialization.json.Json
@@ -29,7 +28,7 @@ public object ReflowCacheLoader {
         return try {
             val file = File(path)
             val fileSize = file.length()
-            val cacheFile = getCacheFile(file)
+            val cacheFile = getReflowCacheFile(file)
 
             if (!cacheFile.exists()) {
                 println("ReflowCache: 缓存文件不存在: ${cacheFile.absolutePath}")
@@ -76,7 +75,7 @@ public object ReflowCacheLoader {
     ): ReflowCacheBean? {
         try {
             val file = File(path)
-            val cacheFile = getCacheFile(file)
+            val cacheFile = getReflowCacheFile(file)
             val cacheDir = cacheFile.parentFile
 
             if (cacheDir != null) {
@@ -109,7 +108,7 @@ public object ReflowCacheLoader {
      */
     public fun deleteReflowCache(file: File) {
         try {
-            val cacheFile = getCacheFile(file)
+            val cacheFile = getReflowCacheFile(file)
             if (cacheFile.exists()) {
                 cacheFile.delete()
                 println("ReflowCache: 删除缓存文件: ${cacheFile.absolutePath}")
@@ -151,14 +150,6 @@ public object ReflowCacheLoader {
         return cacheBean.reflow.subList(startIndex, cacheBean.reflow.size)
     }
 
-    /**
-     * 获取缓存文件路径
-     * @param file 原始PDF文件
-     * @return 缓存文件
-     */
-    public fun getCacheFile(file: File): File {
-        val cacheDir = getCacheDirectory("reflow")
-        val fileName = "${file.nameWithoutExtension}_reflow.json"
-        return File(cacheDir, fileName)
-    }
 }
+
+public expect fun getReflowCacheFile(file: File): File
