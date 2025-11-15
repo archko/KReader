@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.cache.APageSizeLoader
-import com.archko.reader.pdf.cache.APageSizeLoader.PageSizeBean
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
@@ -17,11 +16,11 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
+import com.archko.reader.pdf.entity.PageSizeBean
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
-import com.artifex.mupdf.fitz.Page
 import java.io.File
 
 /**
@@ -43,17 +42,12 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     public var viewSize: IntSize = IntSize.Zero
 
-    // 页面缓存，最多缓存8页
-    private val pageCache = mutableMapOf<Int, Page>()
-    private val maxPageCache = 8
-
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public override var cacheBean: ReflowCacheBean? = null
     public override var filePath: String? = null
 
-    // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
 
@@ -240,19 +234,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
-        // 清理页面缓存
-        pageCache.values.forEach { page ->
-            try {
-                page.destroy()
-            } catch (e: Exception) {
-                println("Error destroying cached page: $e")
-            }
-        }
-        pageCache.clear()
-
-        // 清理链接缓存
         linksCache.clear()
-
         ImageCache.clear()
     }
 
@@ -317,7 +299,6 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
      * @return 链接列表
      */
     public override fun getPageLinks(pageIndex: Int): List<Hyperlink> {
-        // 先检查缓存
         if (linksCache.containsKey(pageIndex)) {
             return linksCache[pageIndex]!!
         }
@@ -330,7 +311,6 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     private fun decodePageLinks(pageIndex: Int): List<Hyperlink> {
-        // 先检查缓存
         if (linksCache.containsKey(pageIndex)) {
             return linksCache[pageIndex]!!
         }
@@ -371,9 +351,8 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                 hyperlinks.add(hyperlink)
             }
 
-            // 缓存结果
             linksCache[pageIndex] = hyperlinks
-            println("DjvuDecoder.decodePageLinks: page=$pageIndex, links=${hyperlinks.size}")
+            //println("DjvuDecoder.decodePageLinks: page=$pageIndex, links=${hyperlinks.size}")
 
             hyperlinks
         } catch (e: Exception) {
