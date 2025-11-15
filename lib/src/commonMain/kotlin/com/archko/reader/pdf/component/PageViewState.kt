@@ -34,7 +34,7 @@ public class PageViewState(
     internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
-    
+
     // 正在朗读的页面索引，null 表示没有朗读
     public var speakingPageIndex: Int? by mutableStateOf(null)
         private set
@@ -95,7 +95,7 @@ public class PageViewState(
      * @return 预加载的屏幕数量
      */
     public fun getPreloadScreens(): Float = preloadScreens
-    
+
     /**
      * 更新正在朗读的页面索引
      * @param pageIndex 页面索引，null 表示没有朗读
@@ -129,21 +129,6 @@ public class PageViewState(
         } else {
             isVisibleWithPreload(viewSize, viewOffset, pixelRect, spec.page)
         }
-    }
-
-    private fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
-        // 获取画布的可视区域
-        val visibleRect = Rect(
-            left = -offset.x,
-            top = -offset.y,
-            right = viewSize.width - offset.x,
-            bottom = viewSize.height - offset.y
-        )
-
-        // 检查页面是否与可视区域相交
-        val visible = bounds.overlaps(visibleRect)
-        //println("page.draw.isStrictlyVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
-        return visible
     }
 
     private fun isVisibleWithPreload(
@@ -572,6 +557,24 @@ public class PageViewState(
                 println("PageViewState.handleLink: 未知链接类型: ${link.linkType}")
                 false
             }
+        }
+    }
+
+    public companion object{
+
+        public fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
+            // 获取画布的可视区域
+            val visibleRect = Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = viewSize.width - offset.x,
+                bottom = viewSize.height - offset.y
+            )
+
+            // 检查页面是否与可视区域相交
+            val visible = bounds.overlaps(visibleRect)
+            //println("page.draw.isStrictlyVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
+            return visible
         }
     }
 }
