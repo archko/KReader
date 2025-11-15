@@ -447,7 +447,7 @@ public class PageViewState(
             toRemove.forEach { key ->
                 // key格式: "index-bounds-scale"
                 val index = key.substringBefore("-").toIntOrNull() ?: return@forEach
-                val page = pages.getOrNull(index) as? Page ?: return@forEach
+                val page = pages.getOrNull(index) ?: return@forEach
                 page.recycle()
             }
             lastPageKeys = newPageKeys
@@ -481,7 +481,7 @@ public class PageViewState(
             toRemove.forEach { key ->
                 // key格式: "index-bounds-scale"
                 val index = key.substringBefore("-").toIntOrNull() ?: return@forEach
-                val page = pages.getOrNull(index) as? Page ?: return@forEach
+                val page = pages.getOrNull(index) ?: return@forEach
                 page.recycle()
             }
             lastPageKeys = newPageKeys

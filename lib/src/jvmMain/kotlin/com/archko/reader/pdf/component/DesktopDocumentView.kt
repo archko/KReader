@@ -31,6 +31,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.util.HyperLinkUtils
 import kotlin.math.max
 import kotlin.math.min
 
@@ -329,7 +330,7 @@ public fun DesktopDocumentView(
 
         pageViewState.onUrlLinkClick = { url ->
             println("DocumentView: URL链接点击，URL: $url")
-            // 这里可以添加打开URL的逻辑，比如调用系统浏览器
+            HyperLinkUtils.openSystemBrowser(url)
         }
     }
 

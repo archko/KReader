@@ -52,7 +52,8 @@ public object FileTypeUtils {
                     filePath.endsWith(".mobi") || filePath.endsWith(".xps") ||
                     filePath.endsWith(".fb") || filePath.endsWith(".fb2") ||
                     filePath.endsWith(".pptx") || filePath.endsWith(".docx") ||
-                    filePath.endsWith(".djvu") || filePath.endsWith(".djv")
+                    filePath.endsWith(".djvu") || filePath.endsWith(".djv") ||
+                    filePath.endsWith(".svg")
         }
     }
 

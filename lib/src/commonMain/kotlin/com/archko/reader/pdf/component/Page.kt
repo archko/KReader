@@ -407,7 +407,6 @@ public class Page(
         nodes.forEach { node ->
             node.draw(
                 drawScope,
-                offset,
                 currentWidth,
                 currentHeight,
                 currentBounds.left,
@@ -418,10 +417,10 @@ public class Page(
         // 绘制分割线
         if (isActuallyVisible) {
             thumbBitmapState?.let { _ ->
-                drawLinks(drawScope, currentBounds, scaleRatio)
+                drawLinks(drawScope, currentBounds)
 
                 // 绘制文本选择高亮
-                drawTextSelection(drawScope, currentBounds, scaleRatio)
+                drawTextSelection(drawScope, currentBounds)
                 drawSpeakingIndicator(drawScope, currentBounds)
                 drawSeparator(drawScope, currentBounds)
             }
@@ -431,7 +430,7 @@ public class Page(
     /**
      * 绘制链接区域
      */
-    private fun drawLinks(drawScope: DrawScope, currentBounds: Rect, scaleRatio: Float) {
+    private fun drawLinks(drawScope: DrawScope, currentBounds: Rect) {
         if (links.isEmpty()) return
 
         for (link in links) {
@@ -479,8 +478,8 @@ public class Page(
             }
 
             // 根据链接类型选择颜色
-            val linkColor = if (link.linkType == Hyperlink.LINKTYPE_PAGE) {
-                Color(0x40FFD700) // 半透明淡黄色
+            val linkColor = if (link.linkType == Hyperlink.LINKTYPE_URL) {
+                Color(0x66336EE5) // 半透明蓝色
             } else {
                 Color(0x40FFA500) // 半透明橙色
             }
@@ -496,7 +495,7 @@ public class Page(
     /**
      * 绘制文本选择高亮
      */
-    private fun drawTextSelection(drawScope: DrawScope, currentBounds: Rect, scaleRatio: Float) {
+    private fun drawTextSelection(drawScope: DrawScope, currentBounds: Rect) {
         val selection = currentSelection ?: return
         val textSelector = pageViewState.textSelector ?: return
         val selectionColor = Color(0x6633B5E5) // 半透明蓝色

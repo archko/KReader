@@ -25,8 +25,8 @@ public class MuPdfHtmlMerger public constructor() {
      * 移除div元素的width和height样式，使其自适应
      */
     private fun removeSizeAttributes(page: Element) {
-        val style: String? = page.attr("style")
-        if (style == null || style.isEmpty()) {
+        val style: String = page.attr("style")
+        if (style.isEmpty()) {
             return
         }
 
@@ -262,7 +262,7 @@ public class MuPdfHtmlMerger public constructor() {
 
         init {
             this.element = p
-            val style: String? = p.attr("style")
+            val style: String = p.attr("style")
 
             // 提取位置和行高
             this.top = extractValue(style, "top")
@@ -273,7 +273,7 @@ public class MuPdfHtmlMerger public constructor() {
             // 提取字体样式（从span中）
             val span: Element? = p.selectFirst("span")
             if (span != null) {
-                val spanStyle: String? = span.attr("style")
+                val spanStyle: String = span.attr("style")
                 this.fontFamily = extractFontFamily(spanStyle)
                 this.fontSize = extractValue(spanStyle, "font-size")
             } else {

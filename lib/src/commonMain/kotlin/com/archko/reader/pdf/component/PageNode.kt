@@ -3,7 +3,6 @@ package com.archko.reader.pdf.component
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -69,11 +68,9 @@ public class PageNode(
     /**
      * @param pageWidth page的缩放后的宽
      * @param pageHeight page的缩放后的高
-     * @param totalScale page当前显示的宽/页面原始的宽,包含了view的缩放值
      */
     public fun draw(
         drawScope: DrawScope,
-        offset: Offset,
         pageWidth: Float,
         pageHeight: Float,
         xOffset: Float,
