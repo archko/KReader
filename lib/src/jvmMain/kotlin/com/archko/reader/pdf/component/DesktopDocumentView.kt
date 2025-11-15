@@ -43,7 +43,7 @@ public fun DesktopDocumentView(
     list: MutableList<APage>,
     state: ImageDecoder,
     jumpToPage: Int? = null,
-    align: PdfViewState.Align = PdfViewState.Align.Top,
+    align: PageViewState.Align = PageViewState.Align.Top,
     initialOrientation: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -93,9 +93,9 @@ public fun DesktopDocumentView(
         }
     }
 
-    val pdfViewState = remember(list) {
-        println("DocumentView: 创建新的PdfViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PdfViewState(list, state, orientation, crop, textSelector)
+    val pageViewState = remember(list) {
+        println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
+        PageViewState(list, state, orientation, crop, textSelector)
     }
 
     // 文本选择相关状态
@@ -112,15 +112,15 @@ public fun DesktopDocumentView(
                 Key.Spacebar -> {
                     // 空格键翻页
                     if (orientation == Vertical) {
-                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                         val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
                         offset = Offset(offset.x, newY)
                     } else {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                         val newX = (offset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
@@ -133,22 +133,22 @@ public fun DesktopDocumentView(
                         val newX = (offset.x + viewSize.width - keepPx).coerceAtMost(0f)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
                 Key.PageDown -> {
                     // PageDown键向下翻页
                     if (orientation == Vertical) {
-                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                         val newY = (offset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
                         offset = Offset(offset.x, newY)
                     } else {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                         val newX = (offset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
@@ -161,22 +161,22 @@ public fun DesktopDocumentView(
                         val newX = (offset.x + 120f).coerceAtMost(0f)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
                 Key.DirectionDown -> {
                     // 下方向键滚动
                     if (orientation == Vertical) {
-                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                         val newY = (offset.y - 120f).coerceAtLeast(-maxY)
                         offset = Offset(offset.x, newY)
                     } else {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                         val newX = (offset.x - 120f).coerceAtLeast(-maxX)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
@@ -189,22 +189,22 @@ public fun DesktopDocumentView(
                         val newX = (offset.x + 120f).coerceAtMost(0f)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
                 Key.DirectionRight -> {
                     // 右方向键滚动
                     if (orientation == Vertical) {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                         val newX = (offset.x - 120f).coerceAtLeast(-maxX)
                         offset = Offset(newX, offset.y)
                     } else {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                         val newX = (offset.x - 120f).coerceAtLeast(-maxX)
                         offset = Offset(newX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
@@ -215,20 +215,20 @@ public fun DesktopDocumentView(
                     } else {
                         offset = Offset(0f, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
                 Key.NumPad1 -> {
                     // End键到底部
                     if (orientation == Vertical) {
-                        val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                        val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                         offset = Offset(offset.x, -maxY)
                     } else {
-                        val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                        val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                         offset = Offset(-maxX, offset.y)
                     }
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                     true
                 }
 
@@ -245,13 +245,13 @@ public fun DesktopDocumentView(
                                 centerY,
                                 vZoom,
                                 offset,
-                                pdfViewState,
+                                pageViewState,
                                 viewSize,
                                 orientation
                             ) { newOffset, newVZoom ->
                                 offset = newOffset
                                 vZoom = newVZoom
-                                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                                pageViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
                         }
                         true
@@ -271,13 +271,13 @@ public fun DesktopDocumentView(
                                 centerY,
                                 vZoom,
                                 offset,
-                                pdfViewState,
+                                pageViewState,
                                 viewSize,
                                 orientation
                             ) { newOffset, newVZoom ->
                                 offset = newOffset
                                 vZoom = newVZoom
-                                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                                pageViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
                         }
                         true
@@ -296,13 +296,13 @@ public fun DesktopDocumentView(
                                 centerY,
                                 vZoom,
                                 offset,
-                                pdfViewState,
+                                pageViewState,
                                 viewSize,
                                 orientation
                             ) { newOffset, newVZoom ->
                                 offset = newOffset
                                 vZoom = newVZoom
-                                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                                pageViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
                         }
                         true
@@ -317,17 +317,17 @@ public fun DesktopDocumentView(
     }
 
     // 设置页面跳转回调
-    LaunchedEffect(pdfViewState) {
-        pdfViewState.onPageLinkClick = { pageIndex ->
+    LaunchedEffect(pageViewState) {
+        pageViewState.onPageLinkClick = { pageIndex ->
             isJumping = true // 设置跳转标志
-            val targetPage = pdfViewState.pages[pageIndex]
+            val targetPage = pageViewState.pages[pageIndex]
             val newOffset = Offset(offset.x, -targetPage.bounds.top)
             offset = newOffset
-            pdfViewState.updateOffset(offset)
+            pageViewState.updateOffset(offset)
             isJumping = false
         }
 
-        pdfViewState.onUrlLinkClick = { url ->
+        pageViewState.onUrlLinkClick = { url ->
             println("DocumentView: URL链接点击，URL: $url")
             // 这里可以添加打开URL的逻辑，比如调用系统浏览器
         }
@@ -337,50 +337,50 @@ public fun DesktopDocumentView(
     LaunchedEffect(list) {
         if (viewSize != IntSize.Zero) {
             println("DocumentView: 更新ViewSize:$viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-            pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+            pageViewState.updateViewSize(viewSize, vZoom, orientation)
         }
     }
 
     // 监听外部参数的变化
-    LaunchedEffect(jumpToPage, initialOrientation, pdfViewState.init) {
-        //println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pdfViewState.init}")
+    LaunchedEffect(jumpToPage, initialOrientation, pageViewState.init) {
+        //println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pageViewState.init}")
 
-        if (initialOrientation != orientation && pdfViewState.init) {
+        if (initialOrientation != orientation && pageViewState.init) {
             isJumping = true // 设置跳转标志
             val firstPageIndex =
-                firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
+                firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
             println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$firstPageIndex")
             orientation = initialOrientation
             offset = Offset.Zero
             vZoom = 1f
-            pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+            pageViewState.updateViewSize(viewSize, vZoom, orientation)
 
             //如果方向变化,不需要通过页码定位,通过偏移量就行.
-            if (firstPageIndex < pdfViewState.pages.size - 1) {
-                val page = pdfViewState.pages.get(firstPageIndex)
+            if (firstPageIndex < pageViewState.pages.size - 1) {
+                val page = pageViewState.pages.get(firstPageIndex)
                 if (orientation == Vertical) {
                     val targetOffsetY = when (align) {
-                        PdfViewState.Align.Top -> page.bounds.top
-                        PdfViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
-                        PdfViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
+                        PageViewState.Align.Top -> page.bounds.top
+                        PageViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
+                        PageViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
                     }
-                    val maxOffsetY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    val maxOffsetY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                     val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
                     val clampedY = -clampedTargetY
                     offset = Offset(offset.x, clampedY)
                 } else {
                     val targetOffsetX = when (align) {
-                        PdfViewState.Align.Top -> page.bounds.left
-                        PdfViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
-                        PdfViewState.Align.Bottom -> page.bounds.right - viewSize.width
+                        PageViewState.Align.Top -> page.bounds.left
+                        PageViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
+                        PageViewState.Align.Bottom -> page.bounds.right - viewSize.width
                     }
-                    val maxOffsetX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    val maxOffsetX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                     val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
                     val clampedX = -clampedTargetX
                     offset = Offset(clampedX, offset.y)
                 }
                 println("DocumentView: orientation改变，跳转: $offset, $firstPageIndex, page:$page")
-                pdfViewState.updateOffset(offset)
+                pageViewState.updateOffset(offset)
             }
             isJumping = false // 清除跳转标志
             return@LaunchedEffect
@@ -388,54 +388,53 @@ public fun DesktopDocumentView(
 
         // 只有在以下情况才执行页面跳转：
         // 1. 有明确的跳转页码
-        // 2. PdfViewState已初始化
+        // 2. PageViewState已初始化
         // 3. 是用户主动跳转（如进度条拖动）或者没有初始偏移量
-        if (null != jumpToPage && toPage != jumpToPage && pdfViewState.init) {
+        if (null != jumpToPage && toPage != jumpToPage && pageViewState.init) {
             isJumping = true // 设置跳转标志
             toPage = jumpToPage
-            val page = pdfViewState.pages.getOrNull(toPage)
+            val page = pageViewState.pages.getOrNull(toPage)
             //println("DocumentView: 执行跳转到第${jumpToPage}页, offset:$offset, page:$page")
             if (page != null) {
                 if (orientation == Vertical) {
                     val targetOffsetY = when (align) {
-                        PdfViewState.Align.Top -> page.bounds.top
-                        PdfViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
-                        PdfViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
+                        PageViewState.Align.Top -> page.bounds.top
+                        PageViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
+                        PageViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
                     }
-                    val maxOffsetY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    val maxOffsetY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                     val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
                     val clampedY = -clampedTargetY
                     offset = Offset(offset.x, clampedY)
                 } else {
                     val targetOffsetX = when (align) {
-                        PdfViewState.Align.Top -> page.bounds.left
-                        PdfViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
-                        PdfViewState.Align.Bottom -> page.bounds.right - viewSize.width
+                        PageViewState.Align.Top -> page.bounds.left
+                        PageViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
+                        PageViewState.Align.Bottom -> page.bounds.right - viewSize.width
                     }
-                    val maxOffsetX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    val maxOffsetX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                     val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
                     val clampedX = -clampedTargetX
                     offset = Offset(clampedX, offset.y)
                 }
-                // 同步到PdfViewState
                 println("DocumentView: 执行跳转到:$offset, top:${page.bounds.top}, toPage:$toPage")
-                pdfViewState.updateOffset(offset)
+                pageViewState.updateOffset(offset)
             }
             isJumping = false // 清除跳转标志
         }
     }
 
     LaunchedEffect(crop) {
-        val old = pdfViewState.isCropEnabled()
+        val old = pageViewState.isCropEnabled()
         if (old != crop) {
             println("DocumentView: 切边变化:$crop")
-            pdfViewState.setCropEnabled(crop)
+            pageViewState.setCropEnabled(crop)
             // 清理所有页面的缓存图像
-            pdfViewState.pages.forEach { page ->
+            pageViewState.pages.forEach { page ->
                 page.recycle()
             }
-            pdfViewState.invalidatePageSizes()
-            pdfViewState.updateOffset(offset)
+            pageViewState.invalidatePageSizes()
+            pageViewState.updateOffset(offset)
         }
     }
 
@@ -443,7 +442,7 @@ public fun DesktopDocumentView(
         if (vZoom != initialZoom.toFloat()) {
             println("DocumentView: initialZoom变化:$initialZoom")
             vZoom = initialZoom.toFloat()
-            pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+            pageViewState.updateViewSize(viewSize, vZoom, orientation)
         }
     }
 
@@ -451,7 +450,7 @@ public fun DesktopDocumentView(
     LaunchedEffect(offset) {
         // 只有在非跳转状态下才处理页面变化回调
         if (!isJumping) {
-            firstPage(pdfViewState, offset, orientation, viewSize, onPageChanged)
+            firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
         }
     }
 
@@ -460,7 +459,7 @@ public fun DesktopDocumentView(
 
     // 保存文档状态的公共方法
     fun saveDocumentState() {
-        val pages = pdfViewState.pages
+        val pages = pageViewState.pages
         var currentPage = 0
         if (pages.isNotEmpty()) {
             val offsetY = offset.y
@@ -482,7 +481,7 @@ public fun DesktopDocumentView(
         }
         val pageCount = list.size
         val zoom = vZoom.toDouble()
-        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation, crop: $crop,${pdfViewState.isCropEnabled()}")
+        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, $viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation, crop: $crop,${pageViewState.isCropEnabled()}")
 
         if (!list.isEmpty()) {
             onSaveDocument?.invoke(
@@ -493,7 +492,7 @@ public fun DesktopDocumentView(
                 offset.y.toLong(),
                 orientation.toLong(),
                 reflow,
-                if (pdfViewState.isCropEnabled()) 0L else 1L
+                if (pageViewState.isCropEnabled()) 0L else 1L
             )
         }
     }
@@ -511,7 +510,7 @@ public fun DesktopDocumentView(
             lifecycleOwner.lifecycle.removeObserver(observer)
             saveDocumentState()
             onCloseDocument?.invoke()
-            pdfViewState.shutdown()
+            pageViewState.shutdown()
             ImageCache.clear()
         }
     }
@@ -525,7 +524,7 @@ public fun DesktopDocumentView(
                 }
                 viewSize = size
                 println("DocumentView: onSizeChanged:$viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-                pdfViewState.updateViewSize(viewSize, vZoom, orientation)
+                pageViewState.updateViewSize(viewSize, vZoom, orientation)
             },
         contentAlignment = Alignment.TopStart
     ) {
@@ -552,7 +551,7 @@ public fun DesktopDocumentView(
                             val contentX = offsetTap.x - offset.x
                             val contentY = offsetTap.y - offset.y
 
-                            val linkHandled = pdfViewState.handleClick(contentX, contentY)
+                            val linkHandled = pageViewState.handleClick(contentX, contentY)
                             //println("DocumentView.onTap: 链接处理结果: $linkHandled")
 
                             // 如果没有处理链接，再处理翻页逻辑
@@ -562,11 +561,11 @@ public fun DesktopDocumentView(
                                     viewSize,
                                     offset,
                                     orientation,
-                                    pdfViewState,
+                                    pageViewState,
                                     keepPx
                                 ) { newOffset ->
                                     offset = newOffset
-                                    pdfViewState.updateOffset(offset)
+                                    pageViewState.updateOffset(offset)
                                 }
 
                                 // 如果不是翻页区域，触发非页面区域点击回调
@@ -575,7 +574,7 @@ public fun DesktopDocumentView(
                                         offsetTap,
                                         offset,
                                         orientation,
-                                        pdfViewState
+                                        pageViewState
                                     )
                                     onTapNonPageArea?.invoke(clickedPage)
                                 }
@@ -613,9 +612,9 @@ public fun DesktopDocumentView(
                                     startPos,
                                     offset,
                                     orientation,
-                                    pdfViewState
+                                    pageViewState
                                 )
-                                val clickedPage = pdfViewState.pages.getOrNull(clickedPageIndex)
+                                val clickedPage = pageViewState.pages.getOrNull(clickedPageIndex)
                                 if (clickedPage != null) {
                                     val contentX = startPos.x - offset.x
                                     val contentY = startPos.y - offset.y
@@ -644,15 +643,15 @@ public fun DesktopDocumentView(
                             } else {
                                 // 非文本选择模式：普通拖拽滚动
                                 val maxX =
-                                    (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                                    (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                                 val maxY =
-                                    (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                                    (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
 
                                 val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
                                 val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
 
                                 offset = Offset(newX, newY)
-                                pdfViewState.updateOffset(offset)
+                                pageViewState.updateOffset(offset)
                             }
                         },
                         onDragEnd = {
@@ -688,23 +687,23 @@ public fun DesktopDocumentView(
                     val scrollMultiplier = 30f
 
                     // 计算边界限制
-                    val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                    val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
 
                     // 支持双向滚动，特别是在缩放后
                     val newX = (offset.x + scrollAmount.x * scrollMultiplier).coerceIn(-maxX, 0f)
                     val newY = (offset.y + scrollAmount.y * scrollMultiplier).coerceIn(-maxY, 0f)
 
                     offset = Offset(newX, newY)
-                    pdfViewState.updateOffset(offset)
+                    pageViewState.updateOffset(offset)
                 }
                 .focusRequester(focusRequester)
                 .focusable()
                 .onKeyEvent(handleKeyboardEvent)
         ) {
             val translateY =
-                if (orientation == Vertical && pdfViewState.totalHeight < viewSize.height) {
-                    (viewSize.height - pdfViewState.totalHeight) / 2
+                if (orientation == Vertical && pageViewState.totalHeight < viewSize.height) {
+                    (viewSize.height - pageViewState.totalHeight) / 2
                 } else {
                     0f
                 }
@@ -721,7 +720,7 @@ public fun DesktopDocumentView(
                     topLeft = visibleRect.topLeft,
                     size = visibleRect.size
                 )*/
-                pdfViewState.drawVisiblePages(this, offset, vZoom, viewSize)
+                pageViewState.drawVisiblePages(this, offset, vZoom, viewSize)
 
                 // 绘制选择区域的调试可视化
                 if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {
@@ -778,14 +777,14 @@ public fun DesktopDocumentView(
 }
 
 private fun firstPage(
-    pdfViewState: PdfViewState,
+    pageViewState: PageViewState,
     offset: Offset,
     orientation: Int,
     viewSize: IntSize,
     onPageChanged: ((Int) -> Unit)?
 ): Int {
     var firstVisible = 0
-    val pages = pdfViewState.pages
+    val pages = pageViewState.pages
     if (pages.isNotEmpty()) {
         val offsetY = offset.y
         val offsetX = offset.x
@@ -814,14 +813,14 @@ private fun calculateClickedPage(
     tapOffset: Offset,
     currentOffset: Offset,
     orientation: Int,
-    pdfViewState: PdfViewState
+    pageViewState: PageViewState
 ): Int {
     // 将点击坐标转换为相对于内容的位置
     val contentX = tapOffset.x - currentOffset.x
     val contentY = tapOffset.y - currentOffset.y
 
     // 查找包含该坐标的页面
-    val pages = pdfViewState.pages
+    val pages = pageViewState.pages
     for (i in pages.indices) {
         val page = pages[i]
         if (orientation == Vertical) {
@@ -841,11 +840,11 @@ private fun calculateClickedPage(
     return pages.indexOfFirst { page ->
         if (orientation == Vertical) {
             val top = -currentOffset.y
-            val bottom = top + pdfViewState.viewSize.height
+            val bottom = top + pageViewState.viewSize.height
             page.bounds.bottom > top && page.bounds.top < bottom
         } else {
             val left = -currentOffset.x
-            val right = left + pdfViewState.viewSize.width
+            val right = left + pageViewState.viewSize.width
             page.bounds.right > left && page.bounds.left < right
         }
     }.coerceAtLeast(0)
@@ -860,7 +859,7 @@ private fun handleZoom(
     centerY: Float,
     currentZoom: Float,
     currentOffset: Offset,
-    pdfViewState: PdfViewState,
+    pageViewState: PageViewState,
     viewSize: IntSize,
     orientation: Int,
     onZoomChanged: (Offset, Float) -> Unit
@@ -876,19 +875,19 @@ private fun handleZoom(
     val newOffsetX = centerX - contentX * zoomRatio
     val newOffsetY = centerY - contentY * zoomRatio
 
-    // 更新PdfViewState的缩放
-    pdfViewState.updateViewSize(viewSize, newZoom, orientation)
+    // 更新PageViewState的缩放
+    pageViewState.updateViewSize(viewSize, newZoom, orientation)
 
     // 计算边界限制
-    val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-    val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+    val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+    val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
 
     // 应用边界限制
     val clampedOffsetX = newOffsetX.coerceIn(-maxX, 0f)
     val clampedOffsetY = newOffsetY.coerceIn(-maxY, 0f)
 
     val newOffset = Offset(clampedOffsetX, clampedOffsetY)
-    pdfViewState.updateOffset(newOffset)
+    pageViewState.updateOffset(newOffset)
 
     onZoomChanged(newOffset, newZoom)
 }
@@ -902,7 +901,7 @@ private fun handleTapGesture(
     viewSize: IntSize,
     currentOffset: Offset,
     orientation: Int,
-    pdfViewState: PdfViewState,
+    pageViewState: PageViewState,
     keepPx: Float,
     onOffsetChanged: (Offset) -> Unit
 ): Boolean {
@@ -920,7 +919,7 @@ private fun handleTapGesture(
 
             y > height * 3 / 4 -> {
                 // 点击下方区域，向下翻页
-                val maxY = (pdfViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
                 val newY = (currentOffset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
                 onOffsetChanged(Offset(currentOffset.x, newY))
                 true
@@ -942,7 +941,7 @@ private fun handleTapGesture(
 
             x > width * 3 / 4 -> {
                 // 点击右侧区域，向右翻页
-                val maxX = (pdfViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
                 val newX = (currentOffset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
                 onOffsetChanged(Offset(newX, currentOffset.y))
                 true

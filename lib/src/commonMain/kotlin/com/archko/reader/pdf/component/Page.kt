@@ -24,7 +24,7 @@ import kotlin.math.ceil
  * @author: archko 2025/7/24 :08:20
  */
 public class Page(
-    private val pdfViewState: PdfViewState,
+    private val pageViewState: PageViewState,
     public var width: Float,   // 最终缩放后的宽
     public var height: Float,  // 最终缩放后的高
     internal var aPage: APage,
@@ -69,9 +69,9 @@ public class Page(
      * 加载页面文本结构
      */
     public fun loadText() {
-        if (textLoaded || pdfViewState.textSelector == null) return
+        if (textLoaded || pageViewState.textSelector == null) return
 
-        structuredText = pdfViewState.textSelector.getStructuredText(aPage.index)
+        structuredText = pageViewState.textSelector.getStructuredText(aPage.index)
         textLoaded = true
     }
 
@@ -90,7 +90,7 @@ public class Page(
     public fun loadLinks() {
         if (linksLoaded) return
 
-        links = pdfViewState.state.getPageLinks(aPage.index)
+        links = pageViewState.state.getPageLinks(aPage.index)
         linksLoaded = true
     }
 
@@ -102,42 +102,42 @@ public class Page(
             return null
         }
 
-        val pdfPoint = screenToPdfPoint(x, y)
-        val foundLink = Hyperlink.findLinkAtPoint(links, pdfPoint.x, pdfPoint.y)
+        val pagePoint = screenToPagePoint(x, y)
+        val foundLink = Hyperlink.findLinkAtPoint(links, pagePoint.x, pagePoint.y)
         return foundLink
     }
 
     /**
-     * 将屏幕坐标转换为PDF坐标
+     * 将屏幕坐标转换为Page坐标
      */
-    private fun screenToPdfPoint(screenX: Float, screenY: Float): Offset {
+    private fun screenToPagePoint(screenX: Float, screenY: Float): Offset {
         // 将点击坐标转换为页面相对坐标
         val pageX = screenX - bounds.left
         val pageY = screenY - bounds.top
 
-        // 转换为原始PDF坐标
-        val pdfX: Float
-        val pdfY: Float
+        // 转换为原始Page坐标
+        val orignalX: Float
+        val orignalY: Float
 
-        if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
-            // 有切边且启用切边：先转换为切边区域内的相对坐标，再转换为原始PDF坐标
+        if (aPage.hasCrop() && pageViewState.isCropEnabled()) {
+            // 有切边且启用切边：先转换为切边区域内的相对坐标，再转换为原始Page坐标
             val cropBounds = aPage.cropBounds!!
             val relativeX = pageX / bounds.width
             val relativeY = pageY / bounds.height
 
-            pdfX = cropBounds.left + relativeX * cropBounds.width
-            pdfY = cropBounds.top + relativeY * cropBounds.height
+            orignalX = cropBounds.left + relativeX * cropBounds.width
+            orignalY = cropBounds.top + relativeY * cropBounds.height
         } else {
             // 无切边：直接按比例转换
             val relativeX = pageX / bounds.width
             val relativeY = pageY / bounds.height
 
-            pdfX = relativeX * aPage.width
-            pdfY = relativeY * aPage.height
+            orignalX = relativeX * aPage.width
+            orignalY = relativeY * aPage.height
         }
 
-        //println("Page.screenToPdfPoint: screen($screenX, $screenY) -> page($pageX, $pageY) -> pdf($pdfX, $pdfY), bounds: $bounds, aPage: ${aPage.width}x${aPage.height}")
-        return Offset(pdfX, pdfY)
+        //println("Page.screenToPagePoint: screen($screenX, $screenY) -> page($pageX, $pageY) -> page($orignalX, $orignalY), bounds: $bounds, aPage: ${aPage.width}x${aPage.height}")
+        return Offset(orignalX, orignalY)
     }
 
     /**
@@ -146,8 +146,8 @@ public class Page(
     public fun startTextSelection(screenX: Float, screenY: Float): Boolean {
         loadText()
 
-        val pdfPoint = screenToPdfPoint(screenX, screenY)
-        val startPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
+        val pagePoint = screenToPagePoint(screenX, screenY)
+        val startPoint = PagePoint(pagePoint.x, pagePoint.y)
 
         structuredText ?: return false
 
@@ -176,8 +176,8 @@ public class Page(
         val structText = structuredText ?: return
         val startPoint = currentSelection?.startPoint ?: return
 
-        val pdfPoint = screenToPdfPoint(screenX, screenY)
-        val endPoint = MuPdfPoint(pdfPoint.x, pdfPoint.y)
+        val pagePoint = screenToPagePoint(screenX, screenY)
+        val endPoint = PagePoint(pagePoint.x, pagePoint.y)
 
         // 只有当起始点和结束点不同时才进行高亮
         if (startPoint.x != endPoint.x || startPoint.y != endPoint.y) {
@@ -222,7 +222,7 @@ public class Page(
 
         val cacheKey = cachedCacheKey ?: run {
             val cacheKey =
-                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
+                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pageViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
             cacheKey
         }
@@ -240,7 +240,7 @@ public class Page(
 
     private fun startThumbnailDecoding(cacheKey: String, thumbWidth: Int, thumbHeight: Int) {
         thumbDecoding = true
-        thumbJob = pdfViewState.decodeScope.launch {
+        thumbJob = pageViewState.decodeScope.launch {
             if (!isScopeActive()) {
                 thumbDecoding = false
                 return@launch
@@ -255,17 +255,17 @@ public class Page(
                 bounds,
                 width.toInt(),
                 height.toInt(),
-                crop = pdfViewState.isCropEnabled(),
+                crop = pageViewState.isCropEnabled(),
                 callback = object : DecodeCallback {
                     override fun onDecodeComplete(
                         bitmap: ImageBitmap?,
                         isThumb: Boolean,
                         error: Throwable?
                     ) {
-                        if (bitmap != null && !pdfViewState.isShutdown()) {
+                        if (bitmap != null && !pageViewState.isShutdown()) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
-                            pdfViewState.decodeScope.launch(Dispatchers.Main) {
-                                if (!pdfViewState.isShutdown()) {
+                            pageViewState.decodeScope.launch(Dispatchers.Main) {
+                                if (!pageViewState.isShutdown()) {
                                     thumbBitmapState?.let { ImageCache.releasePage(it) }
                                     thumbBitmapState = newState
                                     setAspectRatio(bitmap.width, bitmap.height)
@@ -282,36 +282,23 @@ public class Page(
                     }
 
                     override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                        return !pdfViewState.isShutdown() && isPageInRenderList(pageNumber)
+                        return !pageViewState.isShutdown() && isPageInRenderList(pageNumber)
                     }
                 }
             )
 
             // 提交任务到DecodeService
-            pdfViewState.decodeService?.submitTask(decodeTask)
+            pageViewState.decodeService?.submitTask(decodeTask)
         }
     }
 
     private fun isPageInRenderList(pageNumber: Int): Boolean {
-        return pdfViewState.pageToRender.any { it.aPage.index == pageNumber }
-    }
-
-    private fun isPageVisible(drawScope: DrawScope, offset: Offset, bounds: Rect): Boolean {
-        // 获取画布的可视区域
-        val visibleRect = Rect(
-            left = -offset.x,
-            top = -offset.y,
-            right = drawScope.size.width - offset.x,
-            bottom = drawScope.size.height - offset.y
-        )
-
-        // 检查页面是否与可视区域相交
-        return bounds.overlaps(visibleRect)
+        return pageViewState.pageToRender.any { it.aPage.index == pageNumber }
     }
 
     private fun isScopeActive(): Boolean {
-        if (pdfViewState.isShutdown()) {
-            println("[Page.loadThumbnail] page=PdfViewState已关闭:${aPage.index}")
+        if (pageViewState.isShutdown()) {
+            println("[Page.loadThumbnail] page=PageViewState已关闭:${aPage.index}")
             thumbDecoding = false
             return false
         }
@@ -323,13 +310,13 @@ public class Page(
     }
 
     private fun setAspectRatio(aspectRatio: Float) {
-        if (pdfViewState.isCropEnabled() && this.aspectRatio != aspectRatio) {
+        if (pageViewState.isCropEnabled() && this.aspectRatio != aspectRatio) {
             val abs: Float = abs(aspectRatio - this.aspectRatio)
             val changed = abs > 0.008
             this.aspectRatio = aspectRatio
             if (changed) {
                 //println("Page.loadThumbnail: 页面${aPage.index}检测到切边，${abs}, bounds=${aPage.cropBounds}")
-                pdfViewState.invalidatePageSizes()
+                pageViewState.invalidatePageSizes()
             }
         }
     }
@@ -350,8 +337,8 @@ public class Page(
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
         // 计算当前缩放下的实际显示尺寸和位置
-        // Page 的属性是基于 pdfViewState.vZoom 计算的，但当前的 vZoom 可能已经改变,直接用bounds在缩放的时候会白屏
-        val scaleRatio = vZoom / pdfViewState.vZoom
+        // Page 的属性是基于 pageViewState.vZoom 计算的，但当前的 vZoom 可能已经改变,直接用bounds在缩放的时候会白屏
+        val scaleRatio = vZoom / pageViewState.vZoom
         val currentBounds = Rect(
             bounds.left * scaleRatio,
             bounds.top * scaleRatio,
@@ -371,7 +358,7 @@ public class Page(
 
         val cacheKey = cachedCacheKey ?: run {
             val cacheKey =
-                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pdfViewState.isCropEnabled()}"
+                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pageViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
             cacheKey
         }
@@ -450,9 +437,9 @@ public class Page(
         for (link in links) {
             val bbox = link.bbox ?: continue
 
-            // 将PDF坐标转换为屏幕坐标
-            val linkRect = if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
-                // 有切边且启用切边：link的bbox是原始PDF坐标，需要转换为切边后的相对坐标
+            // 将Page坐标转换为屏幕坐标
+            val linkRect = if (aPage.hasCrop() && pageViewState.isCropEnabled()) {
+                // 有切边且启用切边：link的bbox是原始Page坐标，需要转换为切边后的相对坐标
                 val cropBounds = aPage.cropBounds!!
 
                 // 检查link是否在切边区域内
@@ -511,13 +498,13 @@ public class Page(
      */
     private fun drawTextSelection(drawScope: DrawScope, currentBounds: Rect, scaleRatio: Float) {
         val selection = currentSelection ?: return
-        val textSelector = pdfViewState.textSelector ?: return
+        val textSelector = pageViewState.textSelector ?: return
         val selectionColor = Color(0x6633B5E5) // 半透明蓝色
 
         selection.quads.forEach { quad ->
-            // 使用TextSelector将PDF坐标的Quad转换为屏幕坐标
-            val screenQuad = textSelector.quadToScreenQuad(quad) { pdfX, pdfY ->
-                pdfPointToScreenPoint(pdfX, pdfY, currentBounds)
+            // 使用TextSelector将Page坐标的Quad转换为屏幕坐标
+            val screenQuad = textSelector.quadToScreenQuad(quad) { pageX, pageY ->
+                pagePointToScreenPoint(pageX, pageY, currentBounds)
             }
 
             // 绘制高亮矩形（简化处理，使用quad的边界框）
@@ -535,21 +522,21 @@ public class Page(
     }
 
     /**
-     * 将PDF坐标点转换为屏幕坐标点
+     * 将Page坐标点转换为屏幕坐标点
      */
-    private fun pdfPointToScreenPoint(pdfX: Float, pdfY: Float, currentBounds: Rect): Offset {
-        return if (aPage.hasCrop() && pdfViewState.isCropEnabled()) {
+    private fun pagePointToScreenPoint(pageX: Float, pageY: Float, currentBounds: Rect): Offset {
+        return if (aPage.hasCrop() && pageViewState.isCropEnabled()) {
             val cropBounds = aPage.cropBounds!!
-            val relativeX = (pdfX - cropBounds.left) / cropBounds.width
-            val relativeY = (pdfY - cropBounds.top) / cropBounds.height
+            val relativeX = (pageX - cropBounds.left) / cropBounds.width
+            val relativeY = (pageY - cropBounds.top) / cropBounds.height
 
             Offset(
                 currentBounds.left + relativeX * currentBounds.width,
                 currentBounds.top + relativeY * currentBounds.height
             )
         } else {
-            val relativeX = pdfX / aPage.width
-            val relativeY = pdfY / aPage.height
+            val relativeX = pageX / aPage.width
+            val relativeY = pageY / aPage.height
 
             Offset(
                 currentBounds.left + relativeX * currentBounds.width,
@@ -564,7 +551,7 @@ public class Page(
     private fun drawSeparator(drawScope: DrawScope, currentBounds: Rect) {
         val separatorColor = Color(0xFF999999) // 浅灰色
 
-        if (pdfViewState.orientation == Vertical) {
+        if (pageViewState.orientation == Vertical) {
             // 垂直滚动，从左侧开始绘制1/4宽度的水平分割线
             val separatorWidth = (currentBounds.width / 4).coerceAtLeast(1f)
             val separatorHeight = 2f
@@ -597,7 +584,7 @@ public class Page(
      * 绘制朗读指示边框
      */
     private fun drawSpeakingIndicator(drawScope: DrawScope, currentBounds: Rect) {
-        val speakingPage = pdfViewState.speakingPageIndex
+        val speakingPage = pageViewState.speakingPageIndex
         if (speakingPage != null && aPage.index == speakingPage) {
             // 绘制红色边框
             drawScope.drawRect(
@@ -616,37 +603,11 @@ public class Page(
         nodes.forEach { it.recycle() }
     }
 
-    // 计算分块数的通用函数
-    private fun calcBlockCount(length: Float): Int {
-        if (length <= MIN_BLOCK_SIZE) {
-            return 1
-        }
-        val blockCount = ceil(length / MAX_BLOCK_SIZE).toInt()
-        val actualBlockSize = length / blockCount
-        if (actualBlockSize >= MIN_BLOCK_SIZE && actualBlockSize <= MAX_BLOCK_SIZE) {
-            return blockCount
-        } else {
-            return ceil(length / MIN_BLOCK_SIZE).toInt()
-        }
-    }
-
     // 计算分块配置
     private data class TileConfig(val xBlocks: Int, val yBlocks: Int) {
         // 当 xBlocks 和 yBlocks 都是 1 时，表示整个页面作为一个块
         // 这种情况下不需要分块，直接返回原始页面
         val isSingleBlock: Boolean get() = xBlocks == 1 && yBlocks == 1
-    }
-
-    private fun calculateTileConfig(width: Float, height: Float): TileConfig {
-        // 如果页面的宽或高都小于最大块大小，则不分块
-        if (width <= MAX_BLOCK_SIZE && height <= MAX_BLOCK_SIZE) {
-            return TileConfig(1, 1)
-        }
-
-        val xBlocks = calcBlockCount(width)
-        val yBlocks = calcBlockCount(height)
-
-        return TileConfig(xBlocks, yBlocks)
     }
 
     public fun invalidateNodes() {
@@ -661,7 +622,7 @@ public class Page(
 
         // 如果是单个块，直接返回原始页面
         if (config.isSingleBlock) {
-            nodes = listOf(PageNode(pdfViewState, Rect(0f, 0f, 1f, 1f), aPage))
+            nodes = listOf(PageNode(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
             return
         }
 
@@ -682,7 +643,7 @@ public class Page(
                 val right = if (x == config.xBlocks - 1) baseRight else baseRight + overlap
                 val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom + overlap
 
-                newNodes.add(PageNode(pdfViewState, Rect(left, top, right, bottom), aPage))
+                newNodes.add(PageNode(pageViewState, Rect(left, top, right, bottom), aPage))
             }
         }
         nodes.forEach { it.recycle() }
@@ -717,57 +678,81 @@ public class Page(
         return result
     }
 
-    /**
-     * 计算缩略图尺寸：根据宽高比选择基准边
-     */
-    private fun calculateThumbnailSize(
-        pageWidth: Int,
-        pageHeight: Int,
-        baseSize: Int = 240
-    ): Pair<Int, Int> {
-        val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
-        return when {
-            aspectRatio <= 0.5f -> {
-                // 高度是宽度的2倍以上（竖长条），以宽为基准
-                val width = baseSize
-                val height = (baseSize / aspectRatio).toInt()
-                Pair(width, height)
-            }
-
-            aspectRatio >= 2.0f -> {
-                // 宽度是高度的2倍以上（横长条），以高为基准
-                val height = baseSize
-                val width = (baseSize * aspectRatio).toInt()
-                Pair(width, height)
-            }
-
-            else -> {
-                // 宽高比在 1:2 到 2:1 之间，以宽为基准
-                val width = baseSize
-                val height = (baseSize / aspectRatio).toInt()
-                Pair(width, height)
-            }
-        }
-    }
-
     public companion object {
         private const val MIN_BLOCK_SIZE = 256f * 3f // 768
         private const val MAX_BLOCK_SIZE = 256f * 4f // 1024
+
+        // 计算分块数的通用函数
+        private fun calcBlockCount(length: Float): Int {
+            if (length <= MIN_BLOCK_SIZE) {
+                return 1
+            }
+            val blockCount = ceil(length / MAX_BLOCK_SIZE).toInt()
+            val actualBlockSize = length / blockCount
+            if (actualBlockSize in MIN_BLOCK_SIZE..MAX_BLOCK_SIZE) {
+                return blockCount
+            } else {
+                return ceil(length / MIN_BLOCK_SIZE).toInt()
+            }
+        }
+
+        private fun calculateTileConfig(width: Float, height: Float): TileConfig {
+            // 如果页面的宽或高都小于最大块大小，则不分块
+            if (width <= MAX_BLOCK_SIZE && height <= MAX_BLOCK_SIZE) {
+                return TileConfig(1, 1)
+            }
+
+            val xBlocks = calcBlockCount(width)
+            val yBlocks = calcBlockCount(height)
+
+            return TileConfig(xBlocks, yBlocks)
+        }
+
+        /**
+         * 计算缩略图尺寸：根据宽高比选择基准边
+         */
+        private fun calculateThumbnailSize(
+            pageWidth: Int,
+            pageHeight: Int,
+            baseSize: Int = 240
+        ): Pair<Int, Int> {
+            val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
+            return when {
+                aspectRatio <= 0.5f -> {
+                    // 高度是宽度的2倍以上（竖长条），以宽为基准
+                    val width = baseSize
+                    val height = (baseSize / aspectRatio).toInt()
+                    Pair(width, height)
+                }
+
+                aspectRatio >= 2.0f -> {
+                    // 宽度是高度的2倍以上（横长条），以高为基准
+                    val height = baseSize
+                    val width = (baseSize * aspectRatio).toInt()
+                    Pair(width, height)
+                }
+
+                else -> {
+                    // 宽高比在 1:2 到 2:1 之间，以宽为基准
+                    val width = baseSize
+                    val height = (baseSize / aspectRatio).toInt()
+                    Pair(width, height)
+                }
+            }
+        }
+
+        private fun isPageVisible(drawScope: DrawScope, offset: Offset, bounds: Rect): Boolean {
+            // 获取画布的可视区域
+            val visibleRect = Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = drawScope.size.width - offset.x,
+                bottom = drawScope.size.height - offset.y
+            )
+
+            // 检查页面是否与可视区域相交
+            return bounds.overlaps(visibleRect)
+        }
     }
-}
-
-public fun isVisible(drawScope: DrawScope, offset: Offset, bounds: Rect, page: Int): Boolean {
-    // 获取画布的可视区域
-    val visibleRect = Rect(
-        left = -offset.x,
-        top = -offset.y,
-        right = drawScope.size.width - offset.x,
-        bottom = drawScope.size.height - offset.y
-    )
-
-    // 检查页面是否与可视区域相交
-    val visible = bounds.overlaps(visibleRect)
-    //println("page.draw.page:$page, isVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect")
-    return visible
 }
 

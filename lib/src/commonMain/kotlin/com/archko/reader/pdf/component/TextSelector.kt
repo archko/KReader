@@ -5,7 +5,7 @@ import androidx.compose.ui.geometry.Offset
 /**
  * MuPDF Point类的抽象表示
  */
-public data class MuPdfPoint(
+public data class PagePoint(
     val x: Float,
     val y: Float
 )
@@ -27,17 +27,17 @@ public interface StructuredText {
     /**
      * 获取文本高亮区域
      */
-    public fun highlight(startPoint: MuPdfPoint, endPoint: MuPdfPoint): Array<MuPdfQuad>
+    public fun highlight(startPoint: PagePoint, endPoint: PagePoint): Array<MuPdfQuad>
 
     /**
      * 复制选中的文本
      */
-    public fun copy(startPoint: MuPdfPoint, endPoint: MuPdfPoint): String
+    public fun copy(startPoint: PagePoint, endPoint: PagePoint): String
 
     /**
      * 智能选择，自动调整选择边界
      */
-    public fun snapSelection(startPoint: MuPdfPoint, endPoint: MuPdfPoint, mode: Int): MuPdfQuad?
+    public fun snapSelection(startPoint: PagePoint, endPoint: PagePoint, mode: Int): MuPdfQuad?
 
     /**
      * 搜索文本
@@ -77,8 +77,8 @@ public data class ScreenQuad(
  * 文本选择数据类
  */
 public data class TextSelection(
-    val startPoint: MuPdfPoint,        // 起始点
-    val endPoint: MuPdfPoint,          // 结束点
+    val startPoint: PagePoint,        // 起始点
+    val endPoint: PagePoint,          // 结束点
     val text: String,                  // 选中的文本
     val quads: Array<MuPdfQuad>        // 高亮区域
 ) {

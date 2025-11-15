@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 /**
  * @author: archko 2025/7/24 :08:21
  */
-public class PdfViewState(
+public class PageViewState(
     public val list: List<APage>,
     public val state: ImageDecoder,
     public var orientation: Int = Vertical,
@@ -101,7 +101,7 @@ public class PdfViewState(
      * @param pageIndex 页面索引，null 表示没有朗读
      */
     public fun updateSpeakingPageIndex(pageIndex: Int?) {
-        println("PdfViewState: updateSpeakingPageIndex from $speakingPageIndex to $pageIndex")
+        println("PageViewState: updateSpeakingPageIndex from $speakingPageIndex to $pageIndex")
         speakingPageIndex = pageIndex
     }
 
@@ -214,7 +214,7 @@ public class PdfViewState(
     public fun invalidatePageSizes() {
         init = false
         if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
-            println("PdfViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth")
+            println("PageViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth")
             totalHeight = viewSize.height.toFloat()
             totalWidth = viewSize.width.toFloat()
         } else {
@@ -246,7 +246,7 @@ public class PdfViewState(
                     // 直接用最终宽高初始化Page
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
                     currentY += scaledPageHeight
-                    //println("PdfViewState.page=${aPage.index}, pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
+                    //println("PageViewState.page=${aPage.index}, pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }
                 totalHeight = currentY
                 totalWidth = viewSize.width * vZoom
@@ -278,15 +278,15 @@ public class PdfViewState(
                     // 直接用最终宽高初始化Page
                     page.update(scaledPageWidth, scaledPageHeight, bounds)
                     currentX += scaledPageWidth
-                    //println("PdfViewState.pageScale:$pageScale, x:$currentX, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
+                    //println("PageViewState.pageScale:$pageScale, x:$currentX, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
                 }
                 totalWidth = currentX
                 totalHeight = viewSize.height * vZoom
-                //println("PdfViewState: 横向模式 - totalWidth: $totalWidth, totalHeight: $totalHeight, 页面数: ${pages.size}")
+                //println("PageViewState: 横向模式 - totalWidth: $totalWidth, totalHeight: $totalHeight, 页面数: ${pages.size}")
             }
             init = true
         }
-        println("PdfViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth, zoom:$vZoom, orientation:$orientation, crop:$cropEnabled")
+        println("PageViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth, zoom:$vZoom, orientation:$orientation, crop:$cropEnabled")
     }
 
     private fun createPages(): List<Page> {
@@ -338,10 +338,10 @@ public class PdfViewState(
         }
 
         if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
-            println("PdfViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
+            println("PageViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
             invalidatePageSizes()
         } else {
-            println("PdfViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
+            println("PageViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
         }
     }
 
@@ -569,7 +569,7 @@ public class PdfViewState(
             }
 
             else -> {
-                println("PdfViewState.handleLink: 未知链接类型: ${link.linkType}")
+                println("PageViewState.handleLink: 未知链接类型: ${link.linkType}")
                 false
             }
         }

@@ -43,7 +43,7 @@ public class AndroidStructuredTextImpl(
     private val nativeStructuredText: Any // 实际的MuPDF StructuredText对象
 ) : StructuredText {
 
-    override fun highlight(startPoint: MuPdfPoint, endPoint: MuPdfPoint): Array<MuPdfQuad> {
+    override fun highlight(startPoint: PagePoint, endPoint: PagePoint): Array<MuPdfQuad> {
         return try {
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
 
@@ -90,7 +90,7 @@ public class AndroidStructuredTextImpl(
         }
     }
 
-    override fun copy(startPoint: MuPdfPoint, endPoint: MuPdfPoint): String {
+    override fun copy(startPoint: PagePoint, endPoint: PagePoint): String {
         return try {
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
 
@@ -158,8 +158,8 @@ public class AndroidStructuredTextImpl(
     }
 
     override fun snapSelection(
-        startPoint: MuPdfPoint,
-        endPoint: MuPdfPoint,
+        startPoint: PagePoint,
+        endPoint: PagePoint,
         mode: Int
     ): MuPdfQuad? {
         return try {
