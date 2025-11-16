@@ -2,8 +2,8 @@ package com.archko.reader.viewer.tts
 
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
-import org.json.JSONObject
 import androidx.core.content.edit
+import org.json.JSONObject
 
 /**
  * TTS临时进度辅助类
@@ -12,7 +12,7 @@ import androidx.core.content.edit
 object TtsTempProgressHelper {
 
     private const val PREFS_NAME = "tts_temp_progress"
-    private const val MAX_AGE_MILLIS = 60 * 60 * 1000L // 1小时
+    private const val MAX_AGE_MILLIS = 24 * 60 * 60 * 1000L // 1小时
 
     data class TempProgress(
         val path: String,
