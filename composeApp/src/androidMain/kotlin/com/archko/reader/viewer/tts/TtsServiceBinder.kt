@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * TTS服务绑定器，用于在Compose中管理TTS服务连接
  */
-class TtsServiceBinder(private val context: Context) {
+class TtsServiceBinder(private val context: Context, private val documentPath: String) {
 
     private var service: AndroidTtsForegroundService? = null
     private var isBound = false
@@ -33,6 +33,10 @@ class TtsServiceBinder(private val context: Context) {
             service = serviceBinder?.getService()
             isBound = true
             _isConnected.value = true
+
+            TtsTempProgressHelper.clearAllTempProgress(service!!.application)
+            service?.documentPath = documentPath
+            println("TtsServiceBinder: 设置文档路径: $documentPath")
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {

@@ -63,6 +63,7 @@ import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
@@ -97,6 +98,7 @@ fun FileScreen(
     onCloseDocument: () -> Unit = {}
 ) {
     Theme {
+        val context = LocalContext.current
         val scope = rememberCoroutineScope()
         val recentList by viewModel.recentList.collectAsState()
         val hasMoreData by viewModel.hasMoreData.collectAsState()
@@ -105,11 +107,29 @@ fun FileScreen(
         var showDirectoryDialog by remember { mutableStateOf(false) }
         var pendingImagePath by remember { mutableStateOf<String?>(null) }
         var pendingFiles by remember { mutableStateOf<List<File>?>(null) }
-        
+
+        val isDarkTheme = isSystemInDarkTheme()
         val gridState = rememberLazyGridState()
 
         LaunchedEffect(Unit) {
             if (recentList.isEmpty()) {
+                val tempProgressList = TtsTempProgressHelper.getAllTempProgress(context)
+                if (tempProgressList.isNotEmpty()) {
+                    println("FileScreen: 发现${tempProgressList.size}个临时进度，开始恢复")
+                    for (tempProgress in tempProgressList) {
+                        try {
+                            viewModel.updateProgress(
+                                page = tempProgress.page.toLong(),
+                                tempProgress.path
+                            )
+
+                            println("FileScreen: 恢复临时进度成功: ${tempProgress.path}, page=${tempProgress.page}")
+                        } catch (e: Exception) {
+                            println("FileScreen: 恢复临时进度失败: ${tempProgress.path}, error=${e.message}")
+                        }
+                    }
+                    TtsTempProgressHelper.clearAllTempProgress(context)
+                }
                 viewModel.loadRecents()
             }
         }
@@ -143,9 +163,6 @@ fun FileScreen(
                 }
             }
         }
-
-        val context = LocalContext.current
-        val isDarkTheme = isSystemInDarkTheme()
 
         BackHandler(enabled = openDocRequest != null) {
             openDocRequest = null

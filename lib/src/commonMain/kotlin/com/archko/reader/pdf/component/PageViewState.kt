@@ -170,7 +170,7 @@ public class PageViewState(
      * 初始化解码服务
      */
     private fun initDecodeService() {
-        val decoder = PdfDecoderAdapter(
+        val decoder = DecoderAdapter(
             imageDecoder = state,
             viewSize = viewSize,
             isCropEnabled = { cropEnabled }

@@ -46,6 +46,7 @@ import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsSpeechCallback
+import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -161,13 +162,13 @@ fun CustomView(
                             ImagesDecoder(files)
                         } else {
                             if (FileTypeUtils.isDjvuFile(currentPath)) {
-                                ttsServiceBinder = TtsServiceBinder(context)
+                                ttsServiceBinder = TtsServiceBinder(context, currentPath)
                                 ttsServiceBinder?.bindService()
 
                                 val djvuDecoder = DjvuDecoder(File(currentPath))
                                 djvuDecoder
                             } else if (FileTypeUtils.isDocumentFile(currentPath)) {
-                                ttsServiceBinder = TtsServiceBinder(context)
+                                ttsServiceBinder = TtsServiceBinder(context, currentPath)
                                 ttsServiceBinder?.bindService()
 
                                 val pdfDecoder = PdfDecoder(File(currentPath))
@@ -418,6 +419,7 @@ fun CustomView(
                                         if (isReflow) 1L else 0L,
                                         if (isCrop) 1L else 0L
                                     )
+                                    TtsTempProgressHelper.clearTempProgress(context, currentPath)
                                 }
                             }
                         }

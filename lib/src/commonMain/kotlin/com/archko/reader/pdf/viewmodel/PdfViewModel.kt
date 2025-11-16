@@ -220,6 +220,25 @@ public class PdfViewModel : ViewModel() {
         }
     }
 
+    public fun updateProgress(
+        page: Long,
+        path: String
+    ) {
+        viewModelScope.launch {
+            val old = database?.recentDao()?.getRecent(path)
+            println("PdfViewModel.updateProgress:$page, path:$path, old:$old")
+
+            if (old != null) {
+                old.apply {
+                    this.page = page
+                    updateAt = System.currentTimeMillis()
+                }
+                database?.recentDao()?.updateRecent(old)
+                println("PdfViewModel.updateProgress.after:$old")
+            }
+        }
+    }
+
     public fun loadRecents() {
         viewModelScope.launch {
             _isLoading.value = true

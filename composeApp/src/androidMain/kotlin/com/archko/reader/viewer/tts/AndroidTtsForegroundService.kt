@@ -75,6 +75,9 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     // 前台服务状态
     private var isForegroundServiceStarted = false
 
+    // 文档路径，用于保存临时进度
+    var documentPath: String? = null
+
     inner class TtsServiceBinder : Binder() {
         fun getService(): AndroidTtsForegroundService = this@AndroidTtsForegroundService
     }
@@ -194,6 +197,9 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun playNext() {
+        currentBean?.let { bean ->
+            TtsTempProgressHelper.saveTempProgress(bean.page, documentPath, this)
+        }
         currentIndex++
         if (currentIndex < beanList.size) {
             val nextBean = beanList[currentIndex]

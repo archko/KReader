@@ -10,7 +10,7 @@ import com.archko.reader.pdf.util.SmartCropUtils
  * 将现有的ImageDecoder适配到新的Decoder接口
  * @author: archko 2025/1/10
  */
-public class PdfDecoderAdapter(
+public class DecoderAdapter(
     private val imageDecoder: ImageDecoder,
     private val viewSize: IntSize,
     private val isCropEnabled: () -> Boolean
@@ -77,40 +77,6 @@ public class PdfDecoderAdapter(
             task.width,
             task.height
         )
-        /*return try {
-            val aPage = task.aPage
-            val pageSliceBounds = task.pageSliceBounds ?: Rect(0f, 0f, 1f, 1f)
-            
-            // 计算切边区域
-            val cropBounds = if (task.crop && aPage.cropBounds != null) {
-                aPage.cropBounds!!
-            } else {
-                Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
-            }
-            
-            // 计算实际渲染区域
-            val srcRect = Rect(
-                left = pageSliceBounds.left * cropBounds.width + cropBounds.left,
-                top = pageSliceBounds.top * cropBounds.height + cropBounds.top,
-                right = pageSliceBounds.right * cropBounds.width + cropBounds.left,
-                bottom = pageSliceBounds.bottom * cropBounds.height + cropBounds.top
-            )
-            
-            val outWidth = ((srcRect.right - srcRect.left) * task.zoom).toInt()
-            val outHeight = ((srcRect.bottom - srcRect.top) * task.zoom).toInt()
-            
-            imageDecoder.renderPageRegion(
-                region = srcRect,
-                index = task.pageIndex,
-                scale = task.zoom,
-                viewSize = viewSize,
-                outWidth = outWidth,
-                outHeight = outHeight
-            )
-        } catch (e: Exception) {
-            println("PdfDecoderAdapter.decodeNode error: ${e.message}")
-            null
-        }*/
     }
 
     override suspend fun processCrop(task: DecodeTask): CropResult? {
