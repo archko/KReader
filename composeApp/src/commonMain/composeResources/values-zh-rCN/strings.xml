@@ -107,6 +107,8 @@
     <string name="convert_successfully">转换成功%s本, 保存在%s</string>
     <string name="convert_error">转换失败!</string>
 
+    <string name="webdav_title">配置Webdav</string>
+
     <string name="tts_setting_title">语音设置</string>
     <string name="tts_queue_title">朗读队列</string>
     <string name="tts_empty_queue">队列为空</string>

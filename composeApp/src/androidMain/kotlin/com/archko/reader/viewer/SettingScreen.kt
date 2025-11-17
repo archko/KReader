@@ -2,7 +2,6 @@ package com.archko.reader.viewer
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -41,25 +39,14 @@ import com.archko.reader.viewer.dialog.PdfEncryptDialog
 import com.archko.reader.viewer.dialog.PdfExportDialog
 import com.archko.reader.viewer.dialog.PdfMergeDialog
 import com.archko.reader.viewer.dialog.PdfSplitDialog
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.about
-import kreader.composeapp.generated.resources.about_content
-import kreader.composeapp.generated.resources.about_kreader
-import kreader.composeapp.generated.resources.app_author
-import kreader.composeapp.generated.resources.convert_title
-import kreader.composeapp.generated.resources.create_pdf
-import kreader.composeapp.generated.resources.encrypt_decrypt_title
-import kreader.composeapp.generated.resources.export_pdf
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.merge_title
-import kreader.composeapp.generated.resources.split_title
-import kreader.composeapp.generated.resources.support_format
-import kreader.composeapp.generated.resources.version
+import com.archko.reader.viewer.dialog.WebdavConfigDialog
+import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SettingScreen(
+    viewModel: BackupViewModel,
     modifier: Modifier = Modifier,
 ) {
     Theme {
@@ -100,7 +87,7 @@ fun SettingScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                SettingCategory()
+                SettingCategory(viewModel)
 
                 Spacer(modifier = Modifier.height(50.dp))
             }
@@ -109,7 +96,7 @@ fun SettingScreen(
 }
 
 @Composable
-fun SettingCategory() {
+fun SettingCategory(viewModel: BackupViewModel) {
     val context = LocalContext.current
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPdfCreateDialog by remember { mutableStateOf(false) }
@@ -118,6 +105,7 @@ fun SettingCategory() {
     var showPdfSplitDialog by remember { mutableStateOf(false) }
     var showPdfMergeDialog by remember { mutableStateOf(false) }
     var showPdfConvertDialog by remember { mutableStateOf(false) }
+    var showWebdavDialog by remember { mutableStateOf(false) }
 
     val version by remember {
         var packageInfo: PackageInfo? = null
@@ -185,6 +173,13 @@ fun SettingCategory() {
         Spacer(modifier = Modifier.height(8.dp))
 
         SettingItem(
+            title = stringResource(Res.string.webdav_title),
+            onClick = { showWebdavDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
             title = stringResource(Res.string.about),
             onClick = { showAboutDialog = true }
         )
@@ -229,6 +224,14 @@ fun SettingCategory() {
     if (showPdfConvertDialog) {
         ConvertToEpubDialog(
             onDismiss = { showPdfConvertDialog = false }
+        )
+    }
+
+    // Webdav Dialog
+    if (showWebdavDialog) {
+        WebdavConfigDialog(
+            viewModel = viewModel,
+            onDismiss = { showWebdavDialog = false }
         )
     }
 

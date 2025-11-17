@@ -192,4 +192,8 @@ public class APageSizeLoader {
     }
 }
 
-public expect fun getPageCacheFile(file : File): File
+public expect fun getPageCacheFile(file: File): File
+
+public expect fun getWebdavCacheFile(): File
+
+public expect fun saveWebdavCacheFile(name: String, content: String)

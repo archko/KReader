@@ -40,5 +40,6 @@ dependencyResolutionManagement {
     }
 }
 
+include(":dav4kmp") //branch dev
 include(":lib")
 include(":composeApp")

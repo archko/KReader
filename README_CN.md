@@ -1,6 +1,6 @@
 # KReader https://www.pgyer.com/kreader-android
 
-基于 Kotlin Multiplatform 和 Jetpack Compose 构建的现代 PDF 阅读器，为多平台提供流畅的阅读体验。目前支持 pdf, epub, mobi, xps, fb, cb, 图片, (无图的docx, pptx).
+基于 Kotlin Multiplatform 和 Jetpack Compose 构建的现代 PDF 阅读器，为多平台提供流畅的阅读体验。目前支持 pdf, epub, mobi, djvu, xps, fb, cb, 图片, (无图的docx, pptx).
 还支持tiff, bigtiff的浏览.
 
 ## 关于

@@ -52,6 +52,7 @@ fun KApp(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
+    backupViewModel: BackupViewModel,
     externalPath: String? = null
 ) {
     // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
@@ -82,6 +83,7 @@ fun KApp(
                             screenWidthInPixels,
                             screenHeightInPixels,
                             viewModel,
+                            backupViewModel,
                             modifier = Modifier,
                             externalPath = currentExternalPath,
                             onExternalPathConsumed = {
@@ -101,6 +103,7 @@ fun MainContainer(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
+    backupViewModel: BackupViewModel,
     modifier: Modifier = Modifier,
     externalPath: String? = null,
     onExternalPathConsumed: () -> Unit = {}
@@ -130,6 +133,7 @@ fun MainContainer(
                 screenWidthInPixels,
                 screenHeightInPixels,
                 viewModel,
+                backupViewModel,
                 modifier = Modifier.consumeWindowInsets(padding),
                 onShowBottomBarChanged = { showBottomBar = it },
                 externalPath = externalPath,
@@ -143,6 +147,7 @@ fun NavGraphBuilder.addHomeGraph(
     screenWidthInPixels: Int,
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
+    backupViewModel: BackupViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
@@ -159,6 +164,7 @@ fun NavGraphBuilder.addHomeGraph(
     }
     composable(HomeSections.SETTING.route) { from ->
         SettingScreen(
+            backupViewModel,
             modifier
         )
     }

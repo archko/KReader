@@ -6,7 +6,7 @@ import java.io.File
 /**
  * @author: archko 2025/11/1 :9:04 下午
  */
- public actual fun getPageCacheFile(file: File): File {
+public actual fun getPageCacheFile(file: File): File {
     val saveFile = File(
         getCacheDirectory("page").absolutePath
                 + File.separator
@@ -25,3 +25,9 @@ public actual fun getReflowCacheFile(file: File): File {
     val fileName = "${file.nameWithoutExtension}_reflow.json"
     return File(cacheDir, fileName)
 }
+
+public actual fun getWebdavCacheFile(): File {
+    return getCacheDirectory("webdav")
+}
+
+public actual fun saveWebdavCacheFile(name: String, content: String) {}

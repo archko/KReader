@@ -135,12 +135,14 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
+                val backupViewModel: BackupViewModel = viewModel()
                 viewModel.database = database
 
                 KApp(
                     screenWidthInPixels.toInt(),
                     screenHeightInPixels.toInt(),
                     viewModel,
+                    backupViewModel,
                     externalPath
                 )
             }

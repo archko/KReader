@@ -25,3 +25,13 @@ public actual fun getReflowCacheFile(file: File): File {
     val fileName = "${file.nameWithoutExtension}_reflow.json"
     return File(cacheDir, fileName)
 }
+
+public actual fun getWebdavCacheFile(): File {
+    return File(FileUtils.getDir("webdav"))
+}
+
+public actual fun saveWebdavCacheFile(name: String, content: String) {
+    val file = File(getWebdavCacheFile(), name)
+    println("name:$name, content:$content")
+    file.writeText(content)
+}
