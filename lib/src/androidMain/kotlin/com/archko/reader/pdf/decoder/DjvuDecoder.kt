@@ -326,7 +326,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
             for (link in links) {
                 val hyperlink = Hyperlink()
-                hyperlink.bbox = androidx.compose.ui.geometry.Rect(
+                hyperlink.bbox = Rect(
                     link.x.toFloat(),
                     link.y.toFloat(),
                     (link.x + link.width).toFloat(),

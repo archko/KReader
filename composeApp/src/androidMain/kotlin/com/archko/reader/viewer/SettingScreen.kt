@@ -2,7 +2,7 @@ package com.archko.reader.viewer
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -67,40 +68,41 @@ fun SettingScreen(
                 .fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Box {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp)
-                ) {
-                    Logo()
-                    Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                Logo()
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = "KReader",
-                        style = TextStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        maxLines = 1
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "KReader",
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(4.dp))
 
-                    Text(
-                        text = stringResource(Res.string.app_author),
-                        style = TextStyle(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            fontSize = 14.sp
-                        ),
-                        maxLines = 1
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(Res.string.app_author),
+                    style = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        fontSize = 14.sp
+                    ),
+                    maxLines = 1
+                )
 
-                    SettingCategory()
-                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingCategory()
+
+                Spacer(modifier = Modifier.height(50.dp))
             }
         }
     }
@@ -218,14 +220,14 @@ fun SettingCategory() {
 
     // PDF合并 Dialog
     if (showPdfMergeDialog) {
-        PdfMergeDialog (
+        PdfMergeDialog(
             onDismiss = { showPdfMergeDialog = false }
         )
     }
 
     // convert epub Dialog
     if (showPdfConvertDialog) {
-        ConvertToEpubDialog (
+        ConvertToEpubDialog(
             onDismiss = { showPdfConvertDialog = false }
         )
     }

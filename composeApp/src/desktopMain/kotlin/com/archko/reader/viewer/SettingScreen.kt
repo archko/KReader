@@ -1,6 +1,5 @@
 package com.archko.reader.viewer
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -67,61 +66,60 @@ fun SettingScreen(
                     .fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                Box {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp)
+                ) {
+                    Row(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(20.dp)
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .wrapContentHeight()
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = onDismiss) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_back),
-                                    contentDescription = "返回",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = stringResource(Res.string.about_kreader),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        Logo()
-                        Spacer(modifier = Modifier.height(16.dp))
-
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "KReader",
-                            style = TextStyle(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            maxLines = 1
+                            text = stringResource(Res.string.about_kreader),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = stringResource(Res.string.app_author),
-                            style = TextStyle(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                                fontSize = 14.sp
-                            ),
-                            maxLines = 1
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        SettingCategory()
                     }
+                    Logo()
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "KReader",
+                        style = TextStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = stringResource(Res.string.app_author),
+                        style = TextStyle(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            fontSize = 14.sp
+                        ),
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    SettingCategory()
+                    Spacer(modifier = Modifier.height(50.dp))
                 }
             }
         }
@@ -220,21 +218,21 @@ fun SettingCategory() {
 
     // PDF拆分 Dialog
     if (showPdfSplitDialog) {
-        PdfSplitDialog (
+        PdfSplitDialog(
             onDismiss = { showPdfSplitDialog = false }
         )
     }
 
     // PDF合并 Dialog
     if (showPdfMergeDialog) {
-        PdfMergeDialog (
+        PdfMergeDialog(
             onDismiss = { showPdfMergeDialog = false }
         )
     }
 
     // convert epub Dialog
     if (showPdfConvertDialog) {
-        ConvertToEpubDialog (
+        ConvertToEpubDialog(
             onDismiss = { showPdfConvertDialog = false }
         )
     }
