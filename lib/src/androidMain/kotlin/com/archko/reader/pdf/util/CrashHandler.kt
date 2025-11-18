@@ -47,8 +47,8 @@ public class CrashHandler : Thread.UncaughtExceptionHandler {
             if (dir.exists()) {
                 sdcardPath = dir.absolutePath
             }
-            writeLog(stacktrace, "$sdcardPath/m_crash")
-            writeLogcat("$sdcardPath/m_logcat")
+            writeLog(stacktrace, "$sdcardPath/kreader_crash")
+            writeLogcat("$sdcardPath/kreader_logcat")
         }
         defaultUEH.uncaughtException(thread, ex)
     }
@@ -85,7 +85,7 @@ public class CrashHandler : Thread.UncaughtExceptionHandler {
         val filename = name + "_" + timestamp + ".log"
         try {
             doWriteLogcat(filename)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
         }
     }
 

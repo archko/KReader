@@ -15,14 +15,22 @@ public actual fun getPageCacheFile(file: File): File {
     return saveFile
 }
 
+public actual fun getProgressCacheFile(name: String): File {
+    val file = File(
+        getCacheDirectory().absolutePath
+                + File.separator + name
+    )
+    return file
+}
+
 /**
  * 获取缓存文件路径
  * @param file 原始PDF文件
  * @return 缓存文件
  */
 public actual fun getReflowCacheFile(file: File): File {
-    val cacheDir = getCacheDirectory("reflow")
-    val fileName = "${file.nameWithoutExtension}_reflow.json"
+    val cacheDir = getCacheDirectory("tts")
+    val fileName = "${file.nameWithoutExtension}_tts.json"
     return File(cacheDir, fileName)
 }
 

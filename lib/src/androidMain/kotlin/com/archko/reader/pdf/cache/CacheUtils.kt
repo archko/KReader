@@ -9,11 +9,17 @@ import java.io.File
  */
 public actual fun getPageCacheFile(file: File): File {
     val saveFile = File(
-        //FileUtils.getExternalCacheDir(App.instance).path
         FileUtils.getStorageDirPath() + "/amupdf"
                 + File.separator + "page" + File.separator + file.nameWithoutExtension + ".json"
     )
     return saveFile
+}
+
+public actual fun getProgressCacheFile(name: String): File {
+    val file = File(
+        FileUtils.getStorageDirPath() + "/amupdf" + File.separator + name
+    )
+    return file
 }
 
 /**
