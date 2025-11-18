@@ -7,6 +7,10 @@ import java.io.File
 /**
  * @author: archko 2020/11/1 :9:04 下午
  */
+public actual fun getStoragePath(name: String): String {
+    return FileUtils.getStoragePath(name)
+}
+
 public actual fun getPageCacheFile(file: File): File {
     val saveFile = File(
         FileUtils.getStorageDirPath() + "/amupdf"

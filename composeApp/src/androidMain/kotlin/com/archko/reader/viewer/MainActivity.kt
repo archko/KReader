@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
@@ -137,6 +138,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 val viewModel: PdfViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
                 viewModel.database = database
+                backupViewModel.database = database
 
                 KApp(
                     screenWidthInPixels.toInt(),

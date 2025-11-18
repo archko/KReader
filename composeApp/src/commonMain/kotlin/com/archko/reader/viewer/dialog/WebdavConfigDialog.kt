@@ -1,6 +1,6 @@
 package com.archko.reader.viewer.dialog
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,25 +42,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.archko.reader.viewer.BackupViewModel
+import com.archko.reader.pdf.entity.DavResourceItem
+import com.archko.reader.pdf.viewmodel.BackupViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.webdav_config_btn_do
-import kreader.composeapp.generated.resources.webdav_config_btn_save
-import kreader.composeapp.generated.resources.webdav_config_doing
-import kreader.composeapp.generated.resources.webdav_config_host
-import kreader.composeapp.generated.resources.webdav_config_input_name
-import kreader.composeapp.generated.resources.webdav_config_input_pass
-import kreader.composeapp.generated.resources.webdav_config_name
-import kreader.composeapp.generated.resources.webdav_config_no_files
-import kreader.composeapp.generated.resources.webdav_config_pass
-import kreader.composeapp.generated.resources.webdav_config_path
-import kreader.composeapp.generated.resources.webdav_config_path_eg
-import kreader.composeapp.generated.resources.webdav_title
+import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -75,14 +65,14 @@ fun WebdavConfigDialog(
     // 视图状态：true = 显示列表，false = 显示配置表单
     var showListView by remember { mutableStateOf(viewModel.checkAndLoadUser()) }
 
-    var username by remember { mutableStateOf(viewModel.webdavUser?.name ?: "archko@sina.com") }
-    var password by remember { mutableStateOf(viewModel.webdavUser?.pass ?: "a67cedw2buzksi2b") }
+    var username by remember { mutableStateOf(viewModel.webdavUser?.name ?: "") }
+    var password by remember { mutableStateOf(viewModel.webdavUser?.pass ?: "") }
     var host by remember {
         mutableStateOf(
-            viewModel.webdavUser?.host ?: "https://dav.jianguoyun.com"
+            viewModel.webdavUser?.host ?: ""
         )
     }
-    var path by remember { mutableStateOf(viewModel.webdavUser?.path ?: "/dav/我的坚果云") }
+    var path by remember { mutableStateOf(viewModel.webdavUser?.path ?: "") }
     var isConfiguring by remember { mutableStateOf(false) }
 
     val rootPath = remember(viewModel.webdavUser) { viewModel.webdavUser?.path ?: "" }
@@ -209,8 +199,21 @@ fun WebdavConfigDialog(
                             currentPath = item.resource.location.encodedPath.trimEnd('/')
                         },
                         onFileClick = { item ->
-                            // TODO: 处理文件点击
-                            println("File clicked: ${item.resource.location}")
+                            scope.launch {
+                                val filePath = item.resource.location.encodedPath.trimEnd('/')
+                                val fileName = filePath.substringAfterLast('/')
+                                viewModel.restoreFromWebdav(filePath)
+                                    .flowOn(Dispatchers.IO)
+                                    .collectLatest { success ->
+                                        if (success) {
+                                            println("Restore successful: $fileName")
+                                            // TODO: 显示成功提示
+                                        } else {
+                                            println("Restore failed: $fileName")
+                                            // TODO: 显示失败提示
+                                        }
+                                    }
+                            }
                         }
                     )
                 } else {
@@ -234,10 +237,10 @@ fun WebdavConfigDialog(
 @Composable
 private fun FileListView(
     currentPath: String,
-    davResourceItems: List<BackupViewModel.DavResourceItem>?,
+    davResourceItems: List<DavResourceItem>?,
     onNavigateUp: (() -> Unit)?,
-    onDirectoryClick: (BackupViewModel.DavResourceItem) -> Unit,
-    onFileClick: (BackupViewModel.DavResourceItem) -> Unit
+    onDirectoryClick: (DavResourceItem) -> Unit,
+    onFileClick: (DavResourceItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -291,53 +294,92 @@ private fun FileListView(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(davResourceItems) { item ->
-                        val displayName = item.resource.location.encodedPath
-                            .trimEnd('/')
-                            .substringAfterLast('/')
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clickable {
-                                    if (item.isDirectory) {
-                                        onDirectoryClick(item)
-                                    } else {
-                                        onFileClick(item)
-                                    }
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (item.isDirectory) "📁" else "📄",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    modifier = Modifier.padding(end = 12.dp)
-                                )
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = displayName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = item.resource.location.encodedPath,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
+                        FileListItem(
+                            item = item,
+                            onDirectoryClick = onDirectoryClick,
+                            onFileClick = onFileClick
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FileListItem(
+    item: DavResourceItem,
+    onDirectoryClick: (DavResourceItem) -> Unit,
+    onFileClick: (DavResourceItem) -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    val displayName = item.resource.location.encodedPath
+        .trimEnd('/')
+        .substringAfterLast('/')
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .combinedClickable(
+                onClick = {
+                    if (item.isDirectory) {
+                        onDirectoryClick(item)
+                    }
+                },
+                onLongClick = {
+                    if (!item.isDirectory) {
+                        showMenu = true
+                    }
+                }
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (item.isDirectory) "📁" else "📄",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(end = 12.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = item.resource.location.encodedPath,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.webdav_restore)) },
+                onClick = {
+                    showMenu = false
+                    onFileClick(item)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.webdav_upload)) },
+                onClick = {
+                    showMenu = false
+                    // TODO: 上传备份功能
+                }
+            )
         }
     }
 }

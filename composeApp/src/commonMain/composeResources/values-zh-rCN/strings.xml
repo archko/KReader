@@ -120,6 +120,8 @@
     <string name="webdav_config_btn_do">配置</string>
     <string name="webdav_config_btn_save">保存配置</string>
     <string name="webdav_config_no_files">暂无文件</string>
+    <string name="webdav_restore">下载恢复</string>
+    <string name="webdav_upload">上传备份</string>
 
     <string name="tts_setting_title">语音设置</string>
     <string name="tts_queue_title">朗读队列</string>

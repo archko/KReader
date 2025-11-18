@@ -28,7 +28,6 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.lifecycle.viewmodel.compose.android)
-            implementation(libs.ktor.client.okhttp)
         }
         commonMain.dependencies {
             implementation(project(":lib"))
@@ -49,16 +48,12 @@ kotlin {
             api(libs.coil.kt.compose)
             api(libs.coil.kt.okhttp)
             implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(project(":dav4kmp"))
-            api(libs.ktor.client.core)
-            api(libs.ktor.client.content.negotiation)
         }
         desktopMain.dependencies {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.sonner)
-            implementation(libs.ktor.client.cio)
         }
     }
 }

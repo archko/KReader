@@ -119,6 +119,8 @@
     <string name="webdav_config_btn_do">Config</string>
     <string name="webdav_config_btn_save">Save</string>
     <string name="webdav_config_no_files">No Files</string>
+    <string name="webdav_restore">Download &amp; Restore</string>
+    <string name="webdav_upload">Upload Backup</string>
 
     <string name="tts_setting_title">Tts Setting</string>
     <string name="tts_queue_title">Queue</string>

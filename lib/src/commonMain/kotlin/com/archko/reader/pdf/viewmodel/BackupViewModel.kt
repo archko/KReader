@@ -1,13 +1,16 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.viewmodel
 
 import androidx.lifecycle.ViewModel
+import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.BookProgressParser
-import com.archko.reader.pdf.cache.getProgressCacheFile
 import com.archko.reader.pdf.cache.getWebdavCacheDir
 import com.archko.reader.pdf.cache.saveWebdavCacheFile
+import com.archko.reader.pdf.entity.DavResourceItem
+import com.archko.reader.pdf.entity.WebdavUser
 import io.github.triangleofice.dav4kmp.DavCollection
 import io.github.triangleofice.dav4kmp.DavResource
-import io.github.triangleofice.dav4kmp.Response.HrefRelation
+import io.github.triangleofice.dav4kmp.Response
+import io.github.triangleofice.dav4kmp.property.GetContentType
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
@@ -15,8 +18,10 @@ import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,31 +30,27 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.net.URLDecoder
 
 /**
  * @author: archko 2020/11/16 :11:23
  */
-class BackupViewModel : ViewModel() {
+public class BackupViewModel : ViewModel() {
 
-    //private val progressDao by lazy { Graph.database.progressDao() }
-    var webdavUser: WebdavUser? = null
+    public var database: AppDatabase? = null
+    public var webdavUser: WebdavUser? = null
     private var httpClient: HttpClient? = null
     private var davCollection: DavCollection? = null
 
-    data class DavResourceItem(
-        val resource: DavResource,
-        val isDirectory: Boolean
-    )
-
     private val _uiDavResourceModel = MutableStateFlow<List<DavResourceItem>?>(null)
-    val uiDavResourceModel: StateFlow<List<DavResourceItem>?>
+    public val uiDavResourceModel: StateFlow<List<DavResourceItem>?>
         get() = _uiDavResourceModel.asStateFlow()
 
     //private val _uiRestoreModel = MutableStateFlow<ResponseHandler<Boolean>?>(null)
     //val uiRestoreModel: StateFlow<ResponseHandler<Boolean>?>
     //    get() = _uiRestoreModel.asStateFlow()
 
-    fun checkAndLoadUser(): Boolean {
+    public fun checkAndLoadUser(): Boolean {
         if (null == webdavUser) {
             try {
                 val dir = getWebdavCacheDir()
@@ -110,7 +111,7 @@ class BackupViewModel : ViewModel() {
         }
     }*/
 
-    fun backupToWebdav() = flow {
+    public fun backupToWebdav(): Flow<Boolean> = flow {
         try {
             if (!checkAndLoadUser() || davCollection == null) {
                 emit(false)
@@ -131,7 +132,7 @@ class BackupViewModel : ViewModel() {
             // 使用 dav4kmp 上传文件
             val fileName = DEFAULT_JSON
             val fileUrl = buildWebdavUrl(webdavUser!!.host, "${webdavUser!!.path}/$fileName")
-            
+
             davCollection!!.put(
                 body = content.toByteArray()
             ) { response ->
@@ -145,7 +146,7 @@ class BackupViewModel : ViewModel() {
         }
     }.flowOn(Dispatchers.IO)
 
-    suspend fun restoreFromWebdav(name: String) = flow {
+    public fun restoreFromWebdav(filePath: String): Flow<Boolean> = flow {
         try {
             if (!checkAndLoadUser() || davCollection == null) {
                 emit(false)
@@ -153,7 +154,9 @@ class BackupViewModel : ViewModel() {
             }
 
             // 使用 dav4kmp 下载文件
-            val fileUrl = buildWebdavUrl(webdavUser!!.host, "${webdavUser!!.path}/$name")
+            // filePath 是完整路径，例如：/dav/path/file.json
+            val fileUrl = "${webdavUser!!.host}$filePath"
+            println("restoreFromWebdav - fileUrl: $fileUrl")
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
 
             var content = ""
@@ -161,15 +164,16 @@ class BackupViewModel : ViewModel() {
                 content = response.bodyAsText()
             }
 
-            val result = restore(content)
+            val result = restore(database, content)
             emit(result)
         } catch (e: Exception) {
             emit(false)
-            println(e.message)
+            println("restoreFromWebdav error: ${e.message}")
+            e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
 
-    suspend fun loadFileList(path: String) {
+    public suspend fun loadFileList(path: String) {
         flow {
             if (!checkAndLoadUser() || httpClient == null) {
                 emit(listOf())
@@ -188,13 +192,6 @@ class BackupViewModel : ViewModel() {
             .collectLatest { _uiDavResourceModel.value = it }
     }
 
-    fun test() {
-        val name = "mupdf_2024-12-10-09-03-21"
-        val file = getProgressCacheFile(name)
-        val recentList = BookProgressParser.parseRecents(file.readText())
-        println(recentList.size)
-    }
-
     private suspend fun listFilesWithType(
         client: HttpClient,
         path: String,
@@ -207,16 +204,16 @@ class BackupViewModel : ViewModel() {
         val collection = DavCollection(client, Url(filePath))
         val davResources = mutableListOf<DavResourceItem>()
         collection.propfind(depth = 1) { response, relation ->
-            if (relation != HrefRelation.SELF) {
+            if (relation != Response.HrefRelation.SELF) {
                 val decodedHref = try {
-                    java.net.URLDecoder.decode(response.href.toString(), "UTF-8")
-                } catch (e: Exception) {
+                    URLDecoder.decode(response.href.toString(), "UTF-8")
+                } catch (_: Exception) {
                     response.href.toString()
                 }
                 val resource = DavResource(client, Url(decodedHref))
                 val isDirectory = response.properties.any { prop ->
                     when (prop) {
-                        is io.github.triangleofice.dav4kmp.property.GetContentType ->
+                        is GetContentType ->
                             prop.type?.contentType == "httpd/unix-directory"
 
                         else -> prop.toString().contains("collection", ignoreCase = true)
@@ -254,7 +251,12 @@ class BackupViewModel : ViewModel() {
     /**
      * 保存,需要确定path是要可建立目录的权限目录下,坚果云只能在"dav/我的坚果云"路径下才有权限.
      */
-    suspend fun saveWebdavUser(name: String, pass: String, host: String, path: String) = flow {
+    public fun saveWebdavUser(
+        name: String,
+        pass: String,
+        host: String,
+        path: String
+    ): Flow<Boolean> = flow {
         try {
             val testHttpClient = createHttpClient(name, pass)
             val fullUrl = buildWebdavUrl(host, path)
@@ -291,15 +293,15 @@ class BackupViewModel : ViewModel() {
         return "$normalizedHost$normalizedPath"
     }
 
-    companion object {
+    public companion object {
 
-        const val DEFAULT_JSON = "kreader_lastest.json"
-        const val KEY_CONFIG_JSON = "webdav_config_json"
-        const val KEY_CONFIG_USER = "webdav_config_user"
-        const val KEY_NAME = "name"
-        const val KEY_PASS = "pass"
-        const val KEY_PATH = "path"
-        const val KEY_HOST = "host"
+        public const val DEFAULT_JSON: String = "kreader_lastest.json"
+        public const val KEY_CONFIG_JSON: String = "webdav_config_json"
+        public const val KEY_CONFIG_USER: String = "webdav_config_user"
+        public const val KEY_NAME: String = "name"
+        public const val KEY_PASS: String = "pass"
+        public const val KEY_PATH: String = "path"
+        public const val KEY_HOST: String = "host"
 
         //const val JIANGUOYUN = "https://dav.jianguoyun.com"
         //const val PATH = "/dav/我的坚果云"
@@ -342,7 +344,7 @@ class BackupViewModel : ViewModel() {
             }
         }
 
-        suspend fun uploadFile(
+        public suspend fun uploadFile(
             client: HttpClient,
             data: ByteArray,
             path: String,
@@ -352,13 +354,13 @@ class BackupViewModel : ViewModel() {
             val davCollection = DavCollection(client, Url(filePath))
             davCollection.put(
                 body = data,
-                contentType = io.ktor.http.ContentType.Application.OctetStream
+                contentType = ContentType.Application.OctetStream
             ) { response ->
                 println("Upload file successful: ${response.status}")
             }
         }
 
-        suspend fun uploadFile(
+        public suspend fun uploadFile(
             client: HttpClient,
             fileContent: String,
             path: String,
@@ -369,13 +371,13 @@ class BackupViewModel : ViewModel() {
             val davCollection = DavCollection(client, Url(filePath))
             davCollection.put(
                 body = data,
-                contentType = io.ktor.http.ContentType.Application.OctetStream
+                contentType = ContentType.Application.OctetStream
             ) { response ->
                 println("Upload file successful: ${response.status}")
             }
         }
 
-        suspend fun listFiles(
+        public suspend fun listFiles(
             client: HttpClient,
             path: String,
             webdavUser: WebdavUser?
@@ -389,11 +391,11 @@ class BackupViewModel : ViewModel() {
             val davResources = mutableListOf<DavResource>()
             collection.propfind(depth = 1) { response, relation ->
                 // 跳过当前目录本身
-                if (relation != HrefRelation.SELF) {
+                if (relation != Response.HrefRelation.SELF) {
                     val resource = DavResource(client, Url(response.href.toString()))
                     // 为目录添加标记，通过检查 contentType 或 collection 属性
                     val isDirectory = response.properties.any { prop ->
-                        (prop is io.github.triangleofice.dav4kmp.property.GetContentType &&
+                        (prop is GetContentType &&
                                 prop.type?.contentType == "httpd/unix-directory") ||
                                 prop.toString().contains("collection", ignoreCase = true)
                     }
@@ -403,7 +405,7 @@ class BackupViewModel : ViewModel() {
             return davResources
         }
 
-        suspend fun downloadFile(
+        public suspend fun downloadFile(
             client: HttpClient,
             name: String,
             webdavUser: WebdavUser?
@@ -418,7 +420,7 @@ class BackupViewModel : ViewModel() {
             return fileContent
         }
 
-        suspend fun deleteFile(client: HttpClient, name: String, webdavUser: WebdavUser?) {
+        public suspend fun deleteFile(client: HttpClient, name: String, webdavUser: WebdavUser?) {
             val filePath = "${webdavUser?.host}$name"
             val davCollection = DavCollection(client, Url(filePath))
             davCollection.delete { response ->
@@ -426,17 +428,29 @@ class BackupViewModel : ViewModel() {
             }
         }
 
-        fun restore(content: String): Boolean {
-            /*try {
-                val progresses = BookProgressParser.parseProgresses(content)
-                Graph.database.runInTransaction {
-                    Graph.database.progressDao().deleteAllProgress()
-                    Graph.database.progressDao().addProgresses(progresses)
+        public suspend fun restore(database: AppDatabase?, content: String): Boolean {
+            try {
+                if (database == null) {
+                    println("restore: database is null")
+                    return false
                 }
+
+                val recents = BookProgressParser.parseRecents(content)
+                if (recents.isEmpty()) {
+                    println("restore: no recents found in content")
+                    return false
+                }
+
+                // 清除现有数据并插入新数据
+                database.recentDao().deleteAllRecents()
+                database.recentDao().addRecents(recents)
+
+                println("restore: successfully restored ${recents.size} records")
                 return true
             } catch (e: Exception) {
-                println(e.message)
-            }*/
+                println("restore error: ${e.message}")
+                e.printStackTrace()
+            }
             return false
         }
     }

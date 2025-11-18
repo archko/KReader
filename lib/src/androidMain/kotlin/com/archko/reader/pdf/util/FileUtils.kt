@@ -88,13 +88,13 @@ public class FileUtils private constructor() {
         }
 
         public fun getStoragePath(path: String?): String {
-            return Environment.getExternalStorageDirectory().getPath() + "/" + (path)
+            return Environment.getExternalStorageDirectory().path + "/" + (path)
         }
 
         public fun getStorageDir(dir: String?): File {
             //String path = Environment.getExternalStorageDirectory().getPath() + "/" + dir;
             val sdcardRoot: String = getStorageDirPath()
-            val file = File(sdcardRoot + "/" + dir)
+            val file = File("$sdcardRoot/$dir")
             if (!file.exists()) {
                 file.mkdirs()
             }
@@ -102,11 +102,11 @@ public class FileUtils private constructor() {
         }
 
         public fun getStorageDirPath(): String {
-            var externalFileRootDir: File? = PdfApp.Companion.app!!.getExternalFilesDir(null)
+            var externalFileRootDir: File? = PdfApp.app!!.getExternalFilesDir(null)
             do {
                 externalFileRootDir =
-                    Objects.requireNonNull<File?>(externalFileRootDir).getParentFile()
-            } while (Objects.requireNonNull<File?>(externalFileRootDir).getAbsolutePath()
+                    Objects.requireNonNull<File?>(externalFileRootDir).parentFile
+            } while (Objects.requireNonNull<File?>(externalFileRootDir).absolutePath
                     .contains("/Android")
             )
             var sdcardRoot: String? = null

@@ -137,7 +137,7 @@ public class Recent {
                 ", zoom=" + zoom +
                 ", scrollX=" + scrollX +
                 ", scrollY=" + scrollY +
-                ", uri='" + path + '\'' +
+                ", path='" + path + '\'' +
                 ", name='" + name + '\'' +
                 ", ext='" + ext + '\'' +
                 ", size=" + size +

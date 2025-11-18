@@ -192,6 +192,8 @@ public class APageSizeLoader {
     }
 }
 
+public expect fun getStoragePath(name: String): String
+
 public expect fun getPageCacheFile(file: File): File
 
 public expect fun getProgressCacheFile(name: String): File

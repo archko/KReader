@@ -26,7 +26,15 @@ public object BookProgressParser {
 
     public fun addRecentToJson(recent: Recent): JsonObject {
         return buildJsonObject {
-            put("path", recent.path ?: "")
+            // URL encode the path
+            val encodedPath = recent.path?.let {
+                try {
+                    java.net.URLEncoder.encode(it, "UTF-8")
+                } catch (e: Exception) {
+                    it // 如果编码失败，使用原始值
+                }
+            } ?: ""
+            put("path", encodedPath)
             put("name", recent.name ?: "")
             put("ext", recent.ext ?: "")
             put("pageCount", recent.pageCount ?: 0)
@@ -55,7 +63,16 @@ public object BookProgressParser {
 
         return try {
             val recent = Recent()
-            recent.path = jsonObject["path"]?.jsonPrimitive?.contentOrNull
+            // Decode URL-encoded path and add storage path prefix
+            val encodedPath = jsonObject["path"]?.jsonPrimitive?.contentOrNull
+            recent.path = encodedPath?.let {
+                try {
+                    val decodedPath = java.net.URLDecoder.decode(it, "UTF-8")
+                    getStoragePath(decodedPath)
+                } catch (e: Exception) {
+                    it // 如果解码失败，使用原始值
+                }
+            }
             recent.name = jsonObject["name"]?.jsonPrimitive?.contentOrNull
             recent.ext = jsonObject["ext"]?.jsonPrimitive?.contentOrNull
             recent.pageCount = jsonObject["pageCount"]?.jsonPrimitive?.longOrNull ?: 0

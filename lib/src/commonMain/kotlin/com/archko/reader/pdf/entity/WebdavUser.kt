@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.entity
 
 import kotlinx.serialization.Serializable
 
@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
  * @author: archko 2025/11/16 :10:06
  */
 @Serializable
-data class WebdavUser(
+public data class WebdavUser(
     val name: String,
     val pass: String,
     val host: String,

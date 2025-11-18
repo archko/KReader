@@ -29,6 +29,7 @@ kotlin {
             api(libs.tiff.loader)
             api(libs.mmkv)
             api(libs.crashreport)
+            implementation(libs.ktor.client.okhttp)
         }
         commonMain {
             dependencies {
@@ -44,6 +45,10 @@ kotlin {
                 implementation(libs.ktor.serialization.kotlinx.json)
 
                 api(libs.jsoup)
+
+                api(project(":dav4kmp"))
+                api(libs.ktor.client.core)
+                api(libs.ktor.client.content.negotiation)
             }
         }
 
@@ -53,6 +58,7 @@ kotlin {
                 implementation(libs.sqlite.bundled)
                 api(libs.mupdf.fitz)
                 api(libs.tiff.loader.jar)
+                implementation(libs.ktor.client.cio)
             }
         }
     }
