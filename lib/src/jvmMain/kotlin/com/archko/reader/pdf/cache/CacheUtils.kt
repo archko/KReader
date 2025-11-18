@@ -6,9 +6,9 @@ import java.io.File
 /**
  * @author: archko 2025/11/1 :9:04 下午
  */
-public actual fun getStoragePath(name: String): String {
+public actual fun getStoragePath(): String {
     val userHome = System.getProperty("user.home")
-    return "$userHome/$name"
+    return userHome
 }
 
 public actual fun getPageCacheFile(file: File): File {

@@ -7,8 +7,8 @@ import java.io.File
 /**
  * @author: archko 2020/11/1 :9:04 下午
  */
-public actual fun getStoragePath(name: String): String {
-    return FileUtils.getStoragePath(name)
+public actual fun getStoragePath(): String {
+    return FileUtils.getStoragePath("")
 }
 
 public actual fun getPageCacheFile(file: File): File {
