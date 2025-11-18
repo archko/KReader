@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -128,27 +127,17 @@ fun PdfCreateDialog(
         }
     }
 
-    Toaster(
-        state = toaster,
-        maxVisibleToasts = 1,
-        alignment = Alignment.Center,
-    )
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 1000.dp),
+                .widthIn(max = 800.dp),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface
         ) {
-            Surface(
-                modifier = Modifier.wrapContentSize(),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface
-            ) {
+            Box {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -287,6 +276,12 @@ fun PdfCreateDialog(
                         }
                     }
                 }
+
+                Toaster(
+                    state = toaster,
+                    maxVisibleToasts = 1,
+                    alignment = Alignment.Center,
+                )
             }
         }
     }
