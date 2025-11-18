@@ -122,6 +122,10 @@
     <string name="webdav_config_no_files">暂无文件</string>
     <string name="webdav_restore">下载恢复</string>
     <string name="webdav_upload">上传备份</string>
+    <string name="webdav_config_success">设置Webdav成功</string>
+    <string name="webdav_config_failed">设置Webdav失败</string>
+    <string name="webdav_upload_success">上传备份成功</string>
+    <string name="webdav_upload_failed">上传备份失败</string>
 
     <string name="tts_setting_title">语音设置</string>
     <string name="tts_queue_title">朗读队列</string>

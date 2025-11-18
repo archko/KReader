@@ -49,6 +49,7 @@ kotlin {
                 api(project(":dav4kmp"))
                 api(libs.ktor.client.core)
                 api(libs.ktor.client.content.negotiation)
+                api(libs.sonner)
             }
         }
 

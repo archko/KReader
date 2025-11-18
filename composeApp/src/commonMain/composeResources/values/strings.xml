@@ -121,6 +121,10 @@
     <string name="webdav_config_no_files">No Files</string>
     <string name="webdav_restore">Download &amp; Restore</string>
     <string name="webdav_upload">Upload Backup</string>
+    <string name="webdav_config_success">Set Webdav Successfully</string>
+    <string name="webdav_config_failed">Set Webdav Failed</string>
+    <string name="webdav_upload_success">Upload Backup Successfully</string>
+    <string name="webdav_upload_failed">Upload Backup Failed</string>
 
     <string name="tts_setting_title">Tts Setting</string>
     <string name="tts_queue_title">Queue</string>

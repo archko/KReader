@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.viewer.dialog
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures

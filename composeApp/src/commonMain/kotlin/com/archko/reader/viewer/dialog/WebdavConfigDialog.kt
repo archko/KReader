@@ -44,11 +44,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.entity.DavResourceItem
 import com.archko.reader.pdf.viewmodel.BackupViewModel
+import com.dokar.sonner.ToastType
+import com.dokar.sonner.Toaster
+import com.dokar.sonner.rememberToasterState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -61,6 +65,7 @@ fun WebdavConfigDialog(
     onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val toaster = rememberToasterState()
 
     // 视图状态：true = 显示列表，false = 显示配置表单
     var showListView by remember { mutableStateOf(viewModel.checkAndLoadUser()) }
@@ -140,11 +145,16 @@ fun WebdavConfigDialog(
                                     .collectLatest { success ->
                                         isConfiguring = false
                                         if (success) {
-                                            // 配置成功，切换到列表视图
                                             showListView = true
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_config_success),
+                                                type = ToastType.Success,
+                                            )
                                         } else {
-                                            // 配置失败，显示错误提示
-                                            // TODO: 显示错误消息
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_config_failed),
+                                                type = ToastType.Success,
+                                            )
                                         }
                                     }
                             }
@@ -207,10 +217,16 @@ fun WebdavConfigDialog(
                                     .collectLatest { success ->
                                         if (success) {
                                             println("Restore successful: $fileName")
-                                            // TODO: 显示成功提示
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_upload_success),
+                                                type = ToastType.Success,
+                                            )
                                         } else {
                                             println("Restore failed: $fileName")
-                                            // TODO: 显示失败提示
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_upload_failed),
+                                                type = ToastType.Error,
+                                            )
                                         }
                                     }
                             }
@@ -232,6 +248,12 @@ fun WebdavConfigDialog(
             }
         }
     }
+
+    Toaster(
+        state = toaster,
+        maxVisibleToasts = 1,
+        alignment = Alignment.Center,
+    )
 }
 
 @Composable
@@ -325,10 +347,7 @@ private fun FileListItem(
                 onClick = {
                     if (item.isDirectory) {
                         onDirectoryClick(item)
-                    }
-                },
-                onLongClick = {
-                    if (!item.isDirectory) {
+                    } else {
                         showMenu = true
                     }
                 }
