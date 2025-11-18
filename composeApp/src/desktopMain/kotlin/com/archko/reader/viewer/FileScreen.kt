@@ -186,8 +186,8 @@ fun FileScreen(
 
                     println("FileScreen: 文件类型支持，准备打开")
                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
-                    viewModel.getProgress(path)
-                    val startPage = viewModel.progress?.page?.toInt() ?: 0
+                    viewModel.getRecent(path)
+                    val startPage = viewModel.recent?.page?.toInt() ?: 0
                     println("FileScreen: 开始页码: $startPage")
                     openDocRequest = OpenDocRequest(listOf(path), startPage)
                     println("FileScreen: 已设置打开文档请求")
@@ -233,8 +233,8 @@ fun FileScreen(
                                     // 如果是文档文件，直接打开
                                     val paths = listOf(path)
                                     if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                        viewModel.getProgress(path)
-                                        val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                        viewModel.getRecent(path)
+                                        val startPage = viewModel.recent?.page?.toInt() ?: 0
                                         openDocRequest = OpenDocRequest(paths, startPage)
                                     } else {
                                         openDocRequest = OpenDocRequest(paths, 0)
@@ -323,7 +323,7 @@ fun FileScreen(
                                         scope.launch {
                                             val paths = listOf(file.file.absolutePath)
                                             if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                                viewModel.getProgress(file.file.absolutePath)
+                                                viewModel.getRecent(file.file.absolutePath)
                                                 openDocRequest = OpenDocRequest(paths, page)
                                             } else {
                                                 openDocRequest = OpenDocRequest(paths, 0)
@@ -387,7 +387,7 @@ fun FileScreen(
                     paths = openDocRequest!!.paths,
                     progressPage = openDocRequest!!.page,
                     onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
-                        viewModel.updateProgress(
+                        viewModel.updateRecent(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
                             zoom = zoom,
@@ -401,12 +401,12 @@ fun FileScreen(
                     onCloseDocument = {
                         openDocRequest = null
                     },
-                    initialScrollX = viewModel.progress?.scrollX ?: 0L,
-                    initialScrollY = viewModel.progress?.scrollY ?: 0L,
-                    initialZoom = viewModel.progress?.zoom ?: 1.0,
-                    scrollOri = viewModel.progress?.scrollOri ?: 0,
-                    reflow = viewModel.progress?.reflow ?: 0L,
-                    crop = 0L == viewModel.progress?.crop
+                    initialScrollX = viewModel.recent?.scrollX ?: 0L,
+                    initialScrollY = viewModel.recent?.scrollY ?: 0L,
+                    initialZoom = viewModel.recent?.zoom ?: 1.0,
+                    scrollOri = viewModel.recent?.scrollOri ?: 0,
+                    reflow = viewModel.recent?.reflow ?: 0L,
+                    crop = 0L == viewModel.recent?.crop
                 )
             }
         }

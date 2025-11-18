@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.entity.Recent
+import com.archko.reader.pdf.util.getExtension
+import com.archko.reader.pdf.util.getFileName
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * @author: archko 2025/2/14 :21:42
@@ -26,52 +29,64 @@ public class PdfViewModel : ViewModel() {
 
     public val pageSize: Int = 15 // 每页15条记录
 
-    public var progress: Recent? = null
+    public var recent: Recent? = null
     public var path: String? = null
 
     public fun insertOrUpdate(path: String, pageCount: Long) {
         this.path = path
         viewModelScope.launch {
-            val selProgress = database?.recentDao()?.getRecent(path)
-            if (selProgress == null) {
+            val file = File(path)
+            val selRecent = database?.recentDao()?.getRecent(path)
+            if (selRecent == null) {
                 database?.recentDao()?.addRecent(
                     Recent(
-                        path,
-                        0,
-                        pageCount,
-                        System.currentTimeMillis(),
-                        System.currentTimeMillis(),
-                        1,
-                        0,
-                        0,
-                        1.0,
-                        0,
-                        0
+                        path = path,
+                        page = 0L,
+                        pageCount = pageCount,
+                        createAt = System.currentTimeMillis(),
+                        updateAt = System.currentTimeMillis(),
+                        crop = 1L,
+                        reflow = 0L,
+                        scrollOri = 1L,
+                        zoom = 1.0,
+                        scrollX = 0L,
+                        scrollY = 0L,
+                        name = path.getFileName(),
+                        ext = path.getExtension(),
+                        size = file.length(),
+                        readTimes = 1L,
+                        progress = 0L,
+                        isFavorited = 0L,
+                        inRecent = 1L
                     )
                 )
             } else {
-                selProgress.apply {
+                selRecent.apply {
                     this.pageCount = pageCount
-                    createAt = System.currentTimeMillis()
+                    this.updateAt = System.currentTimeMillis()
+                    this.readTimes = (this.readTimes ?: 0) + 1
+                    this.name = path.getFileName()
+                    this.ext = path.getExtension()
+                    this.size = file.length()
                 }
-                database?.recentDao()?.updateRecent(selProgress)
+                database?.recentDao()?.updateRecent(selRecent)
             }
-            progress = database?.recentDao()?.getRecent(path)
-            println("PdfViewModel.insertOrUpdate:${progress}")
+            recent = database?.recentDao()?.getRecent(path)
+            println("PdfViewModel.insertOrUpdate:${recent}")
 
             // 增量更新：如果记录不在当前列表中且列表未满，添加到开头
-            if (progress != null) {
+            if (recent != null) {
                 val currentList = _recentList.value.toMutableList()
                 val existingIndex = currentList.indexOfFirst { it.path == path }
                 if (existingIndex != -1) {
                     // 如果记录已存在，从原位置删除，然后添加到开头（按时间排序）
                     currentList.removeAt(existingIndex)
-                    currentList.add(0, progress!!)
+                    currentList.add(0, recent!!)
                     _recentList.value = currentList
                     println("PdfViewModel.insertOrUpdate - moved existing record to beginning from index: $existingIndex")
                 } else if (currentList.size < pageSize) {
                     // 如果记录不存在且列表未满，添加到开头
-                    currentList.add(0, progress!!)
+                    currentList.add(0, recent!!)
                     _recentList.value = currentList
                     println("PdfViewModel.insertOrUpdate - added new record to beginning")
                 } else {
@@ -86,46 +101,59 @@ public class PdfViewModel : ViewModel() {
         this.path = path
         val deferred = CompletableDeferred<Unit>()
         viewModelScope.launch {
-            val selProgress = database?.recentDao()?.getRecent(path)
-            if (selProgress == null) {
+            val file = File(path)
+            val selRecent = database?.recentDao()?.getRecent(path)
+            if (selRecent == null) {
                 database?.recentDao()?.addRecent(
                     Recent(
-                        path,
-                        0,
-                        pageCount,
-                        System.currentTimeMillis(),
-                        System.currentTimeMillis(),
-                        1,
-                        reflow,
-                        0,
-                        1.0,
-                        0,
-                        0
+                        path = path,
+                        page = 0L,
+                        pageCount = pageCount,
+                        createAt = System.currentTimeMillis(),
+                        updateAt = System.currentTimeMillis(),
+                        crop = 1L,
+                        reflow = reflow,
+                        scrollOri = 1L,
+                        zoom = 1.0,
+                        scrollX = 0L,
+                        scrollY = 0L,
+                        name = path.getFileName(),
+                        ext = path.getExtension(),
+                        size = file.length(),
+                        readTimes = 1L,
+                        progress = 0L,
+                        isFavorited = 0L,
+                        inRecent = 1L
                     )
                 )
             } else {
-                selProgress.apply {
+                selRecent.apply {
                     this.pageCount = pageCount
-                    createAt = System.currentTimeMillis()
+                    this.updateAt = System.currentTimeMillis()
+                    this.reflow = reflow
+                    this.readTimes = (this.readTimes ?: 0) + 1
+                    this.name = path.getFileName()
+                    this.ext = path.getExtension()
+                    this.size = file.length()
                 }
-                database?.recentDao()?.updateRecent(selProgress)
+                database?.recentDao()?.updateRecent(selRecent)
             }
-            progress = database?.recentDao()?.getRecent(path)
-            println("PdfViewModel.insertOrUpdateAndWait:${progress}")
+            this@PdfViewModel.recent = database?.recentDao()?.getRecent(path)
+            println("PdfViewModel.insertOrUpdateAndWait:${this@PdfViewModel.recent}")
 
             // 增量更新：如果记录不在当前列表中且列表未满，添加到开头
-            if (progress != null) {
+            if (this@PdfViewModel.recent != null) {
                 val currentList = _recentList.value.toMutableList()
                 val existingIndex = currentList.indexOfFirst { it.path == path }
                 if (existingIndex != -1) {
                     // 如果记录已存在，从原位置删除，然后添加到开头（按时间排序）
                     currentList.removeAt(existingIndex)
-                    currentList.add(0, progress!!)
+                    currentList.add(0, this@PdfViewModel.recent!!)
                     _recentList.value = currentList
                     println("PdfViewModel.insertOrUpdateAndWait - moved existing record to beginning from index: $existingIndex")
                 } else if (currentList.size < pageSize) {
                     // 如果记录不存在且列表未满，添加到开头
-                    currentList.add(0, progress!!)
+                    currentList.add(0, this@PdfViewModel.recent!!)
                     _recentList.value = currentList
                     println("PdfViewModel.insertOrUpdateAndWait - added new record to beginning")
                 } else {
@@ -139,7 +167,7 @@ public class PdfViewModel : ViewModel() {
         deferred.await()
     }
 
-    public fun updateProgress(
+    public fun updateRecent(
         page: Long,
         pageCount: Long,
         zoom: Double,
@@ -149,84 +177,96 @@ public class PdfViewModel : ViewModel() {
         scrollOri: Long,
         reflow: Long,
     ) {
-        println("PdfViewModel.updateProgress:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, old:$progress")
+        println("PdfViewModel.updateRecent:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, old:$recent")
         if (path == null) {
             return
         }
         viewModelScope.launch {
-            // 如果progress为空但path不为空，则新建一个记录
-            if (progress == null && path != null) {
+            val file = File(path)
+            // 如果recent为空但path不为空，则新建一个记录
+            if (recent == null && path != null) {
                 println("PdfViewModel.get:$path, page:$page")
 
-                progress = database?.recentDao()?.getRecent(path!!)
+                recent = database?.recentDao()?.getRecent(path!!)
             }
-            if (progress == null) {
-                val newProgress = Recent(
-                    path!!,
-                    page,
-                    pageCount,
-                    System.currentTimeMillis(),
-                    System.currentTimeMillis(),
-                    crop,
-                    reflow,
-                    scrollOri,
-                    zoom,
-                    scrollX,
-                    scrollY,
+            if (recent == null) {
+                val recent = Recent(
+                    path = path!!,
+                    page = page,
+                    pageCount = pageCount,
+                    createAt = System.currentTimeMillis(),
+                    updateAt = System.currentTimeMillis(),
+                    crop = crop,
+                    reflow = reflow,
+                    scrollOri = scrollOri,
+                    zoom = zoom,
+                    scrollX = scrollX,
+                    scrollY = scrollY,
+                    name = path!!.getFileName(),
+                    ext = path!!.getExtension(),
+                    size = file.length(),
+                    readTimes = 1L,
+                    progress = if (pageCount > 0) (page * 100 / pageCount) else 0L,
+                    isFavorited = 0L,
+                    inRecent = 1L
                 )
-                database?.recentDao()?.addRecent(newProgress)
-                progress = database?.recentDao()?.getRecent(path!!)
-                println("PdfViewModel.updateProgress-created:$progress")
+                database?.recentDao()?.addRecent(recent)
+                this@PdfViewModel.recent = database?.recentDao()?.getRecent(path!!)
+                println("PdfViewModel.updateRecent-created:${this@PdfViewModel.recent}")
             } else {
                 // 更新现有记录
-                progress?.run {
-                    progress!!.apply {
+                recent?.run {
+                    recent!!.apply {
                         this.page = page
                         this.pageCount = pageCount
-                        updateAt = System.currentTimeMillis()
+                        this.updateAt = System.currentTimeMillis()
                         this.crop = crop
                         this.reflow = reflow
                         this.zoom = zoom
                         this.scrollX = scrollX
                         this.scrollY = scrollY
                         this.scrollOri = scrollOri
+                        this.progress = if (pageCount > 0) (page * 100 / pageCount) else 0L
+                        this.name = path?.getFileName()
+                        this.ext = path?.getExtension()
+                        this.size = file.length()
                     }
-                    database?.recentDao()?.updateRecent(progress!!)
+                    database?.recentDao()?.updateRecent(recent!!)
                     path?.run {
-                        progress = database?.recentDao()?.getRecent(path!!)
-                        println("PdfViewModel.updateProgress.after:$progress")
+                        recent = database?.recentDao()?.getRecent(path!!)
+                        println("PdfViewModel.updateRecent.after:$recent")
                     }
                 }
             }
 
-            // 如果progress不为空，更新列表
-            progress?.let { currentProgress ->
+            // 如果recent不为空，更新列表
+            recent?.let { currentRecent ->
                 // 增量更新：从列表中删除旧记录，然后添加到开头（按updateAt排序）
                 val currentList = _recentList.value.toMutableList()
-                val updatedIndex = currentList.indexOfFirst { it.path == currentProgress.path }
-                println("PdfViewModel.updateProgress - currentList size: ${currentList.size}, updatedIndex: $updatedIndex")
+                val updatedIndex = currentList.indexOfFirst { it.path == currentRecent.path }
+                println("PdfViewModel.updateRecent - currentList size: ${currentList.size}, updatedIndex: $updatedIndex")
 
                 if (updatedIndex != -1) {
                     // 从原位置删除旧记录
                     currentList.removeAt(updatedIndex)
-                    println("PdfViewModel.updateProgress - removed old record from index: $updatedIndex")
+                    println("PdfViewModel.updateRecent - removed old record from index: $updatedIndex")
                 }
 
                 // 将更新后的记录添加到列表开头（因为updateAt最新）
-                currentList.add(0, currentProgress)
+                currentList.add(0, currentRecent)
                 _recentList.value = currentList
-                println("PdfViewModel.updateProgress - added updated record to beginning, new list size: ${_recentList.value.size}")
+                println("PdfViewModel.updateRecent - added updated record to beginning, new list size: ${_recentList.value.size}")
             }
         }
     }
 
-    public fun updateProgress(
+    public fun updateRecent(
         page: Long,
         path: String
     ) {
         viewModelScope.launch {
             val old = database?.recentDao()?.getRecent(path)
-            println("PdfViewModel.updateProgress:$page, path:$path, old:$old")
+            println("PdfViewModel.updateRecent:$page, path:$path, old:$old")
 
             if (old != null) {
                 old.apply {
@@ -234,7 +274,7 @@ public class PdfViewModel : ViewModel() {
                     updateAt = System.currentTimeMillis()
                 }
                 database?.recentDao()?.updateRecent(old)
-                println("PdfViewModel.updateProgress.after:$old")
+                println("PdfViewModel.updateRecent.after:$old")
             }
         }
     }
@@ -243,13 +283,13 @@ public class PdfViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val progresses = database?.recentDao()?.getRecents(0, pageSize)
-                println("PdfViewModel.loadRecents:${progresses?.size}")
-                if (progresses != null) {
-                    if (progresses.isNotEmpty()) {
-                        _recentList.value = progresses
+                val recents = database?.recentDao()?.getRecents(0, pageSize)
+                println("PdfViewModel.loadRecents:${recents?.size}")
+                if (recents != null) {
+                    if (recents.isNotEmpty()) {
+                        _recentList.value = recents
                         // 如果查询结果少于pageSize，说明没有更多数据了
-                        _hasMoreData.value = progresses.size >= pageSize
+                        _hasMoreData.value = recents.size >= pageSize
                     } else {
                         _recentList.value = emptyList()
                         _hasMoreData.value = false
@@ -277,15 +317,15 @@ public class PdfViewModel : ViewModel() {
                 val lastUpdateAt = currentList.last().updateAt ?: 0L
 
                 // 查询updateAt小于最后一条数据的所有记录，按updateAt desc排序
-                val progresses = database?.recentDao()?.getRecentsAfter(lastUpdateAt, pageSize)
+                val recents = database?.recentDao()?.getRecentsAfter(lastUpdateAt, pageSize)
 
-                if (progresses != null && progresses.isNotEmpty()) {
+                if (recents != null && recents.isNotEmpty()) {
                     val newList = currentList.toMutableList()
-                    newList.addAll(progresses)
+                    newList.addAll(recents)
                     _recentList.value = newList
 
                     // 如果查询结果少于pageSize，说明没有更多数据了
-                    _hasMoreData.value = progresses.size >= pageSize
+                    _hasMoreData.value = recents.size >= pageSize
                 } else {
                     _hasMoreData.value = false
                 }
@@ -326,12 +366,12 @@ public class PdfViewModel : ViewModel() {
         }
     }
 
-    public suspend fun getProgress(absolutePath: String) {
+    public suspend fun getRecent(absolutePath: String) {
         this.path = absolutePath
         val deferred = CompletableDeferred<Unit>()
         viewModelScope.launch {
-            progress = database?.recentDao()?.getRecent(absolutePath)
-            println("PdfViewModel.getProgress:${progress}")
+            recent = database?.recentDao()?.getRecent(absolutePath)
+            println("PdfViewModel.getRecent:${recent}")
             deferred.complete(Unit)
         }
         deferred.await()

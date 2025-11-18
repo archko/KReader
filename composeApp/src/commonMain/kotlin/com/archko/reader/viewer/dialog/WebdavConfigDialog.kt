@@ -75,14 +75,14 @@ fun WebdavConfigDialog(
     // 视图状态：true = 显示列表，false = 显示配置表单
     var showListView by remember { mutableStateOf(viewModel.checkAndLoadUser()) }
 
-    var username by remember { mutableStateOf(viewModel.webdavUser?.name ?: "") }
-    var password by remember { mutableStateOf(viewModel.webdavUser?.pass ?: "") }
+    var username by remember { mutableStateOf(viewModel.webdavUser?.name ?: "archko@sina.com") }
+    var password by remember { mutableStateOf(viewModel.webdavUser?.pass ?: "a67cedw2buzksi2b") }
     var host by remember {
         mutableStateOf(
-            viewModel.webdavUser?.host ?: ""
+            viewModel.webdavUser?.host ?: "https://dav.jianguoyun.com"
         )
     }
-    var path by remember { mutableStateOf(viewModel.webdavUser?.path ?: "") }
+    var path by remember { mutableStateOf(viewModel.webdavUser?.path ?: "/dav/我的坚果云") }
     var isConfiguring by remember { mutableStateOf(false) }
 
     val rootPath = remember(viewModel.webdavUser) { viewModel.webdavUser?.path ?: "" }

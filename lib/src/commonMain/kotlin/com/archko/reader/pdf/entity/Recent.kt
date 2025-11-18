@@ -2,6 +2,7 @@ package com.archko.reader.pdf.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 
 /**
@@ -51,14 +52,37 @@ public class Recent {
     @ColumnInfo(name = "scrollY")
     public var scrollY: Long? = 0
 
+    @ColumnInfo(name = "name")
+    public var name: String? = null
+
+    @ColumnInfo(name = "ext")
+    public var ext: String? = null
+
+    @ColumnInfo(name = "size")
+    public var size: Long? = 0
+
+    @ColumnInfo(name = "readTimes")
+    public var readTimes: Long? = 0
+
+    @ColumnInfo(name = "progress")
+    public var progress: Long? = 0
+
+    @ColumnInfo(name = "isFavorited")
+    public var favorited: Long? = 0
+
+    @ColumnInfo(name = "inRecent")
+    public var inRecent: Long? = 0
+
     public constructor()
 
+    @Ignore
     public constructor(path: String?) {
         this.path = path
         createAt = System.currentTimeMillis()
         updateAt = System.currentTimeMillis()
     }
 
+    @Ignore
     public constructor(
         //id: Long,
         path: String,
@@ -71,7 +95,14 @@ public class Recent {
         scrollOri: Long?,
         zoom: Double?,
         scrollX: Long?,
-        scrollY: Long?
+        scrollY: Long?,
+        name: String?,
+        ext: String?,
+        size: Long?,
+        readTimes: Long?,
+        progress: Long?,
+        isFavorited: Long?,
+        inRecent: Long?
     ) {
         //this.id = id
         this.updateAt = updateAt
@@ -85,6 +116,13 @@ public class Recent {
         this.zoom = zoom
         this.scrollX = scrollX
         this.scrollY = scrollY
+        this.name = name
+        this.ext = ext
+        this.size = size
+        this.readTimes = readTimes
+        this.progress = progress
+        this.favorited = isFavorited
+        this.inRecent = inRecent
     }
 
     override fun toString(): String {
@@ -100,6 +138,13 @@ public class Recent {
                 ", scrollX=" + scrollX +
                 ", scrollY=" + scrollY +
                 ", uri='" + path + '\'' +
+                ", name='" + name + '\'' +
+                ", ext='" + ext + '\'' +
+                ", size=" + size +
+                ", readTimes=" + readTimes +
+                ", progress=" + progress +
+                ", isFavorited=" + favorited +
+                ", inRecent=" + inRecent +
                 '}'
     }
 
@@ -117,7 +162,14 @@ public class Recent {
                 scrollOri == other.scrollOri &&
                 zoom == other.zoom &&
                 scrollX == other.scrollX &&
-                scrollY == other.scrollY
+                scrollY == other.scrollY &&
+                name == other.name &&
+                ext == other.ext &&
+                size == other.size &&
+                readTimes == other.readTimes &&
+                progress == other.progress &&
+                favorited == other.favorited &&
+                inRecent == other.inRecent
     }
 
     override fun hashCode(): Int {
@@ -132,6 +184,13 @@ public class Recent {
         result = 31 * result + (zoom?.hashCode() ?: 0)
         result = 31 * result + (scrollX?.hashCode() ?: 0)
         result = 31 * result + (scrollY?.hashCode() ?: 0)
+        result = 31 * result + (name?.hashCode() ?: 0)
+        result = 31 * result + (ext?.hashCode() ?: 0)
+        result = 31 * result + (size?.hashCode() ?: 0)
+        result = 31 * result + (readTimes?.hashCode() ?: 0)
+        result = 31 * result + (progress?.hashCode() ?: 0)
+        result = 31 * result + (favorited?.hashCode() ?: 0)
+        result = 31 * result + (inRecent?.hashCode() ?: 0)
         return result
     }
 
@@ -145,7 +204,14 @@ public class Recent {
             reflow: Long,
             zoom: Double,
             scrollX: Long,
-            scrollY: Long
+            scrollY: Long,
+            name: String? = null,
+            ext: String? = null,
+            size: Long? = null,
+            readTimes: Long? = null,
+            progress: Long? = null,
+            isFavorited: Long? = null,
+            inRecent: Long? = null
         ): Recent {
             val recent = Recent()
             recent.updateAt = System.currentTimeMillis()
@@ -159,6 +225,13 @@ public class Recent {
             recent.zoom = zoom
             recent.scrollX = scrollX
             recent.scrollY = scrollY
+            recent.name = name
+            recent.ext = ext
+            recent.size = size
+            recent.readTimes = readTimes
+            recent.progress = progress
+            recent.favorited = isFavorited
+            recent.inRecent = inRecent
             return recent
         }
 

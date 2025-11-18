@@ -15,6 +15,8 @@ public actual class DriverFactory {
         return getDatabaseBuilder()
             .setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(Dispatchers.IO)
+            .addMigrations(MIGRATION_1_2)
+            .fallbackToDestructiveMigration(dropAllTables = false)
             .build()
     }
 

@@ -9,7 +9,7 @@ import com.archko.reader.pdf.entity.Recent
     entities = [
         Recent::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 public abstract class AppDatabase : RoomDatabase() {

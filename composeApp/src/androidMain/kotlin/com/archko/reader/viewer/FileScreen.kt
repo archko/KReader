@@ -118,7 +118,7 @@ fun FileScreen(
                     println("FileScreen: 发现${tempProgressList.size}个临时进度，开始恢复")
                     for (tempProgress in tempProgressList) {
                         try {
-                            viewModel.updateProgress(
+                            viewModel.updateRecent(
                                 page = tempProgress.page.toLong(),
                                 tempProgress.path
                             )
@@ -146,8 +146,8 @@ fun FileScreen(
                             // 如果是支持的文档文件，直接打开
                             val paths = listOf(file.absolutePath)
                             if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                viewModel.getProgress(file.absolutePath)
-                                val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                viewModel.getRecent(file.absolutePath)
+                                val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(paths, startPage)
                             } else {
                                 openDocRequest = OpenDocRequest(paths, 0)
@@ -297,8 +297,8 @@ fun FileScreen(
                                     val firstDocumentPath = documentFiles.first().absolutePath
                                     val paths = listOf(firstDocumentPath)
                                     if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                        viewModel.getProgress(paths.first())
-                                        val startPage = viewModel.progress?.page?.toInt() ?: 0
+                                        viewModel.getRecent(paths.first())
+                                        val startPage = viewModel.recent?.page?.toInt() ?: 0
                                         openDocRequest = OpenDocRequest(paths, startPage)
                                     }
                                 } else if (tifFiles.isNotEmpty()) {
@@ -385,9 +385,9 @@ fun FileScreen(
                                             scope.launch {
                                                 val paths = listOf(file.absolutePath)
                                                 if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                                    viewModel.getProgress(file.absolutePath)
+                                                    viewModel.getRecent(file.absolutePath)
                                                     val startPage =
-                                                        viewModel.progress?.page?.toInt() ?: 0
+                                                        viewModel.recent?.page?.toInt() ?: 0
                                                     openDocRequest =
                                                         OpenDocRequest(paths, startPage)
                                                 } else {
@@ -459,7 +459,7 @@ fun FileScreen(
                     paths = openDocRequest!!.paths,
                     progressPage = openDocRequest!!.page,
                     onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
-                        viewModel.updateProgress(
+                        viewModel.updateRecent(
                             page = page.toLong(),
                             pageCount = pageCount.toLong(),
                             zoom = zoom,
@@ -474,12 +474,12 @@ fun FileScreen(
                         openDocRequest = null
                         onCloseDocument()
                     },
-                    initialScrollX = viewModel.progress?.scrollX ?: 0L,
-                    initialScrollY = viewModel.progress?.scrollY ?: 0L,
-                    initialZoom = viewModel.progress?.zoom ?: 1.0,
-                    scrollOri = viewModel.progress?.scrollOri ?: 0,
-                    reflow = viewModel.progress?.reflow ?: 0L,
-                    crop = 0L == viewModel.progress?.crop
+                    initialScrollX = viewModel.recent?.scrollX ?: 0L,
+                    initialScrollY = viewModel.recent?.scrollY ?: 0L,
+                    initialZoom = viewModel.recent?.zoom ?: 1.0,
+                    scrollOri = viewModel.recent?.scrollOri ?: 0,
+                    reflow = viewModel.recent?.reflow ?: 0L,
+                    crop = 0L == viewModel.recent?.crop
                 )
             }
         }

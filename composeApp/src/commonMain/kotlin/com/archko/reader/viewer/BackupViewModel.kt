@@ -1,6 +1,8 @@
 package com.archko.reader.viewer
 
 import androidx.lifecycle.ViewModel
+import com.archko.reader.pdf.cache.BookProgressParser
+import com.archko.reader.pdf.cache.getProgressCacheFile
 import com.archko.reader.pdf.cache.getWebdavCacheDir
 import com.archko.reader.pdf.cache.saveWebdavCacheFile
 import io.github.triangleofice.dav4kmp.DavCollection
@@ -184,6 +186,13 @@ class BackupViewModel : ViewModel() {
             }
         }.flowOn(Dispatchers.IO)
             .collectLatest { _uiDavResourceModel.value = it }
+    }
+
+    fun test() {
+        val name = "mupdf_2024-12-10-09-03-21"
+        val file = getProgressCacheFile(name)
+        val recentList = BookProgressParser.parseRecents(file.readText())
+        println(recentList.size)
     }
 
     private suspend fun listFilesWithType(
