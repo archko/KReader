@@ -1,8 +1,11 @@
 package com.archko.reader.viewer
 
+import kotlinx.serialization.Serializable
+
 /**
  * @author: archko 2025/11/16 :10:06
  */
+@Serializable
 data class WebdavUser(
     val name: String,
     val pass: String,

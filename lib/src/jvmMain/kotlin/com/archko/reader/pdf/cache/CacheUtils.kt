@@ -26,7 +26,7 @@ public actual fun getReflowCacheFile(file: File): File {
     return File(cacheDir, fileName)
 }
 
-public actual fun getWebdavCacheFile(): File {
+public actual fun getWebdavCacheDir(): File {
     return getCacheDirectory("webdav")
 }
 

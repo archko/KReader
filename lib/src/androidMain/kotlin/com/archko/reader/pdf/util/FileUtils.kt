@@ -135,6 +135,11 @@ public class FileUtils private constructor() {
             return absPath.substring(0, index + 1)
         }
 
+        public fun getCacheDir(context: Context, uniqueName: String): File {
+            val cachePath = context.cacheDir.path
+            return File(cachePath, uniqueName)
+        }
+
         public fun getFileSize(size: Long): String {
             if (size > 1073741824) {
                 return String.format("%.2f", size / 1073741824.0) + " GB"
@@ -311,9 +316,11 @@ public class FileUtils private constructor() {
         public fun getDiskCacheDir(context: Context, uniqueName: String?): File {
             val cachePath = if (Environment.MEDIA_MOUNTED == Environment
                     .getExternalStorageState()
-            ) getExternalCacheDir(
-                context
-            ).getPath() else context.getCacheDir().getPath()
+            ) {
+                getExternalCacheDir(context).path
+            } else {
+                context.cacheDir.path
+            }
 
             return File(cachePath + File.separator + uniqueName)
         }

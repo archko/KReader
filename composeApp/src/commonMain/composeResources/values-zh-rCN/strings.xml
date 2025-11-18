@@ -108,6 +108,18 @@
     <string name="convert_error">转换失败!</string>
 
     <string name="webdav_title">配置Webdav</string>
+    <string name="webdav_config_name">用户名</string>
+    <string name="webdav_config_input_name">请输入用户名</string>
+    <string name="webdav_config_pass">密码</string>
+    <string name="webdav_config_input_pass">请输入密码</string>
+    <string name="webdav_config_host">主机地址</string>
+    <string name="webdav_config_input_host">请输入主机地址</string>
+    <string name="webdav_config_path">路径</string>
+    <string name="webdav_config_path_eg">例如: /webdav 或留空</string>
+    <string name="webdav_config_doing">配置中...</string>
+    <string name="webdav_config_btn_do">配置</string>
+    <string name="webdav_config_btn_save">保存配置</string>
+    <string name="webdav_config_no_files">暂无文件</string>
 
     <string name="tts_setting_title">语音设置</string>
     <string name="tts_queue_title">朗读队列</string>
@@ -120,10 +132,10 @@
     <string name="tts_sleep_dialog_ok">确定</string>
     <string name="tts_sleep_set_time">已设置睡眠定时%s分钟</string>
     <string name="tts_sleep_set_cancel">已取消睡眠定时</string>
-    
+
     <string name="create_pdf">创建PDF</string>
     <string name="export_pdf">导出PDF</string>
-    
+
     <!-- PDF Export Dialog -->
     <string name="select_pdf_file">选择PDF文件</string>
     <string name="export_images">导出图片</string>
@@ -145,7 +157,7 @@
     <string name="export_cancelled_partial">导出被取消，已导出: %d张</string>
     <string name="html_export_success">HTML导出成功！文件保存在: %s</string>
     <string name="html_export_failed">HTML导出失败</string>
-    
+
     <!-- PDF Create Dialog -->
     <string name="pdf_filename">PDF文件名</string>
     <string name="enter_pdf_filename">输入PDF文件名（可选）</string>

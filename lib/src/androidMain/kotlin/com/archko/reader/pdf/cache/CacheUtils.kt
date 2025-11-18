@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.cache
 
+import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.util.FileUtils
 import java.io.File
 
@@ -21,17 +22,21 @@ public actual fun getPageCacheFile(file: File): File {
  * @return 缓存文件
  */
 public actual fun getReflowCacheFile(file: File): File {
-    val cacheDir = FileUtils.getStorageDir("amupdf/reflow")
-    val fileName = "${file.nameWithoutExtension}_reflow.json"
+    val cacheDir = FileUtils.getStorageDir("amupdf/tts")
+    val fileName = "${file.nameWithoutExtension}_tts.json"
     return File(cacheDir, fileName)
 }
 
-public actual fun getWebdavCacheFile(): File {
-    return File(FileUtils.getDir("webdav"))
+public actual fun getWebdavCacheDir(): File {
+    val dir = FileUtils.getCacheDir(PdfApp.app!!, "webdav")
+    if (!dir.exists()) {
+        dir.mkdirs()
+    }
+    return dir
 }
 
 public actual fun saveWebdavCacheFile(name: String, content: String) {
-    val file = File(getWebdavCacheFile(), name)
+    val file = File(getWebdavCacheDir(), name)
     println("name:$name, content:$content")
     file.writeText(content)
 }
