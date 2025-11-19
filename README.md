@@ -18,7 +18,8 @@ At present, epub/mobi supported custom font. It should be placed in the director
 - **Tts**: Use System Tts
 - **Multi-platform Support**: Android, iOS, and Desktop
 - **Modern UI**: Built with Jetpack Compose
-- **Native Performance**: Kotlin Multiplatform architecture
+- **Native Performance**: pdf, epub, mobi, djvu, xps, fb, cb, images, (docx, pptx)
+- **Support format**: create pdf from images. convert mobi/azw3 to epub. encrypt/decrypt pdf, export images, webdav backup
 
 ## Technology Stack
 
@@ -32,15 +33,15 @@ At present, epub/mobi supported custom font. It should be placed in the director
 
 - ✅ Android
 - 🔄 iOS (requires MuPDF compilation)
-- 🔄 Desktop (MuPDF compilation needed)
+- 🔄 Desktop (support mac, in windows MuPDF compilation needed)
 
 ## Development Status
 
 - **Core Features**: ✅ Implemented
-- **Smooth Scrolling**: ✅ Working
-- **Zoom Functionality**: ✅ Working
-- **Gesture Support**: ✅ Working
-- **Full Feature Migration**: 🔄 In Progress
+- **Smooth Scrolling**: ✅ Implemented
+- **Zoom Functionality**: ✅ Implemented
+- **Gesture Support**: ✅ Implemented
+- **Windows dll**: 🔄 Pause
 
 ## Building
 
@@ -51,6 +52,9 @@ At present, epub/mobi supported custom font. It should be placed in the director
 - Gradle 8.0+
 
 ### Android
+
+git clone https://github.com/archko/dav4kmp.git -branch dev
+download release page zip, unzip to .m2下,aar for mupdf, tiff, djvu, mobi
 
 ```bash
 ./gradlew :composeApp:assembleDebug

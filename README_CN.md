@@ -19,6 +19,8 @@ epub/mobi支持自定义字体,放在/sdcard/fonts/,ttf与otf两种字体
 - **多平台支持**: Android、iOS 和桌面端
 - **现代界面**: 基于 Jetpack Compose 构建
 - **原生性能**: Kotlin Multiplatform 架构
+- **格式支持**: pdf, epub, mobi, djvu, xps, fb, cb, 图片, (无图的docx, pptx)
+- **编辑支持**: 图片创建pdf. mobi/azw3转为epub, pdf的加密,解密,导出图片.备份历史记录等
 
 ## 技术栈
 
@@ -32,15 +34,15 @@ epub/mobi支持自定义字体,放在/sdcard/fonts/,ttf与otf两种字体
 
 - ✅ Android
 - 🔄 iOS (需要编译 MuPDF)
-- 🔄 桌面端 (需要编译 MuPDF)
+- 🔄 桌面端 (macos支持, windows需要编译 MuPDF)
 
 ## 开发状态
 
 - **核心功能**: ✅ 已实现
-- **流畅滚动**: ✅ 正常工作
-- **缩放功能**: ✅ 正常工作
-- **手势支持**: ✅ 正常工作
-- **完整功能迁移**: 🔄 进行中
+- **流畅滚动**: ✅ 已实现
+- **缩放功能**: ✅ 已实现
+- **手势支持**: ✅ 已实现
+- **windows dll**: 🔄 暂停
 
 ## 构建
 
@@ -51,6 +53,9 @@ epub/mobi支持自定义字体,放在/sdcard/fonts/,ttf与otf两种字体
 - Gradle 8.0+
 
 ### Android
+
+git clone https://github.com/archko/dav4kmp.git -branch dev
+下载release页的压缩包,解压到用户目录的.m2下,这是mupdf等的aar包
 
 ```bash
 ./gradlew :composeApp:assembleDebug
