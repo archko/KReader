@@ -13,6 +13,6 @@ public data class WebdavUser(
     val path: String
 ) {
     override fun toString(): String {
-        return "WebdavUser(name='$name', pass='$pass', host='$host', path='$path')"
+        return "WebdavUser(name='$name', host='$host', path='$path')"
     }
 }

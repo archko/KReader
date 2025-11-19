@@ -59,6 +59,16 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * @author: archko 2025/11/17 :15:17
  */
+
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
+        bytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024))
+        else -> String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024))
+    }
+}
+
 @Composable
 fun WebdavConfigDialog(
     viewModel: BackupViewModel,
@@ -79,6 +89,7 @@ fun WebdavConfigDialog(
     }
     var path by remember { mutableStateOf(viewModel.webdavUser?.path ?: "") }
     var isConfiguring by remember { mutableStateOf(false) }
+    var isUploading by remember { mutableStateOf(false) }
 
     val rootPath = remember(viewModel.webdavUser) { viewModel.webdavUser?.path ?: "" }
 
@@ -134,11 +145,60 @@ fun WebdavConfigDialog(
                         )
                     }
 
-                    Button(
-                        onClick = {
-                            if (showListView) {
-                                showListView = false
-                            } else {
+                    if (showListView) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                        ) {
+                            Button(
+                                onClick = { showListView = false },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(Res.string.webdav_config_btn_do))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    isUploading = true
+                                    scope.launch {
+                                        viewModel.backupToWebdav(currentPath)
+                                            .flowOn(Dispatchers.IO)
+                                            .collectLatest { success ->
+                                                isUploading = false
+                                                if (success) {
+                                                    toaster.show(
+                                                        message = getString(Res.string.webdav_upload_success),
+                                                        type = ToastType.Success,
+                                                    )
+                                                    viewModel.loadFileList(currentPath)
+                                                } else {
+                                                    toaster.show(
+                                                        message = getString(Res.string.webdav_upload_failed),
+                                                        type = ToastType.Error,
+                                                    )
+                                                }
+                                            }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isUploading
+                            ) {
+                                if (isUploading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(Res.string.webdav_config_doing))
+                                } else {
+                                    Text(stringResource(Res.string.webdav_upload))
+                                }
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = {
                                 isConfiguring = true
                                 scope.launch {
                                     viewModel.saveWebdavUser(username, password, host, path)
@@ -159,32 +219,25 @@ fun WebdavConfigDialog(
                                             }
                                         }
                                 }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp),
-                        enabled = if (showListView) {
-                            true
-                        } else {
-                            username.isNotBlank()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            enabled = username.isNotBlank()
                                     && password.isNotBlank()
                                     && host.isNotBlank()
                                     && !isConfiguring
-                        }
-                    ) {
-                        if (isConfiguring) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(Res.string.webdav_config_doing))
-                        } else {
-                            Text(
-                                if (showListView) stringResource(Res.string.webdav_config_btn_do)
-                                else stringResource(Res.string.webdav_config_btn_save)
-                            )
+                        ) {
+                            if (isConfiguring) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(Res.string.webdav_config_doing))
+                            } else {
+                                Text(stringResource(Res.string.webdav_config_btn_save))
+                            }
                         }
                     }
 
@@ -269,12 +322,11 @@ private fun FileListView(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
+                .padding(start = 8.dp, bottom = 8.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -301,6 +353,7 @@ private fun FileListView(
 
         Box(
             modifier = Modifier.fillMaxSize()
+                .padding(horizontal = 20.dp)
         ) {
             if (davResourceItems == null) {
                 CircularProgressIndicator(
@@ -374,12 +427,27 @@ private fun FileListItem(
                     maxLines = 1
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.resource.location.encodedPath,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
+                Row {
+                    if (!item.isDirectory && item.contentLength > 0) {
+                        Text(
+                            text = formatFileSize(item.contentLength),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = " • ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = item.resource.location.encodedPath,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
             }
         }
 
@@ -392,13 +460,6 @@ private fun FileListItem(
                 onClick = {
                     showMenu = false
                     onFileClick(item)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(Res.string.webdav_upload)) },
-                onClick = {
-                    showMenu = false
-                    // TODO: 上传备份功能
                 }
             )
         }

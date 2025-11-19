@@ -112,38 +112,38 @@ public class BackupViewModel : ViewModel() {
         }
     }*/
 
-    public fun backupToWebdav(): Flow<Boolean> = flow {
+    public fun backupToWebdav(currentPath: String): Flow<Boolean> = flow {
         try {
-            if (!checkAndLoadUser() || davCollection == null) {
+            if (!checkAndLoadUser() || httpClient == null || database == null) {
                 emit(false)
                 return@flow
             }
-            /*val root = JSONObject()
-            val list = progressDao.getAllProgress()
-            val ja = JSONArray()
-            root.put("root", ja)
-            list?.run {
-                for (progress in list) {
-                    BookProgressParser.addProgressToJson(progress, ja)
-                }
+
+            val list = database!!.recentDao().getAllRecents()
+            val content = if (list.isNullOrEmpty()) {
+                """{"root":[]}"""
+            } else {
+                BookProgressParser.recentsToJson(list)
             }
-            val content = root.toString()
             println("backupToWebdav.content:$content")
 
-            // 使用 dav4kmp 上传文件
+            // 使用 dav4kmp 上传文件到指定路径
             val fileName = DEFAULT_JSON
-            val fileUrl = buildWebdavUrl(webdavUser!!.host, "${webdavUser!!.path}/$fileName")
+            val fileUrl = "${webdavUser!!.host}$currentPath/$fileName"
+            println("backupToWebdav - fileUrl: $fileUrl")
 
-            davCollection!!.put(
-                body = content.toByteArray()
+            val davResource = DavCollection(httpClient!!, Url(fileUrl))
+            davResource.put(
+                body = content.toByteArray(),
+                contentType = ContentType.Application.Json
             ) { response ->
-                // 上传成功回调
                 println("Upload successful: ${response.status}")
-            }*/
+            }
             emit(true)
         } catch (e: Exception) {
             emit(false)
-            println(e.message)
+            println("backupToWebdav error: ${e.message}")
+            e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
 
@@ -213,15 +213,29 @@ public class BackupViewModel : ViewModel() {
                     response.href.toString()
                 }
                 val resource = DavResource(client, Url(decodedHref))
-                val isDirectory = response.properties.any { prop ->
-                    when (prop) {
-                        is GetContentType ->
-                            prop.type?.contentType == "httpd/unix-directory"
+                var isDirectory = false
+                var contentLength = 0L
 
-                        else -> prop.toString().contains("collection", ignoreCase = true)
+                response.properties.forEach { prop ->
+                    when (prop) {
+                        is GetContentType -> {
+                            if (prop.type?.contentType == "httpd/unix-directory") {
+                                isDirectory = true
+                            }
+                        }
+
+                        is io.github.triangleofice.dav4kmp.property.GetContentLength -> {
+                            contentLength = prop.contentLength
+                        }
+
+                        else -> {
+                            if (prop.toString().contains("collection", ignoreCase = true)) {
+                                isDirectory = true
+                            }
+                        }
                     }
                 }
-                davResources.add(DavResourceItem(resource, isDirectory))
+                davResources.add(DavResourceItem(resource, isDirectory, contentLength))
             }
         }
         return davResources
