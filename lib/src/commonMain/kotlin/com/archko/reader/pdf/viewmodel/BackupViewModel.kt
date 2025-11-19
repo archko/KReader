@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.viewmodel
 
+import BackupEventBus
 import androidx.lifecycle.ViewModel
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.BookProgressParser
@@ -165,6 +166,7 @@ public class BackupViewModel : ViewModel() {
             }
 
             val result = restore(database, content)
+            BackupEventBus.emitRestoreCompleted(result)
             emit(result)
         } catch (e: Exception) {
             emit(false)

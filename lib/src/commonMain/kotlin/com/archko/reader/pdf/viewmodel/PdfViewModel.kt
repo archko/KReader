@@ -1,9 +1,9 @@
 package com.archko.reader.pdf.viewmodel
 
+import BackupEventBus
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
-import com.archko.reader.pdf.cache.getStoragePath
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.getExtension
@@ -34,6 +34,16 @@ public class PdfViewModel : ViewModel() {
 
     public var recent: Recent? = null
     public var path: String? = null
+
+    init {
+        viewModelScope.launch {
+            BackupEventBus.restoreCompleted.collect { success ->
+                if (success) {
+                    loadRecents()
+                }
+            }
+        }
+    }
 
     public fun insertOrUpdate(path: String, pageCount: Long) {
         this.path = path
