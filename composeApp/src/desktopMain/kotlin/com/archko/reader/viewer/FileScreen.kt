@@ -54,10 +54,13 @@ import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
-import com.mohamedrejeb.calf.io.KmpFile
+import com.dokar.sonner.ToastType
+import com.dokar.sonner.Toaster
+import com.dokar.sonner.rememberToasterState
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
@@ -90,6 +93,7 @@ fun FileScreen(
     onShowBottomBarChanged: (Boolean) -> Unit = {}
 ) {
     Theme {
+        val toaster = rememberToasterState()
         val scope = rememberCoroutineScope()
         val recentList by viewModel.recentList.collectAsState()
         val hasMoreData by viewModel.hasMoreData.collectAsState()
@@ -318,16 +322,26 @@ fun FileScreen(
                                 RecentItem(
                                     recent = recentList[i],
                                     onClick = {
-                                        val file = KmpFile(File(it.path))
-                                        val page = it.page?.toInt()
-                                        scope.launch {
-                                            val paths = listOf(file.file.absolutePath)
-                                            if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                                viewModel.getRecent(file.file.absolutePath)
-                                                openDocRequest = OpenDocRequest(paths, page)
-                                            } else {
-                                                openDocRequest = OpenDocRequest(paths, 0)
+                                        val path = getAbsolutePath(it.path)
+                                        val file = File(path)
+                                        if (file.exists()) {
+                                            scope.launch {
+                                                val paths = listOf(file.absolutePath)
+                                                if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                                    viewModel.getRecent(it.path!!)
+                                                    val startPage =
+                                                        viewModel.recent?.page?.toInt() ?: 0
+                                                    openDocRequest =
+                                                        OpenDocRequest(paths, startPage)
+                                                } else {
+                                                    openDocRequest = OpenDocRequest(paths, 0)
+                                                }
                                             }
+                                        } else {
+                                            toaster.show(
+                                                message = "File Not Found!",
+                                                type = ToastType.Error,
+                                            )
                                         }
                                     },
                                     onDelete = {
@@ -336,7 +350,7 @@ fun FileScreen(
                                     onDeleteCache = {
                                         // 异步删除缓存文件
                                         scope.launch {
-                                            val path = recentList[i].path
+                                            val path = getAbsolutePath(recentList[i].path)
                                             CustomImageFetcher.deleteCache(path)
                                             APageSizeLoader.deletePageSizeFromFile(path)
                                             ReflowCacheLoader.deleteReflowCache(File(path))
@@ -415,6 +429,12 @@ fun FileScreen(
                 onDismiss = { showSettingDialog = false }
             )
         }
+
+        Toaster(
+            state = toaster,
+            maxVisibleToasts = 1,
+            alignment = Alignment.Center,
+        )
     }
 }
 
