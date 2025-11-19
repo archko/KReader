@@ -219,13 +219,13 @@ fun WebdavConfigDialog(
                                             if (success) {
                                                 println("Restore successful: $fileName")
                                                 toaster.show(
-                                                    message = getString(Res.string.webdav_upload_success),
+                                                    message = getString(Res.string.webdav_restore_success),
                                                     type = ToastType.Success,
                                                 )
                                             } else {
                                                 println("Restore failed: $fileName")
                                                 toaster.show(
-                                                    message = getString(Res.string.webdav_upload_failed),
+                                                    message = getString(Res.string.webdav_restore_failed),
                                                     type = ToastType.Error,
                                                 )
                                             }

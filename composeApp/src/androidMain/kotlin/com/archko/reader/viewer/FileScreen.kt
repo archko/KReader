@@ -1,6 +1,5 @@
 package com.archko.reader.viewer
 
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -60,11 +59,11 @@ import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
-import com.mohamedrejeb.calf.io.KmpFile
 import com.mohamedrejeb.calf.picker.FilePickerFileType
 import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
@@ -376,16 +375,13 @@ fun FileScreen(
                                 RecentItem(
                                     recent = recentList[i],
                                     onClick = {
-                                        val kmpFile = KmpFile(Uri.parse(it.path))
-                                        val path =
-                                            IntentFile.getPath(PdfApp.app!!, kmpFile.uri)
-                                                ?: kmpFile.uri.toString()
+                                        val path = getAbsolutePath(it.path)
                                         val file = File(path)
                                         if (file.exists()) {
                                             scope.launch {
                                                 val paths = listOf(file.absolutePath)
                                                 if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                                    viewModel.getRecent(file.absolutePath)
+                                                    viewModel.getRecent(it.path!!)
                                                     val startPage =
                                                         viewModel.recent?.page?.toInt() ?: 0
                                                     openDocRequest =
@@ -409,7 +405,7 @@ fun FileScreen(
                                     onDeleteCache = {
                                         // 异步删除缓存文件
                                         scope.launch {
-                                            val path = recentList[i].path
+                                            val path = getAbsolutePath(recentList[i].path)
                                             CustomImageFetcher.deleteCache(path)
                                             APageSizeLoader.deletePageSizeFromFile(path)
                                             ReflowCacheLoader.deleteReflowCache(File(path))
@@ -555,7 +551,7 @@ private fun RecentItem(
                 AsyncImage(
                     model = recent.path?.let {
                         CustomImageData(
-                            it,
+                            getAbsolutePath(it),
                             (itemWidth - leftBorder).toIntPx(),
                             (itemHeight - topBorder).toIntPx()
                         )

@@ -88,6 +88,9 @@ public class FileUtils private constructor() {
         }
 
         public fun getStoragePath(path: String?): String {
+            if (TextUtils.isEmpty(path)) {
+                return Environment.getExternalStorageDirectory().path
+            }
             return Environment.getExternalStorageDirectory().path + "/" + (path)
         }
 

@@ -3,9 +3,12 @@ package com.archko.reader.pdf.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
+import com.archko.reader.pdf.cache.getStoragePath
 import com.archko.reader.pdf.entity.Recent
+import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.getExtension
 import com.archko.reader.pdf.util.getFileName
+import com.archko.reader.pdf.util.normalizePath
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,12 +38,14 @@ public class PdfViewModel : ViewModel() {
     public fun insertOrUpdate(path: String, pageCount: Long) {
         this.path = path
         viewModelScope.launch {
-            val file = File(path)
-            val selRecent = database?.recentDao()?.getRecent(path)
+            val normalizedPath = normalizePath(path)
+            val absolutePath = getAbsolutePath(normalizedPath)
+            val file = File(absolutePath)
+            val selRecent = database?.recentDao()?.getRecent(normalizedPath)
             if (selRecent == null) {
                 database?.recentDao()?.addRecent(
                     Recent(
-                        path = path,
+                        path = normalizedPath,
                         page = 0L,
                         pageCount = pageCount,
                         createAt = System.currentTimeMillis(),
@@ -51,8 +56,8 @@ public class PdfViewModel : ViewModel() {
                         zoom = 1.0,
                         scrollX = 0L,
                         scrollY = 0L,
-                        name = path.getFileName(),
-                        ext = path.getExtension(),
+                        name = absolutePath.getFileName(),
+                        ext = absolutePath.getExtension(),
                         size = file.length(),
                         readTimes = 1L,
                         progress = 0L,
@@ -65,19 +70,19 @@ public class PdfViewModel : ViewModel() {
                     this.pageCount = pageCount
                     this.updateAt = System.currentTimeMillis()
                     this.readTimes = (this.readTimes ?: 0) + 1
-                    this.name = path.getFileName()
-                    this.ext = path.getExtension()
+                    this.name = absolutePath.getFileName()
+                    this.ext = absolutePath.getExtension()
                     this.size = file.length()
                 }
                 database?.recentDao()?.updateRecent(selRecent)
             }
-            recent = database?.recentDao()?.getRecent(path)
+            recent = database?.recentDao()?.getRecent(normalizedPath)
             println("PdfViewModel.insertOrUpdate:${recent}")
 
             // 增量更新：如果记录不在当前列表中且列表未满，添加到开头
             if (recent != null) {
                 val currentList = _recentList.value.toMutableList()
-                val existingIndex = currentList.indexOfFirst { it.path == path }
+                val existingIndex = currentList.indexOfFirst { it.path == normalizedPath }
                 if (existingIndex != -1) {
                     // 如果记录已存在，从原位置删除，然后添加到开头（按时间排序）
                     currentList.removeAt(existingIndex)
@@ -101,12 +106,14 @@ public class PdfViewModel : ViewModel() {
         this.path = path
         val deferred = CompletableDeferred<Unit>()
         viewModelScope.launch {
-            val file = File(path)
-            val selRecent = database?.recentDao()?.getRecent(path)
+            val normalizedPath = normalizePath(path)
+            val absolutePath = getAbsolutePath(normalizedPath)
+            val file = File(absolutePath)
+            val selRecent = database?.recentDao()?.getRecent(normalizedPath)
             if (selRecent == null) {
                 database?.recentDao()?.addRecent(
                     Recent(
-                        path = path,
+                        path = normalizedPath,
                         page = 0L,
                         pageCount = pageCount,
                         createAt = System.currentTimeMillis(),
@@ -117,8 +124,8 @@ public class PdfViewModel : ViewModel() {
                         zoom = 1.0,
                         scrollX = 0L,
                         scrollY = 0L,
-                        name = path.getFileName(),
-                        ext = path.getExtension(),
+                        name = absolutePath.getFileName(),
+                        ext = absolutePath.getExtension(),
                         size = file.length(),
                         readTimes = 1L,
                         progress = 0L,
@@ -132,19 +139,19 @@ public class PdfViewModel : ViewModel() {
                     this.updateAt = System.currentTimeMillis()
                     this.reflow = reflow
                     this.readTimes = (this.readTimes ?: 0) + 1
-                    this.name = path.getFileName()
-                    this.ext = path.getExtension()
+                    this.name = absolutePath.getFileName()
+                    this.ext = absolutePath.getExtension()
                     this.size = file.length()
                 }
                 database?.recentDao()?.updateRecent(selRecent)
             }
-            this@PdfViewModel.recent = database?.recentDao()?.getRecent(path)
+            this@PdfViewModel.recent = database?.recentDao()?.getRecent(normalizedPath)
             println("PdfViewModel.insertOrUpdateAndWait:${this@PdfViewModel.recent}")
 
             // 增量更新：如果记录不在当前列表中且列表未满，添加到开头
             if (this@PdfViewModel.recent != null) {
                 val currentList = _recentList.value.toMutableList()
-                val existingIndex = currentList.indexOfFirst { it.path == path }
+                val existingIndex = currentList.indexOfFirst { it.path == normalizedPath }
                 if (existingIndex != -1) {
                     // 如果记录已存在，从原位置删除，然后添加到开头（按时间排序）
                     currentList.removeAt(existingIndex)
@@ -182,16 +189,18 @@ public class PdfViewModel : ViewModel() {
             return
         }
         viewModelScope.launch {
-            val file = File(path)
+            val normalizedPath = normalizePath(path!!)
+            val absolutePath = getAbsolutePath(normalizedPath)
+            val file = File(absolutePath)
             // 如果recent为空但path不为空，则新建一个记录
             if (recent == null && path != null) {
-                println("PdfViewModel.get:$path, page:$page")
+                println("PdfViewModel.get:$normalizedPath, path:$path, page:$page")
 
-                recent = database?.recentDao()?.getRecent(path!!)
+                recent = database?.recentDao()?.getRecent(normalizedPath)
             }
             if (recent == null) {
                 val recent = Recent(
-                    path = path!!,
+                    path = normalizedPath,
                     page = page,
                     pageCount = pageCount,
                     createAt = System.currentTimeMillis(),
@@ -202,8 +211,8 @@ public class PdfViewModel : ViewModel() {
                     zoom = zoom,
                     scrollX = scrollX,
                     scrollY = scrollY,
-                    name = path!!.getFileName(),
-                    ext = path!!.getExtension(),
+                    name = absolutePath.getFileName(),
+                    ext = absolutePath.getExtension(),
                     size = file.length(),
                     readTimes = 1L,
                     progress = if (pageCount > 0) (page * 100 / pageCount) else 0L,
@@ -211,7 +220,7 @@ public class PdfViewModel : ViewModel() {
                     inRecent = 1L
                 )
                 database?.recentDao()?.addRecent(recent)
-                this@PdfViewModel.recent = database?.recentDao()?.getRecent(path!!)
+                this@PdfViewModel.recent = database?.recentDao()?.getRecent(normalizedPath)
                 println("PdfViewModel.updateRecent-created:${this@PdfViewModel.recent}")
             } else {
                 // 更新现有记录
@@ -227,15 +236,13 @@ public class PdfViewModel : ViewModel() {
                         this.scrollY = scrollY
                         this.scrollOri = scrollOri
                         this.progress = if (pageCount > 0) (page * 100 / pageCount) else 0L
-                        this.name = path?.getFileName()
-                        this.ext = path?.getExtension()
+                        this.name = absolutePath.getFileName()
+                        this.ext = absolutePath.getExtension()
                         this.size = file.length()
                     }
                     database?.recentDao()?.updateRecent(recent!!)
-                    path?.run {
-                        recent = database?.recentDao()?.getRecent(path!!)
-                        println("PdfViewModel.updateRecent.after:$recent")
-                    }
+                    recent = database?.recentDao()?.getRecent(normalizedPath)
+                    println("PdfViewModel.updateRecent.after:$recent")
                 }
             }
 
@@ -265,8 +272,9 @@ public class PdfViewModel : ViewModel() {
         path: String
     ) {
         viewModelScope.launch {
-            val old = database?.recentDao()?.getRecent(path)
-            println("PdfViewModel.updateRecent:$page, path:$path, old:$old")
+            val normalizedPath = normalizePath(path)
+            val old = database?.recentDao()?.getRecent(normalizedPath)
+            println("PdfViewModel.updateRecent:$page, path:$normalizedPath, old:$old")
 
             if (old != null) {
                 old.apply {
@@ -370,8 +378,9 @@ public class PdfViewModel : ViewModel() {
         this.path = absolutePath
         val deferred = CompletableDeferred<Unit>()
         viewModelScope.launch {
-            recent = database?.recentDao()?.getRecent(absolutePath)
-            println("PdfViewModel.getRecent:${recent}")
+            val normalizedPath = normalizePath(absolutePath)
+            recent = database?.recentDao()?.getRecent(normalizedPath)
+            println("PdfViewModel.getRecent:normalizedPath:$normalizedPath, path:$absolutePath, $recent")
             deferred.complete(Unit)
         }
         deferred.await()

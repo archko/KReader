@@ -24,19 +24,13 @@ public object BookProgressParser {
         isLenient = true
     }
 
-    public fun addRecentToJson(recent: Recent, storagePath: String): JsonObject {
+    public fun addRecentToJson(recent: Recent): JsonObject {
         return buildJsonObject {
             // Remove storage path prefix and URL encode the path
             val encodedPath = recent.path?.let { fullPath ->
                 try {
-                    // 如果路径包含 storagePath 前缀，去除它
-                    val relativePath = if (fullPath.startsWith(storagePath)) {
-                        fullPath.removePrefix(storagePath).removePrefix("/")
-                    } else {
-                        fullPath
-                    }
-                    java.net.URLEncoder.encode(relativePath, "UTF-8")
-                } catch (e: Exception) {
+                    java.net.URLEncoder.encode(fullPath, "UTF-8")
+                } catch (_: Exception) {
                     fullPath // 如果编码失败，使用原始值
                 }
             } ?: ""
@@ -62,7 +56,7 @@ public object BookProgressParser {
         }
     }
 
-    public fun parseRecent(jsonObject: JsonObject?, storagePath: String): Recent? {
+    public fun parseRecent(jsonObject: JsonObject?): Recent? {
         if (jsonObject == null) {
             return null
         }
@@ -74,8 +68,8 @@ public object BookProgressParser {
             recent.path = encodedPath?.let {
                 try {
                     val decodedPath = java.net.URLDecoder.decode(it, "UTF-8")
-                    "$storagePath/$decodedPath"
-                } catch (e: Exception) {
+                    decodedPath
+                } catch (_: Exception) {
                     it // 如果解码失败，使用原始值
                 }
             }
@@ -118,11 +112,8 @@ public object BookProgressParser {
             val jsonElement = json.parseToJsonElement(jsonString)
             val rootArray = jsonElement.jsonObject["root"]?.jsonArray
 
-            // 在循环外获取一次 storagePath
-            val storagePath = getStoragePath()
-
             rootArray?.forEach { element ->
-                val recent = parseRecent(element.jsonObject, storagePath)
+                val recent = parseRecent(element.jsonObject)
                 if (recent != null) {
                     println("recent:$recent")
                     recentList.add(recent)
@@ -139,12 +130,9 @@ public object BookProgressParser {
      * Convert list of Recent objects to JSON string
      */
     public fun recentsToJson(recents: List<Recent>): String {
-        // 在循环外获取一次 storagePath
-        val storagePath = getStoragePath()
-        
         val rootArray = buildJsonArray {
             recents.forEach { recent ->
-                add(addRecentToJson(recent, storagePath))
+                add(addRecentToJson(recent))
             }
         }
 

@@ -126,6 +126,8 @@
     <string name="webdav_config_failed">设置Webdav失败</string>
     <string name="webdav_upload_success">上传备份成功</string>
     <string name="webdav_upload_failed">上传备份失败</string>
+    <string name="webdav_restore_success">恢复备份成功</string>
+    <string name="webdav_restore_failed">恢复备份失败</string>
 
     <string name="tts_setting_title">语音设置</string>
     <string name="tts_queue_title">朗读队列</string>
