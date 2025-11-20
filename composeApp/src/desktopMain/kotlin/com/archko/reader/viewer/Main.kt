@@ -522,6 +522,7 @@ fun main(args: Array<String>) {
                 val viewModel: PdfViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
                 viewModel.database = database
+                backupViewModel.database = database
 
                 // 文档管理状态
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }

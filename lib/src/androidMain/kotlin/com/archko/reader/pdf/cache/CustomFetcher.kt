@@ -91,6 +91,14 @@ public class CustomImageFetcher(
     override suspend fun fetch(): FetchResult {
         var bitmap = loadBitmapFromCache(data)
         if (bitmap == null) {
+            val file = File(data.path)
+            if (!file.exists()) {
+                return ImageFetchResult(
+                    image = createWhiteBitmap(data.width, data.height).asImage(),
+                    isSampled = false,
+                    dataSource = DataSource.NETWORK
+                )
+            }
             if (FileTypeUtils.isDjvuFile(data.path)) {
                 val djvuLoader = DjvuLoader()
                 djvuLoader.openDjvu(data.path)

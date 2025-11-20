@@ -514,7 +514,7 @@ private fun RecentItem(
                 AsyncImage(
                     model = recent.path?.let {
                         CustomImageData(
-                            it,
+                            getAbsolutePath(it),
                             (itemWidth - leftBorder).toIntPx(),
                             (itemHeight - topBorder).toIntPx()
                         )

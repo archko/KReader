@@ -257,10 +257,6 @@ public class BackupViewModel : ViewModel() {
                 })
             }
 
-            defaultRequest {
-                header("Content-Type", "application/xml; charset=UTF-8")
-            }
-
             // 设置超时时间
             install(HttpTimeout) {
                 requestTimeoutMillis = 160000

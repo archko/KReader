@@ -59,7 +59,7 @@ kotlin {
                 implementation(libs.sqlite.bundled)
                 api(libs.mupdf.fitz)
                 api(libs.tiff.loader.jar)
-                implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.client.okhttp)
             }
         }
     }

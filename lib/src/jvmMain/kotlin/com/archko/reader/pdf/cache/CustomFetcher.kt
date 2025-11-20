@@ -107,6 +107,15 @@ public class CustomImageFetcher(
             // 先检查缓存
             var bitmap = loadImageFromCache(data)
             if (bitmap == null) {
+                val file = File(data.path)
+                if (!file.exists()) {
+                    return ImageFetchResult(
+                        image = createWhiteBitmap(data.width, data.height).asSkiaBitmap().asImage(),
+                        isSampled = false,
+                        dataSource = DataSource.NETWORK
+                    )
+                }
+
                 if (FileTypeUtils.isDjvuFile(data.path)) {
                     val djvuLoader = DjvuLoader()
                     djvuLoader.openDjvu(data.path)
@@ -119,7 +128,12 @@ public class CustomImageFetcher(
                     }
                 } else if (FileTypeUtils.isDocumentFile(data.path)) {
                     val doc = Document.openDocument(data.path)
-                    val image = PdfDecoder.renderCoverPage(data.path, doc.loadPage(0), data.width, data.height)
+                    val image = PdfDecoder.renderCoverPage(
+                        data.path,
+                        doc.loadPage(0),
+                        data.width,
+                        data.height
+                    )
 
                     if (image != null) {
                         bitmap = image
