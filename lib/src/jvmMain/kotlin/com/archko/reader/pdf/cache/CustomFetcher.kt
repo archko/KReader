@@ -32,8 +32,6 @@ public class CustomImageFetcher(
             if (null == image) {
                 return
             }
-            // 内存缓存使用ImageCache存储ImageBitmap
-            ImageCache.putPage(path, image)
 
             val cacheDir = FileUtils.getImageCacheDirectory()
             val cacheFile = File(cacheDir, "${path.hashCode()}.png")
@@ -47,8 +45,6 @@ public class CustomImageFetcher(
             if (path == null) {
                 return
             }
-            // 删除内存缓存
-            ImageCache.removePage(path)
 
             // 删除磁盘缓存
             val cacheDir = FileUtils.getImageCacheDirectory()
@@ -59,13 +55,6 @@ public class CustomImageFetcher(
         }
 
         private fun loadImageFromCache(data: CustomImageData): ImageBitmap? {
-            // 先检查内存缓存
-            val cachedImage = ImageCache.acquirePage(data.path)
-            if (cachedImage != null) {
-                return cachedImage.bitmap
-            }
-
-            // 检查磁盘缓存 - 使用包名作为缓存目录
             val cacheDir = FileUtils.getImageCacheDirectory()
 
             val cacheFile = File(cacheDir, "${data.path.hashCode()}.png")
@@ -77,9 +66,6 @@ public class CustomImageFetcher(
                     if (bufferedImage != null) {
                         // 将BufferedImage转换为ImageBitmap
                         val image = bufferedImage.toComposeImageBitmap()
-
-                        // 放入内存缓存
-                        ImageCache.putPage(data.path, image)
                         return image
                     }
                 } catch (e: Exception) {
@@ -104,7 +90,6 @@ public class CustomImageFetcher(
 
     override suspend fun fetch(): FetchResult? {
         return try {
-            // 先检查缓存
             var bitmap = loadImageFromCache(data)
             if (bitmap == null) {
                 val file = File(data.path)
@@ -112,7 +97,7 @@ public class CustomImageFetcher(
                     return ImageFetchResult(
                         image = createWhiteBitmap(data.width, data.height).asSkiaBitmap().asImage(),
                         isSampled = false,
-                        dataSource = DataSource.NETWORK
+                        dataSource = DataSource.DISK
                     )
                 }
 
@@ -149,7 +134,7 @@ public class CustomImageFetcher(
             ImageFetchResult(
                 image = bitmap.asSkiaBitmap().asImage(),
                 isSampled = false,
-                dataSource = DataSource.NETWORK
+                dataSource = DataSource.DISK
             )
         } catch (_: IOException) {
             null

@@ -3,8 +3,6 @@ package com.archko.reader.pdf.cache
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import coil3.BitmapImage
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
@@ -29,11 +27,11 @@ public class CustomImageFetcher(
 ) : Fetcher {
 
     public companion object {
+
         public fun cacheBitmap(bitmap: Bitmap?, path: String) {
             if (null == bitmap) {
                 return
             }
-            ImageCache.putPage(path, bitmap.asImageBitmap())
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
             if (!cacheDir.exists()) {
@@ -56,8 +54,6 @@ public class CustomImageFetcher(
             if (path == null) {
                 return
             }
-            // 删除内存缓存
-            ImageCache.removePage(path)
 
             // 删除磁盘缓存
             val dir = PdfApp.app!!.externalCacheDir
@@ -70,10 +66,6 @@ public class CustomImageFetcher(
         }
 
         private fun loadBitmapFromCache(data: CustomImageData): Bitmap? {
-            val bmp = ImageCache.acquirePage(data.path)
-            if (null != bmp) {
-                return bmp.bitmap.asAndroidBitmap()
-            }
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
             val key = "${cacheDir.absolutePath}/${data.path.hashCode()}"
@@ -89,6 +81,7 @@ public class CustomImageFetcher(
     }
 
     override suspend fun fetch(): FetchResult {
+        println("fetch:${data.path}")
         var bitmap = loadBitmapFromCache(data)
         if (bitmap == null) {
             val file = File(data.path)
@@ -96,7 +89,7 @@ public class CustomImageFetcher(
                 return ImageFetchResult(
                     image = createWhiteBitmap(data.width, data.height).asImage(),
                     isSampled = false,
-                    dataSource = DataSource.NETWORK
+                    dataSource = DataSource.DISK
                 )
             }
             if (FileTypeUtils.isDjvuFile(data.path)) {
@@ -123,11 +116,9 @@ public class CustomImageFetcher(
             bitmap = createWhiteBitmap(data.width, data.height)
         }
 
-        val imageBitmap: BitmapImage = bitmap.asImage()
-
         return ImageFetchResult(
-            image = imageBitmap,
-            dataSource = DataSource.MEMORY,
+            image = bitmap.asImage(),
+            dataSource = DataSource.DISK,
             isSampled = false
         )
     }
