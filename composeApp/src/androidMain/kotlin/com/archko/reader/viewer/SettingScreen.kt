@@ -63,6 +63,7 @@ fun SettingScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(20.dp)
             ) {
+                Spacer(modifier = Modifier.height(16.dp))
                 Logo()
                 Spacer(modifier = Modifier.height(16.dp))
 
