@@ -18,9 +18,12 @@ import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Url
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -246,7 +249,18 @@ public class BackupViewModel : ViewModel() {
      */
     private fun createHttpClient(name: String, pass: String): HttpClient {
         return HttpClient {
-            install(ContentNegotiation)
+            install(ContentNegotiation) {
+                json(Json {
+                    prettyPrint = true
+                    isLenient = true
+                    ignoreUnknownKeys = true
+                })
+            }
+
+            defaultRequest {
+                header("Content-Type", "Content-Type: application/xml; charset=UTF-8")
+            }
+
             // 设置超时时间
             install(HttpTimeout) {
                 requestTimeoutMillis = 160000

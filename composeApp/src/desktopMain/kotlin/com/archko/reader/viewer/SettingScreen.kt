@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.viewer.dialog.ConvertToEpubDialog
 import com.archko.reader.viewer.dialog.PdfCreateDialog
 import com.archko.reader.viewer.dialog.PdfEncryptDialog
@@ -37,6 +38,7 @@ import com.archko.reader.viewer.dialog.PdfExportDialog
 import com.archko.reader.viewer.dialog.PdfMergeDialog
 import com.archko.reader.viewer.dialog.PdfSplitDialog
 import com.archko.reader.viewer.dialog.TtsDialog
+import com.archko.reader.viewer.dialog.WebdavConfigDialog
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.about
 import kreader.composeapp.generated.resources.about_content
@@ -51,11 +53,13 @@ import kreader.composeapp.generated.resources.merge_title
 import kreader.composeapp.generated.resources.split_title
 import kreader.composeapp.generated.resources.support_format
 import kreader.composeapp.generated.resources.tts_setting_title
+import kreader.composeapp.generated.resources.webdav_title
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SettingScreen(
+    viewModel: BackupViewModel,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -118,7 +122,7 @@ fun SettingScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    SettingCategory()
+                    SettingCategory(viewModel)
                     Spacer(modifier = Modifier.height(50.dp))
                 }
             }
@@ -127,7 +131,7 @@ fun SettingScreen(
 }
 
 @Composable
-fun SettingCategory() {
+fun SettingCategory(viewModel: BackupViewModel) {
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPdfCreateDialog by remember { mutableStateOf(false) }
     var showPdfExportDialog by remember { mutableStateOf(false) }
@@ -135,6 +139,7 @@ fun SettingCategory() {
     var showPdfSplitDialog by remember { mutableStateOf(false) }
     var showPdfMergeDialog by remember { mutableStateOf(false) }
     var showPdfConvertDialog by remember { mutableStateOf(false) }
+    var showWebdavDialog by remember { mutableStateOf(false) }
     var showTtsDialog by remember { mutableStateOf(false) }
 
     Spacer(modifier = Modifier.height(8.dp))
@@ -178,6 +183,13 @@ fun SettingCategory() {
         SettingItem(
             title = stringResource(Res.string.convert_title),
             onClick = { showPdfConvertDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.webdav_title),
+            onClick = { showWebdavDialog = true }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -234,6 +246,14 @@ fun SettingCategory() {
     if (showPdfConvertDialog) {
         ConvertToEpubDialog(
             onDismiss = { showPdfConvertDialog = false }
+        )
+    }
+
+    // Webdav Dialog
+    if (showWebdavDialog) {
+        WebdavConfigDialog(
+            viewModel = viewModel,
+            onDismiss = { showWebdavDialog = false }
         )
     }
 

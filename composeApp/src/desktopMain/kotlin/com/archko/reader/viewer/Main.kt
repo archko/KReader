@@ -28,6 +28,7 @@ import com.archko.reader.pdf.cache.CustomImageDataKeyer
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.cache.FileUtils
+import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -519,6 +520,7 @@ fun main(args: Array<String>) {
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
+                val backupViewModel: BackupViewModel = viewModel()
                 viewModel.database = database
 
                 // 文档管理状态
@@ -576,7 +578,7 @@ fun main(args: Array<String>) {
                 // FileScreen 将使用 currentFilePath 来加载文件
                 // 使用 key 确保文档切换时正确重新加载
                 key(currentFilePath) {
-                    FileScreen(viewModel, currentFilePath)
+                    FileScreen(viewModel, backupViewModel, currentFilePath)
                 }
             }
         }

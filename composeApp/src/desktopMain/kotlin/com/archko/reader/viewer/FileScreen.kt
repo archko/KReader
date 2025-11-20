@@ -57,6 +57,7 @@ import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
+import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
@@ -88,6 +89,7 @@ data class OpenDocRequest(val paths: List<String>, val page: Int?)
 @Composable
 fun FileScreen(
     viewModel: PdfViewModel,
+    backupViewModel: BackupViewModel,
     initialFilePath: String? = null,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {}
@@ -426,6 +428,7 @@ fun FileScreen(
         }
         if (showSettingDialog) {
             SettingScreen(
+                backupViewModel,
                 onDismiss = { showSettingDialog = false }
             )
         }
