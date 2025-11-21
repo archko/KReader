@@ -183,6 +183,9 @@ public class DecodeService(
         isShutdown = true
         processingJob?.cancel()
         taskNotificationChannel.close()
+        pageTaskQueue.clear()
+        nodeTaskQueue.clear()
+        cropTaskQueue.clear()
         serviceScope.cancel()
     }
 }

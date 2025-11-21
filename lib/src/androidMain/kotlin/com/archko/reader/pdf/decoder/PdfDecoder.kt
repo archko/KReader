@@ -379,6 +379,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         document = null
 
         ImageCache.clear()
+        BitmapPool.clear()
     }
 
     private fun prepareSizes(): List<Size> {

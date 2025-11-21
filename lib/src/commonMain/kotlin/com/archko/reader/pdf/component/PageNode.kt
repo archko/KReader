@@ -145,6 +145,7 @@ public class PageNode(
     private fun decode(pageWidth: Float, pageHeight: Float) {
         if (!isDecoding) {
             isDecoding = true
+            decodeJob?.cancel()
             decodeJob = pageViewState.decodeScope.launch {
                 // 解码前判断可见性和协程活跃性
                 if (!isScopeActive()) {

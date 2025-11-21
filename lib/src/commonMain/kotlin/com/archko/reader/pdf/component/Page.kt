@@ -240,6 +240,7 @@ public class Page(
 
     private fun startThumbnailDecoding(cacheKey: String, thumbWidth: Int, thumbHeight: Int) {
         thumbDecoding = true
+        thumbJob?.cancel()
         thumbJob = pageViewState.decodeScope.launch {
             if (!isScopeActive()) {
                 thumbDecoding = false
@@ -332,7 +333,6 @@ public class Page(
         if (aspectRatio == 0f) {
             aspectRatio = width * 1.0f / height
         }
-        invalidateNodes()
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
@@ -403,6 +403,9 @@ public class Page(
             }
         }
 
+        if (nodes.isEmpty()) {
+            invalidateNodes()
+        }
         // 无论是否可见，都要调用node.draw（包括预加载区域）
         nodes.forEach { node ->
             node.draw(
@@ -616,12 +619,17 @@ public class Page(
             return
         }
 
+        // 先回收旧的nodes
+        val oldNodes = nodes
+
         // 保存当前配置
         currentTileConfig = config
 
         // 如果是单个块，直接返回原始页面
         if (config.isSingleBlock) {
             nodes = listOf(PageNode(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
+            // 回收旧nodes
+            oldNodes.forEach { it.recycle() }
             return
         }
 
@@ -645,8 +653,9 @@ public class Page(
                 newNodes.add(PageNode(pageViewState, Rect(left, top, right, bottom), aPage))
             }
         }
-        nodes.forEach { it.recycle() }
         nodes = newNodes
+        // 回收旧nodes
+        oldNodes.forEach { it.recycle() }
     }
 
     override fun equals(other: Any?): Boolean {

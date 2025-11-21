@@ -66,7 +66,6 @@ public object BitmapPool {
         while ((simplePool.acquire().also { bitmap = it }) != null) {
             bitmap!!.recycle()
         }
-        //simplePool = null;
     }
 
     public class FixedSimplePool<T : Any> public constructor(maxPoolSize: Int) : Pools.Pool<T> {

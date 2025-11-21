@@ -231,9 +231,23 @@ private class InnerImageCache(
     public fun clear() {
         runBlocking {
             mutex.withLock {
+                // 强制回收所有缓存的bitmap
+                cache.values.forEach { state ->
+                    if (state.markRecycled()) {
+                        recycleImageBitmap(state.bitmap)
+                    }
+                }
                 cache.clear()
                 currentMemoryBytes = 0L
-                cleanCandidatePool(force = true)
+                
+                // 强制回收候选池中的bitmap
+                candidatePool.values.forEach { (state, _) ->
+                    if (state.markRecycled()) {
+                        recycleImageBitmap(state.bitmap)
+                    }
+                }
+                candidatePool.clear()
+                candidateMemoryBytes = 0L
             }
         }
     }

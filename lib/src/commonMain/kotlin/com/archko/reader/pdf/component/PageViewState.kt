@@ -192,6 +192,18 @@ public class PageViewState(
         isShutdown = true
         decodeService?.shutdown()
         decodeScope.cancel()
+
+        pages.forEach {
+            it.recycle()
+        }
+        pages = emptyList()
+        pageToRender = emptyList()
+
+        state.close()
+
+        println("PageViewState.shutdown: 清理完成，调用GC")
+        // 建议GC
+        System.gc()
     }
 
     public fun isShutdown(): Boolean = isShutdown
@@ -560,7 +572,7 @@ public class PageViewState(
         }
     }
 
-    public companion object{
+    public companion object {
 
         public fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
             // 获取画布的可视区域
