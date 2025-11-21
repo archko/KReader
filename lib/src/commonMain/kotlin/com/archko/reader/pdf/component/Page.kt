@@ -407,14 +407,17 @@ public class Page(
             invalidateNodes()
         }
         // 无论是否可见，都要调用node.draw（包括预加载区域）
-        nodes.forEach { node ->
-            node.draw(
-                drawScope,
-                currentWidth,
-                currentHeight,
-                currentBounds.left,
-                currentBounds.top,
-            )
+        // 添加超大块限制：当currentWidth或currentHeight超过MAX_BLOCK_SIZE时跳过node绘制
+        if (currentWidth <= MAX_BLOCK_SIZE && currentHeight <= MAX_BLOCK_SIZE) {
+            nodes.forEach { node ->
+                node.draw(
+                    drawScope,
+                    currentWidth,
+                    currentHeight,
+                    currentBounds.left,
+                    currentBounds.top,
+                )
+            }
         }
 
         // 绘制分割线
@@ -763,4 +766,3 @@ public class Page(
         }
     }
 }
-
