@@ -5,9 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapState
@@ -333,6 +335,7 @@ public class Page(
         if (aspectRatio == 0f) {
             aspectRatio = width * 1.0f / height
         }
+        invalidateNodes()
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
@@ -403,21 +406,15 @@ public class Page(
             }
         }
 
-        if (nodes.isEmpty()) {
-            invalidateNodes()
-        }
         // 无论是否可见，都要调用node.draw（包括预加载区域）
-        // 添加超大块限制：当currentWidth或currentHeight超过MAX_BLOCK_SIZE时跳过node绘制
-        if (currentWidth <= MAX_BLOCK_SIZE && currentHeight <= MAX_BLOCK_SIZE) {
-            nodes.forEach { node ->
-                node.draw(
-                    drawScope,
-                    currentWidth,
-                    currentHeight,
-                    currentBounds.left,
-                    currentBounds.top,
-                )
-            }
+        nodes.forEach { node ->
+            node.draw(
+                drawScope,
+                currentWidth,
+                currentHeight,
+                currentBounds.left,
+                currentBounds.top,
+            )
         }
 
         // 绘制分割线
@@ -493,7 +490,7 @@ public class Page(
             drawScope.drawRect(
                 color = linkColor,
                 topLeft = Offset(linkRect.left, linkRect.top),
-                size = androidx.compose.ui.geometry.Size(linkRect.width, linkRect.height)
+                size = Size(linkRect.width, linkRect.height)
             )
         }
     }
@@ -521,7 +518,7 @@ public class Page(
             drawScope.drawRect(
                 color = selectionColor,
                 topLeft = Offset(left, top),
-                size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
+                size = Size(right - left, bottom - top)
             )
         }
     }
@@ -567,7 +564,7 @@ public class Page(
                     currentBounds.left,
                     currentBounds.bottom - separatorHeight
                 ),
-                size = androidx.compose.ui.geometry.Size(separatorWidth, separatorHeight)
+                size = Size(separatorWidth, separatorHeight)
             )
         } else {
             // 横向滚动，从顶部开始绘1/4高度的垂直分割线
@@ -580,11 +577,11 @@ public class Page(
                     currentBounds.right - separatorWidth,
                     currentBounds.top
                 ),
-                size = androidx.compose.ui.geometry.Size(separatorWidth, separatorHeight)
+                size = Size(separatorWidth, separatorHeight)
             )
         }
     }
-    
+
     /**
      * 绘制朗读指示边框
      */
@@ -595,8 +592,8 @@ public class Page(
             drawScope.drawRect(
                 color = Color.Red,
                 topLeft = Offset(currentBounds.left, currentBounds.top),
-                size = androidx.compose.ui.geometry.Size(currentBounds.width, currentBounds.height),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8f)
+                size = Size(currentBounds.width, currentBounds.height),
+                style = Stroke(width = 8f)
             )
         }
     }
@@ -647,13 +644,15 @@ public class Page(
                 val baseBottom = (y + 1) / config.yBlocks.toFloat()
 
                 // 添加微小的重叠以避免间隙（除了边缘块）
-                val overlap = 0.001f // 0.1% 的重叠
+                val overlap = 0.0001f // 0.1% 的重叠
                 val left = if (x == 0) baseLeft else baseLeft - overlap
                 val top = if (y == 0) baseTop else baseTop - overlap
                 val right = if (x == config.xBlocks - 1) baseRight else baseRight + overlap
                 val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom + overlap
 
-                newNodes.add(PageNode(pageViewState, Rect(left, top, right, bottom), aPage))
+                val rect = Rect(left, top, right, bottom)
+                newNodes.add(PageNode(pageViewState, rect, aPage))
+                //println("Page[${aPage.index}], scaled.w-h:$width-$height, , orignal:${aPage.getWidth(false)}-${aPage.getHeight(false)}, tile:$rect")
             }
         }
         nodes = newNodes
@@ -690,7 +689,7 @@ public class Page(
     }
 
     public companion object {
-        private const val MIN_BLOCK_SIZE = 256f * 3f // 768
+        public const val MIN_BLOCK_SIZE: Float = 256f * 3f // 768
         private const val MAX_BLOCK_SIZE = 256f * 4f // 1024
 
         // 计算分块数的通用函数

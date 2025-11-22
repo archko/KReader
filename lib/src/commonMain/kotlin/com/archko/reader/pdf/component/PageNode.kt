@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.component.Page.Companion.MIN_BLOCK_SIZE
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -199,6 +200,13 @@ public class PageNode(
                 //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
                 val outWidth = ((srcRect.right - srcRect.left)).toInt()
                 val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
+
+                //外面的计算如果出问题了,会在这里拦截,避免崩溃.目前是正常的
+                if (outWidth > MIN_BLOCK_SIZE * 2 && outHeight > MIN_BLOCK_SIZE * 2) {
+                    println("[PageNode].decode:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
+                    isDecoding = false
+                    return@launch
+                }
 
                 val decodeTask = DecodeTask(
                     type = DecodeTask.TaskType.NODE,

@@ -216,7 +216,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             // 更新对外提供的页面尺寸
             pageSizes = scaledPageSizes
             imageSize = IntSize(documentWidth, totalHeight.toInt())
-            println("PdfDecoder.caculateSize: documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
+            println("DjvuDecoder.caculateSize: documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
         }
     }
 
@@ -230,7 +230,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     override fun close() {
         djvuLoader?.close()
         if (cachePage && aPageList != null && !aPageList.isEmpty()) {
-            println("PdfDecoder.close:$aPageList")
+            println("DjvuDecoder.close:$aPageList")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
@@ -384,7 +384,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                 scale,
             )
 
-            println("PdfDecoder.renderPageRegion:index:$index, scale:$scale, patch:$patchX-$patchY-page:$pageWidth-$pageHeight, region:$region")
+            println("DjvuDecoder.renderPageRegion:index:$index, scale:$scale, patch:$patchX-$patchY-page:$pageWidth-$pageHeight, region:$region")
 
             bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
