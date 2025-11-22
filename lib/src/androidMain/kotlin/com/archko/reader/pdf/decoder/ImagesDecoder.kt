@@ -219,6 +219,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             inSampleSize = calculateInSampleSize(files[aPage.index], targetWidth, targetHeight)
         }
 
+        println("ImagesDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 目标=$targetWidth-$targetHeight")
+
         val bitmap = BitmapFactory.decodeFile(files[aPage.index].absolutePath, options)
         if (bitmap != null) {
             //println("ImagesDecoder.renderPage:原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")

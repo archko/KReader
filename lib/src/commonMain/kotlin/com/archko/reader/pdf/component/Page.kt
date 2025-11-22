@@ -220,9 +220,11 @@ public class Page(
     public fun loadThumbnail() {
         if (thumbDecoding) return
 
-        val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height)
-
         val cacheKey = cachedCacheKey ?: run {
+            val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
+                aPage.width,
+                aPage.height
+            )
             val cacheKey =
                 "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pageViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
@@ -237,10 +239,10 @@ public class Page(
         }
 
         // 开始解码
-        startThumbnailDecoding(cacheKey, thumbWidth, thumbHeight)
+        startThumbnailDecoding(cacheKey)
     }
 
-    private fun startThumbnailDecoding(cacheKey: String, thumbWidth: Int, thumbHeight: Int) {
+    private fun startThumbnailDecoding(cacheKey: String) {
         thumbDecoding = true
         thumbJob?.cancel()
         thumbJob = pageViewState.decodeScope.launch {
@@ -357,9 +359,11 @@ public class Page(
             return
         }
 
-        val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height)
-
         val cacheKey = cachedCacheKey ?: run {
+            val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
+                aPage.width,
+                aPage.height
+            )
             val cacheKey =
                 "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pageViewState.isCropEnabled()}"
             cachedCacheKey = cacheKey
@@ -716,39 +720,6 @@ public class Page(
             val yBlocks = calcBlockCount(height)
 
             return TileConfig(xBlocks, yBlocks)
-        }
-
-        /**
-         * 计算缩略图尺寸：根据宽高比选择基准边
-         */
-        private fun calculateThumbnailSize(
-            pageWidth: Int,
-            pageHeight: Int,
-            baseSize: Int = 240
-        ): Pair<Int, Int> {
-            val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
-            return when {
-                aspectRatio <= 0.5f -> {
-                    // 高度是宽度的2倍以上（竖长条），以宽为基准
-                    val width = baseSize
-                    val height = (baseSize / aspectRatio).toInt()
-                    Pair(width, height)
-                }
-
-                aspectRatio >= 2.0f -> {
-                    // 宽度是高度的2倍以上（横长条），以高为基准
-                    val height = baseSize
-                    val width = (baseSize * aspectRatio).toInt()
-                    Pair(width, height)
-                }
-
-                else -> {
-                    // 宽高比在 1:2 到 2:1 之间，以宽为基准
-                    val width = baseSize
-                    val height = (baseSize / aspectRatio).toInt()
-                    Pair(width, height)
-                }
-            }
         }
 
         private fun isPageVisible(drawScope: DrawScope, offset: Offset, bounds: Rect): Boolean {

@@ -16,35 +16,49 @@ public class DecoderAdapter(
     private val isCropEnabled: () -> Boolean
 ) : Decoder {
 
-    /**
-     * 计算缩略图尺寸：根据宽高比选择基准边
-     */
-    private fun calculateThumbnailSize(
-        pageWidth: Int,
-        pageHeight: Int,
-        baseSize: Int = 240
-    ): Pair<Int, Int> {
-        val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
-        return when {
-            aspectRatio <= 0.5f -> {
-                // 高度是宽度的2倍以上（竖长条），以宽为基准
-                val width = baseSize
-                val height = (baseSize / aspectRatio).toInt()
-                Pair(width, height)
-            }
+    public companion object {
 
-            aspectRatio >= 2.0f -> {
-                // 宽度是高度的2倍以上（横长条），以高为基准
-                val height = baseSize
-                val width = (baseSize * aspectRatio).toInt()
-                Pair(width, height)
+        /**
+         * 计算缩略图尺寸：根据宽高比选择基准边
+         * 对于超大的图片,如果缩略图在最大缩放值10倍的情况下,移动会卡,根本原因是组合次数
+         */
+        public fun calculateThumbnailSize(
+            pageWidth: Int,
+            pageHeight: Int,
+            baseSize: Int = 100
+        ): Pair<Int, Int> {
+            var size = baseSize
+            if (pageWidth > 100_000 || pageHeight > 100_000) {
+                size = 8
+            } else if (pageWidth > 30_000 || pageHeight > 30_000) {
+                size = 12
+            } else if (pageWidth > 20_000 || pageHeight > 20_000) {
+                size = 20
+            } else if (pageWidth > 10_000 || pageHeight > 10_000) {
+                size = 40
             }
+            val aspectRatio = pageWidth.toFloat() / pageHeight.toFloat()
+            return when {
+                aspectRatio <= 0.5f -> {
+                    // 高度是宽度的2倍以上（竖长条），以宽为基准
+                    val width = size
+                    val height = (size / aspectRatio).toInt()
+                    Pair(width, height)
+                }
 
-            else -> {
-                // 宽高比在 1:2 到 2:1 之间，以宽为基准
-                val width = baseSize
-                val height = (baseSize / aspectRatio).toInt()
-                Pair(width, height)
+                aspectRatio >= 2.0f -> {
+                    // 宽度是高度的2倍以上（横长条），以高为基准
+                    val height = size
+                    val width = (size * aspectRatio).toInt()
+                    Pair(width, height)
+                }
+
+                else -> {
+                    // 宽高比在 1:2 到 2:1 之间，以宽为基准
+                    val width = size
+                    val height = (size / aspectRatio).toInt()
+                    Pair(width, height)
+                }
             }
         }
     }
@@ -52,7 +66,7 @@ public class DecoderAdapter(
     override suspend fun decodePage(task: DecodeTask): ImageBitmap? {
         return try {
             val aPage = task.aPage
-            val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height, 240)
+            val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height)
 
             //println("decodePage.page:${task.pageIndex}, $thumbWidth-$thumbHeight")
             imageDecoder.renderPage(
