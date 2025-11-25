@@ -107,7 +107,7 @@ public fun DocumentView(
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PageViewState(list, state, orientation, crop, textSelector)
     }
-    
+
     LaunchedEffect(speakingPageIndex) {
         flingJob?.cancel()
         pageViewState.updateSpeakingPageIndex(speakingPageIndex)
@@ -791,6 +791,9 @@ private fun firstPage(
         }
         if (firstVisible != -1) {
             onPageChanged?.invoke(firstVisible)
+        } else {
+            firstVisible = 0
+            println("firstPage.error:$offset, ori:$orientation, view:$viewSize")
         }
     }
     return firstVisible
