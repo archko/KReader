@@ -13,6 +13,9 @@ import com.archko.reader.pdf.entity.Hyperlink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -62,8 +65,34 @@ public class PageViewState(
     public var decodeService: DecodeService? = null
         private set
 
+    // 渲染触发Flow
+    private val _renderFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+    public val renderFlow: SharedFlow<Unit> = _renderFlow.asSharedFlow()
+
+    // throttle机制（34ms内最多触发一次）
+    private var lastRenderTime = 0L
+
+    // 解码完成回调
+    public var onDecodeCompleted: (() -> Unit)? = null
+
     init {
         initDecodeService()
+    }
+
+    // 触发渲染更新（带throttle）
+    private suspend fun triggerRenderUpdate() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastRenderTime >= 34) { // 34ms throttle
+            _renderFlow.tryEmit(Unit)
+            lastRenderTime = currentTime
+        }
+    }
+
+    public fun notifyDecodeCompleted() {
+        onDecodeCompleted?.invoke()
+        decodeScope.launch {
+            triggerRenderUpdate()
+        }
     }
 
     /**
@@ -337,6 +366,7 @@ public class PageViewState(
         if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
             println("PageViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
             invalidatePageSizes()
+            notifyDecodeCompleted()
         } else {
             println("PageViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
         }
@@ -506,6 +536,7 @@ public class PageViewState(
 
     public fun updateOffset(newOffset: Offset) {
         this.viewOffset = newOffset
+        updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
     }
 
     public enum class Align { Top, Center, Bottom }
@@ -514,9 +545,7 @@ public class PageViewState(
         drawScope: androidx.compose.ui.graphics.drawscope.DrawScope,
         offset: Offset,
         vZoom: Float,
-        viewSize: IntSize
     ) {
-        updateVisiblePages(offset, viewSize, vZoom)
         pageToRender.forEach { page ->
             page.draw(drawScope, offset, vZoom)
         }

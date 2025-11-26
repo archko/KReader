@@ -107,6 +107,14 @@ public fun DocumentView(
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PageViewState(list, state, orientation, crop, textSelector)
     }
+
+    // 监听解码完成事件，触发UI刷新
+    LaunchedEffect(pageViewState.renderFlow, Unit) {
+        pageViewState.renderFlow.collect {
+            // 解码完成时触发Canvas重绘，确保新解码的内容能显示出来
+            println("收到渲染更新通知")
+        }
+    }
     
     LaunchedEffect(speakingPageIndex) {
         flingJob?.cancel()
@@ -703,19 +711,7 @@ public fun DocumentView(
                     0f
                 }
             translate(left = offset.x, top = offset.y + translateY) {
-                //只绘制可见区域.
-                /*val visibleRect = Rect(
-                    left = -offset.x,
-                    top = -offset.y,
-                    right = size.width - offset.x,
-                    bottom = size.height - offset.y
-                )
-                drawRect(
-                    brush = gradientBrush,
-                    topLeft = visibleRect.topLeft,
-                    size = visibleRect.size
-                )*/
-                pageViewState.drawVisiblePages(this, offset, vZoom, viewSize)
+                pageViewState.drawVisiblePages(this, offset, vZoom)
 
                 // 绘制选择区域的调试可视化
                 if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {

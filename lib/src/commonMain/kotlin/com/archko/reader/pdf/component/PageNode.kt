@@ -238,6 +238,8 @@ public class PageNode(
                                         ImageCache.releaseNode(newState)
                                     }
                                 }
+                                // 解码完成，触发UI刷新
+                                pageViewState.notifyDecodeCompleted()
                             } else {
                                 if (error != null) {
                                     println("PageNode decode error: ${error.message}")
