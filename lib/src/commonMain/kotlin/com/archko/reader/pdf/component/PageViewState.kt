@@ -366,6 +366,7 @@ public class PageViewState(
         if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
             println("PageViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
             invalidatePageSizes()
+            updateVisiblePages(viewOffset, viewSize, vZoom)
             notifyDecodeCompleted()
         } else {
             println("PageViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
