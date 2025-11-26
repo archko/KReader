@@ -361,7 +361,7 @@ public fun DocumentView(
                                         ?: 0L
                                 pan += panChange
                                 totalDrag += panChange
-                                panVelocityTracker.addPosition(uptime, pan)
+                                panVelocityTracker.addPosition(uptime, -panChange)
 
                                 // 检测是否开始拖拽
                                 if (totalDrag.getDistance() > 10f) {
