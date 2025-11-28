@@ -80,9 +80,10 @@ public class PageViewState(
     }
 
     // 触发渲染更新（带throttle）
-    private suspend fun triggerRenderUpdate() {
+    private fun triggerRenderUpdate() {
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastRenderTime >= 34) { // 34ms throttle
+        //println("triggerRenderUpdate:${currentTime - lastRenderTime}")
+        if (currentTime - lastRenderTime >= 34) {
             _renderFlow.tryEmit(Unit)
             lastRenderTime = currentTime
         }
@@ -366,8 +367,6 @@ public class PageViewState(
         if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
             println("PageViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
             invalidatePageSizes()
-            updateVisiblePages(viewOffset, viewSize, vZoom)
-            notifyDecodeCompleted()
         } else {
             println("PageViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
         }
@@ -461,6 +460,7 @@ public class PageViewState(
         // 优化：使用二分查找定位可见页面范围
         if (pages.isEmpty()) {
             pageToRender = emptyList()
+            notifyDecodeCompleted()
             return
         }
 

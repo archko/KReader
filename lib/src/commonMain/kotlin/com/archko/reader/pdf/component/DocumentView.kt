@@ -334,7 +334,7 @@ public fun DocumentView(
 
         LaunchedEffect(pageViewState.renderFlow, Unit) {
             pageViewState.renderFlow.collect {
-                println("收到渲染更新通知")
+                //println("收到渲染更新通知")
                 renderTrigger++
             }
         }
@@ -422,7 +422,7 @@ public fun DocumentView(
                                             offset.y.coerceIn(minY, maxY)
                                         )
                                     }
-                                    pageViewState.updateOffset(offset)
+                                    //pageViewState.updateOffset(offset) //缩放过程不更新偏移,否则会导致页面跳动
                                     event.changes.fastForEach { if (it.positionChanged()) it.consume() }
                                 } else {
                                     // 单指拖动
@@ -498,8 +498,10 @@ public fun DocumentView(
                         } finally {
                             // 缩放结束后调用 updateViewSize 重新计算页面
                             if (zooming) {
+                                pageViewState.updateOffset(offset)
                                 pageViewState.updateViewSize(viewSize, vZoom, orientation)
                             }
+                            pageViewState.updateVisiblePages(offset, viewSize, vZoom)
 
                             // 处理文本选择结束
                             if (isTextSelectionMode && isTextSelecting) {
@@ -704,13 +706,7 @@ public fun DocumentView(
                     }
                 }
         ) {
-            val translateY =
-                if (orientation == Vertical && pageViewState.totalHeight < viewSize.height) {
-                    (viewSize.height - pageViewState.totalHeight) / 2
-                } else {
-                    0f
-                }
-            translate(left = offset.x, top = offset.y + translateY) {
+            translate(left = offset.x, top = offset.y) {
                 pageViewState.drawVisiblePages(this, offset, vZoom)
 
                 // 绘制选择区域的调试可视化
