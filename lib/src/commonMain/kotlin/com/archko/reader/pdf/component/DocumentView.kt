@@ -108,18 +108,6 @@ public fun DocumentView(
         PageViewState(list, state, orientation, crop, textSelector)
     }
 
-    // 强制重绘触发器 - 解码完成时改变这个值强制Canvas重绘
-    var renderTrigger by remember { mutableIntStateOf(0) }
-
-    // 监听解码完成事件，触发UI刷新
-    LaunchedEffect(pageViewState.renderFlow, Unit) {
-        pageViewState.renderFlow.collect {
-            // 解码完成时触发Canvas重绘，确保新解码的内容能显示出来
-            println("收到渲染更新通知")
-            renderTrigger++
-        }
-    }
-
     LaunchedEffect(speakingPageIndex) {
         flingJob?.cancel()
         pageViewState.updateSpeakingPageIndex(speakingPageIndex)
@@ -342,6 +330,14 @@ public fun DocumentView(
             },
         contentAlignment = Alignment.TopStart
     ) {
+        var renderTrigger by remember { mutableIntStateOf(0) }
+
+        LaunchedEffect(pageViewState.renderFlow, Unit) {
+            pageViewState.renderFlow.collect {
+                println("收到渲染更新通知")
+                renderTrigger++
+            }
+        }
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
