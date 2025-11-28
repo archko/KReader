@@ -706,7 +706,9 @@ public fun DocumentView(
                     }
                 }
         ) {
-            translate(left = offset.x, top = offset.y) {
+            val centerOffsetX = if (orientation == Horizontal && pageViewState.totalWidth < viewSize.width) (viewSize.width - pageViewState.totalWidth) / 2 else 0f
+            val centerOffsetY = if (orientation == Vertical && pageViewState.totalHeight < viewSize.height) (viewSize.height - pageViewState.totalHeight) / 2 else 0f
+            translate(left = offset.x + centerOffsetX, top = offset.y + centerOffsetY) {
                 pageViewState.drawVisiblePages(this, offset, vZoom)
 
                 // 绘制选择区域的调试可视化

@@ -25,7 +25,7 @@ public class DecoderAdapter(
         public fun calculateThumbnailSize(
             pageWidth: Int,
             pageHeight: Int,
-            baseSize: Int = 100
+            baseSize: Int = 160
         ): Pair<Int, Int> {
             var size = baseSize
             if (pageWidth > 100_000 || pageHeight > 100_000) {
