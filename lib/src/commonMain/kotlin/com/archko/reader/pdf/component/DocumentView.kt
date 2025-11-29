@@ -50,11 +50,10 @@ public const val velocityDistance: Float = 50f
 
 public data class JumpIntent(
     val page: Int = 0,
-    val mode: JumpMode = JumpMode.None
+    val mode: JumpMode = JumpMode.PageRestore
 )
 
 public sealed class JumpMode {
-    public object None : JumpMode()
     public object PageRestore : JumpMode()     // 书签恢复，使用精确offset
     public object PageNavigation : JumpMode()  // 页面跳转，使用页面顶部
 }
@@ -65,7 +64,7 @@ public fun DocumentView(
     list: MutableList<APage>,
     state: ImageDecoder,
     jumpToPage: Int? = null,
-    jumpMode: JumpMode = JumpMode.None,
+    jumpMode: JumpMode = JumpMode.PageRestore,
     initialOrientation: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -265,13 +264,6 @@ public fun DocumentView(
                     } else {
                         println("DocumentView: PageNavigation找不到页面:$toPage")
                     }
-                }
-
-                JumpMode.None -> {
-                    // 无跳转模式，跳过
-                    println("DocumentView: JumpMode.None，跳过跳转:$toPage")
-                    isJumping = false
-                    return@LaunchedEffect
                 }
             }
 

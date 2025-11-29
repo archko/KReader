@@ -50,6 +50,7 @@ import com.archko.reader.viewer.dialog.SleepTimerDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsSpeechCallback
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,6 +64,288 @@ import java.io.File
 /**
  * @author: archko 2025/7/23 :09:09
  */
+
+/**
+ * 错误和加载状态内容组件
+ */
+@Composable
+private fun ErrorContent(
+    loadingError: String?,
+    currentPath: String,
+    onCloseDocument: (() -> Unit)?
+) {
+    when {
+        loadingError != null -> {
+            // 显示错误信息
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = when (loadingError) {
+                        "document_open_failed" -> stringResource(Res.string.document_open_failed)
+                        else -> stringResource(Res.string.document_open_failed)
+                    },
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = currentPath,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(Res.string.support_format),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { onCloseDocument?.invoke() }
+                ) {
+                    Text(stringResource(Res.string.close))
+                }
+            }
+        }
+
+        else -> {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    stringResource(Res.string.loading),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 工具栏内容组件
+ */
+@Composable
+private fun ToolbarContent(
+    isVertical: Boolean,
+    onOrientationChange: () -> Unit,
+    onCloseDocument: (() -> Unit)?,
+    currentPath: String,
+    ttsServiceBinder: TtsServiceBinder?,
+    isSpeaking: Boolean,
+    currentPage: Int,
+    decoder: ImageDecoder,
+    onTextSelectionModeChange: () -> Unit,
+    isTextSelectionMode: Boolean,
+    onCropChange: () -> Unit,
+    isCrop: Boolean,
+    onOutlineDialogShow: () -> Unit,
+    onFontDialogShow: () -> Unit,
+    scope: CoroutineScope,
+    onStartSpeaking: (Int, ImageDecoder, TtsServiceBinder) -> Unit,
+    isReflow: Boolean,
+    paths: List<String>
+) {
+    Surface(
+        color = Color(0xCC222222),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { onCloseDocument?.invoke() }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_back),
+                    contentDescription = stringResource(Res.string.back),
+                    tint = Color.White
+                )
+            }
+
+            LazyRow(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                item {
+                    IconButton(onClick = {
+                        onOrientationChange()
+                    }) {
+                        Icon(
+                            painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                            contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                Res.string.horizontal
+                            ),
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                // 只有文档文件才显示其他按钮
+                if (FileTypeUtils.isDocumentFile(currentPath)) {
+                    ttsServiceBinder?.let { binder ->
+                        item {
+                            val isConnected by binder.isConnected.collectAsState()
+
+                            IconButton(
+                                onClick = {
+                                    if (isConnected && binder.isServiceInitialized()) {
+                                        if (isSpeaking) {
+                                            binder.pause()
+                                        } else {
+                                            scope.launch {
+                                                onStartSpeaking(currentPage, decoder, binder)
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = true
+                            ) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_tts),
+                                    contentDescription = if (isSpeaking) "暂停朗读" else "开始朗读",
+                                    tint = if (isSpeaking) Color.Green else Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        IconButton(onClick = { onTextSelectionModeChange() }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_select),
+                                contentDescription = "文本选择",
+                                tint = if (isTextSelectionMode) Color.Green else Color.White
+                            )
+                        }
+                    }
+
+                    item {
+                        IconButton(onClick = { onCropChange() }) {
+                            Icon(
+                                painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                                contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                                    Res.string.no_crop
+                                ),
+                                tint = Color.White
+                            )
+                        }
+                    }
+
+                    if (FileTypeUtils.shouldShowOutline(paths)) {
+                        item {
+                            IconButton(onClick = { onOutlineDialogShow() }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_toc),
+                                    contentDescription = stringResource(Res.string.outline),
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    if (IntentFile.isReflowable(currentPath)) {
+                        item {
+                            IconButton(onClick = { onFontDialogShow() }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_font),
+                                    contentDescription = stringResource(Res.string.font),
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * TTS控制栏内容组件
+ */
+@Composable
+private fun TtsControlBarContent(
+    ttsServiceBinder: TtsServiceBinder?,
+    onPauseResume: () -> Unit,
+    onSleepTimer: () -> Unit,
+    onQueue: () -> Unit,
+    onStop: () -> Unit,
+) {
+    Surface(
+        color = Color(0xCC333333),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ttsServiceBinder?.let { binder ->
+                val isConnected by binder.isConnected.collectAsState()
+
+                IconButton(
+                    onClick = { onPauseResume() },
+                    enabled = true
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_tts),
+                        contentDescription = "TTS控制",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                IconButton(onClick = { onSleepTimer() }) {
+                    val hasSleepTimer = binder.hasSleepTimer()
+                    Text(
+                        text = "💤",
+                        color = if (hasSleepTimer) Color.Yellow else Color.White,
+                        fontSize = 16.sp
+                    )
+                }
+
+                IconButton(onClick = { onQueue() }) {
+                    Text(
+                        text = "📋",
+                        color = Color.White,
+                        fontSize = 16.sp
+                    )
+                }
+
+                IconButton(onClick = { onStop() }) {
+                    Text(
+                        text = "X",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
@@ -262,61 +545,11 @@ fun CustomView(
 
         if (isNeedPass) {
         } else if (null == decoder) {
-            if (loadingError != null) {
-                // 显示错误信息
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = when (loadingError) {
-                            "document_open_failed" -> stringResource(Res.string.document_open_failed)
-                            else -> stringResource(Res.string.document_open_failed)
-                        },
-                        style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = currentPath,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = stringResource(Res.string.support_format),
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = { onCloseDocument?.invoke() }
-                    ) {
-                        Text(stringResource(Res.string.close))
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        stringResource(Res.string.loading),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
+            ErrorContent(
+                loadingError = loadingError,
+                currentPath = currentPath,
+                onCloseDocument = onCloseDocument
+            )
         } else {
             fun createList(decoder: ImageDecoder): MutableList<APage> {
                 if (!decoder.aPageList.isNullOrEmpty()) {
@@ -384,7 +617,7 @@ fun CustomView(
                         progressPage != null ->
                             JumpIntent(progressPage, JumpMode.PageNavigation)
 
-                        else -> JumpIntent(0, JumpMode.None)
+                        else -> JumpIntent(0, JumpMode.PageRestore)
                     }
                 )
             }
@@ -411,7 +644,6 @@ fun CustomView(
                                     speakingPageIndex = targetPage
                                     if (targetPage != jumpIntent.page) {
                                         jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
-
                                     }
                                 }
                             }
@@ -468,8 +700,6 @@ fun CustomView(
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
-
-            val context = LocalContext.current
 
             // 根据reflow状态选择显示模式
             if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
@@ -542,324 +772,63 @@ fun CustomView(
                 )
             }
 
+            // 阅读器工具栏
             AnimatedVisibility(
                 visible = showToolbar,
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
-                Surface(
-                    color = Color(0xCC222222),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { onCloseDocument?.invoke() }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = stringResource(Res.string.back),
-                                tint = Color.White
-                            )
+                ToolbarContent(
+                    isVertical = isVertical,
+                    onOrientationChange = { isVertical = !isVertical },
+                    onCloseDocument = onCloseDocument,
+                    currentPath = currentPath,
+                    ttsServiceBinder = ttsServiceBinder,
+                    isSpeaking = isSpeaking,
+                    currentPage = currentPage,
+                    decoder = decoder!!,
+                    onTextSelectionModeChange = { isTextSelectionMode = !isTextSelectionMode },
+                    isTextSelectionMode = isTextSelectionMode,
+                    onCropChange = { isCrop = !isCrop },
+                    isCrop = isCrop,
+                    onOutlineDialogShow = { showOutlineDialog = true },
+                    onFontDialogShow = { showFontDialog = true },
+                    scope = scope,
+                    onStartSpeaking = { page, dec, binder ->
+                        scope.launch {
+                            speakingPageIndex = page
+                            speakFromCurrentPage(page, dec, binder)
                         }
-
-                        LazyRow(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.End,
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            item {
-                                IconButton(onClick = {
-                                    isVertical = !isVertical
-                                    showToolbar = false
-                                }) {
-                                    Icon(
-                                        painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                        contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                            Res.string.horizontal
-                                        ),
-                                        tint = Color.White
-                                    )
-                                }
-                            }
-
-                            // 只有文档文件才显示其他按钮
-                            if (FileTypeUtils.isDocumentFile(currentPath)) {
-                                ttsServiceBinder?.let { binder ->
-                                    item {
-                                        val isConnected by binder.isConnected.collectAsState()
-
-                                        IconButton(
-                                            onClick = {
-                                                if (isConnected && binder.isServiceInitialized()) {
-                                                    if (isSpeaking) {
-                                                        binder.pause()
-                                                    } else {
-                                                        scope.launch {
-                                                            speakingPageIndex = currentPage
-                                                            speakFromCurrentPage(
-                                                                currentPage,
-                                                                decoder!!,
-                                                                binder
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                            enabled = true
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_tts),
-                                                contentDescription = if (isSpeaking) "暂停朗读" else "开始朗读",
-                                                tint = if (isSpeaking) Color.Green else Color.White
-                                            )
-                                        }
-                                    }
-                                }
-
-                                item {
-                                    IconButton(onClick = {
-                                        isTextSelectionMode = !isTextSelectionMode
-                                    }) {
-                                        Icon(
-                                            painter = painterResource(Res.drawable.ic_select),
-                                            contentDescription = "文本选择",
-                                            tint = if (isTextSelectionMode) Color.Green else Color.White
-                                        )
-                                    }
-                                }
-
-                                item {
-                                    IconButton(onClick = { isCrop = !isCrop }) {
-                                        Icon(
-                                            painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                            contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                                Res.string.no_crop
-                                            ),
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-
-                                if (FileTypeUtils.shouldShowOutline(paths)) {
-                                    item {
-                                        IconButton(onClick = { showOutlineDialog = true }) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_toc),
-                                                contentDescription = stringResource(Res.string.outline),
-                                                tint = Color.White
-                                            )
-                                        }
-                                    }
-                                }
-
-                                if (IntentFile.isReflowable(currentPath)) {
-                                    item {
-                                        IconButton(onClick = { showFontDialog = true }) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_font),
-                                                contentDescription = stringResource(Res.string.font),
-                                                tint = Color.White
-                                            )
-                                        }
-                                    }
-
-                                    /*item {
-                                        IconButton(onClick = { isReflow = !isReflow }) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_reflow),
-                                                contentDescription = stringResource(Res.string.reflow),
-                                                tint = if (isReflow) Color.Green else Color.White
-                                            )
-                                        }
-                                    }*/
-                                }
-
-                                item {
-                                    IconButton(onClick = { }) {
-                                        Icon(
-                                            painter = painterResource(Res.drawable.ic_search),
-                                            contentDescription = stringResource(Res.string.search),
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                    },
+                    isReflow = isReflow,
+                    paths = paths
+                )
             }
 
-            // 朗读工具条 - 在主工具栏下方
+            // TTS控制栏
             AnimatedVisibility(
                 visible = isSpeaking,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = if (showToolbar) 48.dp else 0.dp)
             ) {
-                Surface(
-                    color = Color(0xCC333333),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(36.dp)
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
+                TtsControlBarContent(
+                    ttsServiceBinder = ttsServiceBinder,
+                    onPauseResume = {
                         ttsServiceBinder?.let { binder ->
-                            val isConnected by binder.isConnected.collectAsState()
-
-                            IconButton(
-                                onClick = {
-                                    if (isConnected && binder.isServiceInitialized()) {
-                                        if (isSpeaking) {
-                                            binder.pause()
-                                        } else {
-                                            scope.launch {
-                                                binder.clearQueue()
-                                                speakFromCurrentPage(
-                                                    currentPage,
-                                                    decoder!!,
-                                                    binder
-                                                )
-                                            }
-                                        }
-                                    }
-                                },
-                                enabled = true
-                            ) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_tts),
-                                    contentDescription = if (isSpeaking) "暂停" else "开始",
-                                    tint = if (isSpeaking) Color.Green else Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { showSleepDialog = true }
-                            ) {
-                                val hasSleepTimer = binder.hasSleepTimer()
-                                Text(
-                                    text = "💤",
-                                    color = if (hasSleepTimer) Color.Yellow else Color.White,
-                                    fontSize = 16.sp
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { showQueueDialog = true }
-                            ) {
-                                Text(
-                                    text = "📋",
-                                    color = Color.White,
-                                    fontSize = 16.sp
-                                )
-                            }
-
-                            IconButton(onClick = { binder.stop() }) {
-                                Text(
-                                    text = "X",
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 睡眠定时对话框
-            if (showSleepDialog) {
-                ttsServiceBinder?.let { binder ->
-                    val sleepSetTimeText = stringResource(Res.string.tts_sleep_set_time)
-                    val sleepCancelText = stringResource(Res.string.tts_sleep_set_cancel)
-
-                    SleepTimerDialog(
-                        onDismiss = { showSleepDialog = false },
-                        onTimeSelected = { minutes ->
-                            if (minutes > 0) {
-                                binder.setSleepTimer(minutes)
-                                val txt = sleepSetTimeText.format(minutes)
-                                Toast.makeText(context, txt, Toast.LENGTH_SHORT).show()
-                            } else {
-                                binder.stop()
-                                Toast.makeText(context, sleepCancelText, Toast.LENGTH_SHORT)
-                                    .show()
-                            }
-                        },
-                        initialMinutes = binder.getSleepTimerMinutes().takeIf { it > 0 } ?: 20
-                    )
-                }
-            }
-
-            // 队列列表弹窗
-            if (showQueueDialog) {
-                ttsServiceBinder?.let { binder ->
-                    QueueDialog(
-                        cacheBean = decoder!!.cacheBean,
-                        currentSpeakingPage = binder.getCurrentSpeakingPage(),
-                        onDismiss = { showQueueDialog = false },
-                        onItemClick = { reflowBean ->
-                            showQueueDialog = false
-
-                            reflowBean.page?.let { pageStr ->
-                                val targetPage = pageStr.toIntOrNull() ?: 0
-
-                                scope.launch {
-                                    jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
-
-                                    // 停止当前朗读
-                                    binder.stop()
-                                    delay(50)
-
-                                    // 开始新的朗读
-                                    speakFromCurrentPage(targetPage, decoder!!, binder)
-                                    if (binder.isSpeaking()) {
-                                        speakingPageIndex = targetPage
-                                    } else {
-                                        speakingPageIndex = null
+                            if (binder.isServiceInitialized()) {
+                                if (isSpeaking) {
+                                    binder.pause()
+                                } else {
+                                    scope.launch {
+                                        speakFromCurrentPage(currentPage, decoder!!, binder)
                                     }
                                 }
                             }
                         }
-                    )
-                }
-            }
-
-            // 大纲弹窗（最上层）- 只有单文档文件才显示
-            if (showOutlineDialog && FileTypeUtils.shouldShowOutline(paths)) {
-                val outlineList = decoder?.outlineItems ?: emptyList()
-                OutlineDialog(
-                    currentPage,
-                    outlineList,
-                    onClick = { item ->
-                        jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
-                        showOutlineDialog = false
-                        showToolbar = false
                     },
-                    onDismiss = { showOutlineDialog = false },
-                )
-            }
-
-            // 字体选择弹窗
-            if (showFontDialog) {
-                FontDialog(
-                    onDismiss = { showFontDialog = false },
-                    onFontSelected = { fontPath ->
-                        println("选择了字体: ${File(fontPath).name}")
-                        FontCSSGenerator.setFontFace(fontPath)
-                        showFontDialog = false
-                    }
+                    onSleepTimer = { showSleepDialog = true },
+                    onQueue = { showQueueDialog = true },
+                    onStop = { ttsServiceBinder?.stop() }
                 )
             }
 
@@ -934,6 +903,92 @@ fun CustomView(
                         )
                     }
                 }
+            }
+
+            // 睡眠定时对话框
+            if (showSleepDialog) {
+                ttsServiceBinder?.let { binder ->
+                    val sleepSetTimeText = stringResource(Res.string.tts_sleep_set_time)
+                    val sleepCancelText = stringResource(Res.string.tts_sleep_set_cancel)
+
+                    SleepTimerDialog(
+                        onDismiss = { showSleepDialog = false },
+                        onTimeSelected = { minutes ->
+                            if (minutes > 0) {
+                                binder.setSleepTimer(minutes)
+                                val txt = sleepSetTimeText.format(minutes)
+                                Toast.makeText(context, txt, Toast.LENGTH_SHORT).show()
+                            } else {
+                                binder.stop()
+                                Toast.makeText(context, sleepCancelText, Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                        },
+                        initialMinutes = binder.getSleepTimerMinutes().takeIf { it > 0 } ?: 20
+                    )
+                }
+            }
+
+            // 队列列表弹窗
+            if (showQueueDialog) {
+                ttsServiceBinder?.let { binder ->
+                    QueueDialog(
+                        cacheBean = decoder!!.cacheBean,
+                        currentSpeakingPage = binder.getCurrentSpeakingPage(),
+                        onDismiss = { showQueueDialog = false },
+                        onItemClick = { reflowBean ->
+                            showQueueDialog = false
+
+                            reflowBean.page?.let { pageStr ->
+                                val targetPage = pageStr.toIntOrNull() ?: 0
+
+                                scope.launch {
+                                    jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
+                                    currentPage = targetPage
+
+                                    // 停止当前朗读
+                                    binder.stop()
+                                    delay(50)
+
+                                    // 开始新的朗读
+                                    speakFromCurrentPage(targetPage, decoder!!, binder)
+                                    if (binder.isSpeaking()) {
+                                        speakingPageIndex = targetPage
+                                    } else {
+                                        speakingPageIndex = null
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+
+            // 大纲弹窗（最上层）- 只有单文档文件才显示
+            if (showOutlineDialog && FileTypeUtils.shouldShowOutline(paths)) {
+                val outlineList = decoder?.outlineItems ?: emptyList()
+                OutlineDialog(
+                    currentPage,
+                    outlineList,
+                    onClick = { item ->
+                        jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
+                        showOutlineDialog = false
+                        showToolbar = false
+                    },
+                    onDismiss = { showOutlineDialog = false },
+                )
+            }
+
+            // 字体选择弹窗
+            if (showFontDialog) {
+                FontDialog(
+                    onDismiss = { showFontDialog = false },
+                    onFontSelected = { fontPath ->
+                        println("选择了字体: ${File(fontPath).name}")
+                        FontCSSGenerator.setFontFace(fontPath)
+                        showFontDialog = false
+                    }
+                )
             }
         }
     }
