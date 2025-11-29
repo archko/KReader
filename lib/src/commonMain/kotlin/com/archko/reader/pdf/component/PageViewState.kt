@@ -540,8 +540,6 @@ public class PageViewState(
         updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
     }
 
-    public enum class Align { Top, Center, Bottom }
-
     public fun drawVisiblePages(
         drawScope: androidx.compose.ui.graphics.drawscope.DrawScope,
         offset: Offset,

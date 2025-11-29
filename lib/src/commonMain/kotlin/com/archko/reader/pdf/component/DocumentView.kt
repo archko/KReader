@@ -48,13 +48,24 @@ public const val Horizontal: Int = 1
 
 public const val velocityDistance: Float = 50f
 
+public data class JumpIntent(
+    val page: Int = 0,
+    val mode: JumpMode = JumpMode.None
+)
+
+public sealed class JumpMode {
+    public object None : JumpMode()
+    public object PageRestore : JumpMode()     // 书签恢复，使用精确offset
+    public object PageNavigation : JumpMode()  // 页面跳转，使用页面顶部
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 public fun DocumentView(
     list: MutableList<APage>,
     state: ImageDecoder,
     jumpToPage: Int? = null,
-    align: PageViewState.Align = PageViewState.Align.Top,
+    jumpMode: JumpMode = JumpMode.None,
     initialOrientation: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -151,39 +162,32 @@ public fun DocumentView(
 
         if (initialOrientation != orientation && pageViewState.init) {
             isJumping = true // 设置跳转标志
-            val firstPageIndex =
-                firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
-            println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$firstPageIndex")
+            val currentPage = jumpToPage ?: 0  // 方向变化应该使用页码，而不依赖offset计算
+            println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$currentPage")
             orientation = initialOrientation
             offset = Offset.Zero
             vZoom = 1f
             pageViewState.updateViewSize(viewSize, vZoom, orientation)
 
-            //如果方向变化,不需要通过页码定位,通过偏移量就行.
-            if (firstPageIndex < pageViewState.pages.size - 1) {
-                val page = pageViewState.pages.get(firstPageIndex)
+            // 用页码跳转到页面top/left
+            val page = pageViewState.pages.getOrNull(currentPage)
+            if (page != null) {
                 if (orientation == Vertical) {
-                    val targetOffsetY = when (align) {
-                        PageViewState.Align.Top -> page.bounds.top
-                        PageViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
-                        PageViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
-                    }
-                    val maxOffsetY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                    val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
+                    val clampedTargetY = page.bounds.top.coerceIn(
+                        0f,
+                        (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    )
                     val clampedY = -clampedTargetY
                     offset = Offset(offset.x, clampedY)
                 } else {
-                    val targetOffsetX = when (align) {
-                        PageViewState.Align.Top -> page.bounds.left
-                        PageViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
-                        PageViewState.Align.Bottom -> page.bounds.right - viewSize.width
-                    }
-                    val maxOffsetX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                    val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
+                    val clampedTargetX = page.bounds.left.coerceIn(
+                        0f,
+                        (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    )
                     val clampedX = -clampedTargetX
                     offset = Offset(clampedX, offset.y)
                 }
-                println("DocumentView: orientation改变，跳转: $offset, $firstPageIndex, page:$page")
+                println("DocumentView: orientation改变，跳转: $offset, $currentPage, page:$page")
                 flingJob?.cancel()
                 pageViewState.updateOffset(offset)
             }
@@ -191,41 +195,88 @@ public fun DocumentView(
             return@LaunchedEffect
         }
 
-        // 只有在以下情况才执行页面跳转：
-        // 1. 有明确的跳转页码
-        // 2. PageViewState已初始化
-        // 3. 是用户主动跳转（如进度条拖动）或者没有初始偏移量
         if (null != jumpToPage && toPage != jumpToPage && pageViewState.init) {
             isJumping = true // 设置跳转标志
             toPage = jumpToPage
-            val page = pageViewState.pages.getOrNull(toPage)
-            //println("DocumentView: 执行跳转到第${jumpToPage}页, offset:$offset, page:$page")
-            if (page != null) {
-                if (orientation == Vertical) {
-                    val targetOffsetY = when (align) {
-                        PageViewState.Align.Top -> page.bounds.top
-                        PageViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
-                        PageViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
+
+            when (jumpMode) {
+                JumpMode.PageRestore -> {
+                    // 恢复模式：检查偏移量是否与页码匹配
+                    val offsetX = initialScrollX.toFloat()
+                    val offsetY = initialScrollY.toFloat()
+                    val testOffset = Offset(offsetX, offsetY)
+                    val offsetPage =
+                        firstPage(pageViewState, testOffset, orientation, viewSize, null)
+
+                    if (offsetPage == toPage) {
+                        // 偏移量准确，直接使用精确offset
+                        offset = Offset(
+                            offsetX.coerceIn(
+                                -(pageViewState.totalWidth - viewSize.width).coerceAtLeast(
+                                    0f
+                                ), 0f
+                            ),
+                            offsetY.coerceIn(
+                                -(pageViewState.totalHeight - viewSize.height).coerceAtLeast(
+                                    0f
+                                ), 0f
+                            )
+                        )
+                    } else {
+                        // 偏移量不准确或失效，用页码跳转到页面top/left
+                        val page = pageViewState.pages.getOrNull(toPage)
+                        if (page != null) {
+                            val clampedTargetY = page.bounds.top.coerceIn(
+                                0f,
+                                (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            )
+                            val clampedY = -clampedTargetY
+                            val clampedTargetX = page.bounds.left.coerceIn(
+                                0f,
+                                (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                            )
+                            val clampedX = -clampedTargetX
+                            offset = Offset(clampedX, clampedY)
+                        }
                     }
-                    val maxOffsetY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                    val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
-                    val clampedY = -clampedTargetY
-                    offset = Offset(offset.x, clampedY)
-                } else {
-                    val targetOffsetX = when (align) {
-                        PageViewState.Align.Top -> page.bounds.left
-                        PageViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
-                        PageViewState.Align.Bottom -> page.bounds.right - viewSize.width
-                    }
-                    val maxOffsetX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                    val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
-                    val clampedX = -clampedTargetX
-                    offset = Offset(clampedX, offset.y)
+                    println("DocumentView: PageRestore跳转 toPage=$toPage, offsetPage=$offsetPage, useOffset=${offsetPage == toPage}, offset:$testOffset")
                 }
-                println("DocumentView: 执行跳转到:$offset, top:${page.bounds.top}, toPage:$toPage")
-                flingJob?.cancel()
-                pageViewState.updateOffset(offset)
+
+                JumpMode.PageNavigation -> {
+                    // 导航模式：跳转到页面顶部
+                    val page = pageViewState.pages.getOrNull(toPage)
+                    if (page != null) {
+                        if (orientation == Vertical) {
+                            val clampedTargetY = page.bounds.top.coerceIn(
+                                0f,
+                                (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                            )
+                            val clampedY = -clampedTargetY
+                            offset = Offset(offset.x, clampedY)
+                        } else {
+                            val clampedTargetX = page.bounds.left.coerceIn(
+                                0f,
+                                (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                            )
+                            val clampedX = -clampedTargetX
+                            offset = Offset(clampedX, offset.y)
+                        }
+                        println("DocumentView: PageNavigation跳转到:$offset, top:${page.bounds.top}, toPage:$toPage")
+                    } else {
+                        println("DocumentView: PageNavigation找不到页面:$toPage")
+                    }
+                }
+
+                JumpMode.None -> {
+                    // 无跳转模式，跳过
+                    println("DocumentView: JumpMode.None，跳过跳转:$toPage")
+                    isJumping = false
+                    return@LaunchedEffect
+                }
             }
+
+            flingJob?.cancel()
+            pageViewState.updateOffset(offset)
             isJumping = false // 清除跳转标志
         }
     }
@@ -706,8 +757,15 @@ public fun DocumentView(
                     }
                 }
         ) {
-            val centerOffsetX = if (orientation == Horizontal && pageViewState.totalWidth < viewSize.width) (viewSize.width - pageViewState.totalWidth) / 2 else 0f
-            val centerOffsetY = if (orientation == Vertical && pageViewState.totalHeight < viewSize.height) (viewSize.height - pageViewState.totalHeight) / 2 else 0f
+            //居中绘制不够屏幕高宽
+            val centerOffsetX =
+                if (orientation == Horizontal && pageViewState.totalWidth < viewSize.width) {
+                    (viewSize.width - pageViewState.totalWidth) / 2
+                } else 0f
+            val centerOffsetY =
+                if (orientation == Vertical && pageViewState.totalHeight < viewSize.height) {
+                    (viewSize.height - pageViewState.totalHeight) / 2
+                } else 0f
             translate(left = offset.x + centerOffsetX, top = offset.y + centerOffsetY) {
                 pageViewState.drawVisiblePages(this, offset, vZoom)
 

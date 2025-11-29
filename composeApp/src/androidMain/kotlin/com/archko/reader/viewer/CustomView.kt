@@ -29,6 +29,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.Horizontal
+import com.archko.reader.pdf.component.JumpIntent
+import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -373,7 +375,19 @@ fun CustomView(
             var isExternalChange by remember { mutableStateOf(false) }
             val pageCount: Int = list.size
             // 跳转页面状态
-            var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+            var jumpIntent by remember {
+                mutableStateOf(
+                    when {
+                        progressPage != null && (initialScrollX != 0L || initialScrollY != 0L) ->
+                            JumpIntent(progressPage, JumpMode.PageRestore)
+
+                        progressPage != null ->
+                            JumpIntent(progressPage, JumpMode.PageNavigation)
+
+                        else -> JumpIntent(0, JumpMode.None)
+                    }
+                )
+            }
 
             var isSpeaking by remember { mutableStateOf(false) }
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
@@ -391,12 +405,13 @@ fun CustomView(
                     override fun onPageComplete(page: String?) {
                         page?.let { pageStr ->
                             val targetPage = pageStr.toIntOrNull()
-                            println("SpeechComplete:targetPage:$targetPage, old:$jumpToPage, speaking:$speakingPageIndex")
+                            println("SpeechComplete:targetPage:$targetPage, old:${jumpIntent.page}, speaking:$speakingPageIndex")
                             if (null != targetPage) {
                                 scope.launch {
                                     speakingPageIndex = targetPage
-                                    if (targetPage != jumpToPage) {
-                                        jumpToPage = targetPage
+                                    if (targetPage != jumpIntent.page) {
+                                        jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
+
                                     }
                                 }
                             }
@@ -440,7 +455,8 @@ fun CustomView(
                                     val targetPage = pageStr.toIntOrNull()
                                     println("OnResume: 正在朗读第${targetPage}页，当前显示第${currentPage}页")
                                     if (targetPage != null && targetPage != currentPage) {
-                                        jumpToPage = targetPage
+                                        jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
+
                                     }
                                 }
                             }
@@ -481,7 +497,7 @@ fun CustomView(
                             Toast.makeText(context, pageText, Toast.LENGTH_SHORT).show()
                         }
                     },
-                    jumpToPage = jumpToPage,
+                    jumpToPage = jumpIntent.page,
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
@@ -493,7 +509,8 @@ fun CustomView(
                 DocumentView(
                     list = list,
                     state = decoder!!,
-                    jumpToPage = jumpToPage,
+                    jumpToPage = jumpIntent.page,
+                    jumpMode = jumpIntent.mode,
                     initialOrientation = orientation,
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
                     onCloseDocument = {
@@ -799,7 +816,7 @@ fun CustomView(
                                 val targetPage = pageStr.toIntOrNull() ?: 0
 
                                 scope.launch {
-                                    jumpToPage = targetPage
+                                    jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
 
                                     // 停止当前朗读
                                     binder.stop()
@@ -826,7 +843,7 @@ fun CustomView(
                     currentPage,
                     outlineList,
                     onClick = { item ->
-                        jumpToPage = item.page
+                        jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
                         showOutlineDialog = false
                         showToolbar = false
                     },
@@ -883,7 +900,7 @@ fun CustomView(
                                 if (!isExternalChange) {
                                     val targetPage = sliderValue.toInt() - 1
                                     if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                        jumpToPage = targetPage
+                                        jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
                                     }
                                 }
                             },
