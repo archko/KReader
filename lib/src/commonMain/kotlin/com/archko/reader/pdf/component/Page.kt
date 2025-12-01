@@ -619,7 +619,7 @@ public class Page(
     }
 
     public fun invalidateNodes() {
-        val config = calculateTileConfig(width, height)
+        val config = calculateTileConfig(width, height, totalScale)
         //println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
         if (config == currentTileConfig) {
             return
@@ -696,30 +696,35 @@ public class Page(
 
     public companion object {
         public const val MIN_BLOCK_SIZE: Float = 256f * 3f // 768
-        private const val MAX_BLOCK_SIZE = 256f * 4f // 1024
+        private const val BASE_MAX_BLOCK_SIZE = 256f * 4f // 1024
+        private const val MAX_CEILING = 256f * 8f // 2048
 
-        // 计算分块数的通用函数
-        private fun calcBlockCount(length: Float): Int {
+        // 计算分块数的通用函数，接受动态 MAX_BLOCK_SIZE
+        private fun calcBlockCount(length: Float, maxBlockSize: Float): Int {
             if (length <= MIN_BLOCK_SIZE) {
                 return 1
             }
-            val blockCount = ceil(length / MAX_BLOCK_SIZE).toInt()
+            val blockCount = ceil(length / maxBlockSize).toInt()
             val actualBlockSize = length / blockCount
-            if (actualBlockSize in MIN_BLOCK_SIZE..MAX_BLOCK_SIZE) {
+            if (actualBlockSize >= MIN_BLOCK_SIZE && actualBlockSize <= maxBlockSize) {
                 return blockCount
             } else {
                 return ceil(length / MIN_BLOCK_SIZE).toInt()
             }
         }
 
-        private fun calculateTileConfig(width: Float, height: Float): TileConfig {
-            // 如果页面的宽或高都小于最大块大小，则不分块
-            if (width <= MAX_BLOCK_SIZE && height <= MAX_BLOCK_SIZE) {
+        private fun calculateTileConfig(width: Float, height: Float, totalScale: Float): TileConfig {
+            // 计算动态 MAX_BLOCK_SIZE
+            val adaptiveExtension = maxOf((totalScale - 1), 0.0f) * 512f // 每个放大级别的 512 增量
+            val effectiveMaxBlock = minOf(BASE_MAX_BLOCK_SIZE + adaptiveExtension, MAX_CEILING)
+
+            // 如果页面的宽或高都小于有效最大块大小，则不分块
+            if (width <= effectiveMaxBlock && height <= effectiveMaxBlock) {
                 return TileConfig(1, 1)
             }
 
-            val xBlocks = calcBlockCount(width)
-            val yBlocks = calcBlockCount(height)
+            val xBlocks = calcBlockCount(width, effectiveMaxBlock)
+            val yBlocks = calcBlockCount(height, effectiveMaxBlock)
 
             return TileConfig(xBlocks, yBlocks)
         }

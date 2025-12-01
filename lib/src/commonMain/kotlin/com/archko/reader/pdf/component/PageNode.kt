@@ -202,7 +202,7 @@ public class PageNode(
                 val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
 
                 //外面的计算如果出问题了,会在这里拦截,避免崩溃.目前是正常的
-                if (outWidth > MIN_BLOCK_SIZE * 2 && outHeight > MIN_BLOCK_SIZE * 2) {
+                if (outWidth > MIN_BLOCK_SIZE * 8 || outHeight > MIN_BLOCK_SIZE * 8) {
                     println("[PageNode].decode:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
                     isDecoding = false
                     return@launch
