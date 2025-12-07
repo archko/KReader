@@ -401,8 +401,8 @@ public class Page(
                 )
             }
         }
-        val renderedNodes = (maxBlockX - minBlockX + 1) * (maxBlockY - minBlockY + 1)
-        println("Page[${aPage.index}] rendering ${renderedNodes} nodes, range: x[$minBlockX-$maxBlockX] y[$minBlockY-$maxBlockY]")
+        //val renderedNodes = (maxBlockX - minBlockX + 1) * (maxBlockY - minBlockY + 1)
+        //println("Page[${aPage.index}] rendering ${renderedNodes} nodes, range: x[$minBlockX-$maxBlockX] y[$minBlockY-$maxBlockY]")
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
@@ -724,7 +724,7 @@ public class Page(
         nodes = newNodes
         // 回收旧nodes
         oldNodes.forEach { it.recycle() }
-        println("Page[${aPage.index}] total nodes.count=${nodes.size}, xBlocks=${config.xBlocks}, yBlocks=${config.yBlocks}")
+        //println("Page[${aPage.index}] total nodes.count=${nodes.size}, xBlocks=${config.xBlocks}, yBlocks=${config.yBlocks}")
     }
 
     override fun equals(other: Any?): Boolean {
