@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * @author: archko 2025/7/24 :08:20
@@ -36,6 +37,7 @@ public class Page(
     public var totalScale: Float = 1f
     public var nodes: List<PageNode> = emptyList()
     private var currentTileConfig: TileConfig? = null
+    private var needInvalidateNodes = true // 初始化为true，确保第一次draw时会重建nodes
 
     //page bound, should be caculate after view measured
     internal var bounds = Rect(0f, 0f, 1f, 1f)
@@ -339,7 +341,68 @@ public class Page(
         if (aspectRatio == 0f) {
             aspectRatio = width * 1.0f / height
         }
-        invalidateNodes()
+        needInvalidateNodes = true
+    }
+
+    private fun drawNodes(
+        drawScope: DrawScope,
+        currentWidth: Float,
+        currentHeight: Float,
+        currentBounds: Rect,
+        offset: Offset,
+        drawScopeSize: Size
+    ) {
+        val config = currentTileConfig ?: run {
+            invalidateNodes()
+            currentTileConfig!!
+        }
+
+        if (config.isSingleBlock) {
+            nodes[0].draw(
+                drawScope,
+                currentWidth,
+                currentHeight,
+                currentBounds.left,
+                currentBounds.top,
+            )
+            return
+        }
+
+        // 获取可视区域
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScopeSize.width - offset.x,
+            bottom = drawScopeSize.height - offset.y
+        )
+
+        // 计算visible区域相对页面 [0,1]
+        val pageVisibleLeft = (visibleRect.left - currentBounds.left) / currentWidth
+        val pageVisibleRight = (visibleRect.right - currentBounds.left) / currentWidth
+        val pageVisibleTop = (visibleRect.top - currentBounds.top) / currentHeight
+        val pageVisibleBottom = (visibleRect.bottom - currentBounds.top) / currentHeight
+
+        // 计算覆盖的block x/y indices范围
+        val minBlockX = floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val maxBlockX = ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val minBlockY = floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+        val maxBlockY = ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+
+        // 只遍历可见range内的block
+        for (x in minBlockX..maxBlockX) {
+            for (y in minBlockY..maxBlockY) {
+                val nodeIndex = y * config.xBlocks + x
+                nodes[nodeIndex].draw(
+                    drawScope,
+                    currentWidth,
+                    currentHeight,
+                    currentBounds.left,
+                    currentBounds.top,
+                )
+            }
+        }
+        val renderedNodes = (maxBlockX - minBlockX + 1) * (maxBlockY - minBlockY + 1)
+        println("Page[${aPage.index}] rendering ${renderedNodes} nodes, range: x[$minBlockX-$maxBlockX] y[$minBlockY-$maxBlockY]")
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
@@ -394,6 +457,11 @@ public class Page(
         val currentWidth = width * scaleRatio
         val currentHeight = height * scaleRatio
 
+        if (nodes.isEmpty() || needInvalidateNodes) {
+            invalidateNodes()
+            needInvalidateNodes = false
+        }
+
         // 只有真正可见的页面才绘制缩略图和UI元素
         if (isActuallyVisible) {
             //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
@@ -412,16 +480,8 @@ public class Page(
             }
         }
 
-        // 无论是否可见，都要调用node.draw（包括预加载区域）
-        nodes.forEach { node ->
-            node.draw(
-                drawScope,
-                currentWidth,
-                currentHeight,
-                currentBounds.left,
-                currentBounds.top,
-            )
-        }
+        // 调用drawNodes方法绘制node
+        drawNodes(drawScope, currentWidth, currentHeight, currentBounds, offset, drawScope.size)
 
         // 绘制分割线
         if (isActuallyVisible) {
@@ -664,6 +724,7 @@ public class Page(
         nodes = newNodes
         // 回收旧nodes
         oldNodes.forEach { it.recycle() }
+        println("Page[${aPage.index}] total nodes.count=${nodes.size}, xBlocks=${config.xBlocks}, yBlocks=${config.yBlocks}")
     }
 
     override fun equals(other: Any?): Boolean {
