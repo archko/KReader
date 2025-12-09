@@ -1,7 +1,11 @@
 package com.archko.reader.viewer
 
+import android.app.Activity
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -64,9 +68,6 @@ import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
-import com.mohamedrejeb.calf.picker.FilePickerFileType
-import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
-import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.browse_directory_message
@@ -248,6 +249,86 @@ fun FileScreen(
             )
         }
 
+        val pickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val paths = mutableListOf<String>()
+                try {
+                    val oneUri = result.data?.data
+                    if (oneUri != null) {
+                        val path = IntentFile.getPath(PdfApp.app!!, oneUri)
+                            ?: oneUri.toString()
+                        paths.add(path)
+                    } else {
+                        // 多选
+                        for (index in 0 until (result.data?.clipData?.itemCount ?: 0)) {
+                            val uri = result.data?.clipData?.getItemAt(index)?.uri
+                            if (uri != null) {
+                                val path = IntentFile.getPath(PdfApp.app!!, uri)
+                                    ?: uri.toString()
+                                paths.add(path)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                scope.launch {
+                    if (paths.isNotEmpty()) {
+                        // 先判断所有文件，得到图片列表和文档列表
+                        val imageFiles = mutableListOf<File>()
+                        val documentFiles = mutableListOf<File>()
+                        val tifFiles = mutableListOf<File>()
+
+                        paths.forEach { path ->
+                            val fileObj = File(path)
+                            if (FileTypeUtils.isAccetableImageFile(fileObj)) {
+                                imageFiles.add(fileObj)
+                            } else if (FileTypeUtils.isDocumentFile(path)) {
+                                documentFiles.add(fileObj)
+                            } else if (FileTypeUtils.isTiffFile(path)) {
+                                tifFiles.add(fileObj)
+                            }
+                        }
+
+                        if (imageFiles.isNotEmpty()) {
+                            // 有图片，弹出对话框选择
+                            val firstImagePath = imageFiles.first().absolutePath
+                            pendingImagePath = firstImagePath
+                            pendingFiles = imageFiles // 直接设置为图片列表
+                            showDirectoryDialog = true
+                        } else if (documentFiles.isNotEmpty()) {
+                            // 没有图片但有文档，直接打开第一个文档
+                            val firstDocumentPath = documentFiles.first().absolutePath
+                            val paths = listOf(firstDocumentPath)
+                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                viewModel.getRecent(paths.first())
+                                val startPage = viewModel.recent?.page?.toInt() ?: 0
+                                openDocRequest = OpenDocRequest(paths, startPage)
+                            }
+                        } else if (tifFiles.isNotEmpty()) {
+                            // tiff
+                            val firstDocumentPath = tifFiles.first().absolutePath
+                            val paths = listOf(firstDocumentPath)
+                            openDocRequest = OpenDocRequest(paths, 0)
+                        }
+                        // 如果都没有，什么都不做
+                    }
+                }
+            }
+        }
+
+        fun selectFiles() {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                type = "*/*"
+            }
+            pickerLauncher.launch(intent)
+        }
+
         Surface(
             modifier = modifier
                 .fillMaxSize(),
@@ -261,56 +342,6 @@ fun FileScreen(
                         .fillMaxSize()
                         .padding(horizontal = 10.dp)
                 ) {
-                    val pickerLauncher = rememberFilePickerLauncher(
-                        type = FilePickerFileType.All,
-                        selectionMode = FilePickerSelectionMode.Multiple
-                    ) { files ->
-                        scope.launch {
-                            if (files.isNotEmpty()) {
-                                // 先判断所有文件，得到图片列表和文档列表
-                                val imageFiles = mutableListOf<File>()
-                                val documentFiles = mutableListOf<File>()
-                                val tifFiles = mutableListOf<File>()
-
-                                files.forEach { file ->
-                                    val path = IntentFile.getPath(PdfApp.app!!, file.uri)
-                                        ?: file.uri.toString()
-                                    val fileObj = File(path)
-                                    if (FileTypeUtils.isAccetableImageFile(fileObj)) {
-                                        imageFiles.add(fileObj)
-                                    } else if (FileTypeUtils.isDocumentFile(path)) {
-                                        documentFiles.add(fileObj)
-                                    } else if (FileTypeUtils.isTiffFile(path)) {
-                                        tifFiles.add(fileObj)
-                                    }
-                                }
-
-                                if (imageFiles.isNotEmpty()) {
-                                    // 有图片，弹出对话框选择
-                                    val firstImagePath = imageFiles.first().absolutePath
-                                    pendingImagePath = firstImagePath
-                                    pendingFiles = imageFiles // 直接设置为图片列表
-                                    showDirectoryDialog = true
-                                } else if (documentFiles.isNotEmpty()) {
-                                    // 没有图片但有文档，直接打开第一个文档
-                                    val firstDocumentPath = documentFiles.first().absolutePath
-                                    val paths = listOf(firstDocumentPath)
-                                    if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                        viewModel.getRecent(paths.first())
-                                        val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                        openDocRequest = OpenDocRequest(paths, startPage)
-                                    }
-                                } else if (tifFiles.isNotEmpty()) {
-                                    // tiff
-                                    val firstDocumentPath = tifFiles.first().absolutePath
-                                    val paths = listOf(firstDocumentPath)
-                                    openDocRequest = OpenDocRequest(paths, 0)
-                                }
-                                // 如果都没有，什么都不做
-                            }
-                        }
-                    }
-
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -329,7 +360,7 @@ fun FileScreen(
                             }
                         }
                         Button(
-                            onClick = pickerLauncher::launch,
+                            onClick = { selectFiles() },
                             modifier = Modifier.align(Alignment.Center),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,

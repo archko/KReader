@@ -1,6 +1,10 @@
 package com.archko.reader.viewer.dialog
 
+import android.app.Activity
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,9 +49,6 @@ import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
-import com.mohamedrejeb.calf.picker.FilePickerFileType
-import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
-import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -69,6 +70,29 @@ fun PdfEncryptDialog(
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val pickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
+                val path = IntentFile.getPath(PdfApp.app!!, uri)
+                    ?: uri.toString()
+                scope.launch {
+                    pdfFilePath = path
+                }
+            }
+        }
+    }
+
+    fun selectFiles() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/pdf"
+        }
+        pickerLauncher.launch(intent)
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -106,22 +130,8 @@ fun PdfEncryptDialog(
                         .verticalScroll(rememberScrollState())
                         .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp)
                 ) {
-                    val pickerLauncher = rememberFilePickerLauncher(
-                        type = FilePickerFileType.Pdf,
-                        selectionMode = FilePickerSelectionMode.Single
-                    ) { files ->
-                        scope.launch {
-                            if (files.isNotEmpty()) {
-                                val file = files.first()
-                                val path = IntentFile.getPath(PdfApp.app!!, file.uri)
-                                    ?: file.uri.toString()
-                                pdfFilePath = path
-                            }
-                        }
-                    }
-
                     Button(
-                        onClick = { pickerLauncher.launch() },
+                        onClick = { selectFiles() },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(stringResource(Res.string.encrypt_decrypt_add))

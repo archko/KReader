@@ -1,6 +1,10 @@
 package com.archko.reader.viewer.dialog
 
+import android.app.Activity
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,9 +49,6 @@ import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.util.FileUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.utils.PDFCreaterHelper
-import com.mohamedrejeb.calf.picker.FilePickerFileType
-import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
-import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -70,33 +71,59 @@ fun ConvertToEpubDialog(
     var outName by remember { mutableStateOf("") }
     var isCreating by remember { mutableStateOf(false) }
 
-    val filePickerLauncher = rememberFilePickerLauncher(
-        type = FilePickerFileType.All,
-        selectionMode = FilePickerSelectionMode.Multiple
-    ) { files ->
-        scope.launch {
-            val filePaths = files.mapNotNull {
-                IntentFile.getPath(PdfApp.app!!, it.uri)
-            }.filter { path ->
-                // 手动过滤 mobi 和 azw3 文件
-                path.endsWith(".mobi", ignoreCase = true) ||
-                        path.endsWith(".azw3", ignoreCase = true)
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val paths = mutableListOf<String>()
+            try {
+                val oneUri = result.data?.data
+                if (oneUri != null) {
+                    val path = IntentFile.getPath(PdfApp.app!!, oneUri)
+                        ?: oneUri.toString()
+                    paths.add(path)
+                } else {
+                    // 多选
+                    for (index in 0 until (result.data?.clipData?.itemCount ?: 0)) {
+                        val uri = result.data?.clipData?.getItemAt(index)?.uri
+                        if (uri != null) {
+                            val path = IntentFile.getPath(PdfApp.app!!, uri)
+                                ?: uri.toString()
+                            paths.add(path)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
-            if (filePaths.isNotEmpty()) {
-                selectedFiles = selectedFiles + filePaths
-            } else {
-                Toast.makeText(
-                    context,
-                    getString(Res.string.convert_select_to_create_epub),
-                    Toast.LENGTH_SHORT
-                ).show()
+            scope.launch {
+                val filePaths = paths.filter { path ->
+                    // 手动过滤 mobi 和 azw3 文件
+                    path.endsWith(".mobi", ignoreCase = true) ||
+                            path.endsWith(".azw3", ignoreCase = true)
+                }
+
+                if (filePaths.isNotEmpty()) {
+                    selectedFiles = selectedFiles + filePaths
+                } else {
+                    Toast.makeText(
+                        context,
+                        getString(Res.string.convert_select_to_create_epub),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
 
     fun selectImages() {
-        filePickerLauncher.launch()
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            type = "*/*"
+        }
+        filePickerLauncher.launch(intent)
     }
 
     fun convert() {

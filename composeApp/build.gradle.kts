@@ -41,7 +41,6 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.viewmodel)
             implementation(libs.jetbrains.lifecycle.runtime.compose)
 
-            implementation(libs.filePicker)
             implementation(libs.reorderable)
 
             api(libs.coil.kt)
@@ -53,6 +52,7 @@ kotlin {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
+            implementation(libs.filePicker)
             implementation(libs.sonner)
         }
     }
