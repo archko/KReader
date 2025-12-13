@@ -167,7 +167,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            textToSpeech?.language = Locale.CHINESE
+            textToSpeech?.language = Locale.getDefault()
             setupTtsListener()
             isInitialized = true
 
