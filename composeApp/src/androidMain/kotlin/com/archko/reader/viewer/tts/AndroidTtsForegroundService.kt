@@ -190,8 +190,8 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             }
 
             override fun onError(utteranceId: String?) {
-                println("TTS: Error occurred for utterance: $utteranceId")
-                playNext()
+                println("TTS: Error occurred for utterance: $utteranceId, stopping TTS")
+                stop()
             }
         })
     }
@@ -255,10 +255,27 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     fun addToQueue(reflowBean: ReflowBean) {
         if (isInitialized) {
             //println("TTS: addToQueue:$reflowBean")
-            beanList.add(reflowBean)
+            val text = reflowBean.data ?: ""
+            if (text.length > 300) {
+                var start = 0
+                val chunkSize = 300
+                var partIndex = 1
+
+                while (start < text.length) {
+                    val end = minOf(start + chunkSize, text.length)
+                    val chunk = text.substring(start, end)
+                    val segmentPage = "${reflowBean.page}-${partIndex}"
+                    val newBean = ReflowBean(data = chunk, type = reflowBean.type, page = segmentPage)
+                    beanList.add(newBean)
+                    start = end
+                    partIndex++
+                }
+            } else {
+                beanList.add(reflowBean)
+            }
 
             // 如果当前没有在朗读，开始朗读
-            if (!isSpeaking() && beanList.size == 1) {
+            if (!isSpeaking() && beanList.size > 0) {
                 currentIndex = 0
                 currentBean = reflowBean
                 speakText(reflowBean.data ?: "")
