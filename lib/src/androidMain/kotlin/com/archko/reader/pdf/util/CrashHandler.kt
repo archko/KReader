@@ -20,7 +20,7 @@ import java.io.Writer
  */
 public class CrashHandler : Thread.UncaughtExceptionHandler {
 
-    private val defaultUEH: Thread.UncaughtExceptionHandler =
+    private val defaultUEH: Thread.UncaughtExceptionHandler? =
         Thread.getDefaultUncaughtExceptionHandler()
 
     override fun uncaughtException(thread: Thread, ex: Throwable) {
@@ -50,14 +50,13 @@ public class CrashHandler : Thread.UncaughtExceptionHandler {
             writeLog(stacktrace, "$sdcardPath/kreader_crash")
             writeLogcat("$sdcardPath/kreader_logcat")
         }
-        defaultUEH.uncaughtException(thread, ex)
+        defaultUEH?.uncaughtException(thread, ex)
     }
 
     private fun writeLog(log: String, name: String) {
         val timestamp = DateFormat.format("yyyyMMdd_kkmmss", System.currentTimeMillis())
         val filename = name + "_" + timestamp + ".log"
-        val stream: FileOutputStream
-        stream = try {
+        val stream: FileOutputStream = try {
             FileOutputStream(filename)
         } catch (e: FileNotFoundException) {
             e.printStackTrace()

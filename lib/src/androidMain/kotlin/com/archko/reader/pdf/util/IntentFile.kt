@@ -60,7 +60,7 @@ public object IntentFile {
             //下面是galaxy s25打开文件浏览器后选中文件的,会有编码.
             //file:///storage/emulated/0/book/%E5%AE%B6%E4%B9%A1.pdf
             path = uri.toString().substring("file://".length)
-            path = URLDecoder.decode(path)
+            path = URLDecoder.decode(path, "UTF-8")
         }
         Log.d("path", "path:$path")
         return path

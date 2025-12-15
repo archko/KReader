@@ -380,7 +380,7 @@ public class FileUtils private constructor() {
             if (TextUtils.isEmpty(path)) {
                 return
             }
-            val file = File(path)
+            val file = File(path!!)
             if (file.exists()) {
                 if (file.isDirectory()) {
                     deleteDir(file)

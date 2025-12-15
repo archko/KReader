@@ -536,8 +536,10 @@ public class PageViewState(
     }
 
     public fun updateOffset(newOffset: Offset) {
-        this.viewOffset = newOffset
-        updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
+        if (viewOffset != newOffset) {
+            this.viewOffset = newOffset
+            updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
+        }
     }
 
     public fun drawVisiblePages(

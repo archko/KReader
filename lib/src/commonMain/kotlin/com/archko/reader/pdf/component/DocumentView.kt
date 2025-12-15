@@ -391,13 +391,11 @@ public fun DocumentView(
                         var dragging = false
                         // pan惯性
                         val panVelocityTracker = VelocityTracker()
-                        var pan: Offset
+                        var pan: Offset = Offset.Zero
                         var totalDrag = Offset.Zero
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val wasFlingActive = flingJob?.isActive == true // 记录按下时是否有fling动画
                         try {
-                            pan = Offset.Zero
-                            totalDrag = Offset.Zero
                             panVelocityTracker.resetTracking()
                             flingJob?.cancel()
                             do {

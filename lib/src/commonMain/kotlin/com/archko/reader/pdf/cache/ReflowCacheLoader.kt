@@ -26,7 +26,7 @@ public object ReflowCacheLoader {
      */
     public fun loadReflowFromFile(pageCount: Int, path: String?): ReflowCacheBean? {
         return try {
-            val file = File(path)
+            val file = File(path!!)
             val fileSize = file.length()
             val cacheFile = getReflowCacheFile(file)
 
@@ -74,7 +74,7 @@ public object ReflowCacheLoader {
         reflowTexts: List<ReflowBean>
     ): ReflowCacheBean? {
         try {
-            val file = File(path)
+            val file = File(path!!)
             val cacheFile = getReflowCacheFile(file)
             val cacheDir = cacheFile.parentFile
 

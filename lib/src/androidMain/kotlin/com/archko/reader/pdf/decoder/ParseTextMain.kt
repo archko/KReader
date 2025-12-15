@@ -34,7 +34,7 @@ public object ParseTextMain {
         val list = txtParser.parseAsList(content, pageIndex)
         for (reflowBean in list) {
             if (ReflowBean.TYPE_STRING == reflowBean.type) {
-                reflowBean.data = Html.fromHtml(reflowBean.data).toString()
+                reflowBean.data = Html.fromHtml(reflowBean.data, Html.FROM_HTML_MODE_LEGACY).toString()
             }
         }
         return list
