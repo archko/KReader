@@ -9,7 +9,7 @@ import java.io.File
  */
 public object FileTypeUtils {
 
-    private const val MAX_SIZE_MB = 100 * 1024 * 1024L
+    private const val MAX_SIZE_MB = 120 * 1024 * 1024L
 
     /**
      * 判断是否为图片文件
@@ -21,6 +21,8 @@ public object FileTypeUtils {
                     || filePath.endsWith(".png") || filePath.endsWith(".gif")
                     || filePath.endsWith(".bmp") || filePath.endsWith(".webp")
                     || filePath.endsWith(".heif") || filePath.endsWith(".heic")
+                    || filePath.endsWith(".dng") || filePath.endsWith(".arw")
+                    || filePath.endsWith(".nef") || filePath.endsWith(".cr2")
         }
     }
 
