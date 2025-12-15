@@ -55,16 +55,6 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
         }
     }
 
-    // 当需要朗读时，启动前台服务以防止被杀死
-    private fun startForegroundServiceIfNeeded() {
-        val intent = Intent(context, AndroidTtsForegroundService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
-    }
-
     fun unbindService() {
         service?.stop()
         if (isBound) {
@@ -77,17 +67,10 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
 
     fun speak(reflowBean: ReflowBean) {
         println("TtsServiceBinder: speak called")
-        // 开始朗读时启动前台服务以防止被杀死
-        //startForegroundServiceIfNeeded()
         service?.speak(reflowBean)
     }
 
     fun addToQueue(reflowBean: ReflowBean) {
-        //println("TtsServiceBinder: addToQueue called")
-        // 如果队列为空且当前没有朗读，说明要开始朗读了
-        //if (service?.getQueueSize() == 0 && !isSpeaking()) {
-        //    startForegroundServiceIfNeeded()
-        //}
         service?.addToQueue(reflowBean)
     }
 
@@ -113,7 +96,7 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
         return service?.getQueueSize() ?: 0
     }
 
-    fun getQueue(): List<TtsTask>? {
+    fun getQueue(): List<ReflowBean>? {
         return service?.getQueue()
     }
 
@@ -147,7 +130,7 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
         return service?.getCurrentReflowBean()?.page
     }
 
-    fun setTtsSpeechCallback(callback: TtsSpeechCallback?) {
-        service?.setTtsSpeechCallback(callback)
+    fun setProgressListener(listener: TtsProgressListener) {
+        service?.setProgressListener(listener)
     }
 }

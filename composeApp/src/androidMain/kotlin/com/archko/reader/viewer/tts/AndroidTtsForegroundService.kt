@@ -9,11 +9,11 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
 import com.archko.reader.pdf.entity.ReflowBean
-import com.archko.reader.pdf.tts.TtsTask
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,21 +26,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-/**
- * TTS朗读回调接口
- */
-interface TtsSpeechCallback {
-    /**
-     * 每页朗读完成时的回调
-     * @param page 完成的页面编号
-     */
-    fun onPageComplete(page: String?)
-
-    /**
-     * 整个朗读结束时的回调
-     * @param lastPage 最后朗读的页面编号
-     */
-    fun onSpeechStop(lastPage: String?)
+// TTS监听器接口
+interface TtsProgressListener {
+    fun onStart(bean: ReflowBean)
+    fun onDone(bean: ReflowBean)
+    fun onFinish()
 }
 
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
@@ -55,14 +45,14 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     private var textToSpeech: TextToSpeech? = null
     private var isInitialized = false
 
+    // TTS监听器
+    private var progressListener: TtsProgressListener? = null
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // 睡眠定时相关
     private var sleepTimerJob: Job? = null
     private var sleepTimerMinutes: Int = 0
-
-    // TTS朗读回调
-    private var ttsSpeechCallback: TtsSpeechCallback? = null
 
     private val beanList = mutableListOf<ReflowBean>()
     private var currentBean: ReflowBean? = null
@@ -73,7 +63,8 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     val isSpeakingFlow: StateFlow<Boolean> = _isSpeakingFlow.asStateFlow()
 
     // 前台服务状态
-    private var isForegroundServiceStarted = false
+    private var isForegroundStarted = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // 文档路径，用于保存临时进度
     var documentPath: String? = null
@@ -85,23 +76,11 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        initWakeLock()
         initializeTts()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                stop()
-            }
-            //else -> {
-            //    // 当通过startForegroundService启动时，立即启动前台服务
-            //    if (!isForegroundServiceStarted) {
-            //        startForeground(NOTIFICATION_ID, createNotification())
-            //        isForegroundServiceStarted = true
-            //    }
-            //}
-        }
-
         return START_STICKY
     }
 
@@ -109,8 +88,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        serviceScope.cancel()
-        textToSpeech?.shutdown()
+        shutdown()
     }
 
     private fun createNotificationChannel() {
@@ -136,7 +114,8 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
-            this, 1, stopIntent, flags
+            this, 1, stopIntent, 
+            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -155,10 +134,36 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun updateNotification() {
-        if (isForegroundServiceStarted) {
+        if (isForegroundStarted) {
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.notify(NOTIFICATION_ID, createNotification())
         }
+    }
+
+    private fun startForegroundIfNeeded() {
+        if (!isForegroundStarted) {
+            startForeground(NOTIFICATION_ID, createNotification())
+            isForegroundStarted = true
+            wakeLock?.acquire()
+        }
+    }
+
+    private fun stopForegroundIfNeeded() {
+        if (isForegroundStarted) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            isForegroundStarted = false
+            wakeLock?.takeIf { it.isHeld }?.release()
+        }
+    }
+
+    private fun initWakeLock() {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TtsForegroundService:TTS")
     }
 
     private fun initializeTts() {
@@ -182,16 +187,21 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun setupTtsListener() {
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
+                println(String.format("onStart:%s, index:%s, size:%s", utteranceId, currentIndex, beanList.size))
+                currentBean?.let { progressListener?.onStart(it) }
                 _isSpeakingFlow.value = true
+                startForegroundIfNeeded()
             }
 
             override fun onDone(utteranceId: String?) {
+                println(String.format("onDone:%s, index:%s, size:%s", utteranceId, currentIndex, beanList.size))
+                currentBean?.let { progressListener?.onDone(it) }
                 playNext()
             }
 
             override fun onError(utteranceId: String?) {
-                println("TTS: Error occurred for utterance: $utteranceId")
-                playNext()
+                println("TTS: Error occurred for utterance: $utteranceId, stopping TTS")
+                stop()
             }
         })
     }
@@ -200,111 +210,111 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         currentBean?.let { bean ->
             TtsTempProgressHelper.saveTempProgress(bean.page, documentPath, this)
         }
-        currentIndex++
         if (currentIndex < beanList.size) {
-            val nextBean = beanList[currentIndex]
-            currentBean = nextBean
-            speakText(nextBean.data ?: "")
-        } else {
-            _isSpeakingFlow.value = false
-            val lastPage = currentBean?.page
-            currentBean = null
-
-            // 所有朗读完成时停止前台服务
-            if (isForegroundServiceStarted) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
-                isForegroundServiceStarted = false
+            currentBean = beanList[currentIndex]
+            val text = currentBean?.data
+            if (!text.isNullOrBlank()) {
+                textToSpeech?.speak(text, TextToSpeech.QUEUE_ADD, null, currentBean?.page)
+                currentIndex++
+            } else {
+                currentIndex++
+                playNext() // 跳过空内容
             }
-
-            println("TTS: 所有朗读完成，触发停止回调，最后页面: $lastPage")
-            ttsSpeechCallback?.onSpeechStop(lastPage)
-        }
-        println("TTS: playNext:$currentBean")
-        currentBean?.let { bean ->
-            ttsSpeechCallback?.onPageComplete(bean.page)
+        } else {
+            // 所有项目播放完成
+            stopForegroundIfNeeded()
+            wakeLock?.takeIf { it.isHeld }?.release()
+            progressListener?.onFinish()
         }
     }
 
-    private fun speakText(text: String) {
-        if (text.isNotBlank()) {
-            val params = hashMapOf<String, String>().apply {
-                put(
-                    TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID,
-                    "utterance_${System.currentTimeMillis()}"
-                )
-            }
-            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params)
-        }
+    fun setProgressListener(listener: TtsProgressListener) {
+        progressListener = listener
     }
 
     fun speak(reflowBean: ReflowBean) {
         if (isInitialized) {
-            beanList.clear()
-            beanList.add(reflowBean)
-            currentIndex = 0
-            currentBean = reflowBean
-            speakText(reflowBean.data ?: "")
+            reset()
+            addToQueue(reflowBean)
+            playNext()
         }
     }
 
     fun addToQueue(reflowBean: ReflowBean) {
-        if (isInitialized) {
-            //println("TTS: addToQueue:$reflowBean")
+        val data = reflowBean.data
+        val segmentCount = if (data.isNullOrBlank() || data.length <= 300) 1 else (data.length / 300.0).toInt() + 1
+        if (data.isNullOrBlank() || data.length <= 300) {
             beanList.add(reflowBean)
-
-            // 如果当前没有在朗读，开始朗读
-            if (!isSpeaking() && beanList.size == 1) {
-                currentIndex = 0
-                currentBean = reflowBean
-                speakText(reflowBean.data ?: "")
+        } else {
+            var index = 0
+            for (i in data.indices step 300) {
+                val sub = data.substring(i, (i + 300).coerceAtMost(data.length))
+                beanList.add(ReflowBean(sub, reflowBean.type, reflowBean.page + "-$index"))
+                index++
             }
         }
+        if (!isSpeaking() && isInitialized && beanList.size == segmentCount) {
+            currentIndex = 0
+            playNext()
+        }
+    }
+
+    fun addToQueue(beans: List<ReflowBean>) {
+        println("addToQueue beans size: ${beans.size}")
+        val allSegments = mutableListOf<ReflowBean>()
+        for (bean in beans) {
+            val data = bean.data
+            if (data != null && data.length > 300) {
+                var index = 0
+                for (i in data.indices step 300) {
+                    val sub = data.substring(i, (i + 300).coerceAtMost(data.length))
+                    allSegments.add(ReflowBean(sub, bean.type, bean.page + "-$index"))
+                    index++
+                }
+            } else {
+                allSegments.add(bean)
+            }
+        }
+        beanList.addAll(allSegments)
+        if (!isSpeaking() && isInitialized) {
+            currentIndex = 0
+            playNext()
+        }
+    }
+
+    fun stop() {
+        textToSpeech?.stop()
+        reset()
+        stopForegroundIfNeeded()
+        wakeLock?.takeIf { it.isHeld }?.release()
+    }
+
+    fun stopAndClear() {
+        val lastPage = currentBean?.page
+        textToSpeech?.stop()
+        reset()
+        progressListener?.onFinish()
+        stopForegroundIfNeeded()
+        wakeLock?.takeIf { it.isHeld }?.release()
+        _isSpeakingFlow.value = false
+        cancelSleepTimer()
     }
 
     fun pause() {
         textToSpeech?.stop()
         _isSpeakingFlow.value = false
-
-        // 暂停时也停止前台服务，移除通知
-        if (isForegroundServiceStarted) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
-            isForegroundServiceStarted = false
-        }
+        stopForegroundIfNeeded()
+        wakeLock?.takeIf { it.isHeld }?.release()
     }
 
-    fun stop() {
-        val lastPage = currentBean?.page
-        textToSpeech?.stop()
+    fun isSpeaking(): Boolean {
+        return textToSpeech?.isSpeaking ?: false
+    }
+
+    fun reset() {
         beanList.clear()
-        currentBean = null
         currentIndex = 0
-        _isSpeakingFlow.value = false
-        cancelSleepTimer()
-
-        // 停止前台服务，移除通知
-        if (isForegroundServiceStarted) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
-            isForegroundServiceStarted = false
-        }
-
-        // 触发朗读停止回调
-        println("TTS: 手动停止朗读，触发停止回调，最后页面: $lastPage")
-        ttsSpeechCallback?.onSpeechStop(lastPage)
+        currentBean = null
     }
 
     fun clearQueue() {
@@ -312,16 +322,10 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         currentIndex = 0
     }
 
-    fun isSpeaking(): Boolean {
-        return textToSpeech?.isSpeaking ?: false
-    }
+    fun getQueueSize(): Int = beanList.size
 
-    fun getQueueSize(): Int {
-        return beanList.size
-    }
-
-    fun getQueue(): List<TtsTask> {
-        return beanList.map { TtsTask(it, priority = 0) }
+    fun getQueue(): List<ReflowBean> {
+        return beanList.toList()
     }
 
     fun getCurrentReflowBean(): ReflowBean? {
@@ -359,9 +363,15 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         return sleepTimerJob?.isActive == true
     }
 
-    fun isServiceInitialized(): Boolean = isInitialized
-
-    fun setTtsSpeechCallback(callback: TtsSpeechCallback?) {
-        ttsSpeechCallback = callback
+    fun shutdown() {
+        textToSpeech?.shutdown()
+        textToSpeech = null
+        isInitialized = false
+        reset()
+        stopForegroundIfNeeded()
+        wakeLock?.takeIf { it.isHeld }?.release()
+        serviceScope.cancel()
     }
+
+    fun isServiceInitialized(): Boolean = isInitialized
 }

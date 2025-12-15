@@ -648,7 +648,7 @@ public fun DocumentView(
                             flingJob?.cancel()
                             if (velocitySquared > velocityThreshold) {
                                 val decayAnimationSpec = exponentialDecay<Float>(
-                                    frictionMultiplier = 0.2f,
+                                    frictionMultiplier = 0.4f,
                                     absVelocityThreshold = 0.45f
                                 )
                                 flingJob = scope.launch {
@@ -666,6 +666,11 @@ public fun DocumentView(
                                                         val minX =
                                                             minOf(0f, viewSize.width - scaledWidth)
                                                         val maxX = 0f
+                                                        // 2. 检查边界：如果增量导致越界，则取消动画并设置到边界
+                                                        if (value > maxX || value < minX) {
+                                                            cancelAnimation()
+                                                        }
+
                                                         val newX = value.coerceIn(minX, maxX)
                                                         offset = Offset(newX, offset.y)
                                                         pageViewState.updateOffset(offset)
@@ -689,6 +694,10 @@ public fun DocumentView(
                                                         val minY =
                                                             if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
                                                         val maxY = 0f
+                                                        if (value > maxY || value < minY) {
+                                                            cancelAnimation()
+                                                        }
+
                                                         val newY = value.coerceIn(minY, maxY)
                                                         offset = Offset(offset.x, newY)
                                                         pageViewState.updateOffset(offset)
@@ -711,8 +720,12 @@ public fun DocumentView(
                                                                 pageViewState.totalWidth
                                                             }
                                                         val minX =
-                                                            if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                                                            minOf(0f, viewSize.width - scaledWidth)
                                                         val maxX = 0f
+                                                        if (value > maxX || value < minX) {
+                                                            cancelAnimation()
+                                                        }
+
                                                         val newX = value.coerceIn(minX, maxX)
                                                         offset = Offset(newX, offset.y)
                                                         pageViewState.updateOffset(offset)
@@ -728,12 +741,15 @@ public fun DocumentView(
                                                 launch {
                                                     animY.animateDecay(decayAnimationSpec) {
                                                         val scaledHeight = viewSize.height * vZoom
-                                                        val minY =
-                                                            minOf(
-                                                                0f,
-                                                                viewSize.height - scaledHeight
-                                                            )
+                                                        val minY = minOf(
+                                                            0f,
+                                                            viewSize.height - scaledHeight
+                                                        )
                                                         val maxY = 0f
+                                                        if (value > maxY || value < minY) {
+                                                            cancelAnimation()
+                                                        }
+
                                                         val newY = value.coerceIn(minY, maxY)
                                                         offset = Offset(offset.x, newY)
                                                         pageViewState.updateOffset(offset)

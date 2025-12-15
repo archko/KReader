@@ -47,8 +47,9 @@ import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.dialog.SleepTimerDialog
+import com.archko.reader.viewer.tts.AndroidTtsForegroundService
+import com.archko.reader.viewer.tts.TtsProgressListener
 import com.archko.reader.viewer.tts.TtsServiceBinder
-import com.archko.reader.viewer.tts.TtsSpeechCallback
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -632,44 +633,46 @@ fun CustomView(
                 }
             }
 
-            // 设置TTS回调
+            // 设置TTS进度监听器 - 用于页面跳转和进度保存
             LaunchedEffect(ttsServiceBinder) {
-                ttsServiceBinder?.setTtsSpeechCallback(object : TtsSpeechCallback {
-                    override fun onPageComplete(page: String?) {
-                        page?.let { pageStr ->
-                            val targetPage = pageStr.toIntOrNull()
-                            println("SpeechComplete:targetPage:$targetPage, old:${jumpIntent.page}, speaking:$speakingPageIndex")
-                            if (null != targetPage) {
-                                scope.launch {
-                                    speakingPageIndex = targetPage
-                                    if (targetPage != jumpIntent.page) {
-                                        jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
-                                    }
+                ttsServiceBinder?.setProgressListener(object : TtsProgressListener {
+                    override fun onStart(bean: ReflowBean) {
+                        // Segment开始朗读
+                    }
+
+                    override fun onDone(bean: ReflowBean) {
+                        // Segment完成，检查是否页面切换
+                        val newPageStr = bean.page?.split("-")?.firstOrNull()
+                        val newPage = newPageStr?.toIntOrNull()
+                        if (newPage != null && newPage != currentPage) {
+                            scope.launch {
+                                speakingPageIndex = newPage
+                                if (newPage != jumpIntent.page) {
+                                    jumpIntent = JumpIntent(newPage, JumpMode.PageNavigation)
                                 }
                             }
                         }
                     }
 
-                    override fun onSpeechStop(lastPage: String?) {
+                    override fun onFinish() {
+                        // 朗读完成，保存最后页面进度
                         scope.launch {
                             speakingPageIndex = null
-                            lastPage?.let { pageStr ->
-                                val targetPage = pageStr.toIntOrNull()
-                                println("SpeechStop: 朗读结束，保存进度，最后页面: $targetPage")
-                                if (null != targetPage) {
-                                    onSaveDocument?.invoke(
-                                        targetPage,
-                                        pageCount,
-                                        initialZoom,
-                                        initialScrollX,
-                                        initialScrollY,
-                                        if (isVertical) Vertical.toLong() else Horizontal.toLong(),
-                                        if (isReflow) 1L else 0L,
-                                        if (isCrop) 1L else 0L
-                                    )
-                                    TtsTempProgressHelper.clearTempProgress(context, currentPath)
-                                }
+                            val lastPageStr = ttsServiceBinder?.getCurrentReflowBean()?.page?.split("-")?.firstOrNull()
+                            val lastPage = lastPageStr?.toIntOrNull()
+                            lastPage?.let { page ->
+                                onSaveDocument?.invoke(
+                                    page,
+                                    pageCount,
+                                    initialZoom,
+                                    initialScrollX,
+                                    initialScrollY,
+                                    if (isVertical) Vertical.toLong() else Horizontal.toLong(),
+                                    if (isReflow) 1L else 0L,
+                                    if (isCrop) 1L else 0L
+                                )
                             }
+                            TtsTempProgressHelper.clearTempProgress(context, currentPath)
                         }
                     }
                 })
@@ -684,7 +687,8 @@ fun CustomView(
                             if (binder.isSpeaking()) {
                                 val speakingPage = binder.getCurrentSpeakingPage()
                                 speakingPage?.let { pageStr ->
-                                    val targetPage = pageStr.toIntOrNull()
+                                    val targetPageStr = pageStr.split("-").firstOrNull()
+                                    val targetPage = targetPageStr?.toIntOrNull()
                                     println("OnResume: 正在朗读第${targetPage}页，当前显示第${currentPage}页")
                                     if (targetPage != null && targetPage != currentPage) {
                                         jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
@@ -934,13 +938,14 @@ fun CustomView(
                 ttsServiceBinder?.let { binder ->
                     QueueDialog(
                         cacheBean = decoder!!.cacheBean,
-                        currentSpeakingPage = binder.getCurrentSpeakingPage(),
+                        currentSpeakingPage = binder.getCurrentSpeakingPage()?.split("-")?.firstOrNull(),
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->
                             showQueueDialog = false
 
                             reflowBean.page?.let { pageStr ->
-                                val targetPage = pageStr.toIntOrNull() ?: 0
+                                val targetPageStr = pageStr.split("-").firstOrNull()
+                                val targetPage = targetPageStr?.toIntOrNull() ?: 0
 
                                 scope.launch {
                                     jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
