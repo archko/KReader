@@ -402,7 +402,10 @@ public class Page(
             }
         }
         //val renderedNodes = (maxBlockX - minBlockX + 1) * (maxBlockY - minBlockY + 1)
-        //println("Page[${aPage.index}] rendering ${renderedNodes} nodes, range: x[$minBlockX-$maxBlockX] y[$minBlockY-$maxBlockY]")
+        //val blockWidth = currentWidth / config.xBlocks
+        //val blockHeight = currentHeight / config.yBlocks
+        //val totalBlocks = config.xBlocks * config.yBlocks
+        //println("Page[${aPage.index}] rendering ${renderedNodes} nodes, range: x[$minBlockX-$maxBlockX] y[$minBlockY-$maxBlockY], blockSize: ${blockWidth}x${blockHeight}, totalBlocks: $totalBlocks")
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
@@ -756,9 +759,9 @@ public class Page(
     }
 
     public companion object {
-        public const val MIN_BLOCK_SIZE: Float = 256f * 3f // 768
-        private const val BASE_MAX_BLOCK_SIZE = 256f * 4f // 1024
-        private const val MAX_CEILING = 256f * 8f // 2048
+        public const val MIN_BLOCK_SIZE: Float = 256f * 2f // 768
+        private const val BASE_MAX_BLOCK_SIZE = 256f * 2f // 1024
+        private const val MAX_CEILING = 256f * 4f // 2048
 
         // 计算分块数的通用函数，接受动态 MAX_BLOCK_SIZE
         private fun calcBlockCount(length: Float, maxBlockSize: Float): Int {

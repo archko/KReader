@@ -49,7 +49,7 @@ public class PageViewState(
     public val decodeScope: CoroutineScope =
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
-    private var lastPageKeys: Set<String> = emptySet()
+    private var lastPageKeys: Set<Int> = emptySet()
 
     // 添加关闭标志
     private var isShutdown = false
@@ -479,18 +479,13 @@ public class PageViewState(
             } else {
                 emptyList()
             }
-
             // 主动移除不再可见的页面图片缓存
-            val newPageKeys = tilesToRenderCopy.flatMap { page ->
-                page.nodes.map { node ->
-                    "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
-                }
+            val newPageKeys = tilesToRenderCopy.map { page ->
+                page.aPage.index
             }.toSet()
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->
-                // key格式: "index-bounds-scale"
-                val index = key.substringBefore("-").toIntOrNull() ?: return@forEach
-                val page = pages.getOrNull(index) ?: return@forEach
+                val page = pages.getOrNull(key) ?: return@forEach
                 page.recycle()
             }
             lastPageKeys = newPageKeys
@@ -513,18 +508,13 @@ public class PageViewState(
             } else {
                 emptyList()
             }
-
             // 主动移除不再可见的页面图片缓存
-            val newPageKeys = tilesToRenderCopy.flatMap { page ->
-                page.nodes.map { node ->
-                    "${node.aPage.index}-${node.bounds}-${node.aPage.scale}"
-                }
+            val newPageKeys = tilesToRenderCopy.map { page ->
+                page.aPage.index
             }.toSet()
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->
-                // key格式: "index-bounds-scale"
-                val index = key.substringBefore("-").toIntOrNull() ?: return@forEach
-                val page = pages.getOrNull(index) ?: return@forEach
+                val page = pages.getOrNull(key) ?: return@forEach
                 page.recycle()
             }
             lastPageKeys = newPageKeys
