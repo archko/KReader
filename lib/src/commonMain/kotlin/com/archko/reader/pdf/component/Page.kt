@@ -760,8 +760,8 @@ public class Page(
 
     public companion object {
         public const val MIN_BLOCK_SIZE: Float = 256f * 2f // 768
-        private const val BASE_MAX_BLOCK_SIZE = 256f * 2f // 1024
-        private const val MAX_CEILING = 256f * 4f // 2048
+        private const val BASE_MAX_BLOCK_SIZE = 256f * 4f // 1024
+        private const val MAX_CEILING = 256f * 8f // 2048
 
         // 计算分块数的通用函数，接受动态 MAX_BLOCK_SIZE
         private fun calcBlockCount(length: Float, maxBlockSize: Float): Int {
