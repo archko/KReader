@@ -293,6 +293,10 @@ public class Page(
                     override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
                         return !pageViewState.isShutdown() && isPageInRenderList(pageNumber)
                     }
+
+                    override fun onFinish(pageNumber: Int) {
+                        thumbDecoding = false
+                    }
                 }
             )
 
@@ -757,7 +761,7 @@ public class Page(
     }
 
     public companion object {
-        public const val MIN_BLOCK_SIZE: Float = 256f * 2f // 768
+        public const val MIN_BLOCK_SIZE: Float = 256f * 3f // 768
         private const val BASE_MAX_BLOCK_SIZE = 256f * 4f // 1024
         private const val MAX_CEILING = 256f * 8f // 2048
 

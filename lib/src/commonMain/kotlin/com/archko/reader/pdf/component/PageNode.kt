@@ -263,6 +263,10 @@ public class PageNode(
                             // 对于节点任务，还需要检查具体的tile是否在预加载区域
                             return pageViewState.isTileVisible(tileSpec, strictMode = false)
                         }
+
+                        override fun onFinish(pageNumber: Int) {
+                            isDecoding = false
+                        }
                     }
                 )
 

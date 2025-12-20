@@ -33,6 +33,7 @@ public data class DecodeTask(
 public interface DecodeCallback {
     public fun onDecodeComplete(bitmap: ImageBitmap?, isThumb: Boolean, error: Throwable?)
     public fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean
+    public fun onFinish(pageNumber: Int)
 }
 
 /**
