@@ -37,6 +37,7 @@ public class PageViewState(
     internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
+    public var nodePool: PageNodePool = PageNodePool()
 
     // 正在朗读的页面索引，null 表示没有朗读
     public var speakingPageIndex: Int? by mutableStateOf(null)
@@ -230,6 +231,7 @@ public class PageViewState(
         pageToRender = emptyList()
 
         state.close()
+        nodePool.clear()
 
         println("PageViewState.shutdown: 清理完成，调用GC")
         // 建议GC

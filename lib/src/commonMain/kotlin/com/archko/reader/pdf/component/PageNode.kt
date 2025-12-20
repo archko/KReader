@@ -25,8 +25,15 @@ import kotlin.math.floor
 public class PageNode(
     private val pageViewState: PageViewState,
     public var bounds: Rect,  // 逻辑坐标(0~1)
-    public val aPage: APage
+    public var aPage: APage
 ) {
+    
+    // 允许对象池更新数据
+    public fun update(newBounds: Rect, newAPage: APage) {
+        this.bounds = newBounds
+        this.aPage = newAPage
+    }
+
     // 逻辑rect转实际像素，直接用Page的width/height
     public fun toPixelRect(
         pageWidth: Float,
@@ -34,20 +41,12 @@ public class PageNode(
         xOffset: Float,
         yOffset: Float
     ): Rect {
-        return if (pageViewState.orientation == Vertical) {
-            // 使用向下取整和向上取整来避免间隙
-            val left = floor(bounds.left * pageWidth)
-            val top = floor(bounds.top * pageHeight + yOffset)
-            val right = ceil(bounds.right * pageWidth)
-            val bottom = ceil(bounds.bottom * pageHeight + yOffset)
-            Rect(left, top, right, bottom)
-        } else {
-            val left = floor(bounds.left * pageWidth + xOffset)
-            val top = floor(bounds.top * pageHeight)
-            val right = ceil(bounds.right * pageWidth + xOffset)
-            val bottom = ceil(bounds.bottom * pageHeight)
-            Rect(left, top, right, bottom)
-        }
+        val left = floor(bounds.left * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
+        val top = floor(bounds.top * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
+        val right = ceil(bounds.right * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
+        val bottom = ceil(bounds.bottom * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
+        
+        return Rect(left, top, right, bottom)
     }
 
     //不能用bounds.toString(),切边切换,key变化
@@ -125,7 +124,8 @@ public class PageNode(
                 drawScope.drawImage(
                     state.bitmap,
                     dstOffset = IntOffset(dstLeft, dstTop),
-                    dstSize = IntSize(dstWidth, dstHeight)
+                    // 关键点：给宽高各增加 1 像素的微量溢出，覆盖邻居边缘
+                    dstSize = IntSize(dstWidth+ 1, dstHeight+ 1)
                 )
             }
         }

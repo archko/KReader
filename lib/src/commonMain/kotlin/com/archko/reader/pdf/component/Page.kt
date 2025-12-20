@@ -696,9 +696,9 @@ public class Page(
 
         // 如果是单个块，直接返回原始页面
         if (config.isSingleBlock) {
-            nodes = listOf(PageNode(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
+            nodes = listOf(pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
             // 回收旧nodes
-            oldNodes.forEach { it.recycle() }
+            oldNodes.forEach { pageViewState.nodePool.release(it) }
             return
         }
 
@@ -712,21 +712,19 @@ public class Page(
                 val baseRight = (x + 1) / config.xBlocks.toFloat()
                 val baseBottom = (y + 1) / config.yBlocks.toFloat()
 
-                // 添加微小的重叠以避免间隙（除了边缘块）
-                val overlap = 0.0001f // 0.1% 的重叠
-                val left = if (x == 0) baseLeft else baseLeft - overlap
-                val top = if (y == 0) baseTop else baseTop - overlap
-                val right = if (x == config.xBlocks - 1) baseRight else baseRight + overlap
-                val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom + overlap
+                val left = if (x == 0) baseLeft else baseLeft
+                val top = if (y == 0) baseTop else baseTop
+                val right = if (x == config.xBlocks - 1) baseRight else baseRight
+                val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom
 
                 val rect = Rect(left, top, right, bottom)
-                newNodes.add(PageNode(pageViewState, rect, aPage))
+                newNodes.add(pageViewState.nodePool.acquire(pageViewState, rect, aPage))
                 //println("Page[${aPage.index}], scaled.w-h:$width-$height, , orignal:${aPage.getWidth(false)}-${aPage.getHeight(false)}, tile:$rect")
             }
         }
         nodes = newNodes
         // 回收旧nodes
-        oldNodes.forEach { it.recycle() }
+        oldNodes.forEach { pageViewState.nodePool.release(it) }
         //println("Page[${aPage.index}] total nodes.count=${nodes.size}, xBlocks=${config.xBlocks}, yBlocks=${config.yBlocks}")
     }
 
