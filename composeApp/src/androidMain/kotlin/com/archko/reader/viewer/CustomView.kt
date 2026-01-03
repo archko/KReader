@@ -630,6 +630,9 @@ fun CustomView(
             LaunchedEffect(ttsServiceBinder) {
                 ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
                     isSpeaking = speaking
+                    if (!speaking) {
+                        speakingPageIndex = null
+                    }
                 }
             }
 

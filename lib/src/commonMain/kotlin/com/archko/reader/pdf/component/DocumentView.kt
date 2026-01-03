@@ -1,12 +1,15 @@
 package com.archko.reader.pdf.component
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -16,8 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -38,6 +43,8 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.HyperLinkUtils
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -360,6 +367,103 @@ public fun DocumentView(
         }
     }
 
+    // 优化的 Fling 执行器
+    fun performFling(velocity: Velocity, viewSize: IntSize, pageViewState: PageViewState) {
+        val decay = exponentialDecay<Float>(
+            frictionMultiplier = 0.4f,
+            absVelocityThreshold = 0.5f
+        )
+
+        flingJob = scope.launch {
+            // 分别为 X 和 Y 创建动画
+            val animX = Animatable(offset.x)
+            val animY = Animatable(offset.y)
+
+            launch {
+                animX.animateDecay(velocity.x, decay) {
+                    val boundOffset = calculateBounds(Offset(value, offset.y), vZoom, viewSize, pageViewState, orientation)
+                    if (abs(value - boundOffset.x) > 0.5f) {
+                        this@launch.cancel() // 撞边停止
+                    }
+                    offset = Offset(boundOffset.x, offset.y)
+                    pageViewState.updateOffset(offset)
+                }
+            }
+
+            launch {
+                animY.animateDecay(velocity.y, decay) {
+                    val boundOffset = calculateBounds(Offset(offset.x, value), vZoom, viewSize, pageViewState, orientation)
+                    if (abs(value - boundOffset.y) > 0.5f) {
+                        this@launch.cancel() // 撞边停止
+                    }
+                    offset = Offset(offset.x, boundOffset.y)
+                    pageViewState.updateOffset(offset)
+                }
+            }
+        }
+    }
+
+    fun handleTapGestureInternal(tapPos: Offset) {
+        val currentTime = System.currentTimeMillis()
+        // 判定是否为双击（300ms内）
+        val isDoubleTap = currentTime - lastTapTime < 300
+
+        if (isDoubleTap) {
+            // 如果是双击，取消掉之前挂起的单击任务
+            tapDelayJob?.cancel()
+
+            // 只有在屏幕中间区域（高度的1/4到3/4之间）双击才触发工具栏
+            if (tapPos.y in (viewSize.height / 4f)..(viewSize.height * 3 / 4f)) {
+                onDoubleTapToolbar?.invoke()
+            }
+            // 重置时间防止连续三次点击触发两次双击
+            lastTapTime = 0L
+        } else {
+            lastTapTime = currentTime
+            // 先取消之前的任务防止堆积
+            tapDelayJob?.cancel()
+
+            // 开启协程延迟处理单击逻辑
+            tapDelayJob = scope.launch {
+                delay(300)
+
+                // 1. 尝试处理超链接点击
+                // 注意：tapPos 是相对于屏幕的，需要转换成相对于内容页面的坐标
+                val linkHandled = pageViewState.handleClick(
+                    tapPos.x - offset.x,
+                    tapPos.y - offset.y
+                )
+
+                // 2. 如果没有命中链接，则处理翻页点击
+                if (!linkHandled) {
+                    val isPageTurned = handleTapGesture(
+                        tapPos,
+                        viewSize,
+                        offset,
+                        orientation,
+                        pageViewState,
+                        keepPx
+                    ) { newOffset ->
+                        offset = newOffset
+                        pageViewState.updateOffset(offset)
+                    }
+
+                    // 如果不是翻页区域，触发非页面区域点击回调
+                    if (!isPageTurned) {
+                        val clickedPage =
+                            calculateClickedPage(
+                                tapPos,
+                                offset,
+                                orientation,
+                                pageViewState
+                            )
+                        onTapNonPageArea?.invoke(clickedPage)
+                    }
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -385,7 +489,136 @@ public fun DocumentView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Transparent)
-                .pointerInput("gestures", isTextSelectionMode) {
+                .pointerInput(isTextSelectionMode) {
+                    if (isTextSelectionMode) {
+                        // 文本选择模式
+                        detectDragGestures(
+                            onDragStart = { pos ->
+                                isTextSelecting = true
+                                selectionStartPos = pos
+                                showTextActionToolbar = false
+
+                                // 找到点击的页面并开始选择
+                                val clickedPageIndex = calculateClickedPage(
+                                    pos,
+                                    offset,
+                                    orientation,
+                                    pageViewState
+                                )
+                                pageViewState.pages.getOrNull(clickedPageIndex)?.let {
+                                    it.startTextSelection(pos.x - offset.x, pos.y - offset.y)
+                                    selectedPage = it
+                                }
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                selectionEndPos = change.position
+                                selectedPage?.updateTextSelection(
+                                    change.position.x - offset.x,
+                                    change.position.y - offset.y
+                                )
+                            },
+                            onDragEnd = {
+                                val selection = selectedPage?.endTextSelection()
+                                isTextSelecting = false
+                                if (selection != null && selection.text.isNotBlank()) showTextActionToolbar =
+                                    true
+                            }
+                        )
+                    } else {
+                        // 阅读模式：优化后的 拖动、缩放 与 惯性
+                        awaitEachGesture {
+                            val velocityTracker = VelocityTracker()
+                            var isZooming = false
+                            var lastChange: PointerInputChange? = null
+
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            flingJob?.cancel() // 触摸即停
+
+                            do {
+                                val event = awaitPointerEvent()
+                                if (!event.changes.fastAny { it.isConsumed }) {
+                                    lastChange = event.changes.firstOrNull()
+                                    val zoomChange = event.calculateZoom()
+                                    val panChange = event.calculatePan()
+
+                                    if (!isZooming && event.changes.size > 1) {
+                                        isZooming = true
+                                    }
+
+                                    if (isZooming) {
+                                        val centroid = event.calculateCentroid(useCurrent = false)
+                                        if (centroid.isSpecified && zoomChange != 1f) {
+                                            val newZoom = (vZoom * zoomChange).coerceIn(1f, 12f)
+                                            val zoomFactor = newZoom / vZoom
+
+                                            // 计算缩放中心点：手势中心相对于内容的位置
+                                            // centroid 是手势中心在视图中的位置
+                                            // 需要将其转换为相对于内容的位置
+                                            val contentCenterX = centroid.x - offset.x
+                                            val contentCenterY = centroid.y - offset.y
+
+                                            // 计算新的偏移量，保持内容中心点不变
+                                            val newOffsetX =
+                                                centroid.x - contentCenterX * zoomFactor
+                                            val newOffsetY =
+                                                centroid.y - contentCenterY * zoomFactor
+
+                                            vZoom = newZoom
+                                            val targetOffset = Offset(newOffsetX, newOffsetY)
+                                            if (targetOffset.isSpecified) {
+                                                offset = calculateBounds(
+                                                    targetOffset,
+                                                    vZoom,
+                                                    viewSize,
+                                                    pageViewState,
+                                                    orientation
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        // 拖动
+                                        val newOffset = offset + panChange
+                                        offset = calculateBounds(
+                                            newOffset,
+                                            vZoom,
+                                            viewSize,
+                                            pageViewState,
+                                            orientation
+                                        )
+                                        pageViewState.updateOffset(offset)
+
+                                        // 这里的 velocityTracker 记录的是指针位置，不是 offset 变量，这样更平滑
+                                        velocityTracker.addPosition(
+                                            lastChange?.uptimeMillis?:0,
+                                            lastChange?.position?:Offset(0f,0f)
+                                        )
+                                    }
+                                    event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                                }
+                            } while (event.changes.fastAny { it.pressed })
+
+                            // --- 抬手后的处理 ---
+                            val finalChange = lastChange ?: return@awaitEachGesture
+                            val dragDistance = (finalChange.position - down.position).getDistance()
+
+                            if (dragDistance < 10f && !isZooming) {
+                                // 调用你原有的点击处理逻辑
+                                handleTapGestureInternal(finalChange.position)
+                            } else if (!isZooming) {
+                                val velocity = velocityTracker.calculateVelocity()
+                                performFling(velocity, viewSize, pageViewState)
+                            }
+
+                            if (isZooming) {
+                                pageViewState.updateOffset(offset)
+                                pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                            }
+                            pageViewState.updateVisiblePages(offset, viewSize, vZoom)
+                        }
+                    }
+                }
+                /*.pointerInput("gestures", isTextSelectionMode) {
                     awaitEachGesture {
                         var zooming = false
                         var dragging = false
@@ -504,32 +737,6 @@ public fun DocumentView(
                                         } else {
                                             // 普通拖拽模式：滚动页面
                                             offset += panChange
-                                            if (orientation == Vertical) {
-                                                val scaledWidth = viewSize.width * vZoom
-                                                val scaledHeight = pageViewState.totalHeight
-                                                val minX = minOf(0f, viewSize.width - scaledWidth)
-                                                val maxX = 0f
-                                                val minY =
-                                                    if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
-                                                val maxY = 0f
-                                                offset = Offset(
-                                                    offset.x.coerceIn(minX, maxX),
-                                                    offset.y.coerceIn(minY, maxY)
-                                                )
-                                            } else {
-                                                val scaledHeight = viewSize.height * vZoom
-                                                val scaledWidth = pageViewState.totalWidth
-                                                val minY = minOf(0f, viewSize.height - scaledHeight)
-                                                val maxY = 0f
-                                                val minX =
-                                                    if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
-                                                val maxX = 0f
-                                                offset = Offset(
-                                                    offset.x.coerceIn(minX, maxX),
-                                                    offset.y.coerceIn(minY, maxY)
-                                                )
-                                            }
-                                            pageViewState.updateOffset(offset)
                                         }
                                     }
                                 }
@@ -761,7 +968,7 @@ public fun DocumentView(
                             }
                         }
                     }
-                }
+                }*/
         ) {
             //居中绘制不够屏幕高宽
             val centerOffsetX =
@@ -822,6 +1029,28 @@ public fun DocumentView(
             )
         }
     }
+}
+
+// 边界检查逻辑
+private fun calculateBounds(
+    targetOffset: Offset,
+    currentZoom: Float,
+    size: IntSize,
+    state: PageViewState,
+    ori: Int
+): Offset {
+    // 在缩放过程中，需要根据当前缩放比例调整总高度
+    val scaleRatio = currentZoom / state.vZoom
+    val contentWidth = if (ori == Vertical) size.width * currentZoom else state.totalWidth * scaleRatio
+    val contentHeight = if (ori == Vertical) state.totalHeight * scaleRatio else size.height * currentZoom
+
+    val minX = if (contentWidth > size.width) size.width - contentWidth else 0f
+    val minY = if (contentHeight > size.height) size.height - contentHeight else 0f
+
+    return Offset(
+        targetOffset.x.coerceIn(minX, 0f),
+        targetOffset.y.coerceIn(minY, 0f)
+    )
 }
 
 private fun firstPage(
