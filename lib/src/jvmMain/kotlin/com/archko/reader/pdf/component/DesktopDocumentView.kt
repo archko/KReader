@@ -516,6 +516,14 @@ public fun DesktopDocumentView(
             },
         contentAlignment = Alignment.TopStart
     ) {
+        var renderTrigger by remember { mutableIntStateOf(0) }
+
+        LaunchedEffect(pageViewState.renderFlow, Unit) {
+            pageViewState.renderFlow.collect {
+                //println("收到渲染更新通知")
+                renderTrigger++
+            }
+        }
         Canvas(
             modifier = Modifier
                 .fillMaxSize()

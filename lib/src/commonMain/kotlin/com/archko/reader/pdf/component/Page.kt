@@ -763,7 +763,7 @@ public class Page(
     public companion object {
         // 核心约束：仅保留最小块、最大块，取消基础块
         public const val MIN_BLOCK: Float = 256f * 2f // 512
-        private const val MAX_BLOCK: Float = 256f * 6f // 1536
+        public const val MAX_BLOCK: Float = 256f * 6f // 1536
 
         // 单轴块数计算：优先1块，仅超出MAX_BLOCK才分块（延迟重建核心）
         private fun calcAxisBlocks(length: Float): Int {
