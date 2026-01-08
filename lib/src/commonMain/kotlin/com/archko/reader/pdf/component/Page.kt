@@ -761,37 +761,33 @@ public class Page(
     }
 
     public companion object {
-        public const val MIN_BLOCK_SIZE: Float = 256f * 2f // 512
-        private const val BASE_MAX_BLOCK_SIZE = 256f * 4f // 1024
-        private const val MAX_CEILING = 256f * 8f // 2048
+        // 核心约束：仅保留最小块、最大块，取消基础块
+        public const val MIN_BLOCK: Float = 256f * 2f // 512
+        private const val MAX_BLOCK: Float = 256f * 6f // 1536
 
-        // 计算分块数的通用函数，接受动态 MAX_BLOCK_SIZE
-        private fun calcBlockCount(length: Float, maxBlockSize: Float): Int {
-            if (length <= MIN_BLOCK_SIZE) {
+        // 单轴块数计算：优先1块，仅超出MAX_BLOCK才分块（延迟重建核心）
+        private fun calcAxisBlocks(length: Float): Int {
+            if (length <= 0) return 1
+
+            // 核心规则：只要长度 ≤ 最大块1536，就用1块（不管最小块512）
+            if (length <= MAX_BLOCK) {
                 return 1
             }
-            val blockCount = ceil(length / maxBlockSize).toInt()
-            val actualBlockSize = length / blockCount
-            if (actualBlockSize >= MIN_BLOCK_SIZE && actualBlockSize <= maxBlockSize) {
-                return blockCount
-            } else {
-                return ceil(length / MIN_BLOCK_SIZE).toInt()
+
+            // 长度 > 最大块1536 → 按1536分块，保证实际块大小 ≥ 512
+            var blocks = ceil(length / MAX_BLOCK).toInt()
+            val actualBlockSize = length / blocks
+
+            // 兜底：如果分块后实际块大小 < 512，按最小块重新分
+            if (actualBlockSize < MIN_BLOCK) {
+                blocks = ceil(length / MIN_BLOCK).toInt()
             }
+            return blocks
         }
 
         private fun calculateTileConfig(width: Float, height: Float, totalScale: Float): TileConfig {
-            // 计算动态 MAX_BLOCK_SIZE
-            val adaptiveExtension = maxOf((totalScale - 1), 0.0f) * 512f // 每个放大级别的 512 增量
-            val effectiveMaxBlock = minOf(BASE_MAX_BLOCK_SIZE + adaptiveExtension, MAX_CEILING)
-
-            // 如果页面的宽或高都小于有效最大块大小，则不分块
-            if (width <= effectiveMaxBlock && height <= effectiveMaxBlock) {
-                return TileConfig(1, 1)
-            }
-
-            val xBlocks = calcBlockCount(width, effectiveMaxBlock)
-            val yBlocks = calcBlockCount(height, effectiveMaxBlock)
-
+            val xBlocks = calcAxisBlocks(width)
+            val yBlocks = calcAxisBlocks(height)
             return TileConfig(xBlocks, yBlocks)
         }
 
