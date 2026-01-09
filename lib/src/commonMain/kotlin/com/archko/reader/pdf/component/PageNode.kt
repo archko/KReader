@@ -27,8 +27,25 @@ public class PageNode(
     public var bounds: Rect,  // 逻辑坐标(0~1)
     public var aPage: APage
 ) {
+
+    //不能用bounds.toString(),切边切换,key变化
+    public val cacheKey: String
+        get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pageViewState.vZoom}-${pageViewState.orientation}-${pageViewState.isCropEnabled()}"
+
+    private var bitmapState by mutableStateOf<BitmapState?>(null)
+    private var isDecoding = false
+    private var decodeJob: Job? = null
+
+    // 缓存像素矩形计算结果
+    private var cachedPixelRect: Rect? = null
+    private var cachedPageWidth: Float = 0f
+    private var cachedPageHeight: Float = 0f
+    private var cachedXOffset: Float = 0f
+    private var cachedYOffset: Float = 0f
+
+    // 缓存TileSpec计算结果
+    private var cachedTileSpec: TileSpec? = null
     
-    // 允许对象池更新数据
     public fun update(newBounds: Rect, newAPage: APage) {
         this.bounds = newBounds
         this.aPage = newAPage
@@ -45,17 +62,57 @@ public class PageNode(
         val top = floor(bounds.top * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
         val right = ceil(bounds.right * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
         val bottom = ceil(bounds.bottom * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
-        
+
         return Rect(left, top, right, bottom)
     }
 
-    //不能用bounds.toString(),切边切换,key变化
-    public val cacheKey: String
-        get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pageViewState.vZoom}-${pageViewState.orientation}-${pageViewState.isCropEnabled()}"
+    // 获取缓存的像素矩形，如果参数变化则重新计算
+    private fun getCachedPixelRect(
+        pageWidth: Float,
+        pageHeight: Float,
+        xOffset: Float,
+        yOffset: Float
+    ): Rect {
+        if (cachedPixelRect == null ||
+            cachedPageWidth != pageWidth ||
+            cachedPageHeight != pageHeight ||
+            cachedXOffset != xOffset ||
+            cachedYOffset != yOffset) {
 
-    private var bitmapState by mutableStateOf<BitmapState?>(null)
-    private var isDecoding = false
-    private var decodeJob: Job? = null
+            // 参数变化，重新计算
+            cachedPixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset)
+            cachedPageWidth = pageWidth
+            cachedPageHeight = pageHeight
+            cachedXOffset = xOffset
+            cachedYOffset = yOffset
+        }
+
+        return cachedPixelRect!!
+    }
+
+    // 获取缓存的TileSpec，如果参数变化则重新计算
+    private fun getCachedTileSpec(
+        pageWidth: Float,
+        pageHeight: Float,
+        scale: Float
+    ): TileSpec {
+        if (cachedTileSpec == null ||
+            cachedPageWidth != pageWidth ||
+            cachedPageHeight != pageHeight) {
+            cachedTileSpec = TileSpec(
+                aPage.index,
+                scale,
+                bounds,
+                pageWidth.toInt(),
+                pageHeight.toInt(),
+                pageViewState.viewSize,
+                cacheKey,
+                null
+            )
+        }
+
+        return cachedTileSpec!!
+    }
 
     public fun recycle() {
         bitmapState?.let { ImageCache.releaseNode(it) }
@@ -63,6 +120,8 @@ public class PageNode(
         isDecoding = false
         decodeJob?.cancel()
         decodeJob = null
+        cachedPixelRect = null
+        cachedTileSpec = null
     }
 
     /**
@@ -76,26 +135,17 @@ public class PageNode(
         xOffset: Float,
         yOffset: Float,
     ) {
-        val pixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset)
         // 页码合法性判断，防止越界
         if (aPage.index < 0 || aPage.index >= pageViewState.list.size) {
             recycle()
             return
         }
+        val pixelRect = getCachedPixelRect(pageWidth, pageHeight, xOffset, yOffset)
 
         val width = aPage.getWidth(pageViewState.isCropEnabled())
         val height = aPage.getHeight(pageViewState.isCropEnabled())
         val scale = pageWidth / width
-        val tileSpec = TileSpec(
-            aPage.index,
-            scale,
-            bounds,
-            pageWidth.toInt(),
-            pageHeight.toInt(),
-            pageViewState.viewSize,
-            cacheKey,
-            null
-        )
+        val tileSpec = getCachedTileSpec(pageWidth, pageHeight, scale)
 
         // 1. 首先检查是否在预加载区域内
         val isInPreloadArea = pageViewState.isTileVisible(tileSpec, strictMode = false)
