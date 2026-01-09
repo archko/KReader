@@ -353,8 +353,7 @@ public class Page(
         currentWidth: Float,
         currentHeight: Float,
         currentBounds: Rect,
-        offset: Offset,
-        drawScopeSize: Size
+        visibleRect: Rect
     ) {
         val config = currentTileConfig ?: run {
             invalidateNodes()
@@ -371,14 +370,6 @@ public class Page(
             )
             return
         }
-
-        // 获取可视区域
-        val visibleRect = Rect(
-            left = -offset.x,
-            top = -offset.y,
-            right = drawScopeSize.width - offset.x,
-            bottom = drawScopeSize.height - offset.y
-        )
 
         // 计算visible区域相对页面 [0,1]
         val pageVisibleLeft = (visibleRect.left - currentBounds.left) / currentWidth
@@ -423,8 +414,16 @@ public class Page(
             bounds.bottom * scaleRatio
         )
 
+        // 获取画布的可视区域
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = drawScope.size.width - offset.x,
+            bottom = drawScope.size.height - offset.y
+        )
+
         // 检查页面是否真正可见（用于绘制判断）
-        val isActuallyVisible = isPageVisible(drawScope, offset, currentBounds)
+        val isActuallyVisible = isPageVisible(visibleRect, currentBounds)
 
         // 如果页面不在可见区域且不在预加载列表中，直接返回
         if (!isActuallyVisible && !isPageInRenderList(aPage.index)) {
@@ -487,8 +486,7 @@ public class Page(
             }
         }
 
-        // 调用drawNodes方法绘制node
-        drawNodes(drawScope, currentWidth, currentHeight, currentBounds, offset, drawScope.size)
+        drawNodes(drawScope, currentWidth, currentHeight, currentBounds, visibleRect)
 
         // 绘制分割线
         if (isActuallyVisible) {
@@ -675,7 +673,8 @@ public class Page(
         //println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
         recycleThumb()
         clearTextSelection()
-        nodes.forEach { it.recycle() }
+        nodes.forEach { pageViewState.nodePool.release(it) }
+        nodes = emptyList()
     }
 
     // 计算分块配置
@@ -795,15 +794,7 @@ public class Page(
             return TileConfig(xBlocks, yBlocks)
         }
 
-        private fun isPageVisible(drawScope: DrawScope, offset: Offset, bounds: Rect): Boolean {
-            // 获取画布的可视区域
-            val visibleRect = Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = drawScope.size.width - offset.x,
-                bottom = drawScope.size.height - offset.y
-            )
-
+        private fun isPageVisible(visibleRect: Rect, bounds: Rect): Boolean {
             // 检查页面是否与可视区域相交
             return bounds.overlaps(visibleRect)
         }
