@@ -526,13 +526,15 @@ fun CustomView(
                                 // 点击非翻页区域时隐藏底部工具栏
                                 if (showBottomToolbar) {
                                     showBottomToolbar = false
-                                }
-                                scope.launch {
-                                    toaster.show(
-                                        message = getString(Res.string.current_page)
-                                            .format(clickedPageIndex + 1, pageCount),
-                                        type = ToastType.Error,
-                                    )
+                                } else {
+                                    // 如果底部工具栏已经隐藏，则显示toast
+                                    scope.launch {
+                                        toaster.show(
+                                            message = getString(Res.string.current_page)
+                                                .format(clickedPageIndex + 1, pageCount),
+                                            type = ToastType.Error,
+                                        )
+                                    }
                                 }
                             },
                             initialScrollX = initialScrollX,

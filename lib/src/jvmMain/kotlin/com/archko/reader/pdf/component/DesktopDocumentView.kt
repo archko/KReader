@@ -44,7 +44,6 @@ public fun DesktopDocumentView(
     list: MutableList<APage>,
     state: ImageDecoder,
     jumpToPage: Int? = null,
-    align: PageViewState.Align = PageViewState.Align.Top,
     initialOrientation: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -360,23 +359,17 @@ public fun DesktopDocumentView(
             if (firstPageIndex < pageViewState.pages.size - 1) {
                 val page = pageViewState.pages.get(firstPageIndex)
                 if (orientation == Vertical) {
-                    val targetOffsetY = when (align) {
-                        PageViewState.Align.Top -> page.bounds.top
-                        PageViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
-                        PageViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
-                    }
-                    val maxOffsetY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                    val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
+                    val clampedTargetY = page.bounds.top.coerceIn(
+                        0f,
+                        (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    )
                     val clampedY = -clampedTargetY
                     offset = Offset(offset.x, clampedY)
                 } else {
-                    val targetOffsetX = when (align) {
-                        PageViewState.Align.Top -> page.bounds.left
-                        PageViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
-                        PageViewState.Align.Bottom -> page.bounds.right - viewSize.width
-                    }
-                    val maxOffsetX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                    val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
+                    val clampedTargetX = page.bounds.left.coerceIn(
+                        0f,
+                        (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    )
                     val clampedX = -clampedTargetX
                     offset = Offset(clampedX, offset.y)
                 }
@@ -398,23 +391,17 @@ public fun DesktopDocumentView(
             //println("DocumentView: 执行跳转到第${jumpToPage}页, offset:$offset, page:$page")
             if (page != null) {
                 if (orientation == Vertical) {
-                    val targetOffsetY = when (align) {
-                        PageViewState.Align.Top -> page.bounds.top
-                        PageViewState.Align.Center -> page.bounds.top - (viewSize.height - page.height) / 2
-                        PageViewState.Align.Bottom -> page.bounds.bottom - viewSize.height
-                    }
-                    val maxOffsetY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                    val clampedTargetY = targetOffsetY.coerceIn(0f, maxOffsetY)
+                    val clampedTargetY = page.bounds.top.coerceIn(
+                        0f,
+                        (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+                    )
                     val clampedY = -clampedTargetY
                     offset = Offset(offset.x, clampedY)
                 } else {
-                    val targetOffsetX = when (align) {
-                        PageViewState.Align.Top -> page.bounds.left
-                        PageViewState.Align.Center -> page.bounds.left - (viewSize.width - page.width) / 2
-                        PageViewState.Align.Bottom -> page.bounds.right - viewSize.width
-                    }
-                    val maxOffsetX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                    val clampedTargetX = targetOffsetX.coerceIn(0f, maxOffsetX)
+                    val clampedTargetX = page.bounds.left.coerceIn(
+                        0f,
+                        (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
+                    )
                     val clampedX = -clampedTargetX
                     offset = Offset(clampedX, offset.y)
                 }
@@ -529,6 +516,14 @@ public fun DesktopDocumentView(
             },
         contentAlignment = Alignment.TopStart
     ) {
+        var renderTrigger by remember { mutableIntStateOf(0) }
+
+        LaunchedEffect(pageViewState.renderFlow, Unit) {
+            pageViewState.renderFlow.collect {
+                //println("收到渲染更新通知")
+                renderTrigger++
+            }
+        }
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -709,19 +704,7 @@ public fun DesktopDocumentView(
                     0f
                 }
             translate(left = offset.x, top = offset.y + translateY) {
-                //只绘制可见区域.
-                /*val visibleRect = Rect(
-                    left = -offset.x,
-                    top = -offset.y,
-                    right = size.width - offset.x,
-                    bottom = size.height - offset.y
-                )
-                drawRect(
-                    brush = gradientBrush,
-                    topLeft = visibleRect.topLeft,
-                    size = visibleRect.size
-                )*/
-                pageViewState.drawVisiblePages(this, offset, vZoom, viewSize)
+                pageViewState.drawVisiblePages(this, offset, vZoom)
 
                 // 绘制选择区域的调试可视化
                 if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {

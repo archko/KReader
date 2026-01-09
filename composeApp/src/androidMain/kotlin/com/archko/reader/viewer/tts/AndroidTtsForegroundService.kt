@@ -296,7 +296,6 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         progressListener?.onFinish()
         stopForegroundIfNeeded()
         wakeLock?.takeIf { it.isHeld }?.release()
-        _isSpeakingFlow.value = false
         cancelSleepTimer()
     }
 
@@ -312,6 +311,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     fun reset() {
+        _isSpeakingFlow.value = false
         beanList.clear()
         currentIndex = 0
         currentBean = null
