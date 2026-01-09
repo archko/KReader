@@ -56,14 +56,24 @@ public class PageNode(
         pageWidth: Float,
         pageHeight: Float,
         xOffset: Float,
-        yOffset: Float
+        yOffset: Float,
+        reuseRect: Rect? = null
     ): Rect {
         val left = floor(bounds.left * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
         val top = floor(bounds.top * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
         val right = ceil(bounds.right * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
         val bottom = ceil(bounds.bottom * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
 
-        return Rect(left, top, right, bottom)
+        return if (reuseRect != null) {
+            reuseRect.apply {
+                this.left = left
+                this.top = top
+                this.right = right
+                this.bottom = bottom
+            }
+        } else {
+            Rect(left, top, right, bottom)
+        }
     }
 
     // 获取缓存的像素矩形，如果参数变化则重新计算
@@ -79,8 +89,8 @@ public class PageNode(
             cachedXOffset != xOffset ||
             cachedYOffset != yOffset) {
 
-            // 参数变化，重新计算
-            cachedPixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset)
+            // 参数变化，重新计算，重用现有的Rect对象
+            cachedPixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset, cachedPixelRect)
             cachedPageWidth = pageWidth
             cachedPageHeight = pageHeight
             cachedXOffset = xOffset
@@ -120,7 +130,20 @@ public class PageNode(
         isDecoding = false
         decodeJob?.cancel()
         decodeJob = null
-        cachedPixelRect = null
+
+        // 重置缓存对象而不是设置为null，避免频繁创建销毁
+        cachedPixelRect?.apply {
+            left = 0f
+            top = 0f
+            right = 0f
+            bottom = 0f
+        }
+        // 重置参数缓存
+        cachedPageWidth = 0f
+        cachedPageHeight = 0f
+        cachedXOffset = 0f
+        cachedYOffset = 0f
+
         cachedTileSpec = null
     }
 

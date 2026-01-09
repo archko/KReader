@@ -61,6 +61,27 @@ public class Page(
     private var isSelecting = false
     private var selectionStartPoint: Offset? = null
 
+    // 缓存可视区域计算结果,避免draw时每次创建
+    private var cachedVisibleRect: Rect? = null
+
+    private fun getCachedVisibleRect(offset: Offset, drawScopeSize: Size): Rect {
+        val offsetX = offset.x
+        val offsetY = offset.y
+        val width = drawScopeSize.width
+        val height = drawScopeSize.height
+
+        if (cachedVisibleRect == null) {
+            cachedVisibleRect = Rect(0f, 0f, 0f, 0f)
+        }
+
+        cachedVisibleRect!!.left = -offsetX
+        cachedVisibleRect!!.top = -offsetY
+        cachedVisibleRect!!.right = width - offsetX
+        cachedVisibleRect!!.bottom = height - offsetY
+
+        return cachedVisibleRect!!
+    }
+
     public fun recycleThumb() {
         thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
@@ -414,13 +435,8 @@ public class Page(
             bounds.bottom * scaleRatio
         )
 
-        // 获取画布的可视区域
-        val visibleRect = Rect(
-            left = -offset.x,
-            top = -offset.y,
-            right = drawScope.size.width - offset.x,
-            bottom = drawScope.size.height - offset.y
-        )
+        // 获取画布的可视区域（使用缓存）
+        val visibleRect = getCachedVisibleRect(offset, drawScope.size)
 
         // 检查页面是否真正可见（用于绘制判断）
         val isActuallyVisible = isPageVisible(visibleRect, currentBounds)
