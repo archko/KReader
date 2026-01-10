@@ -86,6 +86,7 @@ public class Page(
         currentSelection = null
         isSelecting = false
         selectionStartPoint = null
+        structuredText = null
     }
 
     /**
@@ -395,6 +396,8 @@ public class Page(
                         currentBounds.left,
                         currentBounds.top,
                     )
+                } else {
+                    println("Page[${aPage.index}], nodeIndex:${nodeIndex}, nodes.size:${nodes.size}")
                 }
             }
         }
@@ -671,6 +674,9 @@ public class Page(
         clearTextSelection()
         nodes.forEach { pageViewState.nodePool.release(it) }
         nodes = emptyList()
+        currentTileConfig = null
+        aspectRatio = 0f
+        needInvalidateNodes = true
     }
 
     // 计算分块配置

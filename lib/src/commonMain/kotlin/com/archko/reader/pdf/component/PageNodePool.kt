@@ -13,7 +13,8 @@ public class PageNodePool {
     public fun acquire(pageViewState: PageViewState, bounds: Rect, aPage: APage): PageNode {
         val node = pool.removeLastOrNull()
         if (node != null) {
-            node.update(bounds, aPage) // 更新数据而不是新建
+            node.update(bounds, aPage)
+            node.recycle()
             return node
         }
         return PageNode(pageViewState, bounds, aPage)

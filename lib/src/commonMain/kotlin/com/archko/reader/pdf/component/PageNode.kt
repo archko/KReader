@@ -49,7 +49,6 @@ public class PageNode(
     public fun update(newBounds: Rect, newAPage: APage) {
         this.bounds = newBounds
         this.aPage = newAPage
-        recycle()
     }
 
     // 逻辑rect转实际像素，直接用Page的width/height
@@ -157,6 +156,7 @@ public class PageNode(
 
         // 1. 首先检查是否在预加载区域内
         val isInPreloadArea = pageViewState.isTileVisible(tileSpec, strictMode = false)
+        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, isInPreloadArea:$isInPreloadArea, isDecoding=$isDecoding, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=$bitmapState")
         if (!isInPreloadArea) {
             recycle()  // 完全超出预加载区域，回收
             return
