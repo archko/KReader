@@ -49,6 +49,7 @@ public class PageNode(
     public fun update(newBounds: Rect, newAPage: APage) {
         this.bounds = newBounds
         this.aPage = newAPage
+        recycle()
     }
 
     // 逻辑rect转实际像素，直接用Page的width/height

@@ -252,6 +252,7 @@ public fun DesktopDocumentView(
                                 offset = newOffset
                                 vZoom = newVZoom
                                 pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                                pageViewState.updateOffset(newOffset)
                             }
                         }
                         true
@@ -278,6 +279,7 @@ public fun DesktopDocumentView(
                                 offset = newOffset
                                 vZoom = newVZoom
                                 pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                                pageViewState.updateOffset(newOffset)
                             }
                         }
                         true
@@ -303,6 +305,7 @@ public fun DesktopDocumentView(
                                 offset = newOffset
                                 vZoom = newVZoom
                                 pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                                pageViewState.updateOffset(newOffset)
                             }
                         }
                         true
@@ -429,8 +432,23 @@ public fun DesktopDocumentView(
     LaunchedEffect(initialZoom) {
         if (vZoom != initialZoom.toFloat()) {
             println("DocumentView: initialZoom变化:$initialZoom")
-            vZoom = initialZoom.toFloat()
-            pageViewState.updateViewSize(viewSize, vZoom, orientation)
+            val centerX = viewSize.width / 2f
+            val centerY = viewSize.height / 2f
+            handleZoom(
+                initialZoom.toFloat(),
+                centerX,
+                centerY,
+                vZoom,
+                offset,
+                pageViewState,
+                viewSize,
+                orientation
+            ) { newOffset, newVZoom ->
+                offset = newOffset
+                vZoom = newVZoom
+                pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                pageViewState.updateOffset(newOffset)
+            }
         }
     }
 
@@ -859,9 +877,6 @@ private fun handleZoom(
     val newOffsetX = centerX - contentX * zoomRatio
     val newOffsetY = centerY - contentY * zoomRatio
 
-    // 更新PageViewState的缩放
-    pageViewState.updateViewSize(viewSize, newZoom, orientation)
-
     // 计算边界限制
     val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
     val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
@@ -871,7 +886,6 @@ private fun handleZoom(
     val clampedOffsetY = newOffsetY.coerceIn(-maxY, 0f)
 
     val newOffset = Offset(clampedOffsetX, clampedOffsetY)
-    pageViewState.updateOffset(newOffset)
 
     onZoomChanged(newOffset, newZoom)
 }

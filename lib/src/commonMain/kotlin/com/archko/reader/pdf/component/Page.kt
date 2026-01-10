@@ -61,8 +61,6 @@ public class Page(
     private var isSelecting = false
     private var selectionStartPoint: Offset? = null
 
-
-
     public fun recycleThumb() {
         thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
@@ -389,13 +387,15 @@ public class Page(
         for (x in minBlockX..maxBlockX) {
             for (y in minBlockY..maxBlockY) {
                 val nodeIndex = y * config.xBlocks + x
-                nodes[nodeIndex].draw(
-                    drawScope,
-                    currentWidth,
-                    currentHeight,
-                    currentBounds.left,
-                    currentBounds.top,
-                )
+                if (nodeIndex < nodes.size) {
+                    nodes[nodeIndex].draw(
+                        drawScope,
+                        currentWidth,
+                        currentHeight,
+                        currentBounds.left,
+                        currentBounds.top,
+                    )
+                }
             }
         }
         //val renderedNodes = (maxBlockX - minBlockX + 1) * (maxBlockY - minBlockY + 1)
@@ -516,7 +516,6 @@ public class Page(
                 if (bbox.left >= cropBounds.left && bbox.top >= cropBounds.top &&
                     bbox.right <= cropBounds.right && bbox.bottom <= cropBounds.bottom
                 ) {
-
                     // 转换为切边后的相对坐标，然后缩放到屏幕坐标
                     val relativeLeft = (bbox.left - cropBounds.left) / cropBounds.width
                     val relativeTop = (bbox.top - cropBounds.top) / cropBounds.height
