@@ -28,6 +28,8 @@ public class PageNode(
     public var aPage: APage
 ) {
 
+    private var activeDecodeKey: String? = null
+
     //不能用bounds.toString(),切边切换,key变化
     public val cacheKey: String
         get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pageViewState.vZoom}-${pageViewState.orientation}-${pageViewState.isCropEnabled()}"
@@ -115,6 +117,7 @@ public class PageNode(
     }
 
     public fun recycle() {
+        activeDecodeKey = null
         bitmapState?.let { ImageCache.releaseNode(it) }
         bitmapState = null
         isDecoding = false
@@ -212,8 +215,10 @@ public class PageNode(
                     return@launch
                 }
 
+                val currentKey = cacheKey
+
                 // 先查安全缓存
-                val cachedState = ImageCache.acquireNode(cacheKey)
+                val cachedState = ImageCache.acquireNode(currentKey)
                 if (cachedState != null) {
                     withContext(Dispatchers.Main) {
                         bitmapState?.let { ImageCache.releaseNode(it) }
@@ -222,6 +227,7 @@ public class PageNode(
                     isDecoding = false
                     return@launch
                 }
+                activeDecodeKey = currentKey
 
                 val width = aPage.getWidth(pageViewState.isCropEnabled())
                 val height = aPage.getHeight(pageViewState.isCropEnabled())
@@ -282,13 +288,14 @@ public class PageNode(
                             isThumb: Boolean,
                             error: Throwable?
                         ) {
-                            if (bitmap != null && !pageViewState.isShutdown()) {
+                            if (bitmap != null && !pageViewState.isShutdown() && activeDecodeKey == currentKey) {
                                 val newState = ImageCache.putNode(cacheKey, bitmap)
                                 pageViewState.decodeScope.launch(Dispatchers.Main) {
                                     if (pageViewState.isTileVisible(
                                             tileSpec,
                                             strictMode = false
                                         ) && !pageViewState.isShutdown()
+                                        && activeDecodeKey == currentKey
                                     ) {
                                         bitmapState?.let { ImageCache.releaseNode(it) }
                                         bitmapState = newState
@@ -307,7 +314,7 @@ public class PageNode(
                         }
 
                         override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                            if (pageViewState.isShutdown()) {
+                            if (activeDecodeKey != currentKey || pageViewState.isShutdown()) {
                                 return false
                             }
 
@@ -323,7 +330,9 @@ public class PageNode(
                         }
 
                         override fun onFinish(pageNumber: Int) {
-                            isDecoding = false
+                            if (activeDecodeKey == currentKey) {
+                                isDecoding = false
+                            }
                         }
                     }
                 )

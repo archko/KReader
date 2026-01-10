@@ -11,21 +11,23 @@ public class PageNodePool {
 
     // 获取一个 Node，如果没有则新建
     public fun acquire(pageViewState: PageViewState, bounds: Rect, aPage: APage): PageNode {
-        /*val node = pool.removeLastOrNull()
-        if (node != null) {
+        val node = pool.removeLastOrNull()
+        return if (node != null) {
+            // 先重置状态再重新赋值
+            node.recycle() 
             node.update(bounds, aPage)
-            node.recycle()
-            return node
-        }*/
-        return PageNode(pageViewState, bounds, aPage)
+            node
+        } else {
+            PageNode(pageViewState, bounds, aPage)
+        }
     }
 
     // 回收 Node
     public fun release(node: PageNode) {
         node.recycle() // 释放位图和 Job
-        /*if (pool.size < 1000) { // 限制池子大小，防止极端内存占用
+        if (pool.size < 1000) { // 限制池子大小，防止极端内存占用
             pool.addLast(node)
-        }*/
+        }
     }
 
     public fun clear() {
