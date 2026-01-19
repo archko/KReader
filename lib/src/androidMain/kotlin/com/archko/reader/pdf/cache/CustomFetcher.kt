@@ -92,7 +92,7 @@ public class CustomImageFetcher(
                     dataSource = DataSource.DISK
                 )
             }
-            if (FileTypeUtils.isDjvuFile(data.path)) {
+            /*if (FileTypeUtils.isDjvuFile(data.path)) {
                 val djvuLoader = DjvuLoader()
                 djvuLoader.openDjvu(data.path)
                 val image =
@@ -109,7 +109,7 @@ public class CustomImageFetcher(
                 if (bitmap != null) {
                     cacheBitmap(bitmap, data.path)
                 }
-            }
+            }*/
         }
 
         if (bitmap == null) {

@@ -101,7 +101,7 @@ public class CustomImageFetcher(
                     )
                 }
 
-                if (FileTypeUtils.isDjvuFile(data.path)) {
+                /*if (FileTypeUtils.isDjvuFile(data.path)) {
                     val djvuLoader = DjvuLoader()
                     djvuLoader.openDjvu(data.path)
                     val image =
@@ -124,7 +124,7 @@ public class CustomImageFetcher(
                         bitmap = image
                         cacheBitmap(bitmap, data.path)
                     }
-                }
+                }*/
             }
             if (bitmap == null) {
                 // 创建白色背景的 bitmap
