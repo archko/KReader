@@ -80,6 +80,9 @@ public fun getAbsolutePath(path: String?): String {
     return if (path.startsWith(storagePath)) {
         path
     } else {
-        "$storagePath/$path"
+        // 确保storagePath不以/结尾，path不以/开头
+        val cleanStoragePath = storagePath.removeSuffix("/")
+        val cleanPath = path.removePrefix("/")
+        "$cleanStoragePath/$cleanPath"
     }
 }
