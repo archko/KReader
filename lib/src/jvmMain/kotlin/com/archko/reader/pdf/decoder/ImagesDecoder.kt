@@ -113,42 +113,13 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         val targetWidth = 160
         val targetHeight = 200
 
-        // 检查是否为极端长宽比的图片（某边大于8000）
-        return if (pWidth > 8000 || pHeight > 8000) {
-            // 对于极端长宽比，先缩放到目标尺寸之一，再截取
-            val scale = if (pWidth > pHeight) {
-                targetWidth.toFloat() / pWidth
-            } else {
-                targetHeight.toFloat() / pHeight
-            }
+        val params = PdfDecoder.calculateCoverRenderParams(pWidth, pHeight, targetWidth, targetHeight)
 
-            val cropWidth = maxOf(targetWidth, (pWidth * scale).toInt())
-            val cropHeight = maxOf(targetHeight, (pHeight * scale).toInt())
-            println("large.width-height:$cropWidth-$cropHeight")
-            renderImageAtScale(index, scale, cropWidth, cropHeight)
-        } else if (pWidth > pHeight) {
-            // 对于宽大于高的页面，按最大比例缩放后截取
-            val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
+        // 使用calculateCoverRenderParams已经计算好的尺寸
+        val cropWidth = params.renderWidth.toInt()
+        val cropHeight = params.renderHeight.toInt()
 
-            val cropWidth = maxOf(targetWidth, (pWidth * scale).toInt())
-            val cropHeight = maxOf(targetHeight, (pHeight * scale).toInt())
-
-            println("wide.width-height:$cropWidth-$cropHeight")
-            renderImageAtScale(index, scale, cropWidth, cropHeight)
-        } else {
-            // 原始逻辑处理其他情况
-            val xscale = targetWidth.toFloat() / pWidth
-            val yscale = targetHeight.toFloat() / pHeight
-
-            // 使用最大比例以确保填充整个目标区域
-            val scale = maxOf(xscale, yscale)
-
-            val cropWidth = maxOf(targetWidth, (pWidth * scale).toInt())
-            val cropHeight = maxOf(targetHeight, (pHeight * scale).toInt())
-
-            println("width-height:$cropWidth-$cropHeight")
-            renderImageAtScale(index, scale, cropWidth, cropHeight)
-        }
+        return renderImageAtScale(index, params.scale, cropWidth, cropHeight)
     }
 
     /**
@@ -588,4 +559,4 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     override fun decodeReflowAllPages(): List<ReflowBean> {
         return emptyList()
     }
-} 
+}

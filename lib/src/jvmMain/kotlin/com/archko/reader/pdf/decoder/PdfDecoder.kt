@@ -64,6 +64,78 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
     public companion object {
         /**
+         * 计算封面页面的渲染参数
+         */
+        public data class CoverRenderParams(
+            val scale: Float,
+            val renderWidth: Float,
+            val renderHeight: Float,
+            val cropX: Float,
+            val cropY: Float
+        )
+
+        /**
+         * 计算封面页面的缩放和裁剪参数
+         */
+        public fun calculateCoverRenderParams(
+            pWidth: Float,
+            pHeight: Float,
+            targetWidth: Int = 160,
+            targetHeight: Int = 200
+        ): CoverRenderParams {
+            // 定义极宽/极高的阈值
+            val extremeThreshold = 8000f
+            var scale = 1f
+            var renderWidth = targetWidth.toFloat()
+            var renderHeight = targetHeight.toFloat()
+            var cropX = 0f
+            var cropY = 0f
+
+            // 检查是否为极端长宽比的图片（某边大于8000）
+            if (pWidth > extremeThreshold || pHeight > extremeThreshold) {
+                // 极宽/极高图片：单边适配+从顶部/左侧裁剪
+                if (pWidth > pHeight) {
+                    // 极宽图：高缩到200，宽按比例缩放后从左侧裁160
+                    scale = targetHeight / pHeight
+                    val scaledWidth = pWidth * scale
+                    // 裁剪宽度限制为目标宽度，从左侧开始
+                    renderWidth = minOf(scaledWidth, targetWidth.toFloat())
+                    renderHeight = targetHeight.toFloat()
+                    cropX = 0f
+                    cropY = 0f
+                } else {
+                    // 极高图：宽缩到160，高按比例缩放后从顶部裁200
+                    scale = targetWidth / pWidth
+                    val scaledHeight = pHeight * scale
+                    // 裁剪高度限制为目标高度，从顶部开始
+                    renderWidth = targetWidth.toFloat()
+                    renderHeight = minOf(scaledHeight, targetHeight.toFloat())
+                    cropX = 0f
+                    cropY = 0f
+                }
+                println("extreme pWidth:$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
+            } else if (pWidth > pHeight) {
+                // 宽大于高：按宽度缩放到160，高度自适应
+                scale = targetWidth / pWidth
+                renderWidth = targetWidth.toFloat()
+                renderHeight = (pHeight * scale)
+                cropX = 0f
+                cropY = 0f
+                println("wide. pWidth:$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
+            } else {
+                // 高大于/等于宽：统一按宽度缩放到160，高度自适应
+                scale = targetWidth / pWidth
+                renderWidth = targetWidth.toFloat()
+                renderHeight = (pHeight * scale)
+                cropX = 0f
+                cropY = 0f
+                println("normal. pWidth:$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
+            }
+
+            return CoverRenderParams(scale, renderWidth, renderHeight, cropX, cropY)
+        }
+
+        /**
          * 渲染封面页面，根据高宽比进行特殊处理
          */
         public fun renderCoverPage(
@@ -75,124 +147,38 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val pWidth = page.bounds.x1 - page.bounds.x0
             val pHeight = page.bounds.y1 - page.bounds.y0
 
-            // 检查是否为极端长宽比的图片（某边大于8000）
-            return if (pWidth > 8000 || pHeight > 8000) {
-                // 对于极端长宽比，先缩放到目标尺寸之一，再截取
-                val scale = if (pWidth > pHeight) {
-                    targetWidth.toFloat() / pWidth
-                } else {
-                    targetHeight.toFloat() / pHeight
-                }
+            val params = calculateCoverRenderParams(pWidth, pHeight, targetWidth, targetHeight)
+            println("decode.thumb:$path")
 
-                val scaledWidth = (pWidth * scale).toInt()
-                val scaledHeight = (pHeight * scale).toInt()
-
-                val cropWidth = maxOf(targetWidth, scaledWidth)
-                val cropHeight = maxOf(targetHeight, scaledHeight)
-                println("decode.thumb:$path, large.width-height:$cropWidth-$cropHeight")
-                val bbox = com.artifex.mupdf.fitz.Rect(
-                    0f,
-                    0f,
-                    cropWidth.toFloat(),
-                    cropHeight.toFloat()
-                )
+            try {
+                val pixmapBbox = com.artifex.mupdf.fitz.Rect(0f, 0f, params.renderWidth, params.renderHeight)
                 val pixmap = com.artifex.mupdf.fitz.Pixmap(
                     com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                    bbox,
+                    pixmapBbox,
                     true
                 )
                 pixmap.clear(255)
                 com.artifex.mupdf.fitz.Context.disableICC()
-                val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
-                val cropCtm = Matrix()
-                cropCtm.scale(scale, scale)
-                page.run(cropDev, cropCtm, null)
-                cropDev.close()
-                cropDev.destroy()
-                val pixmapWidth = pixmap.width
-                val pixmapHeight = pixmap.height
-                val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
-                image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
+
+                val drawDevice = com.artifex.mupdf.fitz.DrawDevice(pixmap)
+
+                val ctm = Matrix()
+                ctm.scale(params.scale, params.scale)
+                ctm.translate(-params.cropX, -params.cropY)
+
+                page.run(drawDevice, ctm, null)
+
+                val bufferedImage = BufferedImage(params.renderWidth.toInt(), params.renderHeight.toInt(), BufferedImage.TYPE_3BYTE_BGR)
+                bufferedImage.setRGB(0, 0, params.renderWidth.toInt(), params.renderHeight.toInt(), pixmap.pixels, 0, params.renderWidth.toInt())
+
+                drawDevice.close()
+                drawDevice.destroy()
                 pixmap.destroy()
-                image.toComposeImageBitmap()
-            } else if (pWidth > pHeight) {
-                // 对于宽大于高的页面，按最大比例缩放后截取
-                val scale = maxOf(targetWidth.toFloat() / pWidth, targetHeight.toFloat() / pHeight)
 
-                val scaledWidth = (pWidth * scale).toInt()
-                val scaledHeight = (pHeight * scale).toInt()
-
-                // 确保裁剪区域不超过目标尺寸
-                val cropWidth = maxOf(targetWidth, scaledWidth)
-                val cropHeight = maxOf(targetHeight, scaledHeight)
-
-                println("decode.thumb:$path, wide.width-height:$cropWidth-$cropHeight")
-                val bbox = com.artifex.mupdf.fitz.Rect(
-                    0f,
-                    0f,
-                    cropWidth.toFloat(),
-                    cropHeight.toFloat()
-                )
-                val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                    com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                    bbox,
-                    true
-                )
-                pixmap.clear(255)
-                com.artifex.mupdf.fitz.Context.disableICC()
-                val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
-                val cropCtm = Matrix()
-                cropCtm.scale(scale, scale)
-                page.run(cropDev, cropCtm, null)
-                cropDev.close()
-                cropDev.destroy()
-                val pixmapWidth = pixmap.width
-                val pixmapHeight = pixmap.height
-                val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
-                image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-                pixmap.destroy()
-                image.toComposeImageBitmap()
-            } else {
-                // 原始逻辑处理其他情况
-                val xscale = targetWidth.toFloat() / pWidth
-                val yscale = targetHeight.toFloat() / pHeight
-
-                // 使用最大比例以确保填充整个目标区域
-                val scale = maxOf(xscale, yscale)
-
-                val scaledWidth = (pWidth * scale).toInt()
-                val scaledHeight = (pHeight * scale).toInt()
-
-                // 确保裁剪区域不超过目标尺寸
-                val cropWidth = maxOf(targetWidth, scaledWidth)
-                val cropHeight = maxOf(targetHeight, scaledHeight)
-
-                println("decode.thumb:$path, width-height:$cropWidth-$cropHeight")
-                val bbox = com.artifex.mupdf.fitz.Rect(
-                    0f,
-                    0f,
-                    cropWidth.toFloat(),
-                    cropHeight.toFloat()
-                )
-                val pixmap = com.artifex.mupdf.fitz.Pixmap(
-                    com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
-                    bbox,
-                    true
-                )
-                pixmap.clear(255)
-                com.artifex.mupdf.fitz.Context.disableICC()
-                val cropDev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
-                val cropCtm = Matrix()
-                cropCtm.scale(scale, scale)
-                page.run(cropDev, cropCtm, null)
-                cropDev.close()
-                cropDev.destroy()
-                val pixmapWidth = pixmap.width
-                val pixmapHeight = pixmap.height
-                val image = BufferedImage(pixmapWidth, pixmapHeight, BufferedImage.TYPE_3BYTE_BGR)
-                image.setRGB(0, 0, pixmapWidth, pixmapHeight, pixmap.pixels, 0, pixmapWidth)
-                pixmap.destroy()
-                image.toComposeImageBitmap()
+                return bufferedImage.toComposeImageBitmap()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return null
             }
         }
     }
