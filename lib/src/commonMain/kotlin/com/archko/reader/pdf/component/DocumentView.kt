@@ -549,7 +549,7 @@ public fun DocumentView(
                                     if (isZooming) {
                                         val centroid = event.calculateCentroid(useCurrent = false)
                                         if (centroid.isSpecified && zoomChange != 1f) {
-                                            val newZoom = (vZoom * zoomChange).coerceIn(1f, 12f)
+                                            val newZoom = (vZoom * zoomChange).coerceIn(1f, 16f)
                                             val zoomFactor = newZoom / vZoom
 
                                             // 计算缩放中心点：手势中心相对于内容的位置
