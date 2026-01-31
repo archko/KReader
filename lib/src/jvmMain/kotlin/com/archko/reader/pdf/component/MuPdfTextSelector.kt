@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 
 /**
  * JVM平台的actual实现
@@ -25,15 +26,22 @@ public class MuPdfTextSelector(
         return getStructuredTextCallback(pageIndex)
     }
 
-    override fun quadToScreenQuad(
-        quad: MuPdfQuad,
-        pdfToScreenTransform: (Float, Float) -> Offset
-    ): ScreenQuad {
+    override fun quadToScreenQuad(quad: MuPdfQuad, pdfToScreenTransform: (Float, Float) -> Offset): ScreenQuad {
         val ul = pdfToScreenTransform(quad.ul_x, quad.ul_y)
         val ur = pdfToScreenTransform(quad.ur_x, quad.ur_y)
         val ll = pdfToScreenTransform(quad.ll_x, quad.ll_y)
         val lr = pdfToScreenTransform(quad.lr_x, quad.lr_y)
-        return ScreenQuad(ul, ur, ll, lr)
+
+        return ScreenQuad(
+            ul = ul,
+            ur = ur,
+            ll = ll,
+            lr = lr
+        )
+    }
+
+    override fun extractTextFromImage(bitmap: ImageBitmap): String {
+        return ""
     }
 }
 
@@ -47,8 +55,6 @@ public class MuPdfStructuredTextImpl(
 
     override fun highlight(startPoint: PagePoint, endPoint: PagePoint): Array<MuPdfQuad> {
         return try {
-            val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
-
             // 完全绕过MuPDF的智能选择，直接基于坐标创建选择区域
             val left = minOf(startPoint.x, endPoint.x)
             val top = minOf(startPoint.y, endPoint.y)

@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 
 /**
  * MuPDF Point类的抽象表示
@@ -61,6 +62,11 @@ public interface TextSelector {
         quad: MuPdfQuad,
         pdfToScreenTransform: (Float, Float) -> Offset
     ): ScreenQuad
+    
+    /**
+     * 从图像中提取文本
+     */
+    public fun extractTextFromImage(bitmap: ImageBitmap): String
 }
 
 /**

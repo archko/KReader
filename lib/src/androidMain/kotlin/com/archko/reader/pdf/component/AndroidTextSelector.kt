@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
 
 /**
  * Android平台的actual实现
@@ -20,6 +21,8 @@ public class AndroidTextSelector(
     private val getStructuredTextCallback: (Int) -> StructuredText?
 ) : TextSelector {
 
+    private val ocrEngine = OcrEngine()
+
     override fun getStructuredText(pageIndex: Int): StructuredText? {
         return getStructuredTextCallback(pageIndex)
     }
@@ -33,6 +36,10 @@ public class AndroidTextSelector(
         val ll = pdfToScreenTransform(quad.ll_x, quad.ll_y)
         val lr = pdfToScreenTransform(quad.lr_x, quad.lr_y)
         return ScreenQuad(ul, ur, ll, lr)
+    }
+
+    override fun extractTextFromImage(bitmap: ImageBitmap): String {
+        return ocrEngine.recognizeText(bitmap)
     }
 }
 

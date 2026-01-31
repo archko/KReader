@@ -61,6 +61,13 @@ public class Page(
     private var isSelecting = false
     private var selectionStartPoint: Offset? = null
 
+    /**
+     * 获取页面缩略图的缓存键
+     */
+    public fun getThumbnailCacheKey(): String? {
+        return cachedCacheKey
+    }
+
     public fun recycleThumb() {
         thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
@@ -379,10 +386,14 @@ public class Page(
         val pageVisibleBottom = (visibleRect.bottom - currentBounds.top) / currentHeight
 
         // 计算覆盖的block x/y indices范围
-        val minBlockX = floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
-        val maxBlockX = ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
-        val minBlockY = floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
-        val maxBlockY = ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+        val minBlockX =
+            floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val maxBlockX =
+            ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val minBlockY =
+            floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+        val maxBlockY =
+            ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
 
         // 只遍历可见range内的block
         for (x in minBlockX..maxBlockX) {
@@ -420,7 +431,12 @@ public class Page(
         )
 
         // 获取画布的可视区域
-        val visibleRect = Rect(-offset.x, -offset.y, drawScope.size.width - offset.x, drawScope.size.height - offset.y)
+        val visibleRect = Rect(
+            -offset.x,
+            -offset.y,
+            drawScope.size.width - offset.x,
+            drawScope.size.height - offset.y
+        )
 
         // 检查页面是否真正可见（用于绘制判断）
         val isActuallyVisible = isPageVisible(visibleRect, currentBounds)
@@ -701,7 +717,8 @@ public class Page(
 
         // 如果是单个块，直接返回原始页面
         if (config.isSingleBlock) {
-            nodes = listOf(pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
+            nodes =
+                listOf(pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
             // 回收旧nodes
             oldNodes.forEach { pageViewState.nodePool.release(it) }
             return
@@ -786,7 +803,11 @@ public class Page(
             return blocks
         }
 
-        private fun calculateTileConfig(width: Float, height: Float, totalScale: Float): TileConfig {
+        private fun calculateTileConfig(
+            width: Float,
+            height: Float,
+            totalScale: Float
+        ): TileConfig {
             val xBlocks = calcAxisBlocks(width)
             val yBlocks = calcAxisBlocks(height)
             return TileConfig(xBlocks, yBlocks)
