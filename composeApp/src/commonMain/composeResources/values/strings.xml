@@ -177,4 +177,16 @@
     <string name="please_select_images_first">Please select images first</string>
     <string name="pdf_created_successfully">PDF created successfully</string>
     <string name="pdf_creation_failed">PDF creation failed</string>
+
+    <string name="features">Features</string>
+    <string name="auto_crop_edge">Crop edge</string>
+    <string name="multi_format_support">Multi formats</string>
+    <string name="ocr_text_recognition">OCR</string>
+    <string name="image_to_pdf">Image to PDF</string>
+    <string name="mobi_azw3_to_epub">mobi/azw3 to epub</string>
+    <string name="pdf_encrypt_decrypt">PDF Encrypt/Decrypt</string>
+    <string name="webdav_backup">Webdav backup</string>
+    <string name="tts_read_aloud">TTS</string>
+    <string name="export_images">Export Images</string>
+    <string name="split_merge_pdf">PDF Split/Merge</string>
 </resources>

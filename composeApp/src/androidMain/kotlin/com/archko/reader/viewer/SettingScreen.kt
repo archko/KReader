@@ -89,12 +89,104 @@ fun SettingScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                Features()
+
                 SettingCategory(viewModel)
 
                 Spacer(modifier = Modifier.height(50.dp))
             }
         }
     }
+}
+
+@Composable
+fun Features() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Text(
+            text = stringResource(Res.string.features),
+            style = TextStyle(
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+        )
+        
+        // 第一行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FeatureItem(text = stringResource(Res.string.auto_crop_edge))
+            FeatureItem(text = stringResource(Res.string.multi_format_support))
+        }
+        
+        // 第二行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FeatureItem(text = stringResource(Res.string.ocr_text_recognition))
+            FeatureItem(text = stringResource(Res.string.image_to_pdf))
+        }
+        
+        // 第三行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FeatureItem(text = stringResource(Res.string.mobi_azw3_to_epub))
+            FeatureItem(text = stringResource(Res.string.pdf_encrypt_decrypt))
+        }
+        
+        // 第四行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FeatureItem(text = stringResource(Res.string.webdav_backup))
+            FeatureItem(text = stringResource(Res.string.tts_read_aloud))
+        }
+        
+        // 第五行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FeatureItem(text = stringResource(Res.string.export_images))
+            FeatureItem(text = stringResource(Res.string.split_merge_pdf))
+        }
+    }
+}
+
+@Composable
+fun FeatureItem(text: String) {
+    Text(
+        text = text,
+        style = TextStyle(
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 14.sp
+        ),
+        modifier = Modifier
+            .weight(1f)
+            .padding(horizontal = 4.dp)
+    )
 }
 
 @Composable

@@ -178,4 +178,16 @@
     <string name="please_select_images_first">请先选择图片</string>
     <string name="pdf_created_successfully">PDF创建成功</string>
     <string name="pdf_creation_failed">PDF创建失败</string>
+
+    <string name="features">特性</string>
+    <string name="auto_crop_edge">自动裁剪边缘</string>
+    <string name="multi_format_support">多格式支持</string>
+    <string name="ocr_text_recognition">OCR文本识别</string>
+    <string name="image_to_pdf">图片转pdf</string>
+    <string name="mobi_azw3_to_epub">mobi/azw3转epub</string>
+    <string name="pdf_encrypt_decrypt">PDF加密解密</string>
+    <string name="webdav_backup">Webdav备份</string>
+    <string name="tts_read_aloud">TTS朗读</string>
+    <string name="export_images">导出图片</string>
+    <string name="split_merge_pdf">PDF拆分/合并</string>
 </resources>
