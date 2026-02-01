@@ -189,4 +189,11 @@
     <string name="tts_read_aloud">TTS</string>
     <string name="export_images">Export Images</string>
     <string name="split_merge_pdf">PDF Split/Merge</string>
+
+    <string name="ai_setting">AI Settings</string>
+    <string name="select_model">Select Model</string>
+    <string name="input_token">Input Token</string>
+    <string name="save">Save</string>
+    <string name="model_name">Model Name</string>
+    <string name="token">Token</string>
 </resources>

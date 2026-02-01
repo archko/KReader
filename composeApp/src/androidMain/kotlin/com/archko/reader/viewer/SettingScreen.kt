@@ -192,6 +192,7 @@ fun FeatureItem(text: String) {
 @Composable
 fun SettingCategory(viewModel: BackupViewModel) {
     val context = LocalContext.current
+    var showAISettingDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPdfCreateDialog by remember { mutableStateOf(false) }
     var showPdfExportDialog by remember { mutableStateOf(false) }
@@ -220,6 +221,13 @@ fun SettingCategory(viewModel: BackupViewModel) {
         SettingItem(
             title = stringResource(Res.string.version),
             subtitle = version
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingItem(
+            title = stringResource(Res.string.ai_setting),
+            onClick = { showAISettingDialog = true }
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -276,6 +284,13 @@ fun SettingCategory(viewModel: BackupViewModel) {
         SettingItem(
             title = stringResource(Res.string.about),
             onClick = { showAboutDialog = true }
+        )
+    }
+
+    // AI设置 Dialog
+    if (showAISettingDialog) {
+        AISettingDialog(
+            onDismiss = { showAISettingDialog = false }
         )
     }
 
