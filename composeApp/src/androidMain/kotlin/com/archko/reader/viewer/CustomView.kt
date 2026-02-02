@@ -28,6 +28,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DocumentView
+import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
@@ -47,7 +48,6 @@ import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.dialog.SleepTimerDialog
-import com.archko.reader.viewer.tts.AndroidTtsForegroundService
 import com.archko.reader.viewer.tts.TtsProgressListener
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
@@ -149,8 +149,8 @@ private fun ToolbarContent(
     isSpeaking: Boolean,
     currentPage: Int,
     decoder: ImageDecoder,
-    onTextSelectionModeChange: () -> Unit,
-    isTextSelectionMode: Boolean,
+    onGestureModeChange: (gestureMode: GestureMode) -> Unit,
+    gestureMode: GestureMode,
     onCropChange: () -> Unit,
     isCrop: Boolean,
     onOutlineDialogShow: () -> Unit,
@@ -229,11 +229,37 @@ private fun ToolbarContent(
                     }
 
                     item {
-                        IconButton(onClick = { onTextSelectionModeChange() }) {
+                        IconButton(onClick = {
+                            var nMode = gestureMode
+                            if (nMode == GestureMode.SELECTION) {
+                                nMode = GestureMode.VIEW
+                            } else {
+                                nMode = GestureMode.SELECTION
+                            }
+                            onGestureModeChange(nMode)
+                        }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_select),
                                 contentDescription = "文本选择",
-                                tint = if (isTextSelectionMode) Color.Green else Color.White
+                                tint = if (gestureMode == GestureMode.SELECTION) Color.Green else Color.White
+                            )
+                        }
+                    }
+
+                    item {
+                        IconButton(onClick = {
+                            var nMode = gestureMode
+                            if (nMode == GestureMode.DRAW) {
+                                nMode = GestureMode.VIEW
+                            } else {
+                                nMode = GestureMode.DRAW
+                            }
+                            onGestureModeChange(nMode)
+                        }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_draw_pen),
+                                contentDescription = "标注画线",
+                                tint = if (gestureMode == GestureMode.DRAW) Color.Green else Color.White
                             )
                         }
                     }
@@ -574,7 +600,7 @@ fun CustomView(
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
-            var isTextSelectionMode by remember { mutableStateOf(false) }
+            var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
 
             var showSleepDialog by remember { mutableStateOf(false) }
             var showQueueDialog by remember { mutableStateOf(false) }
@@ -661,7 +687,9 @@ fun CustomView(
                         // 朗读完成，保存最后页面进度
                         scope.launch {
                             speakingPageIndex = null
-                            val lastPageStr = ttsServiceBinder?.getCurrentReflowBean()?.page?.split("-")?.firstOrNull()
+                            val lastPageStr =
+                                ttsServiceBinder?.getCurrentReflowBean()?.page?.split("-")
+                                    ?.firstOrNull()
                             val lastPage = lastPageStr?.toIntOrNull()
                             lastPage?.let { page ->
                                 onSaveDocument?.invoke(
@@ -774,7 +802,7 @@ fun CustomView(
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
                     crop = isCrop,
-                    isTextSelectionMode = isTextSelectionMode,
+                    gestureMode = gestureMode,
                     speakingPageIndex = speakingPageIndex,
                 )
             }
@@ -793,8 +821,8 @@ fun CustomView(
                     isSpeaking = isSpeaking,
                     currentPage = currentPage,
                     decoder = decoder!!,
-                    onTextSelectionModeChange = { isTextSelectionMode = !isTextSelectionMode },
-                    isTextSelectionMode = isTextSelectionMode,
+                    onGestureModeChange = { mode -> gestureMode = mode },
+                    gestureMode = gestureMode,
                     onCropChange = { isCrop = !isCrop },
                     isCrop = isCrop,
                     onOutlineDialogShow = { showOutlineDialog = true },
@@ -941,7 +969,8 @@ fun CustomView(
                 ttsServiceBinder?.let { binder ->
                     QueueDialog(
                         cacheBean = decoder!!.cacheBean,
-                        currentSpeakingPage = binder.getCurrentSpeakingPage()?.split("-")?.firstOrNull(),
+                        currentSpeakingPage = binder.getCurrentSpeakingPage()?.split("-")
+                            ?.firstOrNull(),
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->
                             showQueueDialog = false

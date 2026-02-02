@@ -519,6 +519,7 @@ public class Page(
                 // 绘制文本选择高亮
                 drawTextSelection(drawScope, currentBounds)
                 drawSpeakingIndicator(drawScope, currentBounds)
+                drawAnnotation(drawScope, currentBounds)
                 drawSeparator(drawScope, currentBounds)
             }
         }
@@ -638,6 +639,34 @@ public class Page(
                 currentBounds.top + relativeY * currentBounds.height
             )
         }
+    }
+
+    private fun drawAnnotation(
+        drawScope: DrawScope,
+        currentBounds: Rect
+    ) {
+        pageViewState.annotations[aPage.index]?.forEach { anno ->
+            drawAnnotationPath(drawScope, anno.points, anno.color, anno.strokeWidth)
+        }
+
+        // 3. 绘制【正在实时画】的线
+        pageViewState.activeDrawingPath?.let { (index, points) ->
+            if (index == aPage.index) {
+                drawAnnotationPath(drawScope, points, Color.Red, 4f)
+            }
+        }
+    }
+
+    private fun drawAnnotationPath(drawScope: DrawScope, relPoints: List<Offset>, color: Color, stroke: Float) {
+        if (relPoints.size < 2) return
+        val path = androidx.compose.ui.graphics.Path()
+        relPoints.forEachIndexed { i, relP ->
+            // 关键坐标转换：基于 Page 的 xOffset/yOffset 和相对比例
+            val px = xOffset + relP.x * width
+            val py = yOffset + relP.y * height
+            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        }
+        drawScope.drawPath(path, color, style = Stroke(width = stroke * totalScale))
     }
 
     /**

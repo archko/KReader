@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -78,7 +79,7 @@ public fun DocumentView(
     initialZoom: Double = 1.0, // 初始缩放比例
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
-    isTextSelectionMode: Boolean = false, // 是否为文本选择模式
+    gestureMode: GestureMode = GestureMode.VIEW,
     speakingPageIndex: Int? = null, // 正在朗读的页面索引
 ) {
     // 初始化状态
@@ -131,6 +132,10 @@ public fun DocumentView(
     var showTextActionToolbar by remember { mutableStateOf(false) }
     var selectionStartPos by remember { mutableStateOf<Offset?>(null) }
     var selectionEndPos by remember { mutableStateOf<Offset?>(null) }
+
+    // 临时存储当前正在画的线（比例坐标）
+    val drawingPoints = remember { mutableStateListOf<Offset>() }
+    var activeDrawingPage by remember { mutableIntStateOf(-1) }
 
     // 设置页面跳转回调
     LaunchedEffect(pageViewState) {
@@ -493,133 +498,164 @@ public fun DocumentView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Transparent)
-                .pointerInput(isTextSelectionMode) {
-                    if (isTextSelectionMode) {
-                        // 文本选择模式
-                        detectDragGestures(
-                            onDragStart = { pos ->
-                                isTextSelecting = true
-                                selectionStartPos = pos
-                                showTextActionToolbar = false
+                .pointerInput(gestureMode) {
+                    when (gestureMode) {
+                        GestureMode.SELECTION -> {
+                            // 文本选择模式
+                            detectDragGestures(
+                                onDragStart = { pos ->
+                                    isTextSelecting = true
+                                    selectionStartPos = pos
+                                    showTextActionToolbar = false
 
-                                // 找到点击的页面并开始选择
-                                val clickedPageIndex = calculateClickedPage(
-                                    pos,
-                                    offset,
-                                    orientation,
-                                    pageViewState
-                                )
-                                pageViewState.pages.getOrNull(clickedPageIndex)?.let {
-                                    it.startTextSelection(pos.x - offset.x, pos.y - offset.y)
-                                    selectedPage = it
-                                }
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                selectionEndPos = change.position
-                                selectedPage?.updateTextSelection(
-                                    change.position.x - offset.x,
-                                    change.position.y - offset.y
-                                )
-                            },
-                            onDragEnd = {
-                                val selection = selectedPage?.endTextSelection()
-                                isTextSelecting = false
-                                println("onDragEnd:$selection")
-                                if (selection != null && selection.text.isNotBlank()) {
-                                    showTextActionToolbar = true
-                                }
-                            }
-                        )
-                    } else {
-                        // 阅读模式：优化后的 拖动、缩放 与 惯性
-                        awaitEachGesture {
-                            val velocityTracker = VelocityTracker()
-                            var isZooming = false
-                            var lastChange: PointerInputChange? = null
-
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            flingJob?.cancel() // 触摸即停
-
-                            do {
-                                val event = awaitPointerEvent()
-                                if (!event.changes.fastAny { it.isConsumed }) {
-                                    lastChange = event.changes.firstOrNull()
-                                    val zoomChange = event.calculateZoom()
-                                    val panChange = event.calculatePan()
-
-                                    if (!isZooming && event.changes.size > 1) {
-                                        isZooming = true
+                                    // 找到点击的页面并开始选择
+                                    val clickedPageIndex = calculateClickedPage(
+                                        pos,
+                                        offset,
+                                        orientation,
+                                        pageViewState
+                                    )
+                                    pageViewState.pages.getOrNull(clickedPageIndex)?.let {
+                                        it.startTextSelection(pos.x - offset.x, pos.y - offset.y)
+                                        selectedPage = it
                                     }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    selectionEndPos = change.position
+                                    selectedPage?.updateTextSelection(
+                                        change.position.x - offset.x,
+                                        change.position.y - offset.y
+                                    )
+                                },
+                                onDragEnd = {
+                                    val selection = selectedPage?.endTextSelection()
+                                    isTextSelecting = false
+                                    if (selection != null && selection.text.isNotBlank()) {
+                                        showTextActionToolbar = true
+                                    }
+                                }
+                            )
+                        }
+                        GestureMode.DRAW -> {
+                            detectDragGestures(
+                                onDragStart = { startOffset ->
+                                    drawingPoints.clear()
+                                    val targetPage = pageViewState.pageToRender.find {
+                                        it.bounds.contains(startOffset - offset)
+                                    }
+                                    activeDrawingPage = targetPage?.aPage?.index ?: -1
+                                },
+                                onDrag = { change, dragAmount ->
+                                    if (activeDrawingPage != -1) {
+                                        val targetPage = pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage }!!
+                                        val localX = change.position.x - offset.x - targetPage.xOffset
+                                        val localY = change.position.y - offset.y - targetPage.yOffset
+                                        drawingPoints.add(Offset(localX / targetPage.width, localY / targetPage.height))
 
-                                    if (isZooming) {
-                                        val centroid = event.calculateCentroid(useCurrent = false)
-                                        if (centroid.isSpecified && zoomChange != 1f) {
-                                            val newZoom = (vZoom * zoomChange).coerceIn(1f, 16f)
-                                            val zoomFactor = newZoom / vZoom
+                                        pageViewState.updateDrawing(activeDrawingPage, drawingPoints.toList())
+                                        change.consume()
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (activeDrawingPage != -1) {
+                                        pageViewState.finalizeDrawing(activeDrawingPage, drawingPoints.toList())
+                                    }
+                                    drawingPoints.clear()
+                                    activeDrawingPage = -1
+                                }
+                            )
+                        }
+                        GestureMode.VIEW -> {
+                            // 阅读模式：优化后的 拖动、缩放 与 惯性
+                            awaitEachGesture {
+                                val velocityTracker = VelocityTracker()
+                                var isZooming = false
+                                var lastChange: PointerInputChange? = null
 
-                                            // 计算缩放中心点：手势中心相对于内容的位置
-                                            // centroid 是手势中心在视图中的位置
-                                            // 需要将其转换为相对于内容的位置
-                                            val contentCenterX = centroid.x - offset.x
-                                            val contentCenterY = centroid.y - offset.y
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                flingJob?.cancel() // 触摸即停
 
-                                            // 计算新的偏移量，保持内容中心点不变
-                                            val newOffsetX =
-                                                centroid.x - contentCenterX * zoomFactor
-                                            val newOffsetY =
-                                                centroid.y - contentCenterY * zoomFactor
+                                do {
+                                    val event = awaitPointerEvent()
+                                    if (!event.changes.fastAny { it.isConsumed }) {
+                                        lastChange = event.changes.firstOrNull()
+                                        val zoomChange = event.calculateZoom()
+                                        val panChange = event.calculatePan()
 
-                                            vZoom = newZoom
-                                            val targetOffset = Offset(newOffsetX, newOffsetY)
-                                            if (targetOffset.isSpecified) {
-                                                offset = calculateBounds(
-                                                    targetOffset,
-                                                    vZoom,
-                                                    viewSize,
-                                                    pageViewState,
-                                                    orientation
-                                                )
-                                            }
+                                        if (!isZooming && event.changes.size > 1) {
+                                            isZooming = true
                                         }
-                                    } else {
-                                        // 拖动
-                                        val newOffset = offset + panChange
-                                        offset = calculateBounds(
-                                            newOffset,
-                                            vZoom,
-                                            viewSize,
-                                            pageViewState,
-                                            orientation
-                                        )
-                                        pageViewState.updateOffset(offset)
 
-                                        // 这里的 velocityTracker 记录的是指针位置，不是 offset 变量，这样更平滑
-                                        velocityTracker.addPosition(
-                                            lastChange?.uptimeMillis ?: 0,
-                                            lastChange?.position ?: Offset(0f, 0f)
-                                        )
+                                        if (isZooming) {
+                                            val centroid = event.calculateCentroid(useCurrent = false)
+                                            if (centroid.isSpecified && zoomChange != 1f) {
+                                                val newZoom = (vZoom * zoomChange).coerceIn(1f, 16f)
+                                                val zoomFactor = newZoom / vZoom
+
+                                                // 计算缩放中心点：手势中心相对于内容的位置
+                                                // centroid 是手势中心在视图中的位置
+                                                // 需要将其转换为相对于内容的位置
+                                                val contentCenterX = centroid.x - offset.x
+                                                val contentCenterY = centroid.y - offset.y
+
+                                                // 计算新的偏移量，保持内容中心点不变
+                                                val newOffsetX =
+                                                    centroid.x - contentCenterX * zoomFactor
+                                                val newOffsetY =
+                                                    centroid.y - contentCenterY * zoomFactor
+
+                                                vZoom = newZoom
+                                                val targetOffset = Offset(newOffsetX, newOffsetY)
+                                                if (targetOffset.isSpecified) {
+                                                    offset = calculateBounds(
+                                                        targetOffset,
+                                                        vZoom,
+                                                        viewSize,
+                                                        pageViewState,
+                                                        orientation
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            // 拖动
+                                            val newOffset = offset + panChange
+                                            offset = calculateBounds(
+                                                newOffset,
+                                                vZoom,
+                                                viewSize,
+                                                pageViewState,
+                                                orientation
+                                            )
+                                            pageViewState.updateOffset(offset)
+
+                                            // 这里的 velocityTracker 记录的是指针位置，不是 offset 变量，这样更平滑
+                                            velocityTracker.addPosition(
+                                                lastChange?.uptimeMillis ?: 0,
+                                                lastChange?.position ?: Offset(0f, 0f)
+                                            )
+                                        }
+                                        event.changes.fastForEach { if (it.positionChanged()) it.consume() }
                                     }
-                                    event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                                } while (event.changes.fastAny { it.pressed })
+
+                                // --- 抬手后的处理 ---
+                                val finalChange = lastChange ?: return@awaitEachGesture
+                                val dragDistance = (finalChange.position - down.position).getDistance()
+
+                                if (dragDistance < 10f && !isZooming) {
+                                    handleTapGestureInternal(finalChange.position)
+                                } else if (!isZooming) {
+                                    val velocity = velocityTracker.calculateVelocity()
+                                    performFling(velocity, viewSize, pageViewState)
                                 }
-                            } while (event.changes.fastAny { it.pressed })
 
-                            // --- 抬手后的处理 ---
-                            val finalChange = lastChange ?: return@awaitEachGesture
-                            val dragDistance = (finalChange.position - down.position).getDistance()
-
-                            if (dragDistance < 10f && !isZooming) {
-                                handleTapGestureInternal(finalChange.position)
-                            } else if (!isZooming) {
-                                val velocity = velocityTracker.calculateVelocity()
-                                performFling(velocity, viewSize, pageViewState)
+                                if (isZooming) {
+                                    pageViewState.updateOffset(offset)
+                                    pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                                }
+                                pageViewState.updateVisiblePages(offset, viewSize, vZoom)
                             }
-
-                            if (isZooming) {
-                                pageViewState.updateOffset(offset)
-                                pageViewState.updateViewSize(viewSize, vZoom, orientation)
-                            }
-                            pageViewState.updateVisiblePages(offset, viewSize, vZoom)
                         }
                     }
                 }

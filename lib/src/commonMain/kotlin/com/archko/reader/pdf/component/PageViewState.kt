@@ -2,10 +2,12 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -75,6 +77,27 @@ public class PageViewState(
 
     // 解码完成回调
     public var onDecodeCompleted: (() -> Unit)? = null
+
+    // Annotation
+    private val _annotations = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
+    public val annotations: Map<Int, List<AnnotationPath>> = _annotations
+    public var activeDrawingPath: Pair<Int, List<Offset>>? by mutableStateOf(null)
+
+    // 供持久化使用
+    public fun getAnnotationsForPage(pageIndex: Int): MutableList<AnnotationPath>? =
+        _annotations[pageIndex]
+
+    public fun updateDrawing(pageIndex: Int, points: List<Offset>) {
+        activeDrawingPath = pageIndex to points
+    }
+
+    public fun finalizeDrawing(pageIndex: Int, points: List<Offset>) {
+        if (points.size > 1) {
+            val list = _annotations.getOrPut(pageIndex) { mutableListOf() }
+            list.add(AnnotationPath(points))
+        }
+        activeDrawingPath = null
+    }
 
     init {
         initDecodeService()
@@ -232,6 +255,7 @@ public class PageViewState(
 
         state.close()
         nodePool.clear()
+        _annotations.clear()
 
         println("PageViewState.shutdown: 清理完成，调用GC")
         // 建议GC
@@ -535,7 +559,7 @@ public class PageViewState(
     }
 
     public fun drawVisiblePages(
-        drawScope: androidx.compose.ui.graphics.drawscope.DrawScope,
+        drawScope: DrawScope,
         offset: Offset,
         vZoom: Float,
     ) {
