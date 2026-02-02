@@ -2,6 +2,9 @@ package com.archko.reader.viewer
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.viewmodel.BackupViewModel
+import com.archko.reader.viewer.dialog.AISettingDialog
 import com.archko.reader.viewer.dialog.ConvertToEpubDialog
 import com.archko.reader.viewer.dialog.PdfCreateDialog
 import com.archko.reader.viewer.dialog.PdfEncryptDialog
@@ -87,9 +93,11 @@ fun SettingScreen(
                     maxLines = 1
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Features()
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 SettingCategory(viewModel)
 
@@ -104,7 +112,14 @@ fun Features() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(vertical = 8.dp, horizontal = 20.dp)
     ) {
         Text(
             text = stringResource(Res.string.features),
@@ -117,76 +132,90 @@ fun Features() {
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
         )
-        
+
         // 第一行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            FeatureItem(text = stringResource(Res.string.auto_crop_edge))
-            FeatureItem(text = stringResource(Res.string.multi_format_support))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.auto_crop_edge),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.multi_format_support),
+                modifier = Modifier.weight(1f)
+            )
         }
-        
+
         // 第二行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            FeatureItem(text = stringResource(Res.string.ocr_text_recognition))
-            FeatureItem(text = stringResource(Res.string.image_to_pdf))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.ocr_text_recognition),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.image_to_pdf),
+                modifier = Modifier.weight(1f)
+            )
         }
-        
+
         // 第三行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            FeatureItem(text = stringResource(Res.string.mobi_azw3_to_epub))
-            FeatureItem(text = stringResource(Res.string.pdf_encrypt_decrypt))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.mobi_azw3_to_epub),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.pdf_encrypt_decrypt),
+                modifier = Modifier.weight(1f)
+            )
         }
-        
+
         // 第四行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            FeatureItem(text = stringResource(Res.string.webdav_backup))
-            FeatureItem(text = stringResource(Res.string.tts_read_aloud))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.webdav_backup),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.tts_read_aloud),
+                modifier = Modifier.weight(1f)
+            )
         }
-        
+
         // 第五行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            FeatureItem(text = stringResource(Res.string.export_images))
-            FeatureItem(text = stringResource(Res.string.split_merge_pdf))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.export_images),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.split_merge_pdf),
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @Composable
-fun FeatureItem(text: String) {
-    Text(
-        text = text,
-        style = TextStyle(
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 14.sp
-        ),
-        modifier = Modifier
-            .weight(1f)
-            .padding(horizontal = 4.dp)
-    )
+fun FeatureItem(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .height(36.dp)
+            .fillMaxWidth()
+    ) {
+        Text(
+            text = text,
+            style = TextStyle(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp
+            ),
+            maxLines = 1,
+        )
+    }
 }
 
 @Composable
@@ -290,7 +319,8 @@ fun SettingCategory(viewModel: BackupViewModel) {
     // AI设置 Dialog
     if (showAISettingDialog) {
         AISettingDialog(
-            onDismiss = { showAISettingDialog = false }
+            onDismiss = { showAISettingDialog = false },
+            onSave = {}
         )
     }
 

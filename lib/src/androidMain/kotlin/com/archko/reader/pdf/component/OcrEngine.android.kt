@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.ImageBitmap
  */
 public actual class OcrEngine {
 
-    private val ppocrv5ncnn = PPOCRv5Ncnn()
+    //private val ppocrv5ncnn = PPOCRv5Ncnn()
 
     /**
      * 识别图片中的文本
@@ -15,7 +15,8 @@ public actual class OcrEngine {
      * @return 识别到的文本
      */
     public actual fun recognizeText(bitmap: ImageBitmap): String {
-        val result: String? = ppocrv5ncnn.detectAndRecognize(bitmap.)
-        return result
+        //val result: String? = ppocrv5ncnn.detectAndRecognize(bitmap.)
+        //return result
+        return ""
     }
 }

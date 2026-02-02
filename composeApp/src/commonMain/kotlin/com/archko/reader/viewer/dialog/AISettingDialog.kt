@@ -1,18 +1,39 @@
 package com.archko.reader.viewer.dialog
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.archko.reader.viewer.utils.Utils
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ai_setting
+import kreader.composeapp.generated.resources.cancel
+import kreader.composeapp.generated.resources.input_token
+import kreader.composeapp.generated.resources.save
+import kreader.composeapp.generated.resources.select_model
 import org.jetbrains.compose.resources.stringResource
-import com.archko.reader.generated.Res
-import com.archko.reader.generated.Res.string
 
 @Serializable
 data class AIModel(
@@ -20,16 +41,17 @@ data class AIModel(
     val token: String
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AISettingDialog(
-    onDismissRequest: () -> Unit,
+    onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
     var models by remember { mutableStateOf<List<AIModel>>(emptyList()) }
     var expanded by remember { mutableStateOf(false) }
     var selectedModelIndex by remember { mutableIntStateOf(-1) }
     var tokenInput by remember { mutableStateOf("") }
-    
+
     // Load models from Utils
     LaunchedEffect(Unit) {
         loadModelsFromUtils()?.let { loadedModels ->
@@ -40,18 +62,18 @@ fun AISettingDialog(
             }
         }
     }
-    
+
     // Update token when selected model changes
     LaunchedEffect(selectedModelIndex) {
-        if (selectedModelIndex >= 0 && selectedModelIndex < models.size) {
-            tokenInput = models[selectedModelIndex].token
+        tokenInput = if (selectedModelIndex >= 0 && selectedModelIndex < models.size) {
+            models[selectedModelIndex].token
         } else {
-            tokenInput = ""
+            ""
         }
     }
-    
+
     AlertDialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = onDismiss,
         title = { Text(text = stringResource(Res.string.ai_setting)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -64,7 +86,7 @@ fun AISettingDialog(
                         text = stringResource(Res.string.select_model),
                         modifier = Modifier.weight(1f)
                     )
-                    
+
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
@@ -77,13 +99,16 @@ fun AISettingDialog(
                             },
                             onValueChange = {},
                             readOnly = true,
-                            modifier = Modifier.menuAnchor().fillMaxWidth(0.6f),
+                            modifier = Modifier.menuAnchor(
+                                ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                false
+                            ).fillMaxWidth(0.6f),
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                             },
                             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                         )
-                        
+
                         ExposedDropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false }
@@ -100,9 +125,9 @@ fun AISettingDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Token input field
                 OutlinedTextField(
                     value = tokenInput,
@@ -118,13 +143,14 @@ fun AISettingDialog(
                     // Save the updated model with its token
                     if (selectedModelIndex >= 0 && selectedModelIndex < models.size) {
                         val updatedModels = models.toMutableList()
-                        updatedModels[selectedModelIndex] = updatedModels[selectedModelIndex].copy(token = tokenInput)
+                        updatedModels[selectedModelIndex] =
+                            updatedModels[selectedModelIndex].copy(token = tokenInput)
                         saveModelsToUtils(updatedModels)
                         onSave()
-                        onDismissRequest()
+                        onDismiss()
                     } else {
                         // If no model is selected, don't save
-                        onDismissRequest()
+                        onDismiss()
                     }
                 }
             ) {
@@ -132,7 +158,7 @@ fun AISettingDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) {
+            TextButton(onClick = onDismiss) {
                 Text(stringResource(Res.string.cancel))
             }
         }
