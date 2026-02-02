@@ -81,22 +81,32 @@ public class PageViewState(
     // Annotation
     private val _annotations = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
     public val annotations: Map<Int, List<AnnotationPath>> = _annotations
-    public var activeDrawingPath: Pair<Int, List<Offset>>? by mutableStateOf(null)
+    public var activeDrawingAnno: Pair<Int, AnnotationPath>? by mutableStateOf(null)
 
     // 供持久化使用
     public fun getAnnotationsForPage(pageIndex: Int): MutableList<AnnotationPath>? =
         _annotations[pageIndex]
 
-    public fun updateDrawing(pageIndex: Int, points: List<Offset>) {
-        activeDrawingPath = pageIndex to points
+    public fun updateDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
+        val anno = AnnotationPath(
+            points,
+            config = pathConfig
+        )
+
+        activeDrawingAnno = pageIndex to anno
     }
 
-    public fun finalizeDrawing(pageIndex: Int, points: List<Offset>) {
+    public fun finalizeDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
         if (points.size > 1) {
             val list = _annotations.getOrPut(pageIndex) { mutableListOf() }
-            list.add(AnnotationPath(points))
+            list.add(
+                AnnotationPath(
+                    points,
+                    config = pathConfig
+                )
+            )
         }
-        activeDrawingPath = null
+        activeDrawingAnno = null
     }
 
     init {

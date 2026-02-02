@@ -32,6 +32,7 @@ import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.HyperLinkUtils
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -56,6 +57,7 @@ public fun DesktopDocumentView(
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
     gestureMode: GestureMode = GestureMode.VIEW,
+    pathConfig: PathConfig,
 ) {
     // 平台判断 - 只在初始化时判断一次
     val isMacOs by remember {
@@ -631,30 +633,50 @@ public fun DesktopDocumentView(
                                             it.aPage.index == activeDrawingPage
                                         } ?: return@detectDragGestures
 
-                                        val localX =
-                                            change.position.x - offset.x - targetPage.xOffset
-                                        val localY =
-                                            change.position.y - offset.y - targetPage.yOffset
-
-                                        // 归一化为 0..1 的比例坐标
-                                        val relPoint = Offset(
-                                            localX / targetPage.width,
-                                            localY / targetPage.height
+                                        val local = change.position - offset - Offset(
+                                            targetPage.xOffset,
+                                            targetPage.yOffset
                                         )
-                                        drawingPoints.add(relPoint)
-
-                                        pageViewState.updateDrawing(
-                                            activeDrawingPage,
-                                            drawingPoints.toList()
+                                        val currentRel = Offset(
+                                            local.x / targetPage.width,
+                                            local.y / targetPage.height
                                         )
+
+                                        if (pathConfig.drawType == DrawType.LINE) {
+                                            // 直线模式：始终只有起点和当前点
+                                            val startRel = drawingPoints.first()
+                                            val linePoints =
+                                                calculateLinePoints(startRel, currentRel)
+                                            pageViewState.updateDrawing(
+                                                activeDrawingPage,
+                                                linePoints,
+                                                pathConfig,
+                                            )
+                                        } else {
+                                            // 曲线模式
+                                            drawingPoints.add(currentRel)
+                                            pageViewState.updateDrawing(
+                                                activeDrawingPage,
+                                                drawingPoints.toList(),
+                                                pathConfig,
+                                            )
+                                        }
                                         change.consume()
                                     }
                                 },
                                 onDragEnd = {
                                     if (activeDrawingPage != -1) {
+                                        val finalPoints =
+                                            if (pathConfig.drawType == DrawType.LINE) {
+                                                pageViewState.activeDrawingAnno?.second?.points
+                                                    ?: emptyList()
+                                            } else {
+                                                drawingPoints.toList()
+                                            }
                                         pageViewState.finalizeDrawing(
                                             activeDrawingPage,
-                                            drawingPoints.toList()
+                                            finalPoints,
+                                            pathConfig,
                                         )
                                     }
                                     drawingPoints.clear()
@@ -769,7 +791,6 @@ public fun DesktopDocumentView(
                     focusRequester.requestFocus()
                     val rawScrollDelta =
                         event.changes.firstOrNull()?.scrollDelta ?: return@onPointerEvent
-                    val isMacOs = System.getProperty("os.name", "").lowercase().contains("mac")
                     val scrollAmount = Offset(
                         x = if (isMacOs) -rawScrollDelta.x else rawScrollDelta.x,
                         y = if (isMacOs) -rawScrollDelta.y else rawScrollDelta.y
@@ -1026,5 +1047,19 @@ private fun handleTapGesture(
 
             else -> false // 点击中间区域，不是翻页
         }
+    }
+}
+
+// 计算直线坐标的方法
+private fun calculateLinePoints(start: Offset, end: Offset): List<Offset> {
+    val dx = abs(end.x - start.x)
+    val dy = abs(end.y - start.y)
+
+    return if (dx > dy) {
+        // 水平线：Y坐标与起点保持一致
+        listOf(start, Offset(end.x, start.y))
+    } else {
+        // 垂直线：X坐标与起点保持一致
+        listOf(start, Offset(start.x, end.y))
     }
 }

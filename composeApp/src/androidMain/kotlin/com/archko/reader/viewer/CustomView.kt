@@ -32,6 +32,7 @@ import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
+import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -446,6 +447,7 @@ fun CustomView(
 
     // TTS服务绑定器 - 只有文档文件才初始化
     var ttsServiceBinder by remember { mutableStateOf<TtsServiceBinder?>(null) }
+    var pathConfig by remember { mutableStateOf(PathConfig()) }
 
     Box(
         modifier = Modifier
@@ -802,8 +804,9 @@ fun CustomView(
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
                     crop = isCrop,
-                    gestureMode = gestureMode,
                     speakingPageIndex = speakingPageIndex,
+                    gestureMode = gestureMode,
+                    pathConfig = pathConfig,
                 )
             }
 

@@ -8,7 +8,14 @@ import androidx.compose.ui.graphics.Color
  * @author: archko 2026/2/2 :16:35
  */
 public data class AnnotationPath(
-    val points: List<Offset>, // 这里的 Offset 是相对于页面宽高的比例 (0~1)
-    val color: Color = Color.Red,
-    val strokeWidth: Float = 3f
+    val points: List<Offset>,
+    val config: PathConfig,
 )
+
+public data class PathConfig(
+    val color: Color = Color.Red,
+    val strokeWidth: Float = 4f,
+    val drawType: DrawType = DrawType.CURVE
+)
+
+public enum class DrawType { CURVE, LINE }

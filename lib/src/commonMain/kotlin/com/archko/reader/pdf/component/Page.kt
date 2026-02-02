@@ -646,18 +646,32 @@ public class Page(
         currentBounds: Rect
     ) {
         pageViewState.annotations[aPage.index]?.forEach { anno ->
-            drawAnnotationPath(drawScope, anno.points, anno.color, anno.strokeWidth)
+            drawAnnotationPath(
+                drawScope, anno.points,
+                anno.config.color,
+                anno.config.strokeWidth,
+            )
         }
 
         // 3. 绘制【正在实时画】的线
-        pageViewState.activeDrawingPath?.let { (index, points) ->
+        pageViewState.activeDrawingAnno?.let { (index, anno) ->
             if (index == aPage.index) {
-                drawAnnotationPath(drawScope, points, Color.Red, 4f)
+                drawAnnotationPath(
+                    drawScope,
+                    anno.points,
+                    anno.config.color,
+                    anno.config.strokeWidth,
+                )
             }
         }
     }
 
-    private fun drawAnnotationPath(drawScope: DrawScope, relPoints: List<Offset>, color: Color, stroke: Float) {
+    private fun drawAnnotationPath(
+        drawScope: DrawScope,
+        relPoints: List<Offset>,
+        color: Color,
+        stroke: Float
+    ) {
         if (relPoints.size < 2) return
         val path = androidx.compose.ui.graphics.Path()
         relPoints.forEachIndexed { i, relP ->

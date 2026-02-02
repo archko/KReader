@@ -18,7 +18,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -79,8 +78,9 @@ public fun DocumentView(
     initialZoom: Double = 1.0, // 初始缩放比例
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
-    gestureMode: GestureMode = GestureMode.VIEW,
     speakingPageIndex: Int? = null, // 正在朗读的页面索引
+    gestureMode: GestureMode = GestureMode.VIEW,
+    pathConfig: PathConfig,
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -553,13 +553,21 @@ public fun DocumentView(
                                         val localY = change.position.y - offset.y - targetPage.yOffset
                                         drawingPoints.add(Offset(localX / targetPage.width, localY / targetPage.height))
 
-                                        pageViewState.updateDrawing(activeDrawingPage, drawingPoints.toList())
+                                        pageViewState.updateDrawing(
+                                            activeDrawingPage,
+                                            drawingPoints.toList(),
+                                            pathConfig
+                                        )
                                         change.consume()
                                     }
                                 },
                                 onDragEnd = {
                                     if (activeDrawingPage != -1) {
-                                        pageViewState.finalizeDrawing(activeDrawingPage, drawingPoints.toList())
+                                        pageViewState.finalizeDrawing(
+                                            activeDrawingPage,
+                                            drawingPoints.toList(),
+                                            pathConfig
+                                        )
                                     }
                                     drawingPoints.clear()
                                     activeDrawingPage = -1

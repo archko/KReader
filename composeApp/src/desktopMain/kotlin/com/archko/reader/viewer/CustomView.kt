@@ -1,14 +1,22 @@
 package com.archko.reader.viewer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -16,8 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DesktopDocumentView
+import com.archko.reader.pdf.component.DrawType
 import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
+import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -28,9 +38,12 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.viewer.dialog.ColorPickerDialog
+import com.archko.reader.viewer.dialog.DrawTypePickerDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
+import com.archko.reader.viewer.dialog.WidthPickerDialog
 import com.archko.reader.viewer.tts.TtsQueueService
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
@@ -48,6 +61,133 @@ import java.io.File
 /**
  * @author: archko 2025/7/23 :09:09
  */
+@Composable
+fun DrawingToolbar(
+    pathConfig: PathConfig,
+    onClose: (PathConfig) -> Unit,
+) {
+    var showWidthDialog by remember { mutableStateOf(false) }
+    var showTypeDialog by remember { mutableStateOf(false) }
+    var showColorDialog by remember { mutableStateOf(false) }
+
+    Surface(
+        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.padding(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
+            // 1. 粗细预览按钮
+            IconButton(onClick = { showWidthDialog = true }) {
+                Box(Modifier.size(24.dp).drawBehind {
+                    drawLine(
+                        Color.Gray,
+                        Offset(0f, size.height / 2),
+                        Offset(size.width, size.height / 2),
+                        strokeWidth = pathConfig.strokeWidth
+                    )
+                })
+            }
+            // 2. 类型按钮 (显示直线或曲线图标)
+            IconButton(onClick = { showTypeDialog = true }) {
+                Box(Modifier.size(24.dp).drawBehind {
+                    if (pathConfig.drawType == DrawType.LINE) {
+                        // 按钮上画一根倾斜的直线预览
+                        drawLine(
+                            Color.Red,
+                            Offset(4f, size.height - 4f),
+                            Offset(size.width - 4f, 4f),
+                            strokeWidth = 4f
+                        )
+                    } else {
+                        // 按钮上画一个 S 型曲线预览
+                        val p = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(4f, size.height - 4f)
+                            cubicTo(
+                                size.width / 2,
+                                size.height,
+                                size.width / 2,
+                                0f,
+                                size.width - 4f,
+                                4f
+                            )
+                        }
+                        drawPath(p, Color.Red, style = Stroke(width = 4f))
+                    }
+                })
+            }
+            // 3. 颜色预览按钮
+            IconButton(onClick = { showColorDialog = true }) {
+                // 使用当前选中的颜色填充圆形预览
+                Box(
+                    Modifier
+                        .size(24.dp)
+                        .background(pathConfig.color, CircleShape)
+                    .border(1.dp, Color.Gray.copy(alpha = 0.5f), CircleShape)
+                )
+            }
+            VerticalDivider(modifier = Modifier.height(24.dp))
+            IconButton(onClick = { }) {
+                Text(
+                    text = "X",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+
+    if (showWidthDialog) {
+        WidthPickerDialog(
+            currentWidth = pathConfig.strokeWidth,
+            onConfirm = { width ->
+                showWidthDialog = false
+                val config = PathConfig(
+                    color = pathConfig.color,
+                    strokeWidth = width,
+                    drawType = pathConfig.drawType
+                )
+                onClose(config)
+            },
+            onDismiss = { showWidthDialog = false },
+        )
+    }
+
+    if (showTypeDialog) {
+        DrawTypePickerDialog(
+            currentType = pathConfig.drawType,
+            onConfirm = { drawType ->
+                showTypeDialog = false
+                val config = PathConfig(
+                    color = pathConfig.color,
+                    strokeWidth = pathConfig.strokeWidth,
+                    drawType = drawType
+                )
+                onClose(config)
+            },
+            onDismiss = { showTypeDialog = false },
+        )
+    }
+
+    if (showColorDialog) {
+        ColorPickerDialog(
+            currentWidth = pathConfig.strokeWidth,
+            currentColor = pathConfig.color,
+            drawType = pathConfig.drawType,
+            onConfirm = { color ->
+                showColorDialog = false
+                val config = PathConfig(
+                    color = color,
+                    strokeWidth = pathConfig.strokeWidth,
+                    drawType = pathConfig.drawType
+                )
+                onClose(config)
+            },
+            onDismiss = { showColorDialog = false },
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
@@ -74,6 +214,7 @@ fun CustomView(
     val toaster = rememberToasterState()
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
+    var pathConfig by remember { mutableStateOf(PathConfig()) }
 
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
@@ -564,6 +705,19 @@ fun CustomView(
                             initialZoom = vZoom,
                             crop = isCrop,
                             gestureMode = gestureMode,
+                            pathConfig = pathConfig,
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = gestureMode == GestureMode.DRAW,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    ) {
+                        DrawingToolbar(
+                            pathConfig = pathConfig,
+                            onClose = { config ->
+                                pathConfig = config
+                            }
                         )
                     }
 
