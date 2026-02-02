@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DesktopDocumentView
+import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
@@ -279,7 +280,7 @@ fun CustomView(
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
-            var isTextSelectionMode by remember { mutableStateOf(false) }
+            var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
 
             var showQueueDialog by remember { mutableStateOf(false) }
 
@@ -385,12 +386,33 @@ fun CustomView(
                                 }
                             }
                             IconButton(onClick = {
-                                isTextSelectionMode = !isTextSelectionMode
+                                var nMode = gestureMode
+                                if (nMode == GestureMode.SELECTION) {
+                                    nMode = GestureMode.VIEW
+                                } else {
+                                    nMode = GestureMode.SELECTION
+                                }
+                                gestureMode = nMode
                             }) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_select),
                                     contentDescription = "文本选择",
-                                    tint = if (isTextSelectionMode) Color.Green else Color.White
+                                    tint = if (gestureMode == GestureMode.SELECTION) Color.Green else Color.White
+                                )
+                            }
+                            IconButton(onClick = {
+                                var nMode = gestureMode
+                                if (nMode == GestureMode.DRAW) {
+                                    nMode = GestureMode.VIEW
+                                } else {
+                                    nMode = GestureMode.DRAW
+                                }
+                                gestureMode = nMode
+                            }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_draw_pen),
+                                    contentDescription = "标注画线",
+                                    tint = if (gestureMode == GestureMode.DRAW) Color.Green else Color.White
                                 )
                             }
                         }
@@ -541,7 +563,7 @@ fun CustomView(
                             initialScrollY = initialScrollY,
                             initialZoom = vZoom,
                             crop = isCrop,
-                            isTextSelectionMode = isTextSelectionMode,
+                            gestureMode = gestureMode,
                         )
                     }
 

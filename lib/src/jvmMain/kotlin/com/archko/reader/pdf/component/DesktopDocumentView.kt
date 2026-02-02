@@ -55,7 +55,7 @@ public fun DesktopDocumentView(
     initialZoom: Double = 1.0, // 初始缩放比例
     reflow: Long = 0, // 初始缩放比例
     crop: Boolean = false, // 是否切边
-    isTextSelectionMode: Boolean = false, // 是否为文本选择模式
+    gestureMode: GestureMode = GestureMode.VIEW,
 ) {
     // 平台判断 - 只在初始化时判断一次
     val isMacOs by remember {
@@ -542,6 +542,9 @@ public fun DesktopDocumentView(
         contentAlignment = Alignment.TopStart
     ) {
         var renderTrigger by remember { mutableIntStateOf(0) }
+        // 内部定义临时状态
+        val drawingPoints = remember { mutableStateListOf<Offset>() }
+        var activeDrawingPage by remember { mutableStateOf(-1) }
 
         LaunchedEffect(pageViewState.renderFlow, Unit) {
             pageViewState.renderFlow.collect {
@@ -611,93 +614,156 @@ public fun DesktopDocumentView(
                         }
                     )
                 }
-                .pointerInput("drag_gestures", isTextSelectionMode) {
-                    var dragStartPos: Offset? = null
-                    var currentDragPos: Offset? = null
-
-                    detectDragGestures(
-                        onDragStart = { startPos ->
-                            focusRequester.requestFocus()
-                            dragStartPos = startPos
-                            currentDragPos = startPos
-
-                            if (isTextSelectionMode) {
-                                // 文本选择模式：开始文本选择
-                                isTextSelecting = true
-                                selectionStartPos = startPos
-                                selectionEndPos = startPos
-                                showTextActionToolbar = false
-
-                                // 找到点击的页面并开始选择
-                                val clickedPageIndex = calculateClickedPage(
-                                    startPos,
-                                    offset,
-                                    orientation,
-                                    pageViewState
-                                )
-                                val clickedPage = pageViewState.pages.getOrNull(clickedPageIndex)
-                                if (clickedPage != null) {
-                                    val contentX = startPos.x - offset.x
-                                    val contentY = startPos.y - offset.y
-                                    //println("DocumentView: 开始文本选择 - startPos: $startPos, offset: $offset, contentPos: ($contentX, $contentY)")
-                                    clickedPage.startTextSelection(contentX, contentY)
-                                    selectedPage = clickedPage
-                                }
-                            }
-                            // 非文本选择模式：不做任何特殊处理，等待拖拽
-                        },
-                        onDrag = { change ->
-                            if (isTextSelectionMode) {
-                                // 文本选择模式：只处理文本选择，不处理拖拽滚动
-                                if (isTextSelecting && dragStartPos != null) {
-                                    // 累积拖拽位置：从起始位置开始累加所有变化
-                                    currentDragPos = (currentDragPos ?: dragStartPos!!) + change
-                                    selectionEndPos = currentDragPos
-
-                                    selectedPage?.let { page ->
-                                        val contentX = currentDragPos!!.x - offset.x
-                                        val contentY = currentDragPos!!.y - offset.y
-                                        //println("DocumentView: 更新文本选择 - currentDragPos: $currentDragPos, offset: $offset, contentPos: ($contentX, $contentY)")
-                                        page.updateTextSelection(contentX, contentY)
+                .pointerInput("drag_gestures", gestureMode) {
+                    when (gestureMode) {
+                        GestureMode.DRAW -> {
+                            detectDragGestures(
+                                onDragStart = { startOffset ->
+                                    drawingPoints.clear()
+                                    val targetPage = pageViewState.pageToRender.find {
+                                        it.bounds.contains(startOffset - offset)
                                     }
+                                    activeDrawingPage = targetPage?.aPage?.index ?: -1
+                                },
+                                onDrag = { change, _ ->
+                                    if (activeDrawingPage != -1) {
+                                        val targetPage = pageViewState.pageToRender.find {
+                                            it.aPage.index == activeDrawingPage
+                                        } ?: return@detectDragGestures
+
+                                        val localX =
+                                            change.position.x - offset.x - targetPage.xOffset
+                                        val localY =
+                                            change.position.y - offset.y - targetPage.yOffset
+
+                                        // 归一化为 0..1 的比例坐标
+                                        val relPoint = Offset(
+                                            localX / targetPage.width,
+                                            localY / targetPage.height
+                                        )
+                                        drawingPoints.add(relPoint)
+
+                                        pageViewState.updateDrawing(
+                                            activeDrawingPage,
+                                            drawingPoints.toList()
+                                        )
+                                        change.consume()
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (activeDrawingPage != -1) {
+                                        pageViewState.finalizeDrawing(
+                                            activeDrawingPage,
+                                            drawingPoints.toList()
+                                        )
+                                    }
+                                    drawingPoints.clear()
+                                    activeDrawingPage = -1
                                 }
-                            } else {
-                                // 非文本选择模式：普通拖拽滚动
-                                val maxX =
-                                    (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                                val maxY =
-                                    (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-
-                                val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
-                                val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
-
-                                offset = Offset(newX, newY)
-                                pageViewState.updateOffset(offset)
-                            }
-                        },
-                        onDragEnd = {
-                            if (isTextSelectionMode && isTextSelecting) {
-                                // 文本选择模式：结束文本选择
-                                val selection = selectedPage?.endTextSelection()
-                                isTextSelecting = false
-
-                                if (selection != null && selection.text.isNotBlank()) {
-                                    showTextActionToolbar = true
-                                    println("文本选择完成: ${selection.text}")
-                                } else {
-                                    // 如果没有选中文本，清理状态
-                                    selectedPage?.clearTextSelection()
-                                    selectedPage = null
-                                    selectionStartPos = null
-                                    selectionEndPos = null
-                                }
-                            }
-
-                            // 重置拖拽状态
-                            dragStartPos = null
-                            currentDragPos = null
+                            )
                         }
-                    )
+
+                        GestureMode.SELECTION -> {
+                            var dragStartPos: Offset? = null
+                            var currentDragPos: Offset? = null
+
+                            detectDragGestures(
+                                onDragStart = { startPos ->
+                                    focusRequester.requestFocus()
+                                    dragStartPos = startPos
+                                    currentDragPos = startPos
+
+                                    // 文本选择模式：开始文本选择
+                                    isTextSelecting = true
+                                    selectionStartPos = startPos
+                                    selectionEndPos = startPos
+                                    showTextActionToolbar = false
+
+                                    // 找到点击的页面并开始选择
+                                    val clickedPageIndex = calculateClickedPage(
+                                        startPos,
+                                        offset,
+                                        orientation,
+                                        pageViewState
+                                    )
+                                    val clickedPage =
+                                        pageViewState.pages.getOrNull(clickedPageIndex)
+                                    if (clickedPage != null) {
+                                        val contentX = startPos.x - offset.x
+                                        val contentY = startPos.y - offset.y
+                                        //println("DocumentView: 开始文本选择 - startPos: $startPos, offset: $offset, contentPos: ($contentX, $contentY)")
+                                        clickedPage.startTextSelection(contentX, contentY)
+                                        selectedPage = clickedPage
+                                    }
+                                },
+                                onDrag = { change ->
+                                    // 文本选择模式：只处理文本选择，不处理拖拽滚动
+                                    if (isTextSelecting && dragStartPos != null) {
+                                        // 累积拖拽位置：从起始位置开始累加所有变化
+                                        currentDragPos =
+                                            (currentDragPos ?: dragStartPos!!) + change
+                                        selectionEndPos = currentDragPos
+
+                                        selectedPage?.let { page ->
+                                            val contentX = currentDragPos!!.x - offset.x
+                                            val contentY = currentDragPos!!.y - offset.y
+                                            //println("DocumentView: 更新文本选择 - currentDragPos: $currentDragPos, offset: $offset, contentPos: ($contentX, $contentY)")
+                                            page.updateTextSelection(contentX, contentY)
+                                        }
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (isTextSelecting) {
+                                        // 文本选择模式：结束文本选择
+                                        val selection = selectedPage?.endTextSelection()
+                                        isTextSelecting = false
+
+                                        if (selection != null && selection.text.isNotBlank()) {
+                                            showTextActionToolbar = true
+                                            println("文本选择完成: ${selection.text}")
+                                        } else {
+                                            // 如果没有选中文本，清理状态
+                                            selectedPage?.clearTextSelection()
+                                            selectedPage = null
+                                            selectionStartPos = null
+                                            selectionEndPos = null
+                                        }
+                                    }
+
+                                    // 重置拖拽状态
+                                    dragStartPos = null
+                                    currentDragPos = null
+                                }
+                            )
+                        }
+
+                        GestureMode.VIEW -> {
+                            detectDragGestures(
+                                onDragStart = { startPos ->
+                                    focusRequester.requestFocus()
+                                },
+                                onDrag = { change ->
+                                    // 普通拖拽滚动
+                                    val maxX =
+                                        (pageViewState.totalWidth - viewSize.width).coerceAtLeast(
+                                            0f
+                                        )
+                                    val maxY =
+                                        (pageViewState.totalHeight - viewSize.height).coerceAtLeast(
+                                            0f
+                                        )
+
+                                    val newX = (offset.x + change.x).coerceIn(-maxX, 0f)
+                                    val newY = (offset.y + change.y).coerceIn(-maxY, 0f)
+
+                                    offset = Offset(newX, newY)
+                                    pageViewState.updateOffset(offset)
+                                },
+                                onDragEnd = {
+                                }
+                            )
+                        }
+                    }
                 }
                 .onPointerEvent(PointerEventType.Scroll) { event ->
                     focusRequester.requestFocus()
