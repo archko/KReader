@@ -136,8 +136,8 @@ public class AndroidStructuredTextImpl(
             }
 
             println("copy: 选择区域: ($left,$top,$right,$bottom)")
-            println("copy: 直接复制长度: ${directCopy.length}, 内容: '$directCopy'")
-            println("copy: 缩小复制长度: ${shrunkCopy.length}, 内容: '$shrunkCopy'")
+            //println("copy: 直接复制长度: ${directCopy.length}, 内容: '$directCopy'")
+            //println("copy: 缩小复制长度: ${shrunkCopy.length}, 内容: '$shrunkCopy'")
 
             // 选择最合适的结果
             when {
