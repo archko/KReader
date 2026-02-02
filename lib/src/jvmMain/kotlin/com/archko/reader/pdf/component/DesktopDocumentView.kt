@@ -58,7 +58,11 @@ public fun DesktopDocumentView(
     isTextSelectionMode: Boolean = false, // 是否为文本选择模式
 ) {
     // 平台判断 - 只在初始化时判断一次
-    val isMacOs by remember { mutableStateOf(System.getProperty("os.name", "").lowercase().contains("mac")) }
+    val isMacOs by remember {
+        mutableStateOf(
+            System.getProperty("os.name", "").lowercase().contains("mac")
+        )
+    }
 
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -697,7 +701,8 @@ public fun DesktopDocumentView(
                 }
                 .onPointerEvent(PointerEventType.Scroll) { event ->
                     focusRequester.requestFocus()
-                    val rawScrollDelta = event.changes.firstOrNull()?.scrollDelta ?: return@onPointerEvent
+                    val rawScrollDelta =
+                        event.changes.firstOrNull()?.scrollDelta ?: return@onPointerEvent
                     val isMacOs = System.getProperty("os.name", "").lowercase().contains("mac")
                     val scrollAmount = Offset(
                         x = if (isMacOs) -rawScrollDelta.x else rawScrollDelta.x,
@@ -762,7 +767,8 @@ public fun DesktopDocumentView(
             contentAlignment = Alignment.Center
         ) {
             TextActionToolbar(
-                selection = selectedPage!!.currentSelection!!,
+                selectedPage = selectedPage!!,
+                textSelector = textSelector,
                 onCopy = { text ->
                     // 复制到剪贴板
                     println("复制文本: $text")

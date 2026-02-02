@@ -80,7 +80,9 @@ public class Page(
      * 加载页面文本结构
      */
     public fun loadText() {
-        if (textLoaded || pageViewState.textSelector == null) return
+        if (textLoaded || pageViewState.textSelector == null) {
+            return
+        }
 
         structuredText = pageViewState.textSelector.getStructuredText(aPage.index)
         textLoaded = true
@@ -93,7 +95,6 @@ public class Page(
         currentSelection = null
         isSelecting = false
         selectionStartPoint = null
-        structuredText = null
     }
 
     /**
@@ -156,12 +157,18 @@ public class Page(
      * 开始文本选择
      */
     public fun startTextSelection(screenX: Float, screenY: Float): Boolean {
-        loadText()
+        // Ensure structuredText is loaded before selection
+        if (structuredText == null) {
+            loadText()
+        }
 
         val pagePoint = screenToPagePoint(screenX, screenY)
         val startPoint = PagePoint(pagePoint.x, pagePoint.y)
 
-        structuredText ?: return false
+        if (structuredText == null) {
+            //println("Page.startTextSelection: structuredText is still null after loading, cannot start selection")
+            return false
+        }
 
         // 开始选择时不立即高亮，等待拖拽
         isSelecting = true
@@ -175,7 +182,7 @@ public class Page(
             quads = emptyArray()
         )
 
-        //println("startTextSelection: 开始选择，起始点: $startPoint")
+        //println("Page.startTextSelection: 开始选择，起始点: $startPoint")
         return true
     }
 
@@ -194,7 +201,7 @@ public class Page(
         // 只有当起始点和结束点不同时才进行高亮
         if (startPoint.x != endPoint.x || startPoint.y != endPoint.y) {
             val quads = structText.highlight(startPoint, endPoint)
-            //println("updateTextSelection.highlight: startPoint=$startPoint, endPoint=$endPoint, quads.size=${quads.size}")
+            //println("Page.updateTextSelection.highlight: startPoint=$startPoint, endPoint=$endPoint, quads.size=${quads.size}")
 
             val selectedText = structText.copy(startPoint, endPoint)
             currentSelection = TextSelection(
@@ -204,7 +211,7 @@ public class Page(
                 quads = quads
             )
 
-            //println("updateTextSelection: 选中文本: '$selectedText'")
+            //println("Page.updateTextSelection: 选中文本: '$selectedText'")
         }
     }
 
@@ -218,10 +225,10 @@ public class Page(
         val selection = currentSelection
         // 只有当有实际选中的文本时才返回选择结果
         return if (selection != null && selection.text.isNotBlank() && selection.quads.isNotEmpty()) {
-            println("endTextSelection: 返回选择结果: '${selection.text}'")
+            println("Page.endTextSelection: 返回选择结果: '${selection.text}'")
             selection
         } else {
-            println("endTextSelection: 没有选中文本，返回null")
+            println("Page.endTextSelection: 没有选中文本，返回null")
             null
         }
     }

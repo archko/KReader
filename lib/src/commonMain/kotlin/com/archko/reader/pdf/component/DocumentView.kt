@@ -525,8 +525,10 @@ public fun DocumentView(
                             onDragEnd = {
                                 val selection = selectedPage?.endTextSelection()
                                 isTextSelecting = false
-                                if (selection != null && selection.text.isNotBlank()) showTextActionToolbar =
-                                    true
+                                println("onDragEnd:$selection")
+                                if (selection != null && selection.text.isNotBlank()) {
+                                    showTextActionToolbar = true
+                                }
                             }
                         )
                     } else {
@@ -648,330 +650,330 @@ public fun DocumentView(
                             totalDrag += panChange
                             panVelocityTracker.addPosition(uptime, -panChange)
 
-                        // 检测是否开始拖拽
-                        if (totalDrag.getDistance() > 10f) {
-                            dragging = true
-                        }
-                        if (pointerCount > 1) {
-                            zooming = true
-                            val newZoom = (zoomChange * vZoom).coerceIn(1f, 10f)
-                            val zoomFactor = newZoom / vZoom
-
-                            // 计算缩放中心点：手势中心相对于内容的位置
-                            // centroid 是手势中心在视图中的位置
-                            // 需要将其转换为相对于内容的位置
-                            val contentCenterX = centroid.x - offset.x
-                            val contentCenterY = centroid.y - offset.y
-
-                            // 计算新的偏移量，保持内容中心点不变
-                            val newOffsetX = centroid.x - contentCenterX * zoomFactor
-                            val newOffsetY = centroid.y - contentCenterY * zoomFactor
-
-                            vZoom = newZoom
-                            offset = Offset(newOffsetX, newOffsetY)
-
-                            // 边界检查
-                            if (orientation == Vertical) {
-                                val scaledWidth = viewSize.width * vZoom
-                                // 在缩放过程中，需要根据当前缩放比例调整总高度
-                                val scaleRatio = vZoom / pageViewState.vZoom
-                                val scaledHeight = pageViewState.totalHeight * scaleRatio
-                                val minX = minOf(0f, viewSize.width - scaledWidth)
-                                val maxX = 0f
-                                val minY =
-                                    if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
-                                val maxY = 0f
-                                offset = Offset(
-                                    offset.x.coerceIn(minX, maxX),
-                                    offset.y.coerceIn(minY, maxY)
-                                )
-                            } else {
-                                val scaledHeight = viewSize.height * vZoom
-                                val scaleRatio = vZoom / pageViewState.vZoom
-                                val scaledWidth = pageViewState.totalWidth * scaleRatio
-                                val minY = minOf(0f, viewSize.height - scaledHeight)
-                                val maxY = 0f
-                                val minX =
-                                    if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
-                                val maxX = 0f
-                                offset = Offset(
-                                    offset.x.coerceIn(minX, maxX),
-                                    offset.y.coerceIn(minY, maxY)
-                                )
+                            // 检测是否开始拖拽
+                            if (totalDrag.getDistance() > 10f) {
+                                dragging = true
                             }
-                            //pageViewState.updateOffset(offset) //缩放过程不更新偏移,否则会导致页面跳动
-                            event.changes.fastForEach { if (it.positionChanged()) it.consume() }
-                        } else {
-                            // 单指拖动
-                            if (!zooming) {
-                                if (isTextSelectionMode && !isTextSelecting) {
-                                    // 文本选择模式：开始文本选择
-                                    isTextSelecting = true
-                                    selectionStartPos = down.position
-                                    selectionEndPos = down.position + totalDrag
-                                    showTextActionToolbar = false
+                            if (pointerCount > 1) {
+                                zooming = true
+                                val newZoom = (zoomChange * vZoom).coerceIn(1f, 10f)
+                                val zoomFactor = newZoom / vZoom
 
-                                    // 找到点击的页面并开始选择
-                                    val clickedPageIndex = calculateClickedPage(
-                                        down.position,
-                                        offset,
-                                        orientation,
-                                        pageViewState
-                                    )
-                                    val clickedPage =
-                                        pageViewState.pages.getOrNull(clickedPageIndex)
-                                    if (clickedPage != null) {
-                                        val contentX = down.position.x - offset.x
-                                        val contentY = down.position.y - offset.y
-                                        clickedPage.startTextSelection(contentX, contentY)
-selectedPage = clickedPage
-                                    }
-                                } else if (isTextSelectionMode && isTextSelecting) {
-                                    // 文本选择模式：更新文本选择
-                                    selectionEndPos = down.position + totalDrag
+                                // 计算缩放中心点：手势中心相对于内容的位置
+                                // centroid 是手势中心在视图中的位置
+                                // 需要将其转换为相对于内容的位置
+                                val contentCenterX = centroid.x - offset.x
+                                val contentCenterY = centroid.y - offset.y
 
-                                    selectedPage?.let { page ->
-                                        val contentX =
-                                            (down.position + totalDrag).x - offset.x
-                                        val contentY =
-                                            (down.position + totalDrag).y - offset.y
-                                        page.updateTextSelection(contentX, contentY)
-                                    }
-                                } else {
-                                    // 普通拖拽模式：滚动页面
-                                    offset += panChange
-                                }
-                            }
-                        }
-                        event.changes.fastForEach { if (it.positionChanged()) it.consume() }
-                    } while (event.changes.fastAny { it.pressed })
-                } catch (_: CancellationException) {
-                } finally {
-                    // 缩放结束后调用 updateViewSize 重新计算页面
-                    if (zooming) {
-                        pageViewState.updateOffset(offset)
-                        pageViewState.updateViewSize(viewSize, vZoom, orientation)
-                    }
-                    pageViewState.updateVisiblePages(offset, viewSize, vZoom)
+                                // 计算新的偏移量，保持内容中心点不变
+                                val newOffsetX = centroid.x - contentCenterX * zoomFactor
+                                val newOffsetY = centroid.y - contentCenterY * zoomFactor
 
-                    // 处理文本选择结束
-                    if (isTextSelectionMode && isTextSelecting) {
-                        val selection = selectedPage?.endTextSelection()
-                        isTextSelecting = false
+                                vZoom = newZoom
+                                offset = Offset(newOffsetX, newOffsetY)
 
-                        if (selection != null && selection.text.isNotBlank()) {
-                            showTextActionToolbar = true
-                            println("文本选择完成: ${selection.text}")
-                        } else {
-                            // 如果没有选中文本，清理状态
-                            selectedPage?.clearTextSelection()
-                            selectedPage = null
-                            selectionStartPos = null
-                            selectionEndPos = null
-                        }
-                        return@awaitEachGesture
-                    }
-
-                    // 如果没有拖拽和缩放，且按下时没有fling动画，处理点击事件
-                    if (!dragging && !zooming && !wasFlingActive && totalDrag.getDistance() < 10f) {
-                        val tapOffset = down.position
-                        val currentTime = System.currentTimeMillis()
-
-                        // 检查是否是双击（简化检测，只检查时间间隔）
-                        val isDoubleTap = currentTime - lastTapTime < 300
-
-                        if (isDoubleTap) {
-                            // 取消延迟的单击处理
-                            tapDelayJob?.cancel()
-
-                            // 处理双击
-                            val y = tapOffset.y
-                            val height = viewSize.height.toFloat()
-                            if (y >= height / 4 && y <= height * 3 / 4) {
-                                onDoubleTapToolbar?.invoke()
-                            }
-                        } else {
-                            // 延迟处理单击，等待可能的第二次点击
-                            tapDelayJob?.cancel()
-                            tapDelayJob = scope.launch {
-                                delay(300) // 等待300ms
-
-                                // 如果有文本选择工具栏显示，先隐藏它
-                                if (showTextActionToolbar) {
-                                    showTextActionToolbar = false
-                                    selectedPage?.clearTextSelection()
-                                    selectedPage = null
-                                    selectionStartPos = null
-                                    selectionEndPos = null
-                                    return@launch
-                                }
-
-                                // 将点击坐标转换为相对于内容的位置
-                                val contentX = tapOffset.x - offset.x
-                                val contentY = tapOffset.y - offset.y
-
-                                // 首先尝试处理链接点击
-                                val linkHandled =
-                                    pageViewState.handleClick(contentX, contentY)
-                                //println("DocumentView.onTap: 链接处理结果: $linkHandled")
-
-                                // 如果没有处理链接，再处理翻页逻辑
-                                if (!linkHandled) {
-                                    val isPageTurned = handleTapGesture(
-                                        tapOffset,
-                                        viewSize,
-                                        offset,
-                                        orientation,
-                                        pageViewState,
-                                        keepPx
-                                    ) { newOffset ->
-                                        offset = newOffset
-                                        pageViewState.updateOffset(offset)
-                                    }
-
-                                    // 如果不是翻页区域，触发非页面区域点击回调
-                                    if (!isPageTurned) {
-                                        val clickedPage =
-                                            calculateClickedPage(
-                                                tapOffset,
-                                                offset,
-                                                orientation,
-                                                pageViewState
-                                            )
-                                        onTapNonPageArea?.invoke(clickedPage)
-                                    }
-                                }
-                            }
-                        }
-
-                        lastTapTime = currentTime
-                    }
-                    // 计算pan velocity
-                    val velocity = runCatching { panVelocityTracker.calculateVelocity() }
-                        .getOrDefault(
-                            Velocity.Zero
-                        )
-                    val velocitySquared = velocity.x * velocity.x + velocity.y * velocity.y
-                    val velocityThreshold = with(density) { 32.dp.toPx() * 32.dp.toPx() }
-                    flingJob?.cancel()
-                    if (velocitySquared > velocityThreshold) {
-                        val decayAnimationSpec = exponentialDecay<Float>(
-                            frictionMultiplier = 0.4f,
-                            absVelocityThreshold = 0.45f
-                        )
-                        flingJob = scope.launch {
-                            try {
+                                // 边界检查
                                 if (orientation == Vertical) {
-                                    // X方向
-                                    if (abs(velocity.x) > velocityDistance) {
-                                        val animX = AnimationState(
-                                            initialValue = offset.x,
-                                            initialVelocity = velocity.x
-                                        )
-                                        launch {
-                                            animX.animateDecay(decayAnimationSpec) {
-                                                val scaledWidth = viewSize.width * vZoom
-                                                val minX =
-                                                    minOf(0f, viewSize.width - scaledWidth)
-                                                val maxX = 0f
-                                                // 2. 检查边界：如果增量导致越界，则取消动画并设置到边界
-                                                if (value > maxX || value < minX) {
-                                                    cancelAnimation()
-                                                }
-
-                                                val newX = value.coerceIn(minX, maxX)
-                                                offset = Offset(newX, offset.y)
-                                                pageViewState.updateOffset(offset)
-                                            }
-                                        }
-                                    }
-                                    // Y方向
-                                    if (abs(velocity.y) > velocityDistance) {
-                                        val animY = AnimationState(
-                                            initialValue = offset.y,
-                                            initialVelocity = velocity.y
-                                        )
-                                        launch {
-                                            animY.animateDecay(decayAnimationSpec) {
-                                                val scaledHeight =
-                                                    if (orientation == Vertical) {
-                                                        pageViewState.totalHeight
-                                                    } else {
-                                                        pageViewState.totalWidth
-                                                    }
-                                                val minY =
-                                                    if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
-                                                val maxY = 0f
-                                                if (value > maxY || value < minY) {
-                                                    cancelAnimation()
-                                                }
-
-                                                val newY = value.coerceIn(minY, maxY)
-                                                offset = Offset(offset.x, newY)
-                                                pageViewState.updateOffset(offset)
-                                            }
-                                        }
-                                    }
+                                    val scaledWidth = viewSize.width * vZoom
+                                    // 在缩放过程中，需要根据当前缩放比例调整总高度
+                                    val scaleRatio = vZoom / pageViewState.vZoom
+                                    val scaledHeight = pageViewState.totalHeight * scaleRatio
+                                    val minX = minOf(0f, viewSize.width - scaledWidth)
+                                    val maxX = 0f
+                                    val minY =
+                                        if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                    val maxY = 0f
+                                    offset = Offset(
+                                        offset.x.coerceIn(minX, maxX),
+                                        offset.y.coerceIn(minY, maxY)
+                                    )
                                 } else {
-                                    // X方向
-                                    if (abs(velocity.x) > velocityDistance) {
-                                        val animX = AnimationState(
-                                            initialValue = offset.x,
-                                            initialVelocity = velocity.x
-                                        )
-                                        launch {
-                                            animX.animateDecay(decayAnimationSpec) {
-                                                val scaledWidth =
-                                                    if (orientation == Vertical) {
-                                                        pageViewState.totalHeight
-                                                    } else {
-                                                        pageViewState.totalWidth
-                                                    }
-                                                val minX =
-                                                    minOf(0f, viewSize.width - scaledWidth)
-                                                val maxX = 0f
-                                                if (value > maxX || value < minX) {
-                                                    cancelAnimation()
-                                                }
+                                    val scaledHeight = viewSize.height * vZoom
+                                    val scaleRatio = vZoom / pageViewState.vZoom
+                                    val scaledWidth = pageViewState.totalWidth * scaleRatio
+                                    val minY = minOf(0f, viewSize.height - scaledHeight)
+                                    val maxY = 0f
+                                    val minX =
+                                        if (scaledWidth > viewSize.width) viewSize.width - scaledWidth else 0f
+                                    val maxX = 0f
+                                    offset = Offset(
+                                        offset.x.coerceIn(minX, maxX),
+                                        offset.y.coerceIn(minY, maxY)
+                                    )
+                                }
+                                //pageViewState.updateOffset(offset) //缩放过程不更新偏移,否则会导致页面跳动
+                                event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                            } else {
+                                // 单指拖动
+                                if (!zooming) {
+                                    if (isTextSelectionMode && !isTextSelecting) {
+                                        // 文本选择模式：开始文本选择
+                                        isTextSelecting = true
+                                        selectionStartPos = down.position
+                                        selectionEndPos = down.position + totalDrag
+                                        showTextActionToolbar = false
 
-                                                val newX = value.coerceIn(minX, maxX)
-                                                offset = Offset(newX, offset.y)
-                                                pageViewState.updateOffset(offset)
-}
+                                        // 找到点击的页面并开始选择
+                                        val clickedPageIndex = calculateClickedPage(
+                                            down.position,
+                                            offset,
+                                            orientation,
+                                            pageViewState
+                                        )
+                                        val clickedPage =
+                                            pageViewState.pages.getOrNull(clickedPageIndex)
+                                        if (clickedPage != null) {
+                                            val contentX = down.position.x - offset.x
+                                            val contentY = down.position.y - offset.y
+                                            clickedPage.startTextSelection(contentX, contentY)
+                                            selectedPage = clickedPage
                                         }
-                                    }
-                                    // Y方向
-                                    if (abs(velocity.y) > velocityDistance) {
-                                        val animY = AnimationState(
-                                            initialValue = offset.y,
-                                            initialVelocity = velocity.y
-                                        )
-                                        launch {
-                                            animY.animateDecay(decayAnimationSpec) {
-                                                val scaledHeight = viewSize.height * vZoom
-val minY = minOf(
-                                                    0f,
-                                                    viewSize.height - scaledHeight
-                                                )
-                                                val maxY = 0f
-                                                if (value > maxY || value < minY) {
-                                                    cancelAnimation()
-}
+                                    } else if (isTextSelectionMode && isTextSelecting) {
+                                        // 文本选择模式：更新文本选择
+                                        selectionEndPos = down.position + totalDrag
 
-                                                val newY = value.coerceIn(minY, maxY)
-                                                offset = Offset(offset.x, newY)
-                                                pageViewState.updateOffset(offset)
-                                            }
+                                        selectedPage?.let { page ->
+                                            val contentX =
+                                                (down.position + totalDrag).x - offset.x
+                                            val contentY =
+                                                (down.position + totalDrag).y - offset.y
+                                            page.updateTextSelection(contentX, contentY)
+                                        }
+                                    } else {
+                                        // 普通拖拽模式：滚动页面
+                                        offset += panChange
+                                    }
+                                }
+                            }
+                            event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                        } while (event.changes.fastAny { it.pressed })
+                    } catch (_: CancellationException) {
+                    } finally {
+                        // 缩放结束后调用 updateViewSize 重新计算页面
+                        if (zooming) {
+                            pageViewState.updateOffset(offset)
+                            pageViewState.updateViewSize(viewSize, vZoom, orientation)
+                        }
+                        pageViewState.updateVisiblePages(offset, viewSize, vZoom)
+
+                        // 处理文本选择结束
+                        if (isTextSelectionMode && isTextSelecting) {
+                            val selection = selectedPage?.endTextSelection()
+                            isTextSelecting = false
+
+                            if (selection != null && selection.text.isNotBlank()) {
+                                showTextActionToolbar = true
+                                println("文本选择完成: ${selection.text}")
+                            } else {
+                                // 如果没有选中文本，清理状态
+                                selectedPage?.clearTextSelection()
+                                selectedPage = null
+                                selectionStartPos = null
+                                selectionEndPos = null
+                            }
+                            return@awaitEachGesture
+                        }
+
+                        // 如果没有拖拽和缩放，且按下时没有fling动画，处理点击事件
+                        if (!dragging && !zooming && !wasFlingActive && totalDrag.getDistance() < 10f) {
+                            val tapOffset = down.position
+                            val currentTime = System.currentTimeMillis()
+
+                            // 检查是否是双击（简化检测，只检查时间间隔）
+                            val isDoubleTap = currentTime - lastTapTime < 300
+
+                            if (isDoubleTap) {
+                                // 取消延迟的单击处理
+                                tapDelayJob?.cancel()
+
+                                // 处理双击
+                                val y = tapOffset.y
+                                val height = viewSize.height.toFloat()
+                                if (y >= height / 4 && y <= height * 3 / 4) {
+                                    onDoubleTapToolbar?.invoke()
+                                }
+                            } else {
+                                // 延迟处理单击，等待可能的第二次点击
+                                tapDelayJob?.cancel()
+                                tapDelayJob = scope.launch {
+                                    delay(300) // 等待300ms
+
+                                    // 如果有文本选择工具栏显示，先隐藏它
+                                    if (showTextActionToolbar) {
+                                        showTextActionToolbar = false
+                                        selectedPage?.clearTextSelection()
+                                        selectedPage = null
+                                        selectionStartPos = null
+                                        selectionEndPos = null
+                                        return@launch
+                                    }
+
+                                    // 将点击坐标转换为相对于内容的位置
+                                    val contentX = tapOffset.x - offset.x
+                                    val contentY = tapOffset.y - offset.y
+
+                                    // 首先尝试处理链接点击
+                                    val linkHandled =
+                                        pageViewState.handleClick(contentX, contentY)
+                                    //println("DocumentView.onTap: 链接处理结果: $linkHandled")
+
+                                    // 如果没有处理链接，再处理翻页逻辑
+                                    if (!linkHandled) {
+                                        val isPageTurned = handleTapGesture(
+                                            tapOffset,
+                                            viewSize,
+                                            offset,
+                                            orientation,
+                                            pageViewState,
+                                            keepPx
+                                        ) { newOffset ->
+                                            offset = newOffset
+                                            pageViewState.updateOffset(offset)
+                                        }
+
+                                        // 如果不是翻页区域，触发非页面区域点击回调
+                                        if (!isPageTurned) {
+                                            val clickedPage =
+                                                calculateClickedPage(
+                                                    tapOffset,
+                                                    offset,
+                                                    orientation,
+                                                    pageViewState
+                                                )
+                                            onTapNonPageArea?.invoke(clickedPage)
                                         }
                                     }
                                 }
-                            } finally {
+                            }
+
+                            lastTapTime = currentTime
+                        }
+                        // 计算pan velocity
+                        val velocity = runCatching { panVelocityTracker.calculateVelocity() }
+                            .getOrDefault(
+                                Velocity.Zero
+                            )
+                        val velocitySquared = velocity.x * velocity.x + velocity.y * velocity.y
+                        val velocityThreshold = with(density) { 32.dp.toPx() * 32.dp.toPx() }
+                        flingJob?.cancel()
+                        if (velocitySquared > velocityThreshold) {
+                            val decayAnimationSpec = exponentialDecay<Float>(
+                                frictionMultiplier = 0.4f,
+                                absVelocityThreshold = 0.45f
+                            )
+                            flingJob = scope.launch {
+                                try {
+                                    if (orientation == Vertical) {
+                                        // X方向
+                                        if (abs(velocity.x) > velocityDistance) {
+                                            val animX = AnimationState(
+                                                initialValue = offset.x,
+                                                initialVelocity = velocity.x
+                                            )
+                                            launch {
+                                                animX.animateDecay(decayAnimationSpec) {
+                                                    val scaledWidth = viewSize.width * vZoom
+                                                    val minX =
+                                                        minOf(0f, viewSize.width - scaledWidth)
+                                                    val maxX = 0f
+                                                    // 2. 检查边界：如果增量导致越界，则取消动画并设置到边界
+                                                    if (value > maxX || value < minX) {
+                                                        cancelAnimation()
+                                                    }
+
+                                                    val newX = value.coerceIn(minX, maxX)
+                                                    offset = Offset(newX, offset.y)
+                                                    pageViewState.updateOffset(offset)
+                                                }
+                                            }
+                                        }
+                                        // Y方向
+                                        if (abs(velocity.y) > velocityDistance) {
+                                            val animY = AnimationState(
+                                                initialValue = offset.y,
+                                                initialVelocity = velocity.y
+                                            )
+                                            launch {
+                                                animY.animateDecay(decayAnimationSpec) {
+                                                    val scaledHeight =
+                                                        if (orientation == Vertical) {
+                                                            pageViewState.totalHeight
+                                                        } else {
+                                                            pageViewState.totalWidth
+                                                        }
+                                                    val minY =
+                                                        if (scaledHeight > viewSize.height) viewSize.height - scaledHeight else 0f
+                                                    val maxY = 0f
+                                                    if (value > maxY || value < minY) {
+                                                        cancelAnimation()
+                                                    }
+
+                                                    val newY = value.coerceIn(minY, maxY)
+                                                    offset = Offset(offset.x, newY)
+                                                    pageViewState.updateOffset(offset)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // X方向
+                                        if (abs(velocity.x) > velocityDistance) {
+                                            val animX = AnimationState(
+                                                initialValue = offset.x,
+                                                initialVelocity = velocity.x
+                                            )
+                                            launch {
+                                                animX.animateDecay(decayAnimationSpec) {
+                                                    val scaledWidth =
+                                                        if (orientation == Vertical) {
+                                                            pageViewState.totalHeight
+                                                        } else {
+                                                            pageViewState.totalWidth
+                                                        }
+                                                    val minX =
+                                                        minOf(0f, viewSize.width - scaledWidth)
+                                                    val maxX = 0f
+                                                    if (value > maxX || value < minX) {
+                                                        cancelAnimation()
+                                                    }
+
+                                                    val newX = value.coerceIn(minX, maxX)
+                                                    offset = Offset(newX, offset.y)
+                                                    pageViewState.updateOffset(offset)
+                                                }
+                                            }
+                                        }
+                                        // Y方向
+                                        if (abs(velocity.y) > velocityDistance) {
+                                            val animY = AnimationState(
+                                                initialValue = offset.y,
+                                                initialVelocity = velocity.y
+                                            )
+                                            launch {
+                                                animY.animateDecay(decayAnimationSpec) {
+                                                    val scaledHeight = viewSize.height * vZoom
+                                                    val minY = minOf(
+                                                        0f,
+                                                        viewSize.height - scaledHeight
+                                                    )
+                                                    val maxY = 0f
+                                                    if (value > maxY || value < minY) {
+                                                        cancelAnimation()
+                                                    }
+
+                                                    val newY = value.coerceIn(minY, maxY)
+                                                    offset = Offset(offset.x, newY)
+                                                    pageViewState.updateOffset(offset)
+                                                }
+                                            }
+                                        }
+                                    }
+                                } finally {
+                                }
                             }
                         }
                     }
                 }
-            }
-        }*/
+            }*/
         ) {
             //居中绘制不够屏幕高宽
             val centerOffsetX =
@@ -1011,7 +1013,7 @@ val minY = minOf(
         ) {
             TextActionToolbar(
                 selectedPage = selectedPage,
-                textSelector = textSelector, // 传递textSelector参数
+                textSelector = textSelector,
                 onCopy = { text ->
                     // 复制到剪贴板
                     println("复制文本: $text")
@@ -1211,7 +1213,8 @@ public fun TextActionToolbar(
 
     // 检查选中文本是否为空
     val selectedText = selection?.text ?: ""
-    var resultTest by remember { mutableStateOf("") }
+    println("TextActionToolbar:$selectedText")
+    var resultTest by remember { mutableStateOf(selectedText) }
     var isOcring by remember { mutableStateOf(false) }
 
     // 如果选中文本是空的，尝试从缓存获取图片并进行OCR识别
