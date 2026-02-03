@@ -31,6 +31,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
 import kotlin.math.abs
 import kotlin.math.max
@@ -58,6 +59,7 @@ public fun DesktopDocumentView(
     crop: Boolean = false, // 是否切边
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
+    annotationManager: AnnotationManager,
 ) {
     // 平台判断 - 只在初始化时判断一次
     val isMacOs by remember {
@@ -104,7 +106,7 @@ public fun DesktopDocumentView(
 
     val pageViewState = remember(list) {
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PageViewState(list, state, orientation, crop, textSelector)
+        PageViewState(list, state, annotationManager, orientation, crop, textSelector)
     }
 
     // 文本选择相关状态

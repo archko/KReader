@@ -16,6 +16,10 @@ public data class PathConfig(
     val color: Color = Color.Red,
     val strokeWidth: Float = 4f,
     val drawType: DrawType = DrawType.CURVE
-)
+) {
+    override fun toString(): String {
+        return "PathConfig(color=$color, strokeWidth=$strokeWidth, drawType=$drawType)"
+    }
+}
 
 public enum class DrawType { CURVE, LINE }

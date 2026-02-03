@@ -645,7 +645,7 @@ public class Page(
         drawScope: DrawScope,
         currentBounds: Rect
     ) {
-        pageViewState.annotations[aPage.index]?.forEach { anno ->
+        pageViewState.annotationManager.annotations[aPage.index]?.forEach { anno ->
             drawAnnotationPath(
                 drawScope, anno.points,
                 anno.config.color,

@@ -6,16 +6,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
@@ -24,10 +20,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -38,6 +32,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -81,6 +76,7 @@ public fun DocumentView(
     speakingPageIndex: Int? = null, // 正在朗读的页面索引
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
+    annotationManager: AnnotationManager,
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -118,7 +114,7 @@ public fun DocumentView(
 
     val pageViewState = remember(list) {
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PageViewState(list, state, orientation, crop, textSelector)
+        PageViewState(list, state, annotationManager, orientation, crop, textSelector)
     }
 
     LaunchedEffect(speakingPageIndex) {
@@ -537,6 +533,7 @@ public fun DocumentView(
                                 }
                             )
                         }
+
                         GestureMode.DRAW -> {
                             detectDragGestures(
                                 onDragStart = { startOffset ->
@@ -548,10 +545,18 @@ public fun DocumentView(
                                 },
                                 onDrag = { change, dragAmount ->
                                     if (activeDrawingPage != -1) {
-                                        val targetPage = pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage }!!
-                                        val localX = change.position.x - offset.x - targetPage.xOffset
-                                        val localY = change.position.y - offset.y - targetPage.yOffset
-                                        drawingPoints.add(Offset(localX / targetPage.width, localY / targetPage.height))
+                                        val targetPage =
+                                            pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage }!!
+                                        val localX =
+                                            change.position.x - offset.x - targetPage.xOffset
+                                        val localY =
+                                            change.position.y - offset.y - targetPage.yOffset
+                                        drawingPoints.add(
+                                            Offset(
+                                                localX / targetPage.width,
+                                                localY / targetPage.height
+                                            )
+                                        )
 
                                         pageViewState.updateDrawing(
                                             activeDrawingPage,
@@ -574,6 +579,7 @@ public fun DocumentView(
                                 }
                             )
                         }
+
                         GestureMode.VIEW -> {
                             // 阅读模式：优化后的 拖动、缩放 与 惯性
                             awaitEachGesture {
@@ -596,7 +602,8 @@ public fun DocumentView(
                                         }
 
                                         if (isZooming) {
-                                            val centroid = event.calculateCentroid(useCurrent = false)
+                                            val centroid =
+                                                event.calculateCentroid(useCurrent = false)
                                             if (centroid.isSpecified && zoomChange != 1f) {
                                                 val newZoom = (vZoom * zoomChange).coerceIn(1f, 16f)
                                                 val zoomFactor = newZoom / vZoom
@@ -649,7 +656,8 @@ public fun DocumentView(
 
                                 // --- 抬手后的处理 ---
                                 val finalChange = lastChange ?: return@awaitEachGesture
-                                val dragDistance = (finalChange.position - down.position).getDistance()
+                                val dragDistance =
+                                    (finalChange.position - down.position).getDistance()
 
                                 if (dragDistance < 10f && !isZooming) {
                                     handleTapGestureInternal(finalChange.position)
@@ -1237,133 +1245,6 @@ private fun handleTapGesture(
             }
 
             else -> false // 点击中间区域，不是翻页
-        }
-    }
-}
-
-/**
- * 文本操作工具栏
- */
-@Composable
-public fun TextActionToolbar(
-    selectedPage: Page?,
-    textSelector: TextSelector?, // 添加textSelector参数
-    onCopy: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val selection = selectedPage?.currentSelection
-    val clipboardManager = LocalClipboardManager.current
-    val scrollState = rememberScrollState()
-
-    // 检查选中文本是否为空
-    val selectedText = selection?.text ?: ""
-    println("TextActionToolbar:$selectedText")
-    var resultTest by remember { mutableStateOf(selectedText) }
-    var isOcring by remember { mutableStateOf(false) }
-
-    // 如果选中文本是空的，尝试从缓存获取图片并进行OCR识别
-    if (selectedText.isEmpty() && selection != null && textSelector != null) {
-        // 使用selection.quads获取坐标区域
-        selection.quads.forEach { quad ->
-            // 计算quad的边界框
-            val left = minOf(quad.ul_x, quad.ll_x, quad.ur_x, quad.lr_x)
-            val top = minOf(quad.ul_y, quad.ll_y, quad.ur_y, quad.lr_y)
-            val right = maxOf(quad.ul_x, quad.ll_x, quad.ur_x, quad.lr_x)
-            val bottom = maxOf(quad.ul_y, quad.ll_y, quad.ur_y, quad.lr_y)
-
-            // 转换为屏幕坐标
-            val screenRect = Rect(left, top, right, bottom)
-        }
-        val cacheKey = selectedPage.getThumbnailCacheKey()
-        if (cacheKey != null) {
-            val cachedState = ImageCache.acquirePage(cacheKey)
-            if (cachedState != null) {
-                isOcring = true
-                // 使用缓存的缩略图进行OCR识别
-                val thumbnailBitmap = cachedState.bitmap
-                val extractedText = textSelector.extractTextFromImage(thumbnailBitmap)
-
-                LaunchedEffect(extractedText) {
-                    isOcring = false
-                    if (extractedText.isNotEmpty()) {
-                        onCopy(extractedText)
-                    }
-                }
-            }
-        }
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(vertical = 80.dp, horizontal = 40.dp),
-        color = Color.Black.copy(alpha = 0.8f),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Selected Text",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                SelectionContainer {
-                    Text(
-                        text = if (resultTest.isEmpty() && isOcring) {
-                            "Processing image..."
-                        } else {
-                            resultTest
-                        },
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(scrollState)
-                            .padding(8.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
-            ) {
-                TextButton(
-                    onClick = {
-                        clipboardManager.setText(AnnotatedString(resultTest))
-                        onCopy(resultTest)
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Copy")
-                }
-
-                TextButton(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Cancel")
-                }
-            }
         }
     }
 }

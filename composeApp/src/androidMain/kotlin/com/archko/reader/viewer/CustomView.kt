@@ -16,8 +16,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,9 +39,12 @@ import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.viewer.component.DrawingToolbar
+import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.dialog.FontDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
@@ -66,76 +67,6 @@ import java.io.File
 /**
  * @author: archko 2025/7/23 :09:09
  */
-
-/**
- * 错误和加载状态内容组件
- */
-@Composable
-private fun ErrorContent(
-    loadingError: String?,
-    currentPath: String,
-    onCloseDocument: (() -> Unit)?
-) {
-    when {
-        loadingError != null -> {
-            // 显示错误信息
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = when (loadingError) {
-                        "document_open_failed" -> stringResource(Res.string.document_open_failed)
-                        else -> stringResource(Res.string.document_open_failed)
-                    },
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = currentPath,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(Res.string.support_format),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = { onCloseDocument?.invoke() }
-                ) {
-                    Text(stringResource(Res.string.close))
-                }
-            }
-        }
-
-        else -> {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    stringResource(Res.string.loading),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-}
 
 /**
  * 工具栏内容组件
@@ -654,6 +585,17 @@ fun CustomView(
             var isSpeaking by remember { mutableStateOf(false) }
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
+            val annotationManager = remember(paths) {
+                var fileHash = ""
+                if (paths.size == 1) {
+                    val first = paths[0]
+                    if (FileTypeUtils.isDocumentFile(first)) {
+                        fileHash = first.hashCode().toString()
+                    }
+                }
+                AnnotationManager(fileHash)
+            }
+
             // 监听朗读状态
             LaunchedEffect(ttsServiceBinder) {
                 ttsServiceBinder?.isSpeakingFlow?.collect { speaking ->
@@ -807,6 +749,7 @@ fun CustomView(
                     speakingPageIndex = speakingPageIndex,
                     gestureMode = gestureMode,
                     pathConfig = pathConfig,
+                    annotationManager = annotationManager,
                 )
             }
 
@@ -839,6 +782,22 @@ fun CustomView(
                     },
                     isReflow = isReflow,
                     paths = paths
+                )
+            }
+
+            AnimatedVisibility(
+                visible = gestureMode == GestureMode.DRAW,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = if (showToolbar) 48.dp else 0.dp)
+            ) {
+                DrawingToolbar(
+                    annotationManager = annotationManager,
+                    pathConfig = pathConfig,
+                    onClose = { config ->
+                        pathConfig = config
+                        println("onClose.pathConfig:$pathConfig")
+                    }
                 )
             }
 

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
+import com.archko.reader.pdf.state.AnnotationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 public class PageViewState(
     public val list: List<APage>,
     public val state: ImageDecoder,
+    public val annotationManager: AnnotationManager,
     public var orientation: Int = Vertical,
     crop: Boolean,
     public val textSelector: TextSelector? = null
@@ -78,14 +80,7 @@ public class PageViewState(
     // 解码完成回调
     public var onDecodeCompleted: (() -> Unit)? = null
 
-    // Annotation
-    private val _annotations = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
-    public val annotations: Map<Int, List<AnnotationPath>> = _annotations
     public var activeDrawingAnno: Pair<Int, AnnotationPath>? by mutableStateOf(null)
-
-    // 供持久化使用
-    public fun getAnnotationsForPage(pageIndex: Int): MutableList<AnnotationPath>? =
-        _annotations[pageIndex]
 
     public fun updateDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
         val anno = AnnotationPath(
@@ -97,15 +92,8 @@ public class PageViewState(
     }
 
     public fun finalizeDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
-        if (points.size > 1) {
-            val list = _annotations.getOrPut(pageIndex) { mutableListOf() }
-            list.add(
-                AnnotationPath(
-                    points,
-                    config = pathConfig
-                )
-            )
-        }
+        val path = AnnotationPath(points, config = pathConfig)
+        annotationManager.addPath(pageIndex, path)
         activeDrawingAnno = null
     }
 
@@ -265,7 +253,6 @@ public class PageViewState(
 
         state.close()
         nodePool.clear()
-        _annotations.clear()
 
         println("PageViewState.shutdown: 清理完成，调用GC")
         // 建议GC

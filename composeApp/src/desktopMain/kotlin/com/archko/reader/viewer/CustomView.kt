@@ -1,22 +1,14 @@
 package com.archko.reader.viewer
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -24,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DesktopDocumentView
-import com.archko.reader.pdf.component.DrawType
 import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.PathConfig
@@ -36,18 +27,18 @@ import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.util.FileTypeUtils
-import com.archko.reader.viewer.dialog.ColorPickerDialog
-import com.archko.reader.viewer.dialog.DrawTypePickerDialog
+import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
-import com.archko.reader.viewer.dialog.WidthPickerDialog
 import com.archko.reader.viewer.tts.TtsQueueService
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -62,129 +53,194 @@ import java.io.File
  * @author: archko 2025/7/23 :09:09
  */
 @Composable
-fun DrawingToolbar(
-    pathConfig: PathConfig,
-    onClose: (PathConfig) -> Unit,
+private fun ToolbarContent(
+    isVertical: Boolean,
+    onOrientationChange: () -> Unit,
+    onCloseDocument: (() -> Unit)?,
+    currentPath: String,
+    speechService: SpeechService,
+    currentPage: Int,
+    decoder: ImageDecoder,
+    onGestureModeChange: (gestureMode: GestureMode) -> Unit,
+    gestureMode: GestureMode,
+    onCropChange: () -> Unit,
+    isCrop: Boolean,
+    onZoomChange: (zoom: Double) -> Unit,
+    vZoom: Double,
+    onOutlineDialogShow: () -> Unit,
+    onQueueDialogShow: () -> Unit,
+    scope: CoroutineScope,
+    onStartSpeaking: (Int, ImageDecoder, SpeechService) -> Unit,
+    isReflow: Boolean,
 ) {
-    var showWidthDialog by remember { mutableStateOf(false) }
-    var showTypeDialog by remember { mutableStateOf(false) }
-    var showColorDialog by remember { mutableStateOf(false) }
-
     Surface(
-        tonalElevation = 8.dp,
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.padding(8.dp)
+        color = Color(0xff000000),
+        shadowElevation = 8.dp, // 添加阴影确保层级
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
-            // 1. 粗细预览按钮
-            IconButton(onClick = { showWidthDialog = true }) {
-                Box(Modifier.size(24.dp).drawBehind {
-                    drawLine(
-                        Color.Gray,
-                        Offset(0f, size.height / 2),
-                        Offset(size.width, size.height / 2),
-                        strokeWidth = pathConfig.strokeWidth
-                    )
-                })
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .padding(horizontal = 8.dp, vertical = 0.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { onCloseDocument?.invoke() }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_back),
+                    contentDescription = stringResource(Res.string.back),
+                    tint = Color.White
+                )
             }
-            // 2. 类型按钮 (显示直线或曲线图标)
-            IconButton(onClick = { showTypeDialog = true }) {
-                Box(Modifier.size(24.dp).drawBehind {
-                    if (pathConfig.drawType == DrawType.LINE) {
-                        // 按钮上画一根倾斜的直线预览
-                        drawLine(
-                            Color.Red,
-                            Offset(4f, size.height - 4f),
-                            Offset(size.width - 4f, 4f),
-                            strokeWidth = 4f
-                        )
-                    } else {
-                        // 按钮上画一个 S 型曲线预览
-                        val p = androidx.compose.ui.graphics.Path().apply {
-                            moveTo(4f, size.height - 4f)
-                            cubicTo(
-                                size.width / 2,
-                                size.height,
-                                size.width / 2,
-                                0f,
-                                size.width - 4f,
-                                4f
-                            )
-                        }
-                        drawPath(p, Color.Red, style = Stroke(width = 4f))
+            Text(
+                text = currentPath,
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.weight(1f))
+
+            IconButton(onClick = { onOrientationChange() }) {
+                Icon(
+                    painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                    contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                        Res.string.horizontal
+                    ),
+                    tint = Color.White
+                )
+            }
+
+            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                val isSpeaking by speechService.isSpeakingFlow.collectAsState()
+
+                IconButton(onClick = {
+                    scope.launch {
+                        onStartSpeaking(currentPage, decoder, speechService)
                     }
-                })
+                }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_tts),
+                        contentDescription = stringResource(Res.string.tts),
+                        tint = if (isSpeaking) Color.Green else Color.White
+                    )
+                }
+                if (isSpeaking) {
+                    IconButton(
+                        onClick = { onQueueDialogShow() }
+                    ) {
+                        Text(
+                            text = "📋",
+                            color = Color.White,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+                IconButton(onClick = {
+                    var nMode = gestureMode
+                    if (nMode == GestureMode.SELECTION) {
+                        nMode = GestureMode.VIEW
+                    } else {
+                        nMode = GestureMode.SELECTION
+                    }
+                    onGestureModeChange(nMode)
+                }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_select),
+                        contentDescription = "文本选择",
+                        tint = if (gestureMode == GestureMode.SELECTION) Color.Green else Color.White
+                    )
+                }
+                IconButton(onClick = {
+                    var nMode = gestureMode
+                    if (nMode == GestureMode.DRAW) {
+                        nMode = GestureMode.VIEW
+                    } else {
+                        nMode = GestureMode.DRAW
+                    }
+                    onGestureModeChange(nMode)
+                }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_draw_pen),
+                        contentDescription = "标注画线",
+                        tint = if (gestureMode == GestureMode.DRAW) Color.Green else Color.White
+                    )
+                }
             }
-            // 3. 颜色预览按钮
-            IconButton(onClick = { showColorDialog = true }) {
-                // 使用当前选中的颜色填充圆形预览
-                Box(
-                    Modifier
-                        .size(24.dp)
-                        .background(pathConfig.color, CircleShape)
-                    .border(1.dp, Color.Gray.copy(alpha = 0.5f), CircleShape)
+
+            IconButton(onClick = {
+                val newZoom = vZoom + 0.1
+                if (newZoom <= 5f) {
+                    onZoomChange(newZoom)
+                }
+            }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_zoom_in),
+                    contentDescription = "",
+                    tint = Color.White
                 )
             }
-            VerticalDivider(modifier = Modifier.height(24.dp))
-            IconButton(onClick = { }) {
-                Text(
-                    text = "X",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+
+            IconButton(onClick = {
+                val newZoom = vZoom - 0.1
+                if (newZoom >= 0.51f) {
+                    onZoomChange(newZoom)
+                }
+            }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_zoom_out),
+                    contentDescription = "",
+                    tint = Color.White
                 )
+            }
+
+            IconButton(onClick = {
+                onZoomChange(1.0)
+            }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_zoom_reset),
+                    contentDescription = "",
+                    tint = Color.White
+                )
+            }
+
+            // 只有文档文件才显示其他按钮
+            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                IconButton(onClick = { onCropChange() }) {
+                    Icon(
+                        painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
+                        contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
+                            Res.string.no_crop
+                        ),
+                        tint = Color.White
+                    )
+                }
+                // 只有单文档文件才显示大纲按钮
+                if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                    IconButton(onClick = { onOutlineDialogShow() }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_toc),
+                            contentDescription = stringResource(Res.string.outline),
+                            tint = Color.White
+                        )
+                    }
+                }
+                //IconButton(onClick = { isReflow = !isReflow }) {
+                //    Icon(
+                //        painter = painterResource(Res.drawable.ic_reflow),
+                //        contentDescription = stringResource(Res.string.reflow),
+                //        tint = if (isReflow) Color.Green else Color.White
+                //    )
+                //}
+                IconButton(onClick = { }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_search),
+                        contentDescription = stringResource(Res.string.search),
+                        tint = Color.White
+                    )
+                }
             }
         }
-    }
-
-    if (showWidthDialog) {
-        WidthPickerDialog(
-            currentWidth = pathConfig.strokeWidth,
-            onConfirm = { width ->
-                showWidthDialog = false
-                val config = PathConfig(
-                    color = pathConfig.color,
-                    strokeWidth = width,
-                    drawType = pathConfig.drawType
-                )
-                onClose(config)
-            },
-            onDismiss = { showWidthDialog = false },
-        )
-    }
-
-    if (showTypeDialog) {
-        DrawTypePickerDialog(
-            currentType = pathConfig.drawType,
-            onConfirm = { drawType ->
-                showTypeDialog = false
-                val config = PathConfig(
-                    color = pathConfig.color,
-                    strokeWidth = pathConfig.strokeWidth,
-                    drawType = drawType
-                )
-                onClose(config)
-            },
-            onDismiss = { showTypeDialog = false },
-        )
-    }
-
-    if (showColorDialog) {
-        ColorPickerDialog(
-            currentWidth = pathConfig.strokeWidth,
-            currentColor = pathConfig.color,
-            drawType = pathConfig.drawType,
-            onConfirm = { color ->
-                showColorDialog = false
-                val config = PathConfig(
-                    color = color,
-                    strokeWidth = pathConfig.strokeWidth,
-                    drawType = pathConfig.drawType
-                )
-                onClose(config)
-            },
-            onDismiss = { showColorDialog = false },
-        )
     }
 }
 
@@ -455,183 +511,50 @@ fun CustomView(
             val pageCount: Int = list.size
             // 跳转页面状态
             var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+            val annotationManager = remember(paths) {
+                var fileHash = ""
+                if (paths.size == 1) {
+                    val first = paths[0]
+                    if (FileTypeUtils.isDocumentFile(first)) {
+                        fileHash = first.hashCode().toString()
+                    }
+                }
+                AnnotationManager(fileHash)
+            }
 
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // 顶部工具栏 - 始终显示
-                Surface(
-                    color = Color(0xff000000),
-                    shadowElevation = 8.dp, // 添加阴影确保层级
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(36.dp)
-                            .padding(horizontal = 8.dp, vertical = 0.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { onCloseDocument?.invoke() }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = stringResource(Res.string.back),
-                                tint = Color.White
-                            )
-                        }
-                        Text(
-                            text = currentPath,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Spacer(Modifier.weight(1f))
-
-                        IconButton(onClick = { isVertical = !isVertical }) {
-                            Icon(
-                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                    Res.string.horizontal
-                                ),
-                                tint = Color.White
-                            )
-                        }
-
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            val isSpeaking by speechService.isSpeakingFlow.collectAsState()
-
-                            IconButton(onClick = {
-                                scope.launch {
-                                    speakFromCurrentPage(currentPage, decoder!!, speechService)
-                                    if (!speechService.isSpeaking()) {
-                                        showQueueDialog = false
-                                    }
-                                }
-                            }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_tts),
-                                    contentDescription = stringResource(Res.string.tts),
-                                    tint = if (isSpeaking) Color.Green else Color.White
-                                )
-                            }
-                            if (isSpeaking) {
-                                IconButton(
-                                    onClick = { showQueueDialog = true }
-                                ) {
-                                    Text(
-                                        text = "📋",
-                                        color = Color.White,
-                                        fontSize = 16.sp
-                                    )
-                                }
-                            }
-                            IconButton(onClick = {
-                                var nMode = gestureMode
-                                if (nMode == GestureMode.SELECTION) {
-                                    nMode = GestureMode.VIEW
-                                } else {
-                                    nMode = GestureMode.SELECTION
-                                }
-                                gestureMode = nMode
-                            }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_select),
-                                    contentDescription = "文本选择",
-                                    tint = if (gestureMode == GestureMode.SELECTION) Color.Green else Color.White
-                                )
-                            }
-                            IconButton(onClick = {
-                                var nMode = gestureMode
-                                if (nMode == GestureMode.DRAW) {
-                                    nMode = GestureMode.VIEW
-                                } else {
-                                    nMode = GestureMode.DRAW
-                                }
-                                gestureMode = nMode
-                            }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_draw_pen),
-                                    contentDescription = "标注画线",
-                                    tint = if (gestureMode == GestureMode.DRAW) Color.Green else Color.White
-                                )
+                ToolbarContent(
+                    isVertical = isVertical,
+                    onOrientationChange = { isVertical = !isVertical },
+                    onCloseDocument = onCloseDocument,
+                    currentPath = currentPath,
+                    speechService = speechService,
+                    currentPage = currentPage,
+                    decoder = decoder!!,
+                    onGestureModeChange = { mode -> gestureMode = mode },
+                    gestureMode = gestureMode,
+                    onCropChange = { isCrop = !isCrop },
+                    isCrop = isCrop,
+                    onOutlineDialogShow = { showOutlineDialog = true },
+                    onQueueDialogShow = { showQueueDialog = true },
+                    scope = scope,
+                    onStartSpeaking = { page, dec, binder ->
+                        scope.launch {
+                            speakFromCurrentPage(currentPage, decoder!!, speechService)
+                            if (!speechService.isSpeaking()) {
+                                showQueueDialog = false
                             }
                         }
-
-                        IconButton(onClick = {
-                            val newZoom = vZoom + 0.1
-                            if (newZoom <= 5f) {
-                                vZoom = newZoom
-                            }
-                        }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_zoom_in),
-                                contentDescription = "",
-                                tint = Color.White
-                            )
-                        }
-
-                        IconButton(onClick = {
-                            val newZoom = vZoom - 0.1
-                            if (newZoom >= 0.51f) {
-                                vZoom = newZoom
-                            }
-                        }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_zoom_out),
-                                contentDescription = "",
-                                tint = Color.White
-                            )
-                        }
-
-                        IconButton(onClick = {
-                            vZoom = 1.0
-                        }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_zoom_reset),
-                                contentDescription = "",
-                                tint = Color.White
-                            )
-                        }
-
-                        // 只有文档文件才显示其他按钮
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            IconButton(onClick = { isCrop = !isCrop }) {
-                                Icon(
-                                    painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                    contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                        Res.string.no_crop
-                                    ),
-                                    tint = Color.White
-                                )
-                            }
-                            // 只有单文档文件才显示大纲按钮
-                            if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
-                                IconButton(onClick = { showOutlineDialog = true }) {
-                                    Icon(
-                                        painter = painterResource(Res.drawable.ic_toc),
-                                        contentDescription = stringResource(Res.string.outline),
-                                        tint = Color.White
-                                    )
-                                }
-                            }
-                            //IconButton(onClick = { isReflow = !isReflow }) {
-                            //    Icon(
-                            //        painter = painterResource(Res.drawable.ic_reflow),
-                            //        contentDescription = stringResource(Res.string.reflow),
-                            //        tint = if (isReflow) Color.Green else Color.White
-                            //    )
-                            //}
-                            IconButton(onClick = { }) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_search),
-                                    contentDescription = stringResource(Res.string.search),
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    }
-                }
+                    },
+                    vZoom = vZoom,
+                    onZoomChange = { zoom ->
+                        vZoom = zoom
+                    },
+                    isReflow = isReflow,
+                )
 
                 // 队列列表弹窗
                 if (showQueueDialog) {
@@ -706,14 +629,18 @@ fun CustomView(
                             crop = isCrop,
                             gestureMode = gestureMode,
                             pathConfig = pathConfig,
+                            annotationManager = annotationManager,
                         )
                     }
 
                     androidx.compose.animation.AnimatedVisibility(
                         visible = gestureMode == GestureMode.DRAW,
-                        modifier = Modifier.align(Alignment.TopCenter)
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 0.dp)
                     ) {
                         DrawingToolbar(
+                            annotationManager = annotationManager,
                             pathConfig = pathConfig,
                             onClose = { config ->
                                 pathConfig = config
