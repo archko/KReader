@@ -89,22 +89,27 @@ public class AnnotationManager(public val normalizePath: String) {
                 put("normalizePath", normalizePath)
                 put("anno", buildJsonArray {
                     _annotations.forEach { (pageIndex, paths) ->
-                        paths.forEach { path ->
+                        if (paths.isNotEmpty()) {
                             add(buildJsonObject {
                                 put("page", pageIndex)
-                                put("points", buildJsonArray {
-                                    path.points.forEach { offset ->
+                                put("paths", buildJsonArray {
+                                    paths.forEach { path ->
                                         add(buildJsonObject {
-                                            put("x", offset.x)
-                                            put("y", offset.y)
+                                            put("points", buildJsonArray {
+                                                path.points.forEach { offset ->
+                                                    add(buildJsonObject {
+                                                        put("x", offset.x)
+                                                        put("y", offset.y)
+                                                    })
+                                                }
+                                            })
+                                            put("config", buildJsonObject {
+                                                put("c", path.config.color.value.toString(16))
+                                                put("s", path.config.strokeWidth)
+                                                put("d", path.config.drawType.name)
+                                            })
                                         })
                                     }
-                                })
-                                // 序列化 config
-                                put("config", buildJsonObject {
-                                    put("color", path.config.color.value.toLong())
-                                    put("strokeWidth", path.config.strokeWidth)
-                                    put("drawType", path.config.drawType.name)
                                 })
                             })
                         }
@@ -160,33 +165,42 @@ public class AnnotationManager(public val normalizePath: String) {
                 // 先清空现有数据
                 _annotations.clear()
                 
-                array.forEach { itemObj ->
-                    val item = itemObj.jsonObject
-                    val pageIndex = item["page"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@forEach
-                    val pointsArray = item["points"]?.jsonArray
-                    val configObj = item["config"]?.jsonObject
+                array.forEach { pageObj ->
+                    val pageItem = pageObj.jsonObject
+                    val pageIndex = pageItem["page"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@forEach
+                    val pathsArray = pageItem["paths"]?.jsonArray
                     
-                    if (pointsArray != null && configObj != null) {
-                        val points = pointsArray.map { pointObj ->
-                            val point = pointObj.jsonObject
-                            val x = point["x"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
-                            val y = point["y"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
-                            Offset(x, y)
+                    pathsArray?.let { paths ->
+                        paths.forEach { pathObj ->
+                            val path = pathObj.jsonObject
+                            val pointsArray = path["points"]?.jsonArray
+                            val configObj = path["config"]?.jsonObject
+                            
+                            if (pointsArray != null && configObj != null) {
+                                val points = pointsArray.map { pointObj ->
+                                    val point = pointObj.jsonObject
+                                    val x = point["x"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
+                                    val y = point["y"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
+                                    Offset(x, y)
+                                }
+
+                                val colorStr = configObj["c"]?.jsonPrimitive?.content
+                                val colorValue = colorStr?.toULongOrNull(16)
+                                val color = colorValue?.let { Color(it) } ?: Color(0xFFff0000)
+                                val strokeWidth = configObj["s"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 4f
+                                val drawTypeStr = configObj["d"]?.jsonPrimitive?.content ?: "CURVE"
+                                val drawType = DrawType.valueOf(drawTypeStr)
+                                
+                                val config = PathConfig(
+                                    color = color,
+                                    strokeWidth = strokeWidth,
+                                    drawType = drawType
+                                )
+                                
+                                val annotationPath = AnnotationPath(points, config)
+                                _annotations.getOrPut(pageIndex) { mutableListOf() }.add(annotationPath)
+                            }
                         }
-                        
-                        val colorValue = configObj["color"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0xFF0000FF
-                        val strokeWidth = configObj["strokeWidth"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 4f
-                        val drawTypeStr = configObj["drawType"]?.jsonPrimitive?.content ?: "CURVE"
-                        val drawType = DrawType.valueOf(drawTypeStr)
-                        
-                        val config = PathConfig(
-                            color = Color(colorValue),
-                            strokeWidth = strokeWidth,
-                            drawType = drawType
-                        )
-                        
-                        val annotationPath = AnnotationPath(points, config)
-                        _annotations.getOrPut(pageIndex) { mutableListOf() }.add(annotationPath)
                     }
                 }
             }
