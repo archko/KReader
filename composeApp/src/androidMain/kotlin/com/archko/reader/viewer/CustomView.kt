@@ -586,14 +586,14 @@ fun CustomView(
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
             val annotationManager = remember(paths) {
-                var fileHash = ""
+                var normalizedPath = ""
                 if (paths.size == 1) {
                     val first = paths[0]
                     if (FileTypeUtils.isDocumentFile(first)) {
-                        fileHash = first.hashCode().toString()
+                        normalizedPath = normalizePath(first)
                     }
                 }
-                AnnotationManager(fileHash)
+                AnnotationManager(normalizedPath)
             }
 
             // 监听朗读状态

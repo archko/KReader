@@ -196,7 +196,7 @@ public expect fun getStoragePath(): String
 
 public expect fun getPageCacheFile(file: File): File
 
-public expect fun getProgressCacheFile(name: String): File
+public expect fun getCacheDirectory(name: String): File
 
 public expect fun getWebdavCacheDir(): File
 

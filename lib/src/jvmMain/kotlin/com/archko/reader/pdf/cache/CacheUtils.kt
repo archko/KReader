@@ -20,11 +20,14 @@ public actual fun getPageCacheFile(file: File): File {
     return saveFile
 }
 
-public actual fun getProgressCacheFile(name: String): File {
+public actual fun getCacheDirectory(name: String): File {
     val file = File(
         getCacheDirectory().absolutePath
                 + File.separator + name
     )
+    if(!file.exists()) {
+        file.mkdirs()
+    }
     return file
 }
 
