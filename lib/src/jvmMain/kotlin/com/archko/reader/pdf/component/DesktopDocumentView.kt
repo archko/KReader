@@ -33,7 +33,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
-import kotlin.math.abs
+import com.archko.reader.pdf.util.ViewUtils
 import kotlin.math.max
 import kotlin.math.min
 
@@ -362,7 +362,7 @@ public fun DesktopDocumentView(
         if (initialOrientation != orientation && pageViewState.init) {
             isJumping = true // 设置跳转标志
             val firstPageIndex =
-                firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
+                ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
             println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$firstPageIndex")
             orientation = initialOrientation
             offset = Offset.Zero
@@ -467,7 +467,7 @@ public fun DesktopDocumentView(
     LaunchedEffect(offset) {
         // 只有在非跳转状态下才处理页面变化回调
         if (!isJumping) {
-            firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
+            //ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
         }
     }
 
@@ -584,7 +584,7 @@ public fun DesktopDocumentView(
 
                             // 如果没有处理链接，再处理翻页逻辑
                             if (!linkHandled) {
-                                val isPageTurned = handleTapGesture(
+                                val isPageTurned = ViewUtils.handleTapGesture(
                                     offsetTap,
                                     viewSize,
                                     offset,
@@ -598,7 +598,7 @@ public fun DesktopDocumentView(
 
                                 // 如果不是翻页区域，触发非页面区域点击回调
                                 if (!isPageTurned) {
-                                    val clickedPage = calculateClickedPage(
+                                    val clickedPage = ViewUtils.calculateClickedPage(
                                         offsetTap,
                                         offset,
                                         orientation,
@@ -620,73 +620,6 @@ public fun DesktopDocumentView(
                 }
                 .pointerInput("drag_gestures", gestureMode) {
                     when (gestureMode) {
-                        GestureMode.DRAW -> {
-                            detectDragGestures(
-                                onDragStart = { startOffset ->
-                                    drawingPoints.clear()
-                                    val targetPage = pageViewState.pageToRender.find {
-                                        it.bounds.contains(startOffset - offset)
-                                    }
-                                    activeDrawingPage = targetPage?.aPage?.index ?: -1
-                                },
-                                onDrag = { change, _ ->
-                                    if (activeDrawingPage != -1) {
-                                        val targetPage = pageViewState.pageToRender.find {
-                                            it.aPage.index == activeDrawingPage
-                                        } ?: return@detectDragGestures
-
-                                        val local = change.position - offset - Offset(
-                                            targetPage.xOffset,
-                                            targetPage.yOffset
-                                        )
-                                        val currentRel = Offset(
-                                            local.x / targetPage.width,
-                                            local.y / targetPage.height
-                                        )
-
-                                        if (pathConfig.drawType == DrawType.LINE) {
-                                            // 直线模式：始终只有起点和当前点
-                                            val startRel = drawingPoints.first()
-                                            val linePoints =
-                                                calculateLinePoints(startRel, currentRel)
-                                            pageViewState.updateDrawing(
-                                                activeDrawingPage,
-                                                linePoints,
-                                                pathConfig,
-                                            )
-                                        } else {
-                                            // 曲线模式
-                                            drawingPoints.add(currentRel)
-                                            pageViewState.updateDrawing(
-                                                activeDrawingPage,
-                                                drawingPoints.toList(),
-                                                pathConfig,
-                                            )
-                                        }
-                                        change.consume()
-                                    }
-                                },
-                                onDragEnd = {
-                                    if (activeDrawingPage != -1) {
-                                        val finalPoints =
-                                            if (pathConfig.drawType == DrawType.LINE) {
-                                                pageViewState.activeDrawingAnno?.second?.points
-                                                    ?: emptyList()
-                                            } else {
-                                                drawingPoints.toList()
-                                            }
-                                        pageViewState.finalizeDrawing(
-                                            activeDrawingPage,
-                                            finalPoints,
-                                            pathConfig,
-                                        )
-                                    }
-                                    drawingPoints.clear()
-                                    activeDrawingPage = -1
-                                }
-                            )
-                        }
-
                         GestureMode.SELECTION -> {
                             var dragStartPos: Offset? = null
                             var currentDragPos: Offset? = null
@@ -704,7 +637,7 @@ public fun DesktopDocumentView(
                                     showTextActionToolbar = false
 
                                     // 找到点击的页面并开始选择
-                                    val clickedPageIndex = calculateClickedPage(
+                                    val clickedPageIndex = ViewUtils.calculateClickedPage(
                                         startPos,
                                         offset,
                                         orientation,
@@ -757,6 +690,86 @@ public fun DesktopDocumentView(
                                     // 重置拖拽状态
                                     dragStartPos = null
                                     currentDragPos = null
+                                }
+                            )
+                        }
+
+                        GestureMode.DRAW -> {
+                            detectDragGestures(
+                                onDragStart = { startOffset ->
+                                    drawingPoints.clear()
+                                    val targetPage = pageViewState.pageToRender.find {
+                                        it.bounds.contains(startOffset - offset)
+                                    }
+                                    activeDrawingPage = targetPage?.aPage?.index ?: -1
+
+                                    // 添加起始点
+                                    if (activeDrawingPage != -1) {
+                                        val targetPage =
+                                            pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage }!!
+                                        val localX = startOffset.x - offset.x - targetPage.xOffset
+                                        val localY = startOffset.y - offset.y - targetPage.yOffset
+                                        val startRel = Offset(
+                                            localX / targetPage.width,
+                                            localY / targetPage.height
+                                        )
+                                        drawingPoints.add(startRel)
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    if (activeDrawingPage != -1) {
+                                        val targetPage =
+                                            pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage }!!
+                                        val localX =
+                                            change.position.x - offset.x - targetPage.xOffset
+                                        val localY =
+                                            change.position.y - offset.y - targetPage.yOffset
+                                        val currentRel = Offset(
+                                            localX / targetPage.width,
+                                            localY / targetPage.height
+                                        )
+
+                                        if (pathConfig.drawType == DrawType.LINE) {
+                                            // 直线模式：始终只有起点和当前点
+                                            val startRel = drawingPoints.first()
+                                            val linePoints =
+                                                ViewUtils.calculateLinePoints(startRel, currentRel)
+                                            pageViewState.updateDrawing(
+                                                activeDrawingPage,
+                                                linePoints,
+                                                pathConfig
+                                            )
+                                        } else {
+                                            // 曲线模式：添加所有拖拽点
+                                            drawingPoints.add(currentRel)
+                                            pageViewState.updateDrawing(
+                                                activeDrawingPage,
+                                                drawingPoints.toList(),
+                                                pathConfig
+                                            )
+                                        }
+                                        change.consume()
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (activeDrawingPage != -1) {
+                                        val finalPoints =
+                                            if (pathConfig.drawType == DrawType.LINE) {
+                                                // 直线模式：使用当前绘制的点（起点和终点）
+                                                pageViewState.activeDrawingAnno?.second?.points
+                                                    ?: emptyList()
+                                            } else {
+                                                // 曲线模式：使用所有收集的点
+                                                drawingPoints.toList()
+                                            }
+                                        pageViewState.finalizeDrawing(
+                                            activeDrawingPage,
+                                            finalPoints,
+                                            pathConfig
+                                        )
+                                    }
+                                    drawingPoints.clear()
+                                    activeDrawingPage = -1
                                 }
                             )
                         }
@@ -880,80 +893,6 @@ public fun DesktopDocumentView(
     }
 }
 
-private fun firstPage(
-    pageViewState: PageViewState,
-    offset: Offset,
-    orientation: Int,
-    viewSize: IntSize,
-    onPageChanged: ((Int) -> Unit)?
-): Int {
-    var firstVisible = 0
-    val pages = pageViewState.pages
-    if (pages.isNotEmpty()) {
-        val offsetY = offset.y
-        val offsetX = offset.x
-        firstVisible = pages.indexOfFirst { page ->
-            if (orientation == Vertical) {
-                val top = -offsetY
-                val bottom = top + viewSize.height
-                page.bounds.bottom > top && page.bounds.top < bottom
-            } else {
-                val left = -offsetX
-                val right = left + viewSize.width
-                page.bounds.right > left && page.bounds.left < right
-            }
-        }
-        if (firstVisible != -1) {
-            onPageChanged?.invoke(firstVisible)
-        }
-    }
-    return firstVisible
-}
-
-/**
- * 根据点击坐标计算点击的页面索引
- */
-private fun calculateClickedPage(
-    tapOffset: Offset,
-    currentOffset: Offset,
-    orientation: Int,
-    pageViewState: PageViewState
-): Int {
-    // 将点击坐标转换为相对于内容的位置
-    val contentX = tapOffset.x - currentOffset.x
-    val contentY = tapOffset.y - currentOffset.y
-
-    // 查找包含该坐标的页面
-    val pages = pageViewState.pages
-    for (i in pages.indices) {
-        val page = pages[i]
-        if (orientation == Vertical) {
-            // 垂直模式：检查Y坐标是否在页面范围内
-            if (contentY >= page.bounds.top && contentY <= page.bounds.bottom) {
-                return i
-            }
-        } else {
-            // 水平模式：检查X坐标是否在页面范围内
-            if (contentX >= page.bounds.left && contentX <= page.bounds.right) {
-                return i
-            }
-        }
-    }
-
-    // 如果没有找到匹配的页面，返回第一个可见页面
-    return pages.indexOfFirst { page ->
-        if (orientation == Vertical) {
-            val top = -currentOffset.y
-            val bottom = top + pageViewState.viewSize.height
-            page.bounds.bottom > top && page.bounds.top < bottom
-        } else {
-            val left = -currentOffset.x
-            val right = left + pageViewState.viewSize.width
-            page.bounds.right > left && page.bounds.left < right
-        }
-    }.coerceAtLeast(0)
-}
-
 /**
  * 处理缩放操作的公共方法
  */
@@ -990,78 +929,4 @@ private fun handleZoom(
     val newOffset = Offset(clampedOffsetX, clampedOffsetY)
 
     onZoomChanged(newOffset, newZoom)
-}
-
-/**
- * 处理点击手势的公共方法，避免重复代码
- * @return 是否发生了翻页操作
- */
-private fun handleTapGesture(
-    offsetTap: Offset,
-    viewSize: IntSize,
-    currentOffset: Offset,
-    orientation: Int,
-    pageViewState: PageViewState,
-    keepPx: Float,
-    onOffsetChanged: (Offset) -> Unit
-): Boolean {
-    if (orientation == Vertical) {
-        // 垂直方向：上下翻页
-        val y = offsetTap.y
-        val height = viewSize.height.toFloat()
-        return when {
-            y < height / 4 -> {
-                // 点击上方区域，向上翻页
-                val newY = (currentOffset.y + viewSize.height - keepPx).coerceAtMost(0f)
-                onOffsetChanged(Offset(currentOffset.x, newY))
-                true
-            }
-
-            y > height * 3 / 4 -> {
-                // 点击下方区域，向下翻页
-                val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
-                val newY = (currentOffset.y - viewSize.height + keepPx).coerceAtLeast(-maxY)
-                onOffsetChanged(Offset(currentOffset.x, newY))
-                true
-            }
-
-            else -> false // 点击中间区域，不是翻页
-        }
-    } else {
-        // 水平方向：左右翻页
-        val x = offsetTap.x
-        val width = viewSize.width.toFloat()
-        return when {
-            x < width / 4 -> {
-                // 点击左侧区域，向左翻页
-                val newX = (currentOffset.x + viewSize.width - keepPx).coerceAtMost(0f)
-                onOffsetChanged(Offset(newX, currentOffset.y))
-                true
-            }
-
-            x > width * 3 / 4 -> {
-                // 点击右侧区域，向右翻页
-                val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-                val newX = (currentOffset.x - viewSize.width + keepPx).coerceAtLeast(-maxX)
-                onOffsetChanged(Offset(newX, currentOffset.y))
-                true
-            }
-
-            else -> false // 点击中间区域，不是翻页
-        }
-    }
-}
-
-// 计算直线坐标的方法
-private fun calculateLinePoints(start: Offset, end: Offset): List<Offset> {
-    val dx = abs(end.x - start.x)
-    val dy = abs(end.y - start.y)
-
-    return if (dx > dy) {
-        // 水平线：Y坐标与起点保持一致
-        listOf(start, Offset(end.x, start.y))
-    } else {
-        // 垂直线：X坐标与起点保持一致
-        listOf(start, Offset(start.x, end.y))
-    }
 }

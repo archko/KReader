@@ -43,6 +43,7 @@ import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.pdf.util.normalizePath
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.dialog.FontDialog

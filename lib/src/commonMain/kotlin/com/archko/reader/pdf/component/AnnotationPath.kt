@@ -15,7 +15,7 @@ public data class AnnotationPath(
 public data class PathConfig(
     val color: Color = Color.Red,
     val strokeWidth: Float = 4f,
-    val drawType: DrawType = DrawType.CURVE
+    val drawType: DrawType = DrawType.LINE
 ) {
     override fun toString(): String {
         return "PathConfig(color=$color, strokeWidth=$strokeWidth, drawType=$drawType)"

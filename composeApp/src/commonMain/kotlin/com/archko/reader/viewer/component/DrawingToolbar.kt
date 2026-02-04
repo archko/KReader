@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,9 +24,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.component.DrawType
 import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.state.AnnotationManager
@@ -67,7 +64,7 @@ fun DrawingToolbar(
             IconButton(onClick = { showWidthDialog = true }) {
                 Box(Modifier.size(20.dp).drawBehind {
                     drawLine(
-                        Color.Gray,
+                        Color.Red,
                         Offset(0f, size.height / 2),
                         Offset(size.width, size.height / 2),
                         strokeWidth = pathConfig.strokeWidth
