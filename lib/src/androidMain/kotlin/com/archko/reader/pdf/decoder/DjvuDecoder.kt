@@ -104,7 +104,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
         filePath = file.absolutePath
         djvuLoader = DjvuLoader()
-        
+
         // 先打开文件获取页面数
         djvuLoader!!.openDjvu(file.absolutePath)
         val djvuInfo = djvuLoader!!.djvuInfo
@@ -114,12 +114,12 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
         // 先尝试从缓存加载页面尺寸和切边数据
         initPageSizeBean()
-        
+
         // 如果缓存不存在或不完整，从文档加载页面尺寸
         if (originalPageSizes.isEmpty()) {
             originalPageSizes = prepareSizes()
         }
-        
+
         outlineItems = prepareOutlines()
         cacheCoverIfNeeded()
     }
@@ -129,12 +129,12 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             val count: Int = pageCount
             val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
             println("DjvuDecoder.initPageSizeBean:$psb")
-            
+
             if (null != psb && psb.list != null && psb.list!!.size == count) {
                 // 缓存存在且完整，直接使用
                 pageSizeBean = psb
                 aPageList!!.addAll(psb.list as MutableList)
-                
+
                 // 从缓存构建 originalPageSizes，避免重复加载页面
                 val list = mutableListOf<Size>()
                 var totalHeight = 0
@@ -153,7 +153,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                 println("DjvuDecoder.initPageSizeBean: 从缓存加载了 ${list.size} 个页面尺寸")
                 return
             }
-            
+
             // 缓存不存在或不完整，需要从文档加载
             pageSizeBean = PageSizeBean()
             pageSizeBean!!.list = aPageList
@@ -229,8 +229,8 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     override fun close() {
         djvuLoader?.close()
-        if (cachePage && aPageList != null && !aPageList.isEmpty()) {
-            println("DjvuDecoder.close:$aPageList")
+        if (cachePage && !aPageList.isNullOrEmpty()) {
+            println("DjvuDecoder.close:${aPageList.size}")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
@@ -249,7 +249,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         var totalHeight = 0
         println("DjVu document has $pageCount pages")
 
-        for (i in 0 until pageCount) {
+        for (i in 0..pageCount) {
             val pageInfo = djvuLoader!!.getPageInfo(i)
             if (pageInfo != null) {
                 val width = pageInfo.width
@@ -263,18 +263,18 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                 )
                 totalHeight += size.height
                 list.add(size)
-                
+
                 // 同时填充 aPageList
                 val aPage = APage(i, width, height, 1f)
                 aPageList!!.add(aPage)
             }
         }
-        
+
         // 保存到缓存
         if (cachePage && aPageList!!.isNotEmpty()) {
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
-        
+
         println("DjvuDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")
         return list
     }

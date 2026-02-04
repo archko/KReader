@@ -151,7 +151,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             println("decode.thumb:$path")
 
             try {
-                val pixmapBbox = com.artifex.mupdf.fitz.Rect(0f, 0f, params.renderWidth, params.renderHeight)
+                val pixmapBbox =
+                    com.artifex.mupdf.fitz.Rect(0f, 0f, params.renderWidth, params.renderHeight)
                 val pixmap = com.artifex.mupdf.fitz.Pixmap(
                     com.artifex.mupdf.fitz.ColorSpace.DeviceBGR,
                     pixmapBbox,
@@ -168,8 +169,20 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
                 page.run(drawDevice, ctm, null)
 
-                val bufferedImage = BufferedImage(params.renderWidth.toInt(), params.renderHeight.toInt(), BufferedImage.TYPE_3BYTE_BGR)
-                bufferedImage.setRGB(0, 0, params.renderWidth.toInt(), params.renderHeight.toInt(), pixmap.pixels, 0, params.renderWidth.toInt())
+                val bufferedImage = BufferedImage(
+                    params.renderWidth.toInt(),
+                    params.renderHeight.toInt(),
+                    BufferedImage.TYPE_3BYTE_BGR
+                )
+                bufferedImage.setRGB(
+                    0,
+                    0,
+                    params.renderWidth.toInt(),
+                    params.renderHeight.toInt(),
+                    pixmap.pixels,
+                    0,
+                    params.renderWidth.toInt()
+                )
 
                 drawDevice.close()
                 drawDevice.destroy()
@@ -254,15 +267,15 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 doc.layout(w, h, fontSize)
             }
             pageCount = doc.countPages()
-            
+
             // 先尝试从缓存加载页面尺寸和切边数据
             initPageSizeBean()
-            
+
             // 如果缓存不存在或不完整，从文档加载页面尺寸
             if (originalPageSizes.isEmpty()) {
                 originalPageSizes = prepareSizes()
             }
-            
+
             outlineItems = prepareOutlines()
             cacheCoverIfNeeded()
         }
@@ -273,12 +286,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val count: Int = pageCount
             val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
             println("PdfDecoder.initPageSizeBean:$psb")
-            
+
             if (null != psb && psb.list != null && psb.list!!.size == count) {
                 // 缓存存在且完整，直接使用
                 pageSizeBean = psb
                 aPageList!!.addAll(psb.list as MutableList)
-                
+
                 // 从缓存构建 originalPageSizes，避免重复加载页面
                 val list = mutableListOf<Size>()
                 var totalHeight = 0
@@ -297,7 +310,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 println("PdfDecoder.initPageSizeBean: 从缓存加载了 ${list.size} 个页面尺寸")
                 return
             }
-            
+
             // 缓存不存在或不完整，需要从文档加载
             pageSizeBean = PageSizeBean()
             pageSizeBean!!.list = aPageList
@@ -376,8 +389,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun close() {
-        if (cachePage && aPageList != null && !aPageList.isEmpty()) {
-            println("PdfDecoder.close:$aPageList")
+        if (cachePage && !aPageList.isNullOrEmpty()) {
+            println("PdfDecoder.close:${aPageList.size}")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
@@ -419,12 +432,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 totalHeight += size.height
                 page.destroy()
                 list.add(size)
-                
+
                 // 同时填充 aPageList
                 val aPage = APage(i, width, height, 1f)
                 aPageList!!.add(aPage)
             }
-            
+
             // 保存到缓存
             if (cachePage && aPageList!!.isNotEmpty()) {
                 APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)

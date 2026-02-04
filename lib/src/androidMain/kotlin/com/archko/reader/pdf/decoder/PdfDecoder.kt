@@ -357,8 +357,8 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun close() {
-        if (cachePage && aPageList != null && !aPageList.isEmpty()) {
-            println("PdfDecoder.close:$aPageList")
+        if (cachePage && !aPageList.isNullOrEmpty()) {
+            println("PdfDecoder.close:${aPageList.size}")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 

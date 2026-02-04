@@ -228,8 +228,8 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     override fun close() {
         djvuLoader?.close()
-        if (cachePage && aPageList != null && !aPageList.isEmpty()) {
-            println("PdfDecoder.close:$aPageList")
+        if (cachePage && !aPageList.isNullOrEmpty()) {
+            println("PdfDecoder.close:${aPageList.size}")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
@@ -248,7 +248,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         var totalHeight = 0
         println("DjVu document has $pageCount pages")
 
-        for (i in 0 until pageCount) {
+        for (i in 0..pageCount) {
             val pageInfo = djvuLoader!!.getPageInfo(i)
             if (pageInfo != null) {
                 val width = pageInfo.width
