@@ -8,6 +8,7 @@ import com.archko.reader.pdf.cache.getCacheDirectory
 import com.archko.reader.pdf.component.AnnotationPath
 import com.archko.reader.pdf.component.DrawType
 import com.archko.reader.pdf.component.PathConfig
+import com.archko.reader.pdf.util.normalizePath
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,13 +18,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.File
 
 /**
  * @author: archko 2026/2/3 :08:47
  */
-public class AnnotationManager(public val normalizePath: String) {
+public class AnnotationManager(public val path: String) {
     public val decodeScope: CoroutineScope =
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
@@ -54,7 +56,7 @@ public class AnnotationManager(public val normalizePath: String) {
         _annotations.getOrPut(pageIndex) { mutableListOf() }.add(path)
         undoStack.add(UndoAction.Add(pageIndex, path))
         redoStack.clear() // 新操作会清空重做栈
-        
+
         decodeScope.launch {
             saveToFile()
         }
@@ -84,9 +86,13 @@ public class AnnotationManager(public val normalizePath: String) {
 
     // 持久化：转换为 JSON
     public fun toJson(): String {
+        val normalizePath = normalizePath(path)
+        val file = File(path)
+        val size = file.length()
         return try {
             buildJsonObject {
                 put("normalizePath", normalizePath)
+                put("size", size)
                 put("anno", buildJsonArray {
                     _annotations.forEach { (pageIndex, paths) ->
                         if (paths.isNotEmpty()) {
@@ -158,47 +164,63 @@ public class AnnotationManager(public val normalizePath: String) {
     // 从 JSON 解析
     private fun fromJson(json: String) {
         try {
+            _annotations.clear()
+            val file = File(path)
+            val size = file.length()
+            val nPath = normalizePath(path)
             val jsonObj = Json.parseToJsonElement(json).jsonObject
+            if (nPath != jsonObj["normalizePath"]?.jsonPrimitive?.content) {
+                println("new nPath:$nPath")
+                getAnnotationCacheFile().delete()
+                return
+            }
+            if (size != jsonObj["size"]?.jsonPrimitive?.longOrNull) {
+                println("new filesize:$size")
+                getAnnotationCacheFile().delete()
+                return
+            }
             val annoArray = jsonObj["anno"]?.jsonArray
-            
+
             annoArray?.let { array ->
-                // 先清空现有数据
-                _annotations.clear()
-                
                 array.forEach { pageObj ->
                     val pageItem = pageObj.jsonObject
-                    val pageIndex = pageItem["page"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@forEach
+                    val pageIndex =
+                        pageItem["page"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@forEach
                     val pathsArray = pageItem["paths"]?.jsonArray
-                    
+
                     pathsArray?.let { paths ->
                         paths.forEach { pathObj ->
                             val path = pathObj.jsonObject
                             val pointsArray = path["points"]?.jsonArray
                             val configObj = path["config"]?.jsonObject
-                            
+
                             if (pointsArray != null && configObj != null) {
                                 val points = pointsArray.map { pointObj ->
                                     val point = pointObj.jsonObject
-                                    val x = point["x"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
-                                    val y = point["y"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
+                                    val x =
+                                        point["x"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
+                                    val y =
+                                        point["y"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 0f
                                     Offset(x, y)
                                 }
 
                                 val colorStr = configObj["c"]?.jsonPrimitive?.content
                                 val colorValue = colorStr?.toULongOrNull(16)
                                 val color = colorValue?.let { Color(it) } ?: Color(0xFFff0000)
-                                val strokeWidth = configObj["s"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 4f
+                                val strokeWidth =
+                                    configObj["s"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 4f
                                 val drawTypeStr = configObj["d"]?.jsonPrimitive?.content ?: "CURVE"
                                 val drawType = DrawType.valueOf(drawTypeStr)
-                                
+
                                 val config = PathConfig(
                                     color = color,
                                     strokeWidth = strokeWidth,
                                     drawType = drawType
                                 )
-                                
+
                                 val annotationPath = AnnotationPath(points, config)
-                                _annotations.getOrPut(pageIndex) { mutableListOf() }.add(annotationPath)
+                                _annotations.getOrPut(pageIndex) { mutableListOf() }
+                                    .add(annotationPath)
                             }
                         }
                     }
@@ -211,6 +233,7 @@ public class AnnotationManager(public val normalizePath: String) {
 
     // 获取注解缓存文件
     private fun getAnnotationCacheFile(): File {
+        val normalizePath = normalizePath(path)
         return File(getCacheDirectory("anno"), "${normalizePath.hashCode()}.json")
     }
 }

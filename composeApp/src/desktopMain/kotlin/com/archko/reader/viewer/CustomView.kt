@@ -30,7 +30,6 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.util.FileTypeUtils
-import com.archko.reader.pdf.util.normalizePath
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
@@ -513,14 +512,14 @@ fun CustomView(
             // 跳转页面状态
             var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
             val annotationManager = remember(paths) {
-                var normalizedPath = ""
+                var absolutePath = ""
                 if (paths.size == 1) {
                     val first = paths[0]
                     if (FileTypeUtils.isDocumentFile(first)) {
-                        normalizedPath = normalizePath(first)
+                        absolutePath = first
                     }
                 }
-                AnnotationManager(normalizedPath)
+                AnnotationManager(absolutePath)
             }
 
             Column(

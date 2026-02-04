@@ -43,7 +43,6 @@ import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.IntentFile
-import com.archko.reader.pdf.util.normalizePath
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.dialog.FontDialog
@@ -587,14 +586,14 @@ fun CustomView(
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
             val annotationManager = remember(paths) {
-                var normalizedPath = ""
+                var absolutePath = ""
                 if (paths.size == 1) {
                     val first = paths[0]
                     if (FileTypeUtils.isDocumentFile(first)) {
-                        normalizedPath = normalizePath(first)
+                        absolutePath = first
                     }
                 }
-                AnnotationManager(normalizedPath)
+                AnnotationManager(absolutePath)
             }
 
             // 监听朗读状态
