@@ -21,6 +21,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.component.DrawType
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.draw_curve
+import kreader.composeapp.generated.resources.draw_line
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun DrawTypePickerDialog(
@@ -54,7 +58,7 @@ fun DrawTypePickerDialog(
                         drawPath(p, Color.Red, style = Stroke(width = 4f))
                     })
                     Spacer(Modifier.width(12.dp))
-                    Text("自由曲线 (Curve)")
+                    Text(stringResource(Res.string.draw_curve))
                     Spacer(Modifier.weight(1f))
                 }
                 Row(
@@ -71,7 +75,7 @@ fun DrawTypePickerDialog(
                         )
                     })
                     Spacer(Modifier.width(12.dp))
-                    Text("直线模式 (水平/垂直)")
+                    Text(stringResource(Res.string.draw_line))
                     Spacer(Modifier.weight(1f))
                 }
             }

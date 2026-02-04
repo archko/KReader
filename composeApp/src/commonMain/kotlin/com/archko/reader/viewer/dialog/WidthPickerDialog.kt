@@ -19,6 +19,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.cancel
+import kreader.composeapp.generated.resources.confirm
+import kreader.composeapp.generated.resources.draw_stroke_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun WidthPickerDialog(
@@ -29,7 +34,7 @@ fun WidthPickerDialog(
     var width by remember { mutableFloatStateOf(currentWidth) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("笔触粗细") },
+        title = { Text(stringResource(Res.string.draw_stroke_title)) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // 实时预览线宽
@@ -45,7 +50,15 @@ fun WidthPickerDialog(
                 Text("${width.toInt()} px")
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(width) }) { Text("确定") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        confirmButton = {
+            TextButton(onClick = { onConfirm(width) }) {
+                Text(stringResource(Res.string.confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cancel))
+            }
+        }
     )
 }

@@ -196,4 +196,9 @@
     <string name="save">保存</string>
     <string name="model_name">模型名称</string>
     <string name="token">令牌Token</string>
+
+    <string name="draw_curve">自由曲线</string>
+    <string name="draw_line">直线 (水平/垂直)</string>
+    <string name="draw_color_title">选择画笔颜色</string>
+    <string name="draw_stroke_title">笔触粗细</string>
 </resources>

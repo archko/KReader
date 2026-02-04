@@ -28,9 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.component.DrawType
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.cancel
+import kreader.composeapp.generated.resources.confirm
+import kreader.composeapp.generated.resources.draw_color_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ColorPickerDialog(
@@ -54,7 +60,7 @@ fun ColorPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择画笔颜色") },
+        title = { Text(stringResource(Res.string.draw_color_title)) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // 顶部预览区域：展示当前的颜色、粗细和线条类型
@@ -70,24 +76,24 @@ fun ColorPickerDialog(
                                 // 预览直线
                                 drawLine(
                                     color = selectedColor,
-                                    start = Offset(40f, centerY),
-                                    end = Offset(size.width - 40f, centerY),
+                                    start = Offset(20f, centerY),
+                                    end = Offset(size.width - 20f, centerY),
                                     strokeWidth = currentWidth
                                 )
                             } else {
                                 // 预览曲线 (波浪线)
-                                val path = androidx.compose.ui.graphics.Path().apply {
-                                    moveTo(40f, centerY)
-                                    quadraticBezierTo(
+                                val path = Path().apply {
+                                    moveTo(20f, centerY)
+                                    quadraticTo(
                                         size.width / 4,
                                         centerY - 20,
                                         size.width / 2,
                                         centerY
                                     )
-                                    quadraticBezierTo(
+                                    quadraticTo(
                                         size.width * 3 / 4,
                                         centerY + 20,
-                                        size.width - 40,
+                                        size.width - 20,
                                         centerY
                                     )
                                 }
@@ -120,10 +126,14 @@ fun ColorPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedColor) }) { Text("确定") }
+            TextButton(onClick = { onConfirm(selectedColor) }) {
+                Text(stringResource(Res.string.confirm))
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cancel))
+            }
         }
     )
 }
