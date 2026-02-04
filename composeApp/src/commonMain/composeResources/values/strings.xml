@@ -196,6 +196,7 @@
     <string name="model_name">Model Name</string>
     <string name="token">Token</string>
 
+    <string name="draw_line_title">Line Type</string>
     <string name="draw_curve">Curve</string>
     <string name="draw_line">Line (Horizontal/Vertical)</string>
     <string name="draw_color_title">Select Color</string>

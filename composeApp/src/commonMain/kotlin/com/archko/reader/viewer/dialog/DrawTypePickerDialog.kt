@@ -24,6 +24,7 @@ import com.archko.reader.pdf.component.DrawType
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.draw_curve
 import kreader.composeapp.generated.resources.draw_line
+import kreader.composeapp.generated.resources.draw_line_title
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -34,7 +35,7 @@ fun DrawTypePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("LINE") },
+        title = { Text(stringResource(Res.string.draw_line_title)) },
         text = {
             Column {
                 Row(
