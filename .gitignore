@@ -25,3 +25,4 @@ composeApp/release_key.jks
 composeApp/*.sh
 *.log
 .vscode
+picture

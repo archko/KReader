@@ -785,10 +785,10 @@ fun CustomView(
             }
 
             AnimatedVisibility(
-                visible = gestureMode == GestureMode.DRAW,
+                visible = gestureMode == GestureMode.DRAW && showToolbar,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (showToolbar) 48.dp else 0.dp)
+                    .padding(top = 48.dp)
             ) {
                 DrawingToolbar(
                     annotationManager = annotationManager,
@@ -968,8 +968,14 @@ fun CustomView(
                 OutlineDialog(
                     currentPage,
                     outlineList,
-                    onClick = { item ->
+                    annotationManager = annotationManager,
+                    onOutlineClick = { item ->
                         jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
+                        showOutlineDialog = false
+                        showToolbar = false
+                    },
+                    onAnnotationClick = { pageIndex ->
+                        jumpIntent = JumpIntent(pageIndex, JumpMode.PageNavigation)
                         showOutlineDialog = false
                         showToolbar = false
                     },

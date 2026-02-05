@@ -11,6 +11,9 @@ import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.util.normalizePath
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
@@ -29,9 +32,11 @@ public class AnnotationManager(public val path: String) {
     public val decodeScope: CoroutineScope =
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
-    // 原始数据：Map<页码, 路径列表>
     private val _annotations = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
     public val annotations: Map<Int, List<AnnotationPath>> = _annotations
+
+    private val _annotationsFlow = MutableStateFlow<Map<Int, List<AnnotationPath>>>(emptyMap())
+    public val annotationsFlow: StateFlow<Map<Int, List<AnnotationPath>>> = _annotationsFlow.asStateFlow()
 
     // 撤销/重做栈：记录的是"操作指令"
     private val undoStack = mutableStateListOf<UndoAction>()
@@ -44,6 +49,7 @@ public class AnnotationManager(public val path: String) {
     init {
         decodeScope.launch {
             loadFromFile()
+            updateAnnotationsFlow()
         }
     }
 
@@ -57,6 +63,8 @@ public class AnnotationManager(public val path: String) {
         undoStack.add(UndoAction.Add(pageIndex, path))
         redoStack.clear() // 新操作会清空重做栈
 
+        updateAnnotationsFlow()
+
         decodeScope.launch {
             saveToFile()
         }
@@ -69,7 +77,21 @@ public class AnnotationManager(public val path: String) {
             is UndoAction.Add -> {
                 _annotations[action.pageIndex]?.remove(action.path)
                 redoStack.add(action)
+                
+                updateAnnotationsFlow()
             }
+        }
+    }
+
+    public fun deletePaths(pageIndex: Int) {
+        _annotations.remove(pageIndex)
+        undoStack.clear()
+        redoStack.clear()
+        
+        updateAnnotationsFlow()
+
+        decodeScope.launch {
+            saveToFile()
         }
     }
 
@@ -80,11 +102,12 @@ public class AnnotationManager(public val path: String) {
             is UndoAction.Add -> {
                 _annotations.getOrPut(action.pageIndex) { mutableListOf() }.add(action.path)
                 undoStack.add(action)
+                
+                updateAnnotationsFlow()
             }
         }
     }
 
-    // 持久化：转换为 JSON
     public fun toJson(): String {
         val normalizePath = normalizePath(path)
         val file = File(path)
@@ -128,7 +151,6 @@ public class AnnotationManager(public val path: String) {
         }
     }
 
-    // 保存到文件
     public fun saveToFile() {
         try {
             val saveFile = getAnnotationCacheFile()
@@ -140,7 +162,6 @@ public class AnnotationManager(public val path: String) {
         }
     }
 
-    // 从文件加载
     public fun loadFromFile(): Boolean {
         return try {
             val saveFile = getAnnotationCacheFile()
@@ -161,7 +182,6 @@ public class AnnotationManager(public val path: String) {
         }
     }
 
-    // 从 JSON 解析
     private fun fromJson(json: String) {
         try {
             _annotations.clear()
@@ -231,9 +251,15 @@ public class AnnotationManager(public val path: String) {
         }
     }
 
-    // 获取注解缓存文件
     private fun getAnnotationCacheFile(): File {
         val normalizePath = normalizePath(path)
         return File(getCacheDirectory("anno"), "${normalizePath.hashCode()}.json")
+    }
+
+    private fun updateAnnotationsFlow() {
+        val immutableMap = _annotations.mapValues { (_, paths) ->
+            paths.toList()
+        }
+        _annotationsFlow.value = immutableMap
     }
 }

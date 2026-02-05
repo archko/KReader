@@ -2,6 +2,7 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.archko.reader.pdf.state.OcrEngine
 
 /**
  * Android平台的actual实现

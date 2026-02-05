@@ -202,4 +202,9 @@
     <string name="draw_line">直线 (水平/垂直)</string>
     <string name="draw_color_title">选择画笔颜色</string>
     <string name="draw_stroke_title">笔触粗细</string>
+    <string name="outline_tab">大纲</string>
+    <string name="annotation_tab">标注</string>
+    <string name="annotation_empty">没有标注</string>
+    <string name="annotations_count">%d个标注</string>
+    <string name="delete_annotation">删除标注</string>
 </resources>
