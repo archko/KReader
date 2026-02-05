@@ -49,6 +49,7 @@ import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.dialog.SleepTimerDialog
+import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsProgressListener
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
@@ -228,6 +229,16 @@ private fun ToolbarContent(
                                     tint = Color.White
                                 )
                             }
+                        }
+                    }
+
+                    item {
+                        IconButton(onClick = { onThumbnailDialogShow() }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_toc),
+                                contentDescription = "缩略图",
+                                tint = Color.White
+                            )
                         }
                     }
                 }
@@ -529,6 +540,7 @@ fun CustomView(
 
             var showToolbar by remember { mutableStateOf(false) }
             var showOutlineDialog by remember { mutableStateOf(false) }
+            var showThumbnailDialog by remember { mutableStateOf(false) }
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
@@ -980,6 +992,20 @@ fun CustomView(
                         showToolbar = false
                     },
                     onDismiss = { showOutlineDialog = false },
+                )
+            }
+
+            if (showThumbnailDialog) {
+                ThumbnailDialog(
+                    currentPage,
+                    list,
+                    decoder!!,
+                    onPageClick = { page ->
+                        jumpIntent = JumpIntent(page, JumpMode.PageNavigation)
+                        showThumbnailDialog = false
+                        showToolbar = false
+                    },
+                    onDismiss = { showThumbnailDialog = false },
                 )
             }
 
