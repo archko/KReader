@@ -29,7 +29,6 @@ import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.BitmapUtils
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
-import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.Utils
 import com.archko.reader.pdf.util.loadOutlineItems
@@ -173,7 +172,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         try {
             filePath = file.absolutePath
-            if (IntentFile.isReflowable(file.absolutePath)) {
+            if (FileTypeUtils.isReflowable(file.absolutePath)) {
                 val css = FontCSSGenerator.generateFontCSS(FontCSSGenerator.getFontFace(), "10px")
                 if (!TextUtils.isEmpty(css)) {
                     println("应用自定义CSS: $css")

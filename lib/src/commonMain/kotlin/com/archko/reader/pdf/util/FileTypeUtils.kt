@@ -21,8 +21,16 @@ public object FileTypeUtils {
                     || filePath.endsWith(".png") || filePath.endsWith(".gif")
                     || filePath.endsWith(".bmp") || filePath.endsWith(".webp")
                     || filePath.endsWith(".heif") || filePath.endsWith(".heic")
+                    //raw images
                     || filePath.endsWith(".dng") || filePath.endsWith(".arw")
                     || filePath.endsWith(".nef") || filePath.endsWith(".cr2")
+                    || filePath.endsWith(".cr3") || filePath.endsWith(".arw")
+                    || filePath.endsWith(".raf") || filePath.endsWith(".orf")
+                    || filePath.endsWith(".sr2") || filePath.endsWith(".srf")
+                    || filePath.endsWith(".srw") || filePath.endsWith(".x3f")
+                    || filePath.endsWith(".pef") || filePath.endsWith(".3fr")
+                    || filePath.endsWith(".rw2") || filePath.endsWith(".nrw")
+                    || filePath.endsWith(".crw")
         }
     }
 
@@ -108,5 +116,11 @@ public object FileTypeUtils {
                 || path.endsWith(".pptx", true)
                 || path.endsWith(".docx", true)
                 || path.endsWith(".xlsx", true)
+    }
+
+    public fun isSupportedImageForCreater(path: String): Boolean {
+        return path.endsWith(".jpg", true)
+                || path.endsWith(".jpeg", true)
+                || path.endsWith(".gif", true)
     }
 } 

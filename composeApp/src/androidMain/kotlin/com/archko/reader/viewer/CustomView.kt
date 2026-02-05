@@ -42,7 +42,6 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
-import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.dialog.FontDialog
@@ -220,7 +219,7 @@ private fun ToolbarContent(
                         }
                     }
 
-                    if (IntentFile.isReflowable(currentPath)) {
+                    if (FileTypeUtils.isReflowable(currentPath)) {
                         item {
                             IconButton(onClick = { onFontDialogShow() }) {
                                 Icon(

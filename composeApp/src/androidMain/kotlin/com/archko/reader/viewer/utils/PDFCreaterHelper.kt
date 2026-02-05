@@ -11,8 +11,8 @@ import com.archko.reader.image.MobiMetadata
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.util.BitmapUtils
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FileUtils
-import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.StreamUtils
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Image
@@ -148,7 +148,7 @@ object PDFCreaterHelper {
                     //split image,maxheight=PAPER_HEIGHT
                     splitImages(result, path, options.outWidth, options.outHeight)
                 } else {
-                    if (IntentFile.isSupportedImageForCreater(path)) {
+                    if (FileTypeUtils.isSupportedImageForCreater(path)) {
                         result.add(path)
                     } else {
                         convertImageToJpeg(result, path)
