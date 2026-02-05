@@ -16,22 +16,7 @@ public object FileTypeUtils {
      * Android支持的图片格式：JPEG, PNG, GIF, BMP, WebP, HEIF, HEIC
      */
     public fun isImageFile(path: String): Boolean {
-        return path.lowercase().let { filePath ->
-            filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")
-                    || filePath.endsWith(".png") || filePath.endsWith(".gif")
-                    || filePath.endsWith(".bmp") || filePath.endsWith(".webp")
-                    || filePath.endsWith(".heif") || filePath.endsWith(".heic")
-                    //raw images
-                    || filePath.endsWith(".dng") || filePath.endsWith(".arw")
-                    || filePath.endsWith(".nef") || filePath.endsWith(".cr2")
-                    || filePath.endsWith(".cr3") || filePath.endsWith(".arw")
-                    || filePath.endsWith(".raf") || filePath.endsWith(".orf")
-                    || filePath.endsWith(".sr2") || filePath.endsWith(".srf")
-                    || filePath.endsWith(".srw") || filePath.endsWith(".x3f")
-                    || filePath.endsWith(".pef") || filePath.endsWith(".3fr")
-                    || filePath.endsWith(".rw2") || filePath.endsWith(".nrw")
-                    || filePath.endsWith(".crw")
-        }
+        return isSupportedImageFile(path)
     }
 
     /**
@@ -51,6 +36,14 @@ public object FileTypeUtils {
         return file.exists()
                 && file.isFile
                 && isImageFile(file.absolutePath)
+    }
+
+    /**
+     * 检测文件是否为HEIF格式
+     */
+    public fun isHeifFormat(file: File): Boolean {
+        val extension = file.extension.lowercase()
+        return extension == "heic" || extension == "heif"
     }
 
     /**
@@ -123,4 +116,6 @@ public object FileTypeUtils {
                 || path.endsWith(".jpeg", true)
                 || path.endsWith(".gif", true)
     }
-} 
+}
+
+public expect fun isSupportedImageFile(path: String): Boolean

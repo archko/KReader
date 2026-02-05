@@ -6,8 +6,8 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.HeifLoader
-import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.cache.CustomImageFetcher
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
@@ -15,6 +15,7 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
+import com.archko.reader.pdf.util.FileTypeUtils
 import com.artifex.mupdf.fitz.Document
 import java.io.File
 
@@ -68,7 +69,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
         // 检测文件类型
         files.forEach { file ->
-            val isHeif = isHeifFormat(file)
+            val isHeif = FileTypeUtils.isHeifFormat(file)
             isHeifFile.add(isHeif)
         }
 
@@ -196,14 +197,6 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             println("renderImageAtScale error for file ${files[index].absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-    }
-
-    /**
-     * 检测文件是否为HEIF格式
-     */
-    private fun isHeifFormat(file: File): Boolean {
-        val extension = file.extension.lowercase()
-        return extension == "heic" || extension == "heif"
     }
 
     override fun size(viewportSize: IntSize): IntSize {
