@@ -618,7 +618,7 @@ public fun DesktopDocumentView(
                         }
                     )
                 }
-                .pointerInput("drag_gestures", gestureMode) {
+                .pointerInput("drag_gestures", gestureMode, pathConfig) {
                     when (gestureMode) {
                         GestureMode.SELECTION -> {
                             var dragStartPos: Offset? = null

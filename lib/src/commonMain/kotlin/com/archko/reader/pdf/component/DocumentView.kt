@@ -64,7 +64,6 @@ public fun DocumentView(
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
 ) {
-    val currentPathConfig by remember(pathConfig) { mutableStateOf(pathConfig) }
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var offset by remember {
@@ -480,7 +479,7 @@ public fun DocumentView(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Transparent)
-                .pointerInput(gestureMode) {
+                .pointerInput(gestureMode, pathConfig) {
                     when (gestureMode) {
                         GestureMode.SELECTION -> {
                             // 文本选择模式
@@ -555,7 +554,7 @@ public fun DocumentView(
                                             localY / targetPage.height
                                         )
 
-                                        if (currentPathConfig.drawType == DrawType.LINE) {
+                                        if (pathConfig.drawType == DrawType.LINE) {
                                             // 直线模式：始终只有起点和当前点
                                             val startRel = drawingPoints.first()
                                             val linePoints =
@@ -563,7 +562,7 @@ public fun DocumentView(
                                             pageViewState.updateDrawing(
                                                 activeDrawingPage,
                                                 linePoints,
-                                                currentPathConfig
+                                                pathConfig
                                             )
                                         } else {
                                             // 曲线模式：添加所有拖拽点
@@ -571,7 +570,7 @@ public fun DocumentView(
                                             pageViewState.updateDrawing(
                                                 activeDrawingPage,
                                                 drawingPoints.toList(),
-                                                currentPathConfig
+                                                pathConfig
                                             )
                                         }
                                         change.consume()
@@ -580,7 +579,7 @@ public fun DocumentView(
                                 onDragEnd = {
                                     if (activeDrawingPage != -1) {
                                         val finalPoints =
-                                            if (currentPathConfig.drawType == DrawType.LINE) {
+                                            if (pathConfig.drawType == DrawType.LINE) {
                                                 // 直线模式：使用当前绘制的点（起点和终点）
                                                 pageViewState.activeDrawingAnno?.second?.points
                                                     ?: emptyList()
@@ -591,7 +590,7 @@ public fun DocumentView(
                                         pageViewState.finalizeDrawing(
                                             activeDrawingPage,
                                             finalPoints,
-                                            currentPathConfig
+                                            pathConfig
                                         )
                                     }
                                     drawingPoints.clear()

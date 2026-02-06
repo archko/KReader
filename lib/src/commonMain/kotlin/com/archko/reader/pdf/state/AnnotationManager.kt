@@ -1,5 +1,7 @@
 package com.archko.reader.pdf.state
 
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.geometry.Offset
@@ -32,8 +34,8 @@ public class AnnotationManager(public val path: String) {
     public val decodeScope: CoroutineScope =
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
-    private val _annotations = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
-    public val annotations: Map<Int, List<AnnotationPath>> = _annotations
+    // 使用 mutableStateMapOf 并直接暴露，保持 Compose 响应性
+    public val annotations: MutableMap<Int, MutableList<AnnotationPath>> = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
 
     private val _annotationsFlow = MutableStateFlow<Map<Int, List<AnnotationPath>>>(emptyMap())
     public val annotationsFlow: StateFlow<Map<Int, List<AnnotationPath>>> = _annotationsFlow.asStateFlow()
@@ -42,9 +44,9 @@ public class AnnotationManager(public val path: String) {
     private val undoStack = mutableStateListOf<UndoAction>()
     private val redoStack = mutableStateListOf<UndoAction>()
 
-    // 用于 UI 判断按钮是否可用
-    public val canUndo: Boolean get() = undoStack.isNotEmpty()
-    public val canRedo: Boolean get() = redoStack.isNotEmpty()
+    // 用于 UI 判断按钮是否可用 - 使用 derivedStateOf 使其成为可观察的状态
+    public val canUndo: Boolean by derivedStateOf { undoStack.isNotEmpty() }
+    public val canRedo: Boolean by derivedStateOf { redoStack.isNotEmpty() }
 
     init {
         decodeScope.launch {
@@ -59,7 +61,8 @@ public class AnnotationManager(public val path: String) {
     }
 
     public fun addPath(pageIndex: Int, path: AnnotationPath) {
-        _annotations.getOrPut(pageIndex) { mutableListOf() }.add(path)
+        val list = annotations.getOrPut(pageIndex) { mutableListOf() }
+        list.add(path)
         undoStack.add(UndoAction.Add(pageIndex, path))
         redoStack.clear() // 新操作会清空重做栈
 
@@ -75,16 +78,32 @@ public class AnnotationManager(public val path: String) {
         val action = undoStack.removeAt(undoStack.size - 1)
         when (action) {
             is UndoAction.Add -> {
-                _annotations[action.pageIndex]?.remove(action.path)
+                val list = annotations[action.pageIndex]
+                if (list != null) {
+                    list.remove(action.path)
+                    // 强制触发 Compose 重组：先移除再重新添加
+                    if (list.isEmpty()) {
+                        annotations.remove(action.pageIndex)
+                    } else {
+                        val pageIndex = action.pageIndex
+                        val newList = list.toMutableList()
+                        annotations.remove(pageIndex)
+                        annotations[pageIndex] = newList
+                    }
+                }
                 redoStack.add(action)
                 
                 updateAnnotationsFlow()
+                
+                decodeScope.launch {
+                    saveToFile()
+                }
             }
         }
     }
 
     public fun deletePaths(pageIndex: Int) {
-        _annotations.remove(pageIndex)
+        annotations.remove(pageIndex)
         undoStack.clear()
         redoStack.clear()
         
@@ -100,10 +119,20 @@ public class AnnotationManager(public val path: String) {
         val action = redoStack.removeAt(redoStack.size - 1)
         when (action) {
             is UndoAction.Add -> {
-                _annotations.getOrPut(action.pageIndex) { mutableListOf() }.add(action.path)
+                val pageIndex = action.pageIndex
+                val list = annotations.getOrPut(pageIndex) { mutableListOf() }
+                list.add(action.path)
+                // 强制触发 Compose 重组：先移除再重新添加
+                val newList = list.toMutableList()
+                annotations.remove(pageIndex)
+                annotations[pageIndex] = newList
                 undoStack.add(action)
                 
                 updateAnnotationsFlow()
+                
+                decodeScope.launch {
+                    saveToFile()
+                }
             }
         }
     }
@@ -117,7 +146,7 @@ public class AnnotationManager(public val path: String) {
                 put("normalizePath", normalizePath)
                 put("size", size)
                 put("anno", buildJsonArray {
-                    _annotations.forEach { (pageIndex, paths) ->
+                    annotations.forEach { (pageIndex, paths) ->
                         if (paths.isNotEmpty()) {
                             add(buildJsonObject {
                                 put("page", pageIndex)
@@ -184,7 +213,7 @@ public class AnnotationManager(public val path: String) {
 
     private fun fromJson(json: String) {
         try {
-            _annotations.clear()
+            annotations.clear()
             val file = File(path)
             val size = file.length()
             val nPath = normalizePath(path)
@@ -239,7 +268,7 @@ public class AnnotationManager(public val path: String) {
                                 )
 
                                 val annotationPath = AnnotationPath(points, config)
-                                _annotations.getOrPut(pageIndex) { mutableListOf() }
+                                annotations.getOrPut(pageIndex) { mutableListOf() }
                                     .add(annotationPath)
                             }
                         }
@@ -257,7 +286,7 @@ public class AnnotationManager(public val path: String) {
     }
 
     private fun updateAnnotationsFlow() {
-        val immutableMap = _annotations.mapValues { (_, paths) ->
+        val immutableMap = annotations.mapValues { (_, paths) ->
             paths.toList()
         }
         _annotationsFlow.value = immutableMap
