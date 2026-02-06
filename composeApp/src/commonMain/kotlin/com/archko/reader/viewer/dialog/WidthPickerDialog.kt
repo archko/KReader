@@ -46,7 +46,7 @@ fun WidthPickerDialog(
                         strokeWidth = width
                     )
                 })
-                Slider(value = width, onValueChange = { width = it }, valueRange = 1f..10f)
+                Slider(value = width, onValueChange = { width = it }, valueRange = 1f..20f)
                 Text("${width.toInt()} px")
             }
         },

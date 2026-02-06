@@ -680,7 +680,7 @@ public class Page(
             val py = yOffset + relP.y * height
             if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
         }
-        drawScope.drawPath(path, color, style = Stroke(width = stroke * totalScale))
+        drawScope.drawPath(path, color, style = Stroke(width = stroke))
     }
 
     /**
