@@ -87,6 +87,7 @@ private fun ToolbarContent(
     isCrop: Boolean,
     onOutlineDialogShow: () -> Unit,
     onFontDialogShow: () -> Unit,
+    onThumbnailDialogShow: () -> Unit,
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, TtsServiceBinder) -> Unit,
     isReflow: Boolean,
@@ -231,15 +232,15 @@ private fun ToolbarContent(
                             }
                         }
                     }
+                }
 
-                    item {
-                        IconButton(onClick = { onThumbnailDialogShow() }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_toc),
-                                contentDescription = "缩略图",
-                                tint = Color.White
-                            )
-                        }
+                item {
+                    IconButton(onClick = { onThumbnailDialogShow() }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_thumb),
+                            contentDescription = "缩略图",
+                            tint = Color.White
+                        )
                     }
                 }
             }
@@ -784,6 +785,7 @@ fun CustomView(
                     isCrop = isCrop,
                     onOutlineDialogShow = { showOutlineDialog = true },
                     onFontDialogShow = { showFontDialog = true },
+                    onThumbnailDialogShow = { showThumbnailDialog = true },
                     scope = scope,
                     onStartSpeaking = { page, dec, binder ->
                         scope.launch {

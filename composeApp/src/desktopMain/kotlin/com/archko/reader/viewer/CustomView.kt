@@ -34,6 +34,7 @@ import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
+import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsQueueService
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
@@ -69,6 +70,7 @@ private fun ToolbarContent(
     vZoom: Double,
     onOutlineDialogShow: () -> Unit,
     onQueueDialogShow: () -> Unit,
+    onThumbnailDialogShow: () -> Unit,
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, SpeechService) -> Unit,
     isReflow: Boolean,
@@ -239,6 +241,14 @@ private fun ToolbarContent(
                         tint = Color.White
                     )
                 }
+            }
+
+            IconButton(onClick = { onThumbnailDialogShow() }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_thumb),
+                    contentDescription = "缩略图",
+                    tint = Color.White
+                )
             }
         }
     }
@@ -474,6 +484,7 @@ fun CustomView(
             // 工具栏显示状态 - 顶部工具栏始终显示，底部可以隐藏
             var showBottomToolbar by remember { mutableStateOf(true) }
             var showOutlineDialog by remember { mutableStateOf(false) }
+            var showThumbnailDialog by remember { mutableStateOf(false) }
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
@@ -540,6 +551,7 @@ fun CustomView(
                     isCrop = isCrop,
                     onOutlineDialogShow = { showOutlineDialog = true },
                     onQueueDialogShow = { showQueueDialog = true },
+                    onThumbnailDialogShow = { showThumbnailDialog = true },
                     scope = scope,
                     onStartSpeaking = { page, dec, binder ->
                         scope.launch {
@@ -654,8 +666,13 @@ fun CustomView(
                         OutlineDialog(
                             currentPage,
                             outlineList,
-                            onClick = { item ->
+                            annotationManager,
+                            onOutlineClick = { item ->
                                 jumpToPage = item.page
+                                showOutlineDialog = false
+                            },
+                            onAnnotationClick = { pageIndex ->
+                                jumpToPage = pageIndex
                                 showOutlineDialog = false
                             },
                             onDismiss = { showOutlineDialog = false },
@@ -734,6 +751,19 @@ fun CustomView(
                                 )
                             }
                         }
+                    }
+
+                    if (showThumbnailDialog) {
+                        ThumbnailDialog(
+                            currentPage,
+                            list,
+                            decoder!!,
+                            onPageClick = { page ->
+                                jumpToPage = page
+                                showThumbnailDialog = false
+                            },
+                            onDismiss = { showThumbnailDialog = false },
+                        )
                     }
                 }
             }

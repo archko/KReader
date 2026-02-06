@@ -282,7 +282,7 @@ public fun DocumentView(
     LaunchedEffect(offset) {
         // 只有在非跳转状态下才处理页面变化回调
         if (!isJumping) {
-            //ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
+            ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
         }
     }
 
