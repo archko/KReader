@@ -14,9 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -30,7 +30,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
@@ -38,14 +40,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.component.DecodeCallback
+import com.archko.reader.pdf.component.DecodeService
+import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.DecoderAdapter
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ic_back
@@ -62,25 +65,24 @@ fun ThumbnailDialog(
     onPageClick: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val lazyListState = rememberLazyListState(
-        initialFirstVisibleItemIndex = currentPage.coerceAtLeast(0)
-    )
 
-    val singleThreadScope = remember {
-        CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val decodeService = remember(decoder) {
+        DecodeService(DecoderAdapter(decoder, IntSize.Zero) { false })
     }
+
+    val decodeScope =
+        CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     DisposableEffect(Unit) {
         onDispose {
-            singleThreadScope.cancel()
+            decodeService.shutdown()
         }
     }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .width(180.dp)
-                .fillMaxHeight(),
+                .fillMaxSize(),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface
         ) {
@@ -105,8 +107,8 @@ fun ThumbnailDialog(
                     )
                 }
 
-                LazyColumn(
-                    state = lazyListState,
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
                     modifier = Modifier
                         .fillMaxSize(),
                 ) {
@@ -117,12 +119,12 @@ fun ThumbnailDialog(
                         ThumbnailItem(
                             index = index,
                             aPage = page,
-                            decoder = decoder,
                             isSelected = isCurrentPage,
                             onClick = {
                                 onPageClick(index)
                             },
-                            scope = singleThreadScope
+                            decodeService = decodeService,
+                            decodeScope = decodeScope
                         )
                     }
                 }
@@ -135,10 +137,10 @@ fun ThumbnailDialog(
 private fun ThumbnailItem(
     index: Int,
     aPage: APage,
-    decoder: ImageDecoder,
     isSelected: Boolean,
     onClick: () -> Unit,
-    scope: CoroutineScope
+    decodeService: DecodeService,
+    decodeScope: CoroutineScope
 ) {
     val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
         aPage.width,
@@ -150,6 +152,8 @@ private fun ThumbnailItem(
     val cacheKey = "thumb-${index}-${thumbWidth}x${thumbHeight}"
     val imageState = remember { mutableStateOf<Painter?>(null) }
     val isLoading = remember { mutableStateOf(true) }
+    val job = remember { mutableStateOf<Job?>(null) }
+    val isDisposed = remember { mutableStateOf(false) }
 
     val itemModifier = Modifier
         .fillMaxWidth()
@@ -194,28 +198,70 @@ private fun ThumbnailItem(
     }
 
     DisposableEffect(index, thumbWidth, thumbHeight) {
+        job.value?.cancel()
+        job.value = null
+
         val cachedState = ImageCache.acquirePage(cacheKey)
         if (cachedState != null) {
             imageState.value = BitmapPainter(cachedState.bitmap)
             isLoading.value = false
-        } else {
-            scope.launch {
-                if (isActive) {
-                    val bitmap = decoder.renderPage(
-                        aPage,
-                        IntSize.Zero,
-                        thumbWidth,
-                        thumbHeight,
-                        false
-                    )
-                    val newState = ImageCache.putPage(cacheKey, bitmap)
-                    imageState.value = BitmapPainter(newState.bitmap)
-                    isLoading.value = false
-                }
+            return@DisposableEffect onDispose {
+                cachedState.let { ImageCache.releasePage(it) }
+                isLoading.value = false
             }
         }
 
+        val loadJob = decodeScope.launch {
+            val decodeTask = DecodeTask(
+                type = DecodeTask.TaskType.PAGE,
+                pageIndex = index,
+                decodeKey = cacheKey,
+                aPage = aPage,
+                zoom = 1f,
+                Rect(0f, 0f, 1f, 1f),
+                width = thumbWidth,
+                height = thumbHeight,
+                crop = false,
+                callback = object : DecodeCallback {
+                    override fun onDecodeComplete(
+                        bitmap: ImageBitmap?,
+                        isThumb: Boolean,
+                        error: Throwable?
+                    ) {
+                        println("onDecodeComplete: ${bitmap}")
+                        if (bitmap != null) {
+                            val newState = ImageCache.putPage(cacheKey, bitmap)
+                            imageState.value = BitmapPainter(newState.bitmap)
+                            isLoading.value = false
+                        } else {
+                            if (error != null) {
+                                println("Thumbnail decode error: ${error.message}")
+                            }
+                            isLoading.value = false
+                        }
+                    }
+
+                    override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                        return !isDisposed.value
+                    }
+
+                    override fun onFinish(pageNumber: Int) {
+                        println("onFinish pageNumber: ${pageNumber}")
+                        isLoading.value = false
+                    }
+                }
+            )
+
+            decodeService.submitTask(decodeTask)
+        }
+
+        job.value = loadJob
+
         onDispose {
+            job.value?.cancel()
+            job.value = null
+            isDisposed.value = true
+
             cachedState?.let { ImageCache.releasePage(it) }
             isLoading.value = false
         }

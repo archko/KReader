@@ -35,10 +35,12 @@ public class AnnotationManager(public val path: String) {
         CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     // 使用 mutableStateMapOf 并直接暴露，保持 Compose 响应性
-    public val annotations: MutableMap<Int, MutableList<AnnotationPath>> = mutableStateMapOf<Int, MutableList<AnnotationPath>>()
+    public val annotations: MutableMap<Int, MutableList<AnnotationPath>> =
+        mutableStateMapOf<Int, MutableList<AnnotationPath>>()
 
     private val _annotationsFlow = MutableStateFlow<Map<Int, List<AnnotationPath>>>(emptyMap())
-    public val annotationsFlow: StateFlow<Map<Int, List<AnnotationPath>>> = _annotationsFlow.asStateFlow()
+    public val annotationsFlow: StateFlow<Map<Int, List<AnnotationPath>>> =
+        _annotationsFlow.asStateFlow()
 
     // 撤销/重做栈：记录的是"操作指令"
     private val undoStack = mutableStateListOf<UndoAction>()
@@ -92,9 +94,9 @@ public class AnnotationManager(public val path: String) {
                     }
                 }
                 redoStack.add(action)
-                
+
                 updateAnnotationsFlow()
-                
+
                 decodeScope.launch {
                     saveToFile()
                 }
@@ -106,7 +108,7 @@ public class AnnotationManager(public val path: String) {
         annotations.remove(pageIndex)
         undoStack.clear()
         redoStack.clear()
-        
+
         updateAnnotationsFlow()
 
         decodeScope.launch {
@@ -127,9 +129,9 @@ public class AnnotationManager(public val path: String) {
                 annotations.remove(pageIndex)
                 annotations[pageIndex] = newList
                 undoStack.add(action)
-                
+
                 updateAnnotationsFlow()
-                
+
                 decodeScope.launch {
                     saveToFile()
                 }
