@@ -28,18 +28,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.features
 import kreader.composeapp.generated.resources.auto_crop_edge
-import kreader.composeapp.generated.resources.multi_format_support
-import kreader.composeapp.generated.resources.ocr_text_recognition
+import kreader.composeapp.generated.resources.export_images
+import kreader.composeapp.generated.resources.features
 import kreader.composeapp.generated.resources.image_to_pdf
 import kreader.composeapp.generated.resources.mobi_azw3_to_epub
+import kreader.composeapp.generated.resources.multi_format_support
+import kreader.composeapp.generated.resources.ocr_text_recognition
 import kreader.composeapp.generated.resources.pdf_encrypt_decrypt
-import kreader.composeapp.generated.resources.webdav_backup
-import kreader.composeapp.generated.resources.export_images
 import kreader.composeapp.generated.resources.split_merge_pdf
 import kreader.composeapp.generated.resources.tts_read_aloud
-import org.jetbrains.compose.resources.painterResource
+import kreader.composeapp.generated.resources.webdav_backup
 import org.jetbrains.compose.resources.stringResource
 
 /**
