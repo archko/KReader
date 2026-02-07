@@ -232,7 +232,6 @@ private fun ThumbnailItem(
                         isThumb: Boolean,
                         error: Throwable?
                     ) {
-                        println("onDecodeComplete: ${bitmap}")
                         if (bitmap != null) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
                             imageState.value = BitmapPainter(newState.bitmap)
@@ -250,7 +249,6 @@ private fun ThumbnailItem(
                     }
 
                     override fun onFinish(pageNumber: Int) {
-                        println("onFinish pageNumber: ${pageNumber}")
                         isLoading.value = false
                     }
                 }
