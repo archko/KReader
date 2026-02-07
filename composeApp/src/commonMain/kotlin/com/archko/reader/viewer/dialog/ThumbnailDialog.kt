@@ -189,10 +189,10 @@ private fun ThumbnailItem(
         Text(
             text = "${index + 1}",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(horizontal = 4.dp, vertical = 1.dp)
+                .padding(horizontal = 2.dp, vertical = 1.dp)
                 .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(4.dp))
         )
     }
