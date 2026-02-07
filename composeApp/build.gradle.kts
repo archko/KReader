@@ -16,7 +16,7 @@ kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
 
@@ -47,6 +47,8 @@ kotlin {
             api(libs.coil.kt.compose)
             api(libs.coil.kt.okhttp)
             implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
         }
         desktopMain.dependencies {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
@@ -153,7 +155,7 @@ compose.desktop {
             modules("java.instrument", "java.sql", "jdk.unsupported")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "KReader"
-            packageVersion = "1.2.0"
+            packageVersion = "1.2.1"
 
             // 应用描述
             description = "A PDF and document reader application"
