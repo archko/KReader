@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -534,12 +535,13 @@ private fun RecentItem(
                 Text(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(horizontal = 2.dp, vertical = 1.dp)
-                        .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(4.dp)),
+                        .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(2.dp))
+                        .padding(horizontal = 4.dp)
+                        .wrapContentSize(),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     text = "${recent.page?.plus(1)}/${recent.pageCount}",
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     overflow = TextOverflow.Ellipsis
                 )
             }

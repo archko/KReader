@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -192,8 +193,9 @@ private fun ThumbnailItem(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(horizontal = 2.dp, vertical = 1.dp)
-                .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(2.dp))
+                .padding(horizontal = 4.dp)
+                .wrapContentSize()
         )
     }
 
