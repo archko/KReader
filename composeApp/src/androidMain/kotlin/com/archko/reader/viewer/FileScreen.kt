@@ -605,7 +605,7 @@ private fun RecentItem(
                         .align(Alignment.BottomEnd)
                         .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(2.dp))
                         .padding(horizontal = 4.dp)
-                        .wrapContentSize()
+                        .wrapContentSize(),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     text = "${recent.page?.plus(1)}/${recent.pageCount}",
