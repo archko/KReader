@@ -160,7 +160,7 @@ public class PageViewState(
         val page = pages.getOrNull(spec.page) ?: return false
         val yOffset = page.yOffset
         val xOffset = page.xOffset
-        val pixelRect = if (orientation == Vertical) {
+        val pixelRect = if (orientation == Vertical || orientation == DoublePage) {
             Rect(
                 left = spec.bounds.left * spec.pageWidth,
                 top = spec.bounds.top * spec.pageHeight + yOffset,
@@ -175,7 +175,7 @@ public class PageViewState(
                 bottom = spec.bounds.bottom * spec.pageHeight
             )
         }
-        return if (strictMode) {
+        return if (strictMode || orientation == DoublePage) {
             isVisible(viewSize, viewOffset, pixelRect, spec.page)
         } else {
             isVisibleWithPreload(viewSize, viewOffset, pixelRect, spec.page)
@@ -267,7 +267,73 @@ public class PageViewState(
             totalHeight = viewSize.height.toFloat()
             totalWidth = viewSize.width.toFloat()
         } else {
-            if (orientation == Vertical) {
+            if (orientation == DoublePage) {
+                var currentY = 0f
+                val scaledPageWidth = (viewSize.width * vZoom) / 2
+                val pageCount = list.size
+
+                var i = 0
+                while (i < pageCount) {
+                    // 第一页
+                    val aPage1 = list[i]
+                    val page1 = pages[i]
+
+                    // 计算第一页的缩放比例和高度（按垂直布局逻辑，宽度为半宽）
+                    val pageScale1 = if (cropEnabled && aPage1.hasCrop()) {
+                        scaledPageWidth / aPage1.getWidth(true)
+                    } else {
+                        scaledPageWidth / aPage1.getWidth(false)
+                    }
+                    val scaledPageHeight1 = if (cropEnabled && aPage1.hasCrop()) {
+                        aPage1.getHeight(true) * pageScale1
+                    } else {
+                        aPage1.getHeight(false) * pageScale1
+                    }
+
+                    // 更新第一页的位置和尺寸（左侧）
+                    val bounds1 = Rect(
+                        left = 0f,
+                        top = currentY,
+                        right = scaledPageWidth,
+                        bottom = currentY + scaledPageHeight1
+                    )
+                    page1.update(scaledPageWidth, scaledPageHeight1, bounds1)
+
+                    var scaledPageHeight2 = 0f
+                    if (i + 1 < pageCount) {
+                        val aPage2 = list[i + 1]
+                        val page2 = pages[i + 1]
+
+                        val pageScale2 = if (cropEnabled && aPage2.hasCrop()) {
+                            scaledPageWidth / aPage2.getWidth(true)
+                        } else {
+                            scaledPageWidth / aPage2.getWidth(false)
+                        }
+                        scaledPageHeight2 = if (cropEnabled && aPage2.hasCrop()) {
+                            aPage2.getHeight(true) * pageScale2
+                        } else {
+                            aPage2.getHeight(false) * pageScale2
+                        }
+
+                        // 更新第二页的位置和尺寸（右侧）
+                        val bounds2 = Rect(
+                            left = scaledPageWidth,
+                            top = currentY,
+                            right = scaledPageWidth * 2,
+                            bottom = currentY + scaledPageHeight2
+                        )
+                        page2.update(scaledPageWidth, scaledPageHeight2, bounds2)
+                    }
+
+                    // 累积高度取两个页面中较高的那个（符合"累积高则用两个页的高的一个"的需求）
+                    currentY += maxOf(scaledPageHeight1, scaledPageHeight2)
+
+                    i += 2
+                }
+
+                totalWidth = viewSize.width * vZoom
+                totalHeight = currentY
+            } else if (orientation == Vertical) {
                 var currentY = 0f
                 val scaledPageWidth = viewSize.width * vZoom
                 list.zip(pages).forEach { (aPage, page) ->
@@ -502,6 +568,32 @@ public class PageViewState(
                 emptyList()
             }
             // 主动移除不再可见的页面图片缓存
+            val newPageKeys = tilesToRenderCopy.map { page ->
+                page.aPage.index
+            }.toSet()
+            val toRemove = lastPageKeys - newPageKeys
+            toRemove.forEach { key ->
+                val page = pages.getOrNull(key) ?: return@forEach
+                page.recycle()
+            }
+            lastPageKeys = newPageKeys
+
+            if (tilesToRenderCopy != pageToRender) {
+                pageToRender = tilesToRenderCopy
+            }
+        } else if (orientation == DoublePage) {
+            val visibleTop = -offset.y
+            val visibleBottom = viewSize.height - offset.y
+            val preloadBottom = visibleBottom
+
+            val first = findVerticalFirstVisible(visibleTop, currentVZoom)
+            val last = findVerticalLastVisible(preloadBottom, currentVZoom)
+
+            val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
+                pages.subList(first, last + 1)
+            } else {
+                emptyList()
+            }
             val newPageKeys = tilesToRenderCopy.map { page ->
                 page.aPage.index
             }.toSet()

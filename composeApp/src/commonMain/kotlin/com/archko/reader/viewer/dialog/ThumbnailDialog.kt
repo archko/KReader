@@ -183,7 +183,9 @@ private fun ThumbnailItem(
             )
         } else {
             CircularProgressIndicator(
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(32.dp)
+                    .align(Alignment.Center)
             )
         }
 

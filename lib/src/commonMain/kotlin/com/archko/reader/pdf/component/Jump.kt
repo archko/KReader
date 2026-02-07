@@ -5,6 +5,7 @@ package com.archko.reader.pdf.component
  */
 public const val Vertical: Int = 0
 public const val Horizontal: Int = 1
+public const val DoublePage: Int = 2
 
 public data class JumpIntent(
     val page: Int = 0,
