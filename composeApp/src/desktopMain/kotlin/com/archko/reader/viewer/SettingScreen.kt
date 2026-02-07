@@ -120,7 +120,11 @@ fun SettingScreen(
                         ),
                         maxLines = 1
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Features()
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     SettingCategory(viewModel)
                     Spacer(modifier = Modifier.height(50.dp))

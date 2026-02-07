@@ -24,8 +24,23 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.features
+import kreader.composeapp.generated.resources.auto_crop_edge
+import kreader.composeapp.generated.resources.multi_format_support
+import kreader.composeapp.generated.resources.ocr_text_recognition
+import kreader.composeapp.generated.resources.image_to_pdf
+import kreader.composeapp.generated.resources.mobi_azw3_to_epub
+import kreader.composeapp.generated.resources.pdf_encrypt_decrypt
+import kreader.composeapp.generated.resources.webdav_backup
+import kreader.composeapp.generated.resources.export_images
+import kreader.composeapp.generated.resources.split_merge_pdf
+import kreader.composeapp.generated.resources.tts_read_aloud
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * @author: archko 2025/11/6 :11:51
@@ -92,8 +107,8 @@ fun Logo() {
         // 创建现代PDF阅读器图标
         Canvas(
             modifier = Modifier
-                .size(96.dp)
-                .clip(RoundedCornerShape(96.dp))
+                .size(128.dp)
+                .clip(RoundedCornerShape(128.dp))
                 .background(Color(0xFFE3F2FD))
         ) {
             val centerX = size.width / 2
@@ -302,5 +317,116 @@ fun Logo() {
                 center = Offset(centerX, centerY + size.minDimension * 0.25f)
             )*/
         }
+    }
+}
+
+@Composable
+fun Features() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(vertical = 8.dp, horizontal = 20.dp)
+    ) {
+        Text(
+            text = stringResource(Res.string.features),
+            style = TextStyle(
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+        )
+
+        // 第一行
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.auto_crop_edge),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.multi_format_support),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 第二行
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.ocr_text_recognition),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.image_to_pdf),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 第三行
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.mobi_azw3_to_epub),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.pdf_encrypt_decrypt),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 第四行
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.webdav_backup),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.tts_read_aloud),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // 第五行
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FeatureItem(
+                text = stringResource(Res.string.export_images),
+                modifier = Modifier.weight(1f)
+            )
+            FeatureItem(
+                text = stringResource(Res.string.split_merge_pdf),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun FeatureItem(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .height(36.dp)
+            .fillMaxWidth()
+    ) {
+        Text(
+            text = text,
+            style = TextStyle(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp
+            ),
+            maxLines = 1,
+        )
     }
 }

@@ -430,7 +430,7 @@ public actual fun isSupportedImageFile(path: String): Boolean {
                 || filePath.endsWith(".nef") || filePath.endsWith(".cr2")
                 || filePath.endsWith(".cr3") || filePath.endsWith(".arw")
                 || filePath.endsWith(".raf") || filePath.endsWith(".orf")
-                || filePath.endsWith(".sr2") || filePath.endsWith(".srf")
+                || filePath.endsWith(".sr2") //|| filePath.endsWith(".srf")
                 || filePath.endsWith(".srw") || filePath.endsWith(".x3f")
                 || filePath.endsWith(".pef") || filePath.endsWith(".3fr")
                 || filePath.endsWith(".rw2") || filePath.endsWith(".nrw")
