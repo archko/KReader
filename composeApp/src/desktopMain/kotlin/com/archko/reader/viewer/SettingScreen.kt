@@ -50,6 +50,15 @@ import kreader.composeapp.generated.resources.create_pdf
 import kreader.composeapp.generated.resources.encrypt_decrypt_title
 import kreader.composeapp.generated.resources.export_pdf
 import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_create
+import kreader.composeapp.generated.resources.ic_export
+import kreader.composeapp.generated.resources.ic_encrypt_decrypt
+import kreader.composeapp.generated.resources.ic_split
+import kreader.composeapp.generated.resources.ic_merge
+import kreader.composeapp.generated.resources.ic_convert
+import kreader.composeapp.generated.resources.ic_cloud
+import kreader.composeapp.generated.resources.ic_tts
+import kreader.composeapp.generated.resources.ic_information
 import kreader.composeapp.generated.resources.merge_title
 import kreader.composeapp.generated.resources.split_title
 import kreader.composeapp.generated.resources.tts_setting_title
@@ -150,7 +159,6 @@ fun SettingCategory(viewModel: BackupViewModel) {
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-
         modifier = Modifier.fillMaxWidth().height(360.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -158,63 +166,126 @@ fun SettingCategory(viewModel: BackupViewModel) {
         item {
             SettingItem(
                 title = stringResource(Res.string.create_pdf),
-                onClick = { showPdfCreateDialog = true }
+                onClick = { showPdfCreateDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_create),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.export_pdf),
-                onClick = { showPdfExportDialog = true }
+                onClick = { showPdfExportDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_export),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.encrypt_decrypt_title),
-                onClick = { showPdfEncryptDialog = true }
+                onClick = { showPdfEncryptDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_encrypt_decrypt),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.split_title),
-                onClick = { showPdfSplitDialog = true }
+                onClick = { showPdfSplitDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_split),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.merge_title),
-                onClick = { showPdfMergeDialog = true }
+                onClick = { showPdfMergeDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_merge),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.convert_title),
-                onClick = { showPdfConvertDialog = true }
+                onClick = { showPdfConvertDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_convert),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.webdav_title),
-                onClick = { showWebdavDialog = true }
+                onClick = { showWebdavDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_cloud),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.tts_setting_title),
-                onClick = { showTtsDialog = true }
+                onClick = { showTtsDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_tts),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
 
         item {
             SettingItem(
                 title = stringResource(Res.string.about),
-                onClick = { showAboutDialog = true }
+                onClick = { showAboutDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_information),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             )
         }
     }
