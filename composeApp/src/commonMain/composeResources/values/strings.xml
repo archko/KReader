@@ -1,5 +1,5 @@
 <resources>
-    <string name="support_format">Support pdf, epub, mobi, xps, djvu, fb, cb, images, (docx, pptx), tiff, bigtiff</string>
+    <string name="support_format">Support pdf, epub, mobi, xps, djvu, fb, cbz, images, (docx, pptx), tiff, bigtiff</string>
     <string name="about_content">Why did I create this app? There are many PDF readers based on the Android View system on the market, but so far, none have been built on Compose.\nThat’s why I developed this app—a Compose-based PDF reader that supports all platforms.\nCurrently, zooming and scrolling functions are very smooth, but the full range of features from the old reader has not yet been migrated.\nDue to time constraints, the app has been implemented on Android. For iOS, compiling MuPDF is required, while the desktop version of MuPDF is easy to compile, so it won’t be uploaded.\nFonts should be placed in the directory /sdcard/fonts/, and both TTF and OTF font formats are compatible.\n</string>
     <string name="app_author">Author:archko@gmail.com</string>
     <string name="version">Version</string>
@@ -179,13 +179,13 @@
     <string name="pdf_creation_failed">PDF creation failed</string>
 
     <string name="features">Features</string>
-    <string name="auto_crop_edge">Crop edge</string>
+    <string name="auto_crop_edge">Crop Bounds</string>
     <string name="multi_format_support">Multi formats</string>
     <string name="ocr_text_recognition">OCR</string>
     <string name="image_to_pdf">Image to PDF</string>
-    <string name="mobi_azw3_to_epub">mobi/azw3 to epub</string>
+    <string name="mobi_azw3_to_epub">Mobi/Azw3 to Epub</string>
     <string name="pdf_encrypt_decrypt">PDF Encrypt/Decrypt</string>
-    <string name="webdav_backup">Webdav backup</string>
+    <string name="webdav_backup">WebDav backup</string>
     <string name="tts_read_aloud">TTS</string>
     <string name="split_merge_pdf">PDF Split/Merge</string>
 

@@ -21,7 +21,7 @@ At present, epub/mobi supported custom font. It should be placed in the director
 - **Support album**: support album/image
 - **Multi-platform Support**: Android, iOS, and Desktop
 - **Modern UI**: Built with Jetpack Compose
-- **Support format**: pdf, epub, mobi, djvu, xps, fb, cb, images, (docx, pptx)
+- **Support format**: pdf, epub, mobi, djvu, xps, fb, cbz, images, (docx, pptx)
 - **Editor**: create pdf from images. convert mobi/azw3 to epub. encrypt/decrypt pdf, export images, webdav backup
 
 ## Technology Stack

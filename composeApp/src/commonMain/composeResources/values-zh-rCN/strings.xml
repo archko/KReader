@@ -1,5 +1,5 @@
 <resources>
-    <string name="support_format">目前支持 pdf, epub, mobi, xps, djvu, fb, cb, 图片, (无图的docx, pptx), tiff, bigtiff.</string>
+    <string name="support_format">目前支持 pdf, epub, mobi, xps, djvu, fb, cbz, 图片, (无图的docx, pptx), tiff, bigtiff.</string>
     <string name="about_content">为什么有这个app,市面上基于android view系统的pdf阅读器很多,基于compose的,目前没有看到有.\n所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n目前支持自定义字体放在/sdcard/fonts/,ttf与otf两种字体</string>
     <string name="app_author">作者:archko@gmail.com</string>
     <string name="version">版本</string>
@@ -184,9 +184,9 @@
     <string name="multi_format_support">多格式支持</string>
     <string name="ocr_text_recognition">OCR文本识别</string>
     <string name="image_to_pdf">图片转pdf</string>
-    <string name="mobi_azw3_to_epub">mobi/azw3转epub</string>
+    <string name="mobi_azw3_to_epub">Mobi/Azw3转Epub</string>
     <string name="pdf_encrypt_decrypt">PDF加密解密</string>
-    <string name="webdav_backup">Webdav备份</string>
+    <string name="webdav_backup">WebDav备份</string>
     <string name="tts_read_aloud">TTS朗读</string>
     <string name="split_merge_pdf">PDF拆分/合并</string>
     
@@ -203,8 +203,8 @@
     <string name="draw_color_title">选择画笔颜色</string>
     <string name="draw_stroke_title">笔触粗细</string>
     <string name="outline_tab">大纲</string>
-    <string name="annotation_tab">标注</string>
-    <string name="annotation_empty">没有标注</string>
-    <string name="annotations_count">%d个标注</string>
-    <string name="delete_annotation">删除标注</string>
+    <string name="annotation_tab">批注</string>
+    <string name="annotation_empty">没有批注</string>
+    <string name="annotations_count">%d个批注</string>
+    <string name="delete_annotation">删除批注</string>
 </resources>

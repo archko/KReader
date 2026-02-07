@@ -22,7 +22,7 @@ epub/mobi支持自定义字体,放在/sdcard/fonts/,ttf与otf两种字体
 - **多平台支持**: Android、iOS 和桌面端
 - **现代界面**: 基于 Jetpack Compose 构建
 - **原生性能**: 流畅的速度
-- **格式支持**: pdf, epub, mobi, djvu, xps, fb, cb, 图片, (无图的docx, pptx)
+- **格式支持**: pdf, epub, mobi, djvu, xps, fb, cbz, 图片, (无图的docx, pptx)
 - **编辑支持**: 图片创建pdf. mobi/azw3转为epub, pdf的加密,解密,导出图片.备份历史记录等
 
 ## 技术栈

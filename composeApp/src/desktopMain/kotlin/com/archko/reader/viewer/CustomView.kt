@@ -164,7 +164,7 @@ private fun ToolbarContent(
                 }) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_draw_pen),
-                        contentDescription = "标注画线",
+                        contentDescription = "批注画线",
                         tint = if (gestureMode == GestureMode.DRAW) Color.Green else Color.White
                     )
                 }

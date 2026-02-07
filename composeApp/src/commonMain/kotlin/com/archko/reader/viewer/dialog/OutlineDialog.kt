@@ -68,7 +68,7 @@ fun OutlineDialog(
 
         val hasOutline = outlineList.isNotEmpty()
 
-        // 使用 Flow 来监听标注数据的变化
+        // 使用 Flow 来监听批注数据的变化
         val annotations = annotationManager?.annotationsFlow?.collectAsState()?.value
             ?: emptyMap()
 
