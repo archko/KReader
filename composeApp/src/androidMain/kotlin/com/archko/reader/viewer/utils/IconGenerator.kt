@@ -423,7 +423,9 @@ object IconGenerator {
         val iconSize = size * 0.7f
 
         // 绘制背景
-        val backgroundPaint = android.graphics.Paint().apply {
+        val backgroundPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true // 开启位图过滤
+            isDither = true       // 开启防抖动，让渐变更平滑
             shader = android.graphics.RadialGradient(
                 centerX - size * 0.1f, centerY - size * 0.1f, size * 0.6f,
                 intArrayOf(
@@ -451,7 +453,7 @@ object IconGenerator {
         }
 
         // 绘制光晕效果
-        val glowPaint = android.graphics.Paint().apply {
+        val glowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             shader = android.graphics.RadialGradient(
                 centerX + size * 0.2f, centerY + size * 0.2f, size * 0.4f,
                 intArrayOf(
@@ -472,7 +474,7 @@ object IconGenerator {
         val bookTop = centerY - bookHeight / 2
 
         // 书本阴影
-        val shadowPaint = android.graphics.Paint().apply {
+        val shadowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = 0x1A000000 // 10% black
         }
         canvas.drawRoundRect(
@@ -482,7 +484,7 @@ object IconGenerator {
         )
 
         // 书本主体
-        val bookPaint = android.graphics.Paint().apply {
+        val bookPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt() // white
         }
         canvas.drawRoundRect(
@@ -491,7 +493,7 @@ object IconGenerator {
         )
 
         // 绘制书本页面线条
-        val linePaint = android.graphics.Paint().apply {
+        val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xCCE8EAF6.toInt() // 80% alpha
             strokeWidth = size * 0.008f
         }
@@ -508,7 +510,7 @@ object IconGenerator {
         val kLeft = bookLeft + bookWidth - kSize - size * 0.06f  // 向左移动，与SettingScreen一致
         val kTop = bookTop + (bookHeight - kSize) / 2 + size * 0.04f
 
-        val kPaint = android.graphics.Paint().apply {
+        val kPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             shader = android.graphics.LinearGradient(
                 kLeft, kTop, kLeft + kSize, kTop + kSize,
                 intArrayOf(
@@ -556,7 +558,7 @@ object IconGenerator {
 
         // 左上角装饰圆（紫色，与SettingScreen一致）
         val leftTopRadius = size * 0.13f  // 与SettingScreen中的13.dp.toPx()对应
-        val leftTopPaint = android.graphics.Paint().apply {
+        val leftTopPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = 0x4D9C27B0 // 紫色，30%透明度
         }
         canvas.drawCircle(
@@ -566,7 +568,7 @@ object IconGenerator {
 
         // 右下角装饰圆（绿色，与SettingScreen一致）
         val dotRadius2 = size * 0.09f  // 与SettingScreen中的9.dp.toPx()对应
-        val rightBottomPaint = android.graphics.Paint().apply {
+        val rightBottomPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = 0x4D4CAF50 // 绿色，30%透明度
         }
         canvas.drawCircle(
@@ -578,7 +580,7 @@ object IconGenerator {
         val triangleRadius = size * 0.18f  // 与SettingScreen中的0.18f对应
 
         // 第一个圆形（左上角，带渐变效果，显示在最上层）
-        val trianglePaint = android.graphics.Paint().apply {
+        val trianglePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             shader = android.graphics.RadialGradient(
                 centerX - size * 0.2f - size * 0.02f,
                 centerY - size * 0.2f + size * 0.02f - triangleRadius * 0.3f,
