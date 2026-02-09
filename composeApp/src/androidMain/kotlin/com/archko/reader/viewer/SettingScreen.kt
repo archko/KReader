@@ -4,14 +4,11 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
@@ -32,7 +29,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.compose.resources.painterResource
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.viewer.dialog.AISettingDialog
 import com.archko.reader.viewer.dialog.AboutDialog
@@ -43,29 +39,8 @@ import com.archko.reader.viewer.dialog.PdfExportDialog
 import com.archko.reader.viewer.dialog.PdfMergeDialog
 import com.archko.reader.viewer.dialog.PdfSplitDialog
 import com.archko.reader.viewer.dialog.WebdavConfigDialog
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.about
-import kreader.composeapp.generated.resources.ai_setting
-import kreader.composeapp.generated.resources.app_author
-import kreader.composeapp.generated.resources.convert_title
-import kreader.composeapp.generated.resources.create_pdf
-import kreader.composeapp.generated.resources.encrypt_decrypt_title
-import kreader.composeapp.generated.resources.export_pdf
-import kreader.composeapp.generated.resources.ic_android
-import kreader.composeapp.generated.resources.ic_create
-import kreader.composeapp.generated.resources.ic_export
-import kreader.composeapp.generated.resources.ic_encrypt_decrypt
-import kreader.composeapp.generated.resources.ic_split
-import kreader.composeapp.generated.resources.ic_merge
-import kreader.composeapp.generated.resources.ic_convert
-import kreader.composeapp.generated.resources.ic_cloud
-import kreader.composeapp.generated.resources.ic_tts
-import kreader.composeapp.generated.resources.ic_information
-import kreader.composeapp.generated.resources.ic_version
-import kreader.composeapp.generated.resources.merge_title
-import kreader.composeapp.generated.resources.split_title
-import kreader.composeapp.generated.resources.version
-import kreader.composeapp.generated.resources.webdav_title
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -118,7 +93,7 @@ fun SettingScreen(
 
                 SettingCategory(viewModel)
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -154,7 +129,9 @@ fun SettingCategory(viewModel: BackupViewModel) {
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxWidth().height(360.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(360.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

@@ -2,6 +2,7 @@ package com.archko.reader.viewer.utils
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -234,7 +235,7 @@ object IconGenerator {
             drawIconToCanvas(canvas, size, isCircular)
 
             // 保存文件到应用内部存储
-            val file = File(context.getExternalFilesDir(null), "$fileName.png")
+            val file = File(Environment.getExternalStorageDirectory(), "$fileName.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
             }

@@ -1,6 +1,6 @@
 <resources>
-    <string name="support_format">目前支持 pdf, epub, mobi, xps, djvu, fb, cbz, 图片, (无图的docx, pptx), tiff, bigtiff.</string>
-    <string name="about_content">为什么有这个app,市面上基于android view系统的pdf阅读器很多,基于compose的,目前没有看到有.\n所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n目前支持自定义字体放在/sdcard/fonts/,ttf与otf两种字体</string>
+    <string name="support_format">目前支持 PDF, epub, mobi, xps, djvu, fb, cbz, 图片, (无图的docx, pptx), tiff, bigtiff.</string>
+    <string name="about_content">为什么有这个app,市面上基于android view系统的PDF阅读器很多,基于compose的,目前没有看到有.\n所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n目前支持自定义字体放在/sdcard/fonts/,ttf与otf两种字体</string>
     <string name="app_author">作者:archko@gmail.com</string>
     <string name="version">版本</string>
     <string name="about">关于</string>
@@ -11,7 +11,7 @@
     <string name="setting">设置</string>
     <string name="loading">加载中</string>
     <string name="clear_history">清除</string>
-    <string name="select_pdf">Pdf,epub,mobi,图片</string>
+    <string name="select_pdf">PDF,Epub,Mobi,图片</string>
     <string name="delete_history">删除历史记录</string>
     <string name="delete_cache">删除缓存</string>
     <string name="load_more">加载更多</string>
@@ -49,8 +49,8 @@
     <string name="select_cancel">取消</string>
 
     <string name="encrypt_decrypt_title">加密/解密</string>
-    <string name="encrypt_decrypt_tips">Pdf信息</string>
-    <string name="encrypt_decrypt_add">选择Pdf</string>
+    <string name="encrypt_decrypt_tips">PDF信息</string>
+    <string name="encrypt_decrypt_add">选择PDF</string>
     <string name="encrypt_decrypt_encrypt">加密</string>
     <string name="encrypt_decrypt_decrypt">解密</string>
     <string name="encrypt_decrypt_file_path">文件路径: %s</string>
@@ -89,8 +89,8 @@
     <string name="split_success">拆分成功！文件保存在: %s</string>
     <string name="split_error">拆分失败，请检查输入范围是否正确</string>
 
-    <string name="merge_title">合并Pdf</string>
-    <string name="merge_btn">合并Pdf</string>
+    <string name="merge_title">合并PDF</string>
+    <string name="merge_btn">合并PDF</string>
     <string name="merge_pdf_to_split">请选择要要合并的PDF文件</string>
     <string name="merge_success">合并成功！文件保存在: %s</string>
     <string name="merge_error">合并失败!</string>
@@ -183,7 +183,7 @@
     <string name="auto_crop_edge">自动裁剪边缘</string>
     <string name="multi_format_support">多格式支持</string>
     <string name="ocr_text_recognition">OCR文本识别</string>
-    <string name="image_to_pdf">图片转pdf</string>
+    <string name="image_to_pdf">图片转PDF</string>
     <string name="mobi_azw3_to_epub">Mobi/Azw3转Epub</string>
     <string name="pdf_encrypt_decrypt">PDF加密解密</string>
     <string name="webdav_backup">WebDav备份</string>

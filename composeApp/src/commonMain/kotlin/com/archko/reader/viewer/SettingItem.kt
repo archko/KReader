@@ -354,7 +354,7 @@ fun Features() {
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp)
+                .padding(vertical = 8.dp)
         )
 
         // 第一行
