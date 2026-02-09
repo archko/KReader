@@ -1,6 +1,6 @@
 <resources>
-    <string name="support_format">Support PDF, epub, mobi, xps, djvu, fb, cbz, images, (docx, pptx), tiff, bigtiff</string>
-    <string name="about_content">Why did I create this app? There are many PDF readers based on the Android View system on the market, but so far, none have been built on Compose.\nThat’s why I developed this app—a Compose-based PDF reader that supports all platforms.\nCurrently, zooming and scrolling functions are very smooth, but the full range of features from the old reader has not yet been migrated.\nDue to time constraints, the app has been implemented on Android. For iOS, compiling MuPDF is required, while the desktop version of MuPDF is easy to compile, so it won’t be uploaded.\nFonts should be placed in the directory /sdcard/fonts/, and both TTF and OTF font formats are compatible.\n</string>
+    <string name="support_format">Support PDF,, Epub, Mobi, Xps, Djvu, Fb2, Cbz, Image, (Docx, PPTX), Tiff, BigTiff</string>
+    <string name="about_content">Most Android PDF readers on the market are developed based on the traditional View system, while similar products built with Jetpack Compose have always been non-existent.\n\nWe have created this cross-platform PDF reader based on Compose, aiming to achieve a consistent and smooth reading experience across all platforms:\n\nCore Experience: The Android version has implemented extremely smooth zooming and scrolling functions, with decoding response far exceeding traditional solutions;\n\nPersonalization Support: Epub/Mobi, Custom fonts are supported (place TTF/OTF format fonts in the /sdcard/fonts/ path);\n\nCross-platform Progress:\nAndroid: Core reading functions have been launched;\nDesktop: The macOS version has been completed.\niOS: Requires mupdf compilation and a corresponding iOS developer account;\nDevelopment Notes: Contributions are welcome → https://github.com/archko/kreader.git\n</string>
     <string name="app_author">Author:archko@gmail.com</string>
     <string name="version">Version</string>
     <string name="about">About</string>
@@ -106,7 +106,7 @@
     <string name="convert_successfully">Convert successfully %s, Saved to:%s</string>
     <string name="convert_error">Convert failed!</string>
 
-    <string name="webdav_title">Webdav Config</string>
+    <string name="webdav_title">WebDav Config</string>
     <string name="webdav_config_name">Username</string>
     <string name="webdav_config_input_name">Input Username</string>
     <string name="webdav_config_pass">Password</string>
@@ -114,15 +114,15 @@
     <string name="webdav_config_host">Host</string>
     <string name="webdav_config_input_host">Input Host</string>
     <string name="webdav_config_path">Path</string>
-    <string name="webdav_config_path_eg">eg: /webdav 或""</string>
+    <string name="webdav_config_path_eg">eg: /webDav 或""</string>
     <string name="webdav_config_doing">Saving config</string>
     <string name="webdav_config_btn_do">Config</string>
     <string name="webdav_config_btn_save">Save</string>
     <string name="webdav_config_no_files">No Files</string>
     <string name="webdav_restore">Download &amp; Restore</string>
     <string name="webdav_upload">Upload Backup</string>
-    <string name="webdav_config_success">Set Webdav Successfully</string>
-    <string name="webdav_config_failed">Set Webdav Failed</string>
+    <string name="webdav_config_success">Set WebDav Successfully</string>
+    <string name="webdav_config_failed">Set WebDav Failed</string>
     <string name="webdav_upload_success">Upload Backup Successfully</string>
     <string name="webdav_upload_failed">Upload Backup Failed</string>
     <string name="webdav_restore_success">Restore Backup Successfully</string>
@@ -206,4 +206,6 @@
     <string name="annotation_empty">No annotations</string>
     <string name="annotations_count">%d annotations</string>
     <string name="delete_annotation">Delete Annotation</string>
+
+    <string name="thumb_dialog_title">Thumbs</string>
 </resources>

@@ -1,6 +1,6 @@
 <resources>
-    <string name="support_format">目前支持 PDF, epub, mobi, xps, djvu, fb, cbz, 图片, (无图的docx, pptx), tiff, bigtiff.</string>
-    <string name="about_content">为什么有这个app,市面上基于android view系统的PDF阅读器很多,基于compose的,目前没有看到有.\n所以我做了这个app,一个基于compose的pdf阅读器,支持全平台.\n目前缩放,滚动已经非常流畅,旧阅读器的完整功能未迁移过来.\n时间有限,目前在android已经实现,ios则需要编译mupdf,桌面端的mupdf容易编译就不上传了.\n目前支持自定义字体放在/sdcard/fonts/,ttf与otf两种字体</string>
+    <string name="support_format">目前支持 PDF, Epub, Mobi, Xps, Djvu, Fb2, Cbz, 图片, (无图的Docx, PPTX), Tiff, BigTiff.</string>
+    <string name="about_content">市面上绝大多数Android PDF阅读器均基于传统 View 系统开发，而基于Jetpack Compose 构建的同类产品始终处于空白状态。\n\n为此，我们打造了这款基于 Compose 的全平台 PDF 阅读器，旨在实现全平台统一的流畅阅读体验：\n\n核心体验：安卓端已实现极致流畅的缩放，解码响应远超传统方案；\n\n个性化支持：Epub/Mobi可自定义字体（将 TTF/OTF 格式字体放入 /sdcard/fonts/ 路径即可）；\n\n全平台进度：\n安卓端：核心阅读功能已上线；\n桌面端：macOS 版本已开发完成。\niOS 端：需完成 mupdf 编译，且依赖对应的 iOS 开发者账号；\n\n开发说明：欢迎参与开源贡献 → https://github.com/archko/kreader.git\n</string>
     <string name="app_author">作者:archko@gmail.com</string>
     <string name="version">版本</string>
     <string name="about">关于</string>
@@ -76,7 +76,7 @@
     <string name="encrypt_decrypt_decrypt_failed">解密失败</string>
     <string name="encrypt_decrypt_modification_time">修改时间: %s</string>
 
-    <string name="split_title">拆分Pdf</string>
+    <string name="split_title">拆分PDF</string>
     <string name="split_pdf_to_split">请选择要拆分的PDF文件</string>
     <string name="split_rule">拆分规则</string>
     <string name="split_rule_desc">如 1-10,11-20,将会拆分1到10页与11到20页两个文件</string>
@@ -107,7 +107,7 @@
     <string name="convert_successfully">转换成功%s本, 保存在%s</string>
     <string name="convert_error">转换失败!</string>
 
-    <string name="webdav_title">配置Webdav</string>
+    <string name="webdav_title">配置WebDav</string>
     <string name="webdav_config_name">用户名</string>
     <string name="webdav_config_input_name">请输入用户名</string>
     <string name="webdav_config_pass">密码</string>
@@ -115,15 +115,15 @@
     <string name="webdav_config_host">主机地址</string>
     <string name="webdav_config_input_host">请输入主机地址</string>
     <string name="webdav_config_path">路径</string>
-    <string name="webdav_config_path_eg">例如: /webdav 或留空</string>
+    <string name="webdav_config_path_eg">例如: /WebDav 或留空</string>
     <string name="webdav_config_doing">配置中...</string>
     <string name="webdav_config_btn_do">配置</string>
     <string name="webdav_config_btn_save">保存配置</string>
     <string name="webdav_config_no_files">暂无文件</string>
     <string name="webdav_restore">下载恢复</string>
     <string name="webdav_upload">上传备份</string>
-    <string name="webdav_config_success">设置Webdav成功</string>
-    <string name="webdav_config_failed">设置Webdav失败</string>
+    <string name="webdav_config_success">设置WebDav成功</string>
+    <string name="webdav_config_failed">设置WebDav失败</string>
     <string name="webdav_upload_success">上传备份成功</string>
     <string name="webdav_upload_failed">上传备份失败</string>
     <string name="webdav_restore_success">恢复备份成功</string>
@@ -207,4 +207,6 @@
     <string name="annotation_empty">没有批注</string>
     <string name="annotations_count">%d个批注</string>
     <string name="delete_annotation">删除批注</string>
+
+    <string name="thumb_dialog_title">缩略图列表</string>
 </resources>

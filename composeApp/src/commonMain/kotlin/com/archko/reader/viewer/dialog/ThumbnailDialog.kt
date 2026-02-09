@@ -7,13 +7,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -53,7 +51,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.thumb_dialog_title
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * @author: archko 2026/2/6 :6:17
@@ -102,7 +102,7 @@ fun ThumbnailDialog(
                         )
                     }
                     Text(
-                        text = "缩略图列表",
+                        text = stringResource(Res.string.thumb_dialog_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
