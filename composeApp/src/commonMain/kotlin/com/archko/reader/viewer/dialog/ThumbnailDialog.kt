@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,6 +81,10 @@ fun ThumbnailDialog(
         }
     }
 
+    val gridState = rememberLazyGridState(
+        initialFirstVisibleItemIndex = currentPage.coerceAtLeast(0)
+    )
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
@@ -112,6 +117,7 @@ fun ThumbnailDialog(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier
                         .fillMaxSize(),
+                    state = gridState
                 ) {
                     itemsIndexed(
                         list, key = { index, _ -> index },
@@ -148,7 +154,6 @@ private fun ThumbnailItem(
         aPage.height,
         baseSize = 180
     )
-    val thumbHeightDp = thumbHeight.dp
 
     val cacheKey = "thumb-${index}-${thumbWidth}x${thumbHeight}"
     val imageState = remember { mutableStateOf<Painter?>(null) }
@@ -158,7 +163,7 @@ private fun ThumbnailItem(
 
     val itemModifier = Modifier
         .fillMaxWidth()
-        .height(thumbHeightDp)
+        .height(120.dp)
         .clickable(onClick = onClick)
         .then(
             if (isSelected) {
@@ -175,10 +180,10 @@ private fun ThumbnailItem(
             Image(
                 painter = imageState.value!!,
                 contentDescription = "页面 ${index + 1}",
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(thumbHeightDp)
+                    .height(120.dp)
                     .background(Color.White)
             )
         } else {

@@ -140,12 +140,12 @@ public class AnnotationManager(public val path: String) {
     }
 
     public fun toJson(): String {
-        val normalizePath = normalizePath(path)
         val file = File(path)
         val size = file.length()
+        val fileName = file.name
         return try {
             buildJsonObject {
-                put("normalizePath", normalizePath)
+                put("fileName", fileName)
                 put("size", size)
                 put("anno", buildJsonArray {
                     annotations.forEach { (pageIndex, paths) ->
@@ -218,10 +218,10 @@ public class AnnotationManager(public val path: String) {
             annotations.clear()
             val file = File(path)
             val size = file.length()
-            val nPath = normalizePath(path)
+            val fileName = file.name
             val jsonObj = Json.parseToJsonElement(json).jsonObject
-            if (nPath != jsonObj["normalizePath"]?.jsonPrimitive?.content) {
-                println("new nPath:$nPath")
+            if (fileName != jsonObj["fileName"]?.jsonPrimitive?.content) {
+                println("new fileName:$fileName")
                 getAnnotationCacheFile().delete()
                 return
             }
@@ -283,8 +283,9 @@ public class AnnotationManager(public val path: String) {
     }
 
     private fun getAnnotationCacheFile(): File {
-        val normalizePath = normalizePath(path)
-        return File(getCacheDirectory("anno"), "${normalizePath.hashCode()}.json")
+        val file = File(path)
+        val fileName = file.nameWithoutExtension
+        return File(getCacheDirectory("anno"), "$fileName.json")
     }
 
     private fun updateAnnotationsFlow() {

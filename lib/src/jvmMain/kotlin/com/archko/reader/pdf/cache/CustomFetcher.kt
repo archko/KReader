@@ -34,7 +34,8 @@ public class CustomImageFetcher(
             }
 
             val cacheDir = FileUtils.getImageCacheDirectory()
-            val cacheFile = File(cacheDir, "${path.hashCode()}.png")
+            val fileName = File(path).name
+            val cacheFile = File(cacheDir, "${fileName.hashCode()}.png")
 
             // 将ImageBitmap转换为BufferedImage，然后使用ImageIO保存为PNG
             val bufferedImage = image.toAwtImage()
@@ -48,7 +49,8 @@ public class CustomImageFetcher(
 
             // 删除磁盘缓存
             val cacheDir = FileUtils.getImageCacheDirectory()
-            val cacheFile = File(cacheDir, "${path.hashCode()}.png")
+            val fileName = File(path).name
+            val cacheFile = File(cacheDir, "${fileName.hashCode()}.png")
             if (cacheFile.exists()) {
                 cacheFile.delete()
             }
@@ -56,8 +58,8 @@ public class CustomImageFetcher(
 
         private fun loadImageFromCache(data: CustomImageData): ImageBitmap? {
             val cacheDir = FileUtils.getImageCacheDirectory()
-
-            val cacheFile = File(cacheDir, "${data.path.hashCode()}.png")
+            val fileName = File(data.path).name
+            val cacheFile = File(cacheDir, "${fileName.hashCode()}.png")
 
             if (cacheFile.exists()) {
                 try {

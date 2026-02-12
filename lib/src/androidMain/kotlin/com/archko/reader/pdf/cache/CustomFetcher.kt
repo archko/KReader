@@ -37,7 +37,8 @@ public class CustomImageFetcher(
             if (!cacheDir.exists()) {
                 cacheDir.mkdirs()
             }
-            val filePath = "${cacheDir.absolutePath}/${path.hashCode()}"
+            val fileName = File(path).name
+            val filePath = "${cacheDir.absolutePath}/${fileName.hashCode()}"
             val bmp = Bitmap.createBitmap(
                 bitmap.width,
                 bitmap.height,
@@ -58,7 +59,8 @@ public class CustomImageFetcher(
             // 删除磁盘缓存
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
-            val filePath = "${cacheDir.absolutePath}/${path.hashCode()}"
+            val fileName = File(path).name
+            val filePath = "${cacheDir.absolutePath}/${fileName.hashCode()}"
             val cacheFile = File(filePath)
             if (cacheFile.exists()) {
                 cacheFile.delete()
@@ -68,7 +70,8 @@ public class CustomImageFetcher(
         private fun loadBitmapFromCache(data: CustomImageData): Bitmap? {
             val dir = PdfApp.app!!.externalCacheDir
             val cacheDir = File(dir, "image")
-            val key = "${cacheDir.absolutePath}/${data.path.hashCode()}"
+            val fileName = File(data.path).name
+            val key = "${cacheDir.absolutePath}/${fileName.hashCode()}"
             val bitmap = BitmapFactory.decodeFile(key)
             return bitmap
         }
