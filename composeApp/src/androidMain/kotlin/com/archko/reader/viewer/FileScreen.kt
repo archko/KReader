@@ -4,9 +4,9 @@ import android.app.Activity
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -71,6 +71,7 @@ import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
@@ -86,6 +87,7 @@ import kreader.composeapp.generated.resources.delete_cache
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
+import kreader.composeapp.generated.resources.book_info
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -111,6 +113,7 @@ fun FileScreen(
         var showDirectoryDialog by remember { mutableStateOf(false) }
         var pendingImagePath by remember { mutableStateOf<String?>(null) }
         var pendingFiles by remember { mutableStateOf<List<File>?>(null) }
+        var showBookInfoDialog by remember { mutableStateOf<Recent?>(null) }
 
         val isDarkTheme = isSystemInDarkTheme()
         val gridState = rememberLazyGridState()
@@ -249,6 +252,37 @@ fun FileScreen(
                     ) {
                         Text(stringResource(Res.string.cancel))
                     }
+                }
+            )
+        }
+
+        // 书本信息对话框
+        showBookInfoDialog?.let { recent ->
+            BookInfoDialog(
+                recent = recent,
+                onDismiss = { showBookInfoDialog = null },
+                onRead = { bookRecent ->
+                    val path = getAbsolutePath(bookRecent.path)
+                    val file = File(path)
+                    if (file.exists()) {
+                        scope.launch {
+                            val paths = listOf(file.absolutePath)
+                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                viewModel.getRecent(bookRecent.path!!)
+                                val startPage = viewModel.recent?.page?.toInt() ?: 0
+                                openDocRequest = OpenDocRequest(paths, startPage)
+                            } else {
+                                openDocRequest = OpenDocRequest(paths, 0)
+                            }
+                        }
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "File Not Found!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    showBookInfoDialog = null
                 }
             )
         }
@@ -433,6 +467,9 @@ fun FileScreen(
                                             ).show()
                                         }
                                     },
+                                    onInfo = { recent ->
+                                        showBookInfoDialog = recent
+                                    },
                                     onDelete = {
                                         // 删除历史记录
                                         viewModel.deleteRecent(recentList[i])
@@ -521,6 +558,7 @@ fun FileScreen(
 private fun RecentItem(
     recent: Recent,
     onClick: (Recent) -> Unit,
+    onInfo: (Recent) -> Unit,
     onDelete: (Recent) -> Unit,
     onDeleteCache: (Recent) -> Unit
 ) {
@@ -629,6 +667,13 @@ private fun RecentItem(
             expanded = showMenu,
             onDismissRequest = { showMenu = false }
         ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.book_info)) },
+                onClick = {
+                    showMenu = false
+                    onInfo(recent)
+                }
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.delete_history)) },
                 onClick = {

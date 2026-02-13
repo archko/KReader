@@ -63,6 +63,7 @@ import com.archko.reader.pdf.util.inferName
 import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
@@ -84,6 +85,7 @@ import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
 import kreader.composeapp.generated.resources.setting
+import kreader.composeapp.generated.resources.book_info
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -108,6 +110,7 @@ fun FileScreen(
         var showSettingDialog by remember { mutableStateOf(false) }
         var showDirectoryDialog by remember { mutableStateOf(false) }
         var pendingImagePath by remember { mutableStateOf<String?>(null) }
+        var showBookInfoDialog by remember { mutableStateOf<Recent?>(null) }
 
         val gridState = rememberLazyGridState()
 
@@ -177,6 +180,31 @@ fun FileScreen(
                     ) {
                         Text(stringResource(Res.string.cancel))
                     }
+                }
+            )
+        }
+
+        // 书本信息对话框
+        showBookInfoDialog?.let { recent ->
+            BookInfoDialog(
+                recent = recent,
+                onDismiss = { showBookInfoDialog = null },
+                onRead = { bookRecent ->
+                    val path = getAbsolutePath(bookRecent.path)
+                    val file = File(path)
+                    if (file.exists()) {
+                        scope.launch {
+                            val paths = listOf(file.absolutePath)
+                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                viewModel.getRecent(bookRecent.path!!)
+                                val startPage = viewModel.recent?.page?.toInt() ?: 0
+                                openDocRequest = OpenDocRequest(paths, startPage)
+                            } else {
+                                openDocRequest = OpenDocRequest(paths, 0)
+                            }
+                        }
+                    }
+                    showBookInfoDialog = null
                 }
             )
         }
@@ -350,6 +378,9 @@ fun FileScreen(
                                             )
                                         }
                                     },
+                                    onInfo = { recent ->
+                                        showBookInfoDialog = recent
+                                    },
                                     onDelete = {
                                         viewModel.deleteRecent(recentList[i])
                                     },
@@ -394,7 +425,6 @@ fun FileScreen(
                                 }
                             }
 
-                            // 底部间距 - 占满一行
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
@@ -450,6 +480,7 @@ fun FileScreen(
 private fun RecentItem(
     recent: Recent,
     onClick: (Recent) -> Unit,
+    onInfo: (Recent) -> Unit,
     onDelete: (Recent) -> Unit,
     onDeleteCache: (Recent) -> Unit
 ) {
@@ -561,6 +592,13 @@ private fun RecentItem(
             expanded = showMenu,
             onDismissRequest = { showMenu = false }
         ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.book_info)) },
+                onClick = {
+                    showMenu = false
+                    onInfo(recent)
+                }
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(Res.string.delete_history)) },
                 onClick = {

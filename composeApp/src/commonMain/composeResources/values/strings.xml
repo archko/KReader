@@ -208,4 +208,12 @@
     <string name="delete_annotation">Delete Annotation</string>
 
     <string name="thumb_dialog_title">Thumbs</string>
+
+    <string name="book_info">Book Info</string>
+    <string name="book_name">Name: %s</string>
+    <string name="book_path">Path: %s</string>
+    <string name="book_size">Size: %s</string>
+    <string name="book_read_count">Read Times: %d</string>
+    <string name="book_progress">Progress: %.1f%%</string>
+    <string name="book_read">Read</string>
 </resources>

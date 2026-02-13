@@ -209,4 +209,12 @@
     <string name="delete_annotation">删除批注</string>
 
     <string name="thumb_dialog_title">缩略图列表</string>
+
+    <string name="book_info">书籍信息</string>
+    <string name="book_name">书名: %s</string>
+    <string name="book_path">路径: %s</string>
+    <string name="book_size">大小: %s</string>
+    <string name="book_read_count">阅读次数: %d</string>
+    <string name="book_progress">进度: %.1f%%</string>
+    <string name="book_read">阅读</string>
 </resources>
