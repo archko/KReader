@@ -152,7 +152,7 @@ private fun ThumbnailItem(
     val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
         aPage.width,
         aPage.height,
-        baseSize = 180
+        baseSize = 240
     )
 
     val cacheKey = "thumb-${index}-${thumbWidth}x${thumbHeight}"
@@ -182,8 +182,7 @@ private fun ThumbnailItem(
                 contentDescription = "页面 ${index + 1}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
+                    .fillMaxSize()
                     .background(Color.White)
             )
         } else {

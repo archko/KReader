@@ -131,10 +131,10 @@ private fun ToolbarContent(
                     IconButton(
                         onClick = { onQueueDialogShow() }
                     ) {
-                        Text(
-                            text = "📋",
-                            color = Color.White,
-                            fontSize = 16.sp
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_toc),
+                            contentDescription = stringResource(Res.string.outline),
+                            tint = Color.White
                         )
                     }
                 }

@@ -269,46 +269,40 @@ private fun TtsControlBarContent(
                 .height(36.dp)
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             ttsServiceBinder?.let { binder ->
-                val isConnected by binder.isConnected.collectAsState()
-
                 IconButton(
                     onClick = { onPauseResume() },
                     enabled = true
                 ) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_tts),
-                        contentDescription = "TTS控制",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        contentDescription = "TTS",
+                        tint = Color.Green,
                     )
                 }
 
                 IconButton(onClick = { onSleepTimer() }) {
-                    val hasSleepTimer = binder.hasSleepTimer()
                     Text(
                         text = "💤",
-                        color = if (hasSleepTimer) Color.Yellow else Color.White,
+                        color = Color.White,
                         fontSize = 16.sp
                     )
                 }
 
                 IconButton(onClick = { onQueue() }) {
-                    Text(
-                        text = "📋",
-                        color = Color.White,
-                        fontSize = 16.sp
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_toc),
+                        contentDescription = stringResource(Res.string.outline),
+                        tint = Color.White
                     )
                 }
 
                 IconButton(onClick = { onStop() }) {
-                    Text(
-                        text = "X",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_close),
+                        contentDescription = "close",
+                        tint = Color.White
                     )
                 }
             }
@@ -799,47 +793,52 @@ fun CustomView(
             }
 
             AnimatedVisibility(
-                visible = gestureMode == GestureMode.DRAW && showToolbar,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 48.dp)
-            ) {
-                DrawingToolbar(
-                    annotationManager = annotationManager,
-                    pathConfig = pathConfig,
-                    onClose = { config ->
-                        pathConfig = config
-                        println("onClose.pathConfig:$pathConfig")
-                    }
-                )
-            }
-
-            // TTS控制栏
-            AnimatedVisibility(
-                visible = isSpeaking,
+                visible = (gestureMode == GestureMode.DRAW && showToolbar) || isSpeaking,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = if (showToolbar) 48.dp else 0.dp)
             ) {
-                TtsControlBarContent(
-                    ttsServiceBinder = ttsServiceBinder,
-                    onPauseResume = {
-                        ttsServiceBinder?.let { binder ->
-                            if (binder.isServiceInitialized()) {
-                                if (isSpeaking) {
-                                    binder.pause()
-                                } else {
-                                    scope.launch {
-                                        speakFromCurrentPage(currentPage, decoder!!, binder)
+                Column() {
+                    AnimatedVisibility(
+                        visible = gestureMode == GestureMode.DRAW && showToolbar,
+                        modifier = Modifier
+                    ) {
+                        DrawingToolbar(
+                            annotationManager = annotationManager,
+                            pathConfig = pathConfig,
+                            onClose = { config ->
+                                pathConfig = config
+                                println("onClose.pathConfig:$pathConfig")
+                            }
+                        )
+                    }
+
+                    // TTS控制栏
+                    AnimatedVisibility(
+                        visible = isSpeaking,
+                        modifier = Modifier
+                    ) {
+                        TtsControlBarContent(
+                            ttsServiceBinder = ttsServiceBinder,
+                            onPauseResume = {
+                                ttsServiceBinder?.let { binder ->
+                                    if (binder.isServiceInitialized()) {
+                                        if (isSpeaking) {
+                                            binder.pause()
+                                        } else {
+                                            scope.launch {
+                                                speakFromCurrentPage(currentPage, decoder!!, binder)
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        }
-                    },
-                    onSleepTimer = { showSleepDialog = true },
-                    onQueue = { showQueueDialog = true },
-                    onStop = { ttsServiceBinder?.stop() }
-                )
+                            },
+                            onSleepTimer = { showSleepDialog = true },
+                            onQueue = { showQueueDialog = true },
+                            onStop = { ttsServiceBinder?.stop() }
+                        )
+                    }
+                }
             }
 
             // 底部SeekBar - 考虑导航栏（上层）
