@@ -8,8 +8,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * 基于三队列优先级的解码服务
@@ -23,19 +22,18 @@ import kotlinx.coroutines.sync.withLock
 public class DecodeService(
     private val decoder: Decoder
 ) {
-    private val pageTaskQueue = mutableListOf<DecodeTask>()
-    private val nodeTaskQueue = mutableListOf<DecodeTask>()
-    private val cropTaskQueue = mutableListOf<DecodeTask>()
+    // 使用线程安全的原子队列代替普通 List + Mutex
+    private val pageTaskQueue = ConcurrentLinkedQueue<DecodeTask>()
+    private val nodeTaskQueue = ConcurrentLinkedQueue<DecodeTask>()
+    private val cropTaskQueue = ConcurrentLinkedQueue<DecodeTask>()
 
-    private val queueMutex = Mutex()
-
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val decodeDispatcher = Dispatchers.Default.limitedParallelism(1)
+    private val serviceScope = CoroutineScope(SupervisorJob() + decodeDispatcher)
 
     private var processingJob: Job? = null
-
     private var isShutdown = false
 
-    // 任务通知channel - 只用于通知有新任务，不传递任务内容
+    // 任务通知channel - 仅用于唤醒解码循环，不携带数据
     private val taskNotificationChannel = Channel<Unit>(Channel.UNLIMITED)
 
     init {
@@ -50,51 +48,52 @@ public class DecodeService(
 
     private suspend fun taskProcessorLoop() {
         while (serviceScope.isActive && !isShutdown) {
-            // 1. 按优先级选择任务执行
+            // 按照优先级获取下一个任务
             val task = selectNextTask()
+
             if (task != null) {
                 executeTask(task)
-                continue
-            }
-
-            // 2. 没有任务时，等待新任务通知
-            taskNotificationChannel.receive() // 阻塞等待通知
-        }
-    }
-
-    private suspend fun selectNextTask(): DecodeTask? {
-        return queueMutex.withLock {
-            when {
-                pageTaskQueue.isNotEmpty() -> pageTaskQueue.removeAt(0)
-                nodeTaskQueue.isNotEmpty() -> nodeTaskQueue.removeAt(0)
-                cropTaskQueue.isNotEmpty() -> cropTaskQueue.removeAt(0)
-                else -> null
+            } else {
+                // 队列全空时挂起，等待新信号
+                taskNotificationChannel.receive()
             }
         }
     }
 
-    private suspend fun addTaskToQueue(task: DecodeTask) {
-        queueMutex.withLock {
-            when (task.type) {
-                DecodeTask.TaskType.PAGE -> {
-                    // 移除相同key的旧任务，避免重复解码
-                    pageTaskQueue.removeAll { it.decodeKey == task.decodeKey }
-                    pageTaskQueue.add(task)
-                }
+    /**
+     * 优先级策略实现：Page -> Node -> Crop
+     * 由于是单线程消费，直接 poll() 是线程安全的
+     */
+    private fun selectNextTask(): DecodeTask? {
+        return pageTaskQueue.poll()
+            ?: nodeTaskQueue.poll()
+            ?: cropTaskQueue.poll()
+    }
 
-                DecodeTask.TaskType.NODE -> {
-                    nodeTaskQueue.removeAll { it.decodeKey == task.decodeKey }
-                    nodeTaskQueue.add(task)
-                }
+    public fun submitTask(task: DecodeTask) {
+        if (isShutdown) return
 
-                DecodeTask.TaskType.CROP -> {
-                    cropTaskQueue.removeAll { it.decodeKey == task.decodeKey }
-                    cropTaskQueue.add(task)
-                }
-            }
+        when (task.type) {
+            DecodeTask.TaskType.PAGE -> pageTaskQueue.add(task)
+            DecodeTask.TaskType.NODE -> nodeTaskQueue.add(task)
+            DecodeTask.TaskType.CROP -> cropTaskQueue.add(task)
         }
 
-        // 通知处理循环有新任务（非阻塞）
+        // 发出信号唤醒 taskProcessorLoop。trySend 是非阻塞原子操作。
+        taskNotificationChannel.trySend(Unit)
+    }
+
+    /**
+     * 批量提交切边任务
+     */
+    public fun submitCropTasks(tasks: List<DecodeTask>) {
+        if (isShutdown) return
+
+        // 清除旧任务并添加新任务。
+        // 虽然多线程下 clear+addAll 不是绝对原子的，但在 PDF 切边场景下足够安全
+        cropTaskQueue.clear()
+        cropTaskQueue.addAll(tasks)
+
         taskNotificationChannel.trySend(Unit)
     }
 
@@ -107,7 +106,7 @@ public class DecodeService(
                 ?: true
         if (!shouldRender) {
             // 保证node的状态可以恢复
-            task.callback?.onFinish(task.pageIndex)
+            task.callback.onFinish(task.pageIndex)
             //println("DecodeService.executeTask: 跳过不可见任务 - page: ${task.pageIndex}, type: ${task.type}")
             return
         }
@@ -126,7 +125,6 @@ public class DecodeService(
 
                 DecodeTask.TaskType.CROP -> {
                     val result = decoder.processCrop(task)
-                    // crop任务通常没有callback，结果直接更新到APage
                     result?.let {
                         task.aPage.cropBounds = it.cropBounds
                     }
@@ -135,26 +133,6 @@ public class DecodeService(
         } catch (e: Exception) {
             println("DecodeService.executeTask error: ${e.message}")
             task.callback?.onDecodeComplete(null, false, e)
-        }
-    }
-
-    public fun submitTask(task: DecodeTask) {
-        if (isShutdown) return
-        serviceScope.launch {
-            addTaskToQueue(task)
-        }
-    }
-
-    public fun submitCropTasks(tasks: List<DecodeTask>) {
-        if (isShutdown) return
-        serviceScope.launch {
-            queueMutex.withLock {
-                // 清除旧的切边任务，添加新的
-                cropTaskQueue.clear()
-                cropTaskQueue.addAll(tasks)
-            }
-            // 通知有新任务
-            taskNotificationChannel.trySend(Unit)
         }
     }
 

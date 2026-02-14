@@ -15,7 +15,6 @@ import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -47,7 +46,7 @@ public class PageNode(
 
     // 缓存TileSpec计算结果
     private var cachedTileSpec: TileSpec? = null
-    
+
     public fun update(newBounds: Rect, newAPage: APage) {
         this.bounds = newBounds
         this.aPage = newAPage
@@ -60,10 +59,14 @@ public class PageNode(
         xOffset: Float,
         yOffset: Float
     ): Rect {
-        val left = floor(bounds.left * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
-        val top = floor(bounds.top * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
-        val right = ceil(bounds.right * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
-        val bottom = ceil(bounds.bottom * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
+        val left =
+            floor(bounds.left * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
+        val top =
+            floor(bounds.top * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
+        val right =
+            ceil(bounds.right * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
+        val bottom =
+            ceil(bounds.bottom * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
 
         return Rect(left, top, right, bottom)
     }
@@ -79,7 +82,8 @@ public class PageNode(
             cachedPageWidth != pageWidth ||
             cachedPageHeight != pageHeight ||
             cachedXOffset != xOffset ||
-            cachedYOffset != yOffset) {
+            cachedYOffset != yOffset
+        ) {
 
             // 参数变化，重新计算
             cachedPixelRect = toPixelRect(pageWidth, pageHeight, xOffset, yOffset)
@@ -100,7 +104,8 @@ public class PageNode(
     ): TileSpec {
         if (cachedTileSpec == null ||
             cachedPageWidth != pageWidth ||
-            cachedPageHeight != pageHeight) {
+            cachedPageHeight != pageHeight
+        ) {
             cachedTileSpec = TileSpec(
                 aPage.index,
                 scale,
@@ -186,7 +191,7 @@ public class PageNode(
                     state.bitmap,
                     dstOffset = IntOffset(dstLeft, dstTop),
                     // 关键点：给宽高各增加 1 像素的微量溢出，覆盖邻居边缘
-                    dstSize = IntSize(dstWidth+ 1, dstHeight+ 1)
+                    dstSize = IntSize(dstWidth + 1, dstHeight + 1)
                 )
             }
         }
@@ -205,140 +210,135 @@ public class PageNode(
     }
 
     private fun decode(pageWidth: Float, pageHeight: Float) {
-        if (!isDecoding) {
+        val currentKey = cacheKey
+
+        if (activeDecodeKey == currentKey || isDecoding) return
+
+        val cachedState = ImageCache.acquireNode(currentKey)
+        if (cachedState != null) {
+            bitmapState?.let { ImageCache.releaseNode(it) }
+            bitmapState = cachedState
+            activeDecodeKey = currentKey
+            return
+        }
+
+        decodeJob?.cancel()
+
+        decodeJob = pageViewState.decodeScope.launch {
+            if (!isScopeActive()) return@launch
+
             isDecoding = true
-            decodeJob?.cancel()
-            decodeJob = pageViewState.decodeScope.launch {
-                // 解码前判断可见性和协程活跃性
-                if (!isScopeActive()) {
-                    isDecoding = false
-                    return@launch
-                }
+            activeDecodeKey = currentKey
 
-                val currentKey = cacheKey
+            val width = aPage.getWidth(pageViewState.isCropEnabled())
+            val height = aPage.getHeight(pageViewState.isCropEnabled())
+            val scale = pageWidth / width
+            val tileSpec = TileSpec(
+                aPage.index,
+                scale,
+                bounds,
+                pageWidth.toInt(),
+                pageHeight.toInt(),
+                pageViewState.viewSize,
+                cacheKey,
+                null
+            )
 
-                // 先查安全缓存
-                val cachedState = ImageCache.acquireNode(currentKey)
-                if (cachedState != null) {
-                    withContext(Dispatchers.Main) {
-                        bitmapState?.let { ImageCache.releaseNode(it) }
-                        bitmapState = cachedState
-                    }
-                    isDecoding = false
-                    return@launch
-                }
-                activeDecodeKey = currentKey
+            // 使用预加载区域判断（包含可见区域）
+            /*if (!pageViewState.isTileVisible(tileSpec, strictMode = false)) {
+                isDecoding = false
+                return@launch
+            }*/
 
-                val width = aPage.getWidth(pageViewState.isCropEnabled())
-                val height = aPage.getHeight(pageViewState.isCropEnabled())
-                val scale = pageWidth / width
-                val tileSpec = TileSpec(
-                    aPage.index,
-                    scale,
-                    bounds,
-                    pageWidth.toInt(),
-                    pageHeight.toInt(),
-                    pageViewState.viewSize,
-                    cacheKey,
-                    null
-                )
+            val left =
+                (if (null != aPage.cropBounds && pageViewState.isCropEnabled()) aPage.cropBounds!!.left
+                else 1f) * pageWidth / width
+            val top =
+                (if (null != aPage.cropBounds && pageViewState.isCropEnabled()) aPage.cropBounds!!.top
+                else 1f) * pageHeight / height
+            val srcRect = Rect(
+                left = bounds.left * pageWidth + left,
+                top = bounds.top * pageHeight + top,
+                right = bounds.right * pageWidth + left,
+                bottom = bounds.bottom * pageHeight + top
+            )
+            //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
+            val outWidth = ((srcRect.right - srcRect.left)).toInt()
+            val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
 
-                // 使用预加载区域判断（包含可见区域）
-                if (!pageViewState.isTileVisible(tileSpec, strictMode = false)) {
-                    isDecoding = false
-                    return@launch
-                }
+            //外面的计算如果出问题了,会在这里拦截,避免崩溃.目前是正常的
+            if (outWidth > MAX_BLOCK * 2 || outHeight > MAX_BLOCK * 2) {
+                println("[PageNode].decode:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
+                isDecoding = false
+                return@launch
+            }
 
-                val left =
-                    (if (null != aPage.cropBounds && pageViewState.isCropEnabled()) aPage.cropBounds!!.left
-                    else 1f) * pageWidth / width
-                val top =
-                    (if (null != aPage.cropBounds && pageViewState.isCropEnabled()) aPage.cropBounds!!.top
-                    else 1f) * pageHeight / height
-                val srcRect = Rect(
-                    left = bounds.left * pageWidth + left,
-                    top = bounds.top * pageHeight + top,
-                    right = bounds.right * pageWidth + left,
-                    bottom = bounds.bottom * pageHeight + top
-                )
-                //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
-                val outWidth = ((srcRect.right - srcRect.left)).toInt()
-                val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
-
-                //外面的计算如果出问题了,会在这里拦截,避免崩溃.目前是正常的
-                if (outWidth > MAX_BLOCK * 2 || outHeight > MAX_BLOCK * 2) {
-                    println("[PageNode].decode:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
-                    isDecoding = false
-                    return@launch
-                }
-
-                val decodeTask = DecodeTask(
-                    type = DecodeTask.TaskType.NODE,
-                    pageIndex = aPage.index,
-                    decodeKey = cacheKey,
-                    aPage = aPage,
-                    zoom = scale,
-                    pageSliceBounds = srcRect,
-                    outWidth,
-                    outHeight,
-                    crop = pageViewState.isCropEnabled(),
-                    callback = object : DecodeCallback {
-                        override fun onDecodeComplete(
-                            bitmap: ImageBitmap?,
-                            isThumb: Boolean,
-                            error: Throwable?
-                        ) {
-                            if (bitmap != null && !pageViewState.isShutdown() && activeDecodeKey == currentKey) {
-                                val newState = ImageCache.putNode(cacheKey, bitmap)
-                                pageViewState.decodeScope.launch(Dispatchers.Main) {
-                                    if (pageViewState.isTileVisible(
-                                            tileSpec,
-                                            strictMode = false
-                                        ) && !pageViewState.isShutdown()
-                                        && activeDecodeKey == currentKey
-                                    ) {
-                                        bitmapState?.let { ImageCache.releaseNode(it) }
-                                        bitmapState = newState
-                                    } else {
-                                        ImageCache.releaseNode(newState)
-                                    }
-                                }
-                                // 解码完成，触发UI刷新
-                                pageViewState.notifyDecodeCompleted()
-                            } else {
-                                if (error != null) {
-                                    println("PageNode decode error: ${error.message}")
+            val decodeTask = DecodeTask(
+                type = DecodeTask.TaskType.NODE,
+                pageIndex = aPage.index,
+                decodeKey = currentKey,
+                aPage = aPage,
+                zoom = scale,
+                pageSliceBounds = srcRect,
+                outWidth,
+                outHeight,
+                crop = pageViewState.isCropEnabled(),
+                callback = object : DecodeCallback {
+                    override fun onDecodeComplete(
+                        bitmap: ImageBitmap?,
+                        isThumb: Boolean,
+                        error: Throwable?
+                    ) {
+                        if (bitmap != null && !pageViewState.isShutdown()) {
+                            val newState = ImageCache.putNode(cacheKey, bitmap)
+                            pageViewState.decodeScope.launch(Dispatchers.Main) {
+                                if (pageViewState.isTileVisible(
+                                        tileSpec,
+                                        strictMode = false
+                                    ) && !pageViewState.isShutdown()
+                                    && activeDecodeKey == currentKey
+                                ) {
+                                    bitmapState?.let { ImageCache.releaseNode(it) }
+                                    bitmapState = newState
+                                } else {
+                                    ImageCache.releaseNode(newState)
                                 }
                             }
+                            // 解码完成，触发UI刷新
+                            pageViewState.notifyDecodeCompleted()
+                        } else {
+                            if (error != null) {
+                                println("PageNode decode error: ${error.message}")
+                            }
+                        }
+                        isDecoding = false
+                    }
+
+                    override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                        if (activeDecodeKey != currentKey || pageViewState.isShutdown()) {
+                            return false
+                        }
+
+                        // 检查页面是否在当前可见页面列表中
+                        val isPageVisible =
+                            pageViewState.pageToRender.any { it.aPage.index == pageNumber }
+                        if (!isPageVisible) {
+                            return false
+                        }
+
+                        // 对于节点任务，还需要检查具体的tile是否在预加载区域
+                        return pageViewState.isTileVisible(tileSpec, strictMode = false)
+                    }
+
+                    override fun onFinish(pageNumber: Int) {
+                        if (activeDecodeKey == currentKey) {
                             isDecoding = false
                         }
-
-                        override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                            if (activeDecodeKey != currentKey || pageViewState.isShutdown()) {
-                                return false
-                            }
-
-                            // 检查页面是否在当前可见页面列表中
-                            val isPageVisible =
-                                pageViewState.pageToRender.any { it.aPage.index == pageNumber }
-                            if (!isPageVisible) {
-                                return false
-                            }
-
-                            // 对于节点任务，还需要检查具体的tile是否在预加载区域
-                            return pageViewState.isTileVisible(tileSpec, strictMode = false)
-                        }
-
-                        override fun onFinish(pageNumber: Int) {
-                            if (activeDecodeKey == currentKey) {
-                                isDecoding = false
-                            }
-                        }
                     }
-                )
+                }
+            )
 
-                pageViewState.decodeService?.submitTask(decodeTask)
-            }
+            pageViewState.decodeService?.submitTask(decodeTask)
         }
     }
 

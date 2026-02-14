@@ -352,8 +352,8 @@ public fun DocumentView(
     // 优化的 Fling 执行器
     fun performFling(velocity: Velocity, viewSize: IntSize, pageViewState: PageViewState) {
         val decay = exponentialDecay<Float>(
-            frictionMultiplier = 0.3f,
-            absVelocityThreshold = 0.40f
+            frictionMultiplier = 0.35f, // (摩擦系数) 作用：它决定了减速度的大小。数值越大，摩擦力越大，速度降得越快，滑动距离越短。
+            absVelocityThreshold = 0.50f //(绝对速度阈值) 作用：它定义了动画“停止”的临界点。当滑动速度降到这个值以下时，动画会立即结束（不再继续计算微小的位移）。
         )
 
         flingJob = scope.launch {
@@ -361,7 +361,7 @@ public fun DocumentView(
             val animY = Animatable(offset.y)
 
             launch {
-                animX.animateDecay(velocity.x, decay) {
+                animX.animateDecay(velocity.x * 1.1f, decay) {
                     val boundOffset = calculateBounds(
                         Offset(value, offset.y),
                         vZoom,
@@ -378,7 +378,7 @@ public fun DocumentView(
             }
 
             launch {
-                animY.animateDecay(velocity.y, decay) {
+                animY.animateDecay(velocity.y * 1.1f, decay) {
                     val boundOffset = calculateBounds(
                         Offset(offset.x, value),
                         vZoom,
