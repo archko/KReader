@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -52,11 +51,11 @@ public fun TextActionToolbar(
     // 检查选中文本是否为空
     val selectedText = selection?.text ?: ""
     println("TextActionToolbar:$selectedText")
-    var resultTest by remember { mutableStateOf(selectedText) }
+    var resultText by remember { mutableStateOf(selectedText) }
     var isOcring by remember { mutableStateOf(false) }
 
     // 如果选中文本是空的，尝试从缓存获取图片并进行OCR识别
-    if (selectedText.isEmpty() && selection != null && textSelector != null) {
+    /*if (selectedText.isEmpty() && selection != null && textSelector != null) {
         // 使用selection.quads获取坐标区域
         selection.quads.forEach { quad ->
             // 计算quad的边界框
@@ -79,13 +78,14 @@ public fun TextActionToolbar(
 
                 LaunchedEffect(extractedText) {
                     isOcring = false
+                    resultText = extractedText
                     if (extractedText.isNotEmpty()) {
-                        onCopy(extractedText)
+                        //onCopy(extractedText)
                     }
                 }
             }
         }
-    }
+    }*/
 
     Surface(
         modifier = Modifier
@@ -115,10 +115,10 @@ public fun TextActionToolbar(
             ) {
                 SelectionContainer {
                     Text(
-                        text = if (resultTest.isEmpty() && isOcring) {
+                        text = if (resultText.isEmpty() && isOcring) {
                             "Processing image..."
                         } else {
-                            resultTest
+                            resultText
                         },
                         color = Color.White,
                         style = MaterialTheme.typography.bodyMedium,
@@ -139,8 +139,8 @@ public fun TextActionToolbar(
             ) {
                 TextButton(
                     onClick = {
-                        clipboardManager.setText(AnnotatedString(resultTest))
-                        onCopy(resultTest)
+                        clipboardManager.setText(AnnotatedString(resultText))
+                        onCopy(resultText)
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = Color.White

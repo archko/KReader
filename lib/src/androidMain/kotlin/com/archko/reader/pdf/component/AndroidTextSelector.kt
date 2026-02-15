@@ -3,15 +3,22 @@ package com.archko.reader.pdf.component
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.pdf.state.OcrEngine
+import com.archko.reader.pdf.util.FileTypeUtils
 
 /**
  * Android平台的actual实现
  */
-public actual fun createTextSelector(getStructuredTextCallback: (Int) -> StructuredText?): TextSelector {
+public actual fun createTextSelector(path: String, getStructuredTextCallback: (Int) -> StructuredText?): TextSelector {
+    if (FileTypeUtils.isDjvuFile(path)) {
+        DjvuTextSelector(getStructuredTextCallback)
+    }
     return AndroidTextSelector(getStructuredTextCallback)
 }
 
-public actual fun createStructuredTextImpl(nativeStructuredText: Any): StructuredText {
+public actual fun createStructuredTextImpl(path: String, nativeStructuredText: Any): StructuredText {
+    if (FileTypeUtils.isDjvuFile(path)) {
+        return DjvuStructuredTextImpl(nativeStructuredText)
+    }
     return AndroidStructuredTextImpl(nativeStructuredText)
 }
 
@@ -19,13 +26,13 @@ public actual fun createStructuredTextImpl(nativeStructuredText: Any): Structure
  * Android平台的文本选择器实现
  */
 public class AndroidTextSelector(
-    private val getStructuredTextCallback: (Int) -> StructuredText?
+    private val structuredTextCallback: (Int) -> StructuredText?
 ) : TextSelector {
 
     private val ocrEngine = OcrEngine()
 
     override fun getStructuredText(pageIndex: Int): StructuredText? {
-        return getStructuredTextCallback(pageIndex)
+        return structuredTextCallback(pageIndex)
     }
 
     override fun quadToScreenQuad(
@@ -51,10 +58,9 @@ public class AndroidStructuredTextImpl(
     private val nativeStructuredText: Any // 实际的MuPDF StructuredText对象
 ) : StructuredText {
 
+    // 暂时是无用的,但必须返回一个矩形
     override fun highlight(startPoint: PagePoint, endPoint: PagePoint): Array<MuPdfQuad> {
         return try {
-            val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
-
             // 完全绕过MuPDF的智能选择，直接基于坐标创建选择区域
             val left = minOf(startPoint.x, endPoint.x)
             val top = minOf(startPoint.y, endPoint.y)
@@ -76,29 +82,12 @@ public class AndroidStructuredTextImpl(
                 emptyArray()
             }
         } catch (e: Exception) {
-            println("MuPDF highlight error: ${e.message}")
-            // 降级到简单实现
-            val left = minOf(startPoint.x, endPoint.x)
-            val top = minOf(startPoint.y, endPoint.y)
-            val right = maxOf(startPoint.x, endPoint.x)
-            val bottom = maxOf(startPoint.y, endPoint.y)
-
-            // 只有当起始点和结束点不同时才创建选择区域
-            if (left != right || top != bottom) {
-                val quad = MuPdfQuad(
-                    ul_x = left, ul_y = top,
-                    ur_x = right, ur_y = top,
-                    ll_x = left, ll_y = bottom,
-                    lr_x = right, lr_y = bottom
-                )
-                arrayOf(quad)
-            } else {
-                emptyArray()
-            }
+            emptyArray()
         }
     }
 
-    override fun copy(startPoint: PagePoint, endPoint: PagePoint): String {
+    // 真正选中文本的方法
+    override fun selectText(startPoint: PagePoint, endPoint: PagePoint): String {
         return try {
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
 
@@ -159,9 +148,7 @@ public class AndroidStructuredTextImpl(
         } catch (e: Exception) {
             println("MuPDF copy error: ${e.message}")
             // 降级到简单实现
-            val width = kotlin.math.abs(endPoint.x - startPoint.x)
-            val height = kotlin.math.abs(endPoint.y - startPoint.y)
-            "选中文本 (${width.toInt()}x${height.toInt()})"
+            (nativeStructuredText as com.artifex.mupdf.fitz.StructuredText).asText()
         }
     }
 
@@ -211,5 +198,71 @@ public class AndroidStructuredTextImpl(
             println("MuPDF search error: ${e.message}")
             emptyArray()
         }
+    }
+}
+
+public class DjvuTextSelector(
+    private val structuredTextCallback: (Int) -> StructuredText?
+) : TextSelector {
+
+    private val ocrEngine = OcrEngine()
+
+    override fun getStructuredText(pageIndex: Int): StructuredText? {
+        return structuredTextCallback(pageIndex)
+    }
+
+    override fun quadToScreenQuad(
+        quad: MuPdfQuad,
+        pdfToScreenTransform: (Float, Float) -> Offset
+    ): ScreenQuad {
+        val ul = pdfToScreenTransform(quad.ul_x, quad.ul_y)
+        val ur = pdfToScreenTransform(quad.ur_x, quad.ur_y)
+        val ll = pdfToScreenTransform(quad.ll_x, quad.ll_y)
+        val lr = pdfToScreenTransform(quad.lr_x, quad.lr_y)
+        return ScreenQuad(ul, ur, ll, lr)
+    }
+
+    override fun extractTextFromImage(bitmap: ImageBitmap): String {
+        return ocrEngine.recognizeText(bitmap)
+    }
+}
+
+public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
+    override fun highlight(startPoint: PagePoint, endPoint: PagePoint): Array<MuPdfQuad> {
+        return try {
+            val left = minOf(startPoint.x, endPoint.x)
+            val top = minOf(startPoint.y, endPoint.y)
+            val right = maxOf(startPoint.x, endPoint.x)
+            val bottom = maxOf(startPoint.y, endPoint.y)
+
+            println("highlight: 使用坐标选择 start:($startPoint) end:($endPoint) -> rect:($left,$top,$right,$bottom)")
+
+            if (left != right || top != bottom) {
+                val quad = MuPdfQuad(
+                    ul_x = left, ul_y = top,      // 左上角
+                    ur_x = right, ur_y = top,     // 右上角
+                    ll_x = left, ll_y = bottom,   // 左下角
+                    lr_x = right, lr_y = bottom   // 右下角
+                )
+                arrayOf(quad)
+            } else {
+                emptyArray()
+            }
+        } catch (e: Exception) {
+            println(e)
+            emptyArray()
+        }
+    }
+
+    override fun selectText(startPoint: PagePoint, endPoint: PagePoint): String {
+        return text as String
+    }
+
+    override fun snapSelection(startPoint: PagePoint, endPoint: PagePoint, mode: Int): MuPdfQuad? {
+        return null
+    }
+
+    override fun search(needle: String, flags: Int): Array<Array<MuPdfQuad>> {
+        return emptyArray()
     }
 }

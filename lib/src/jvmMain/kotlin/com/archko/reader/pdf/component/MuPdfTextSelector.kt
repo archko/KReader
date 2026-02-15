@@ -6,11 +6,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 /**
  * JVM平台的actual实现
  */
-public actual fun createTextSelector(getStructuredTextCallback: (Int) -> StructuredText?): TextSelector {
+public actual fun createTextSelector(path: String, getStructuredTextCallback: (Int) -> StructuredText?): TextSelector {
     return MuPdfTextSelector(getStructuredTextCallback)
 }
 
-public actual fun createStructuredTextImpl(nativeStructuredText: Any): StructuredText {
+public actual fun createStructuredTextImpl(path: String, nativeStructuredText: Any): StructuredText {
     return MuPdfStructuredTextImpl(nativeStructuredText)
 }
 
@@ -98,7 +98,7 @@ public class MuPdfStructuredTextImpl(
         }
     }
 
-    override fun copy(startPoint: PagePoint, endPoint: PagePoint): String {
+    override fun selectText(startPoint: PagePoint, endPoint: PagePoint): String {
         return try {
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
 

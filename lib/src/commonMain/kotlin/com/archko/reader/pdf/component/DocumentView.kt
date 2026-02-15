@@ -63,6 +63,7 @@ public fun DocumentView(
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
+    currentPath: String,
 ) {
     // 初始化状态
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
@@ -87,11 +88,11 @@ public fun DocumentView(
 
     // 创建文本选择器 - 使用expect/actual模式
     val textSelector = remember {
-        createTextSelector { pageIndex ->
+        createTextSelector(currentPath) { pageIndex ->
             // 从PdfDecoder获取真实的StructuredText
             val structuredText = state.getStructuredText(pageIndex)
             if (structuredText != null) {
-                createStructuredTextImpl(structuredText)
+                createStructuredTextImpl(currentPath, structuredText)
             } else {
                 null
             }

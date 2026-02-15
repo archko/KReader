@@ -203,7 +203,7 @@ public class Page(
             val quads = structText.highlight(startPoint, endPoint)
             //println("Page.updateTextSelection.highlight: startPoint=$startPoint, endPoint=$endPoint, quads.size=${quads.size}")
 
-            val selectedText = structText.copy(startPoint, endPoint)
+            val selectedText = structText.selectText(startPoint, endPoint)
             currentSelection = TextSelection(
                 startPoint = startPoint,
                 endPoint = endPoint,

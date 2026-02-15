@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -569,7 +568,7 @@ fun CustomView(
             // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
             val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
             // 当前页与总页数
-            var currentPage by remember { mutableIntStateOf(0) }
+            var currentPage by remember { mutableIntStateOf(progressPage ?: 0) }
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
             val pageCount: Int = list.size
@@ -756,6 +755,7 @@ fun CustomView(
                     gestureMode = gestureMode,
                     pathConfig = pathConfig,
                     annotationManager = annotationManager,
+                    currentPath = currentPath,
                 )
             }
 

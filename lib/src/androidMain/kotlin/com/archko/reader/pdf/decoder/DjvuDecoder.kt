@@ -560,7 +560,10 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun getStructuredText(index: Int): Any? {
-        return null
+        if (djvuLoader == null) {
+            return null
+        }
+        return djvuLoader!!.getPageText(index)
     }
 
     /**
