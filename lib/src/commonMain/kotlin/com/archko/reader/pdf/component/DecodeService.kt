@@ -9,6 +9,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * 基于三队列优先级的解码服务
@@ -22,6 +25,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 public class DecodeService(
     private val decoder: Decoder
 ) {
+
+    // 全局单线程解码作用域
+    public val dispatchScope: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "Page-Dispatcher").apply { isDaemon = true }
+    }
+
     // 使用线程安全的原子队列代替普通 List + Mutex
     private val pageTaskQueue = ConcurrentLinkedQueue<DecodeTask>()
     private val nodeTaskQueue = ConcurrentLinkedQueue<DecodeTask>()
@@ -38,6 +47,10 @@ public class DecodeService(
 
     init {
         startProcessing()
+    }
+
+    public fun submit(func: Runnable): Future<*> {
+        return dispatchScope.submit(func)
     }
 
     private fun startProcessing() {
@@ -144,5 +157,6 @@ public class DecodeService(
         nodeTaskQueue.clear()
         cropTaskQueue.clear()
         serviceScope.cancel()
+        dispatchScope.shutdownNow()
     }
 }

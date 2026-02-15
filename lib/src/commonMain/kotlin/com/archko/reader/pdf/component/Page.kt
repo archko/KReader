@@ -16,9 +16,10 @@ import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.concurrent.Future
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -44,7 +45,7 @@ public class Page(
 
     private var thumbBitmapState by mutableStateOf<BitmapState?>(null)
     private var thumbDecoding = false
-    private var thumbJob: Job? = null
+    private var thumbJob: Future<*>? = null
     private var aspectRatio = 0f
 
     // 缓存的cacheKey，只在viewSize有值时计算一次
@@ -72,7 +73,7 @@ public class Page(
         thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
         thumbDecoding = false
-        thumbJob?.cancel()
+        thumbJob?.cancel(true)
         thumbJob = null
     }
 
@@ -261,11 +262,11 @@ public class Page(
 
     private fun startThumbnailDecoding(cacheKey: String) {
         thumbDecoding = true
-        thumbJob?.cancel()
-        thumbJob = pageViewState.decodeScope.launch {
+        thumbJob?.cancel(true)
+        thumbJob = pageViewState.decodeService!!.submit {
             if (!isScopeActive()) {
                 thumbDecoding = false
-                return@launch
+                return@submit
             }
 
             val decodeTask = DecodeTask(
@@ -286,7 +287,7 @@ public class Page(
                     ) {
                         if (bitmap != null && !pageViewState.isShutdown()) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
-                            pageViewState.decodeScope.launch(Dispatchers.Main) {
+                            CoroutineScope(Dispatchers.Main).launch() {
                                 if (!pageViewState.isShutdown()) {
                                     thumbBitmapState?.let { ImageCache.releasePage(it) }
                                     thumbBitmapState = newState

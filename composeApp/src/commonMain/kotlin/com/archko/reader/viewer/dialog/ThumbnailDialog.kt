@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,8 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -46,15 +47,14 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.DecoderAdapter
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.thumb_dialog_title
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * @author: archko 2026/2/6 :6:17
@@ -72,10 +72,11 @@ fun ThumbnailDialog(
         DecodeService(DecoderAdapter(decoder, IntSize.Zero) { false })
     }
 
-    val decodeScope =
-        CoroutineScope(Dispatchers.Default.limitedParallelism(1))
+    val decodeScope: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "ThumbDecoder-Dispatcher").apply { isDaemon = true }
+    }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(decodeService) {
         onDispose {
             decodeService.shutdown()
         }
@@ -117,19 +118,18 @@ fun ThumbnailDialog(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier
                         .fillMaxSize(),
-                    state = gridState
+                    state = gridState,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     itemsIndexed(
                         list, key = { index, _ -> index },
                     ) { index, page ->
-                        val isCurrentPage = index == currentPage
                         ThumbnailItem(
                             index = index,
                             aPage = page,
-                            isSelected = isCurrentPage,
-                            onClick = {
-                                onPageClick(index)
-                            },
+                            isSelected = index == currentPage,
+                            onClick = { onPageClick(index) },
                             decodeService = decodeService,
                             decodeScope = decodeScope
                         )
@@ -147,7 +147,7 @@ private fun ThumbnailItem(
     isSelected: Boolean,
     onClick: () -> Unit,
     decodeService: DecodeService,
-    decodeScope: CoroutineScope
+    decodeScope: ExecutorService
 ) {
     val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
         aPage.width,
@@ -158,7 +158,7 @@ private fun ThumbnailItem(
     val cacheKey = "thumb-${index}-${thumbWidth}x${thumbHeight}"
     val imageState = remember { mutableStateOf<Painter?>(null) }
     val isLoading = remember { mutableStateOf(true) }
-    val job = remember { mutableStateOf<Job?>(null) }
+    val job = remember { mutableStateOf<Future<*>?>(null) }
     val isDisposed = remember { mutableStateOf(false) }
 
     val itemModifier = Modifier
@@ -181,9 +181,7 @@ private fun ThumbnailItem(
                 painter = imageState.value!!,
                 contentDescription = "页面 ${index + 1}",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White)
+                modifier = Modifier.fillMaxSize()
             )
         } else {
             CircularProgressIndicator(
@@ -195,7 +193,7 @@ private fun ThumbnailItem(
 
         Text(
             text = "${index + 1}",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -206,7 +204,7 @@ private fun ThumbnailItem(
     }
 
     DisposableEffect(index, thumbWidth, thumbHeight) {
-        job.value?.cancel()
+        job.value?.cancel(true)
         job.value = null
 
         val cachedState = ImageCache.acquirePage(cacheKey)
@@ -219,7 +217,7 @@ private fun ThumbnailItem(
             }
         }
 
-        val loadJob = decodeScope.launch {
+        val loadJob = decodeScope.submit {
             val decodeTask = DecodeTask(
                 type = DecodeTask.TaskType.PAGE,
                 pageIndex = index,
@@ -264,7 +262,7 @@ private fun ThumbnailItem(
         job.value = loadJob
 
         onDispose {
-            job.value?.cancel()
+            job.value?.cancel(true)
             job.value = null
             isDisposed.value = true
 

@@ -10,7 +10,6 @@ import com.archko.reader.pdf.cache.getCacheDirectory
 import com.archko.reader.pdf.component.AnnotationPath
 import com.archko.reader.pdf.component.DrawType
 import com.archko.reader.pdf.component.PathConfig
-import com.archko.reader.pdf.util.normalizePath
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +35,7 @@ public class AnnotationManager(public val path: String) {
 
     // 使用 mutableStateMapOf 并直接暴露，保持 Compose 响应性
     public val annotations: MutableMap<Int, MutableList<AnnotationPath>> =
-        mutableStateMapOf<Int, MutableList<AnnotationPath>>()
+        mutableStateMapOf()
 
     private val _annotationsFlow = MutableStateFlow<Map<Int, List<AnnotationPath>>>(emptyMap())
     public val annotationsFlow: StateFlow<Map<Int, List<AnnotationPath>>> =
@@ -77,8 +76,7 @@ public class AnnotationManager(public val path: String) {
 
     public fun undo() {
         if (undoStack.isEmpty()) return
-        val action = undoStack.removeAt(undoStack.size - 1)
-        when (action) {
+        when (val action = undoStack.removeAt(undoStack.size - 1)) {
             is UndoAction.Add -> {
                 val list = annotations[action.pageIndex]
                 if (list != null) {
@@ -118,8 +116,7 @@ public class AnnotationManager(public val path: String) {
 
     public fun redo() {
         if (redoStack.isEmpty()) return
-        val action = redoStack.removeAt(redoStack.size - 1)
-        when (action) {
+        when (val action = redoStack.removeAt(redoStack.size - 1)) {
             is UndoAction.Add -> {
                 val pageIndex = action.pageIndex
                 val list = annotations.getOrPut(pageIndex) { mutableListOf() }

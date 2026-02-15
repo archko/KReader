@@ -12,13 +12,9 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.state.AnnotationManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.launch
 
 /**
  * @author: archko 2025/7/24 :08:21
@@ -48,10 +44,6 @@ public class PageViewState(
 
     // 预加载配置
     private var preloadScreens: Float = 0.8f // 预加载1屏的距离
-
-    // 全局单线程解码作用域
-    public val decodeScope: CoroutineScope =
-        CoroutineScope(Dispatchers.Default.limitedParallelism(1))
 
     private var lastPageKeys: Set<Int> = emptySet()
 
@@ -112,9 +104,7 @@ public class PageViewState(
 
     public fun notifyDecodeCompleted() {
         onDecodeCompleted?.invoke()
-        decodeScope.launch {
-            triggerRenderUpdate()
-        }
+        triggerRenderUpdate()
     }
 
     /**
@@ -230,7 +220,7 @@ public class PageViewState(
 
         // 如果启用切边，生成切边任务
         if (cropEnabled) {
-            decodeScope.launch {
+            decodeService!!.submit {
                 val cropTasks = decoder.generateCropTasks()
                 if (cropTasks.isNotEmpty()) {
                     decodeService?.submitCropTasks(cropTasks)
@@ -242,7 +232,6 @@ public class PageViewState(
     public fun shutdown() {
         isShutdown = true
         decodeService?.shutdown()
-        decodeScope.cancel()
 
         pages.forEach {
             it.recycle()

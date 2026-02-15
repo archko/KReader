@@ -12,9 +12,11 @@ import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Page.Companion.MAX_BLOCK
 import com.archko.reader.pdf.entity.APage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.concurrent.Future
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -35,7 +37,7 @@ public class PageNode(
 
     private var bitmapState by mutableStateOf<BitmapState?>(null)
     private var isDecoding = false
-    private var decodeJob: Job? = null
+    private var decodeJob: Future<*>? = null
 
     // 缓存像素矩形计算结果
     private var cachedPixelRect: Rect? = null
@@ -126,7 +128,7 @@ public class PageNode(
         bitmapState?.let { ImageCache.releaseNode(it) }
         bitmapState = null
         isDecoding = false
-        decodeJob?.cancel()
+        decodeJob?.cancel(true)
         decodeJob = null
 
         // 重置缓存
@@ -222,10 +224,10 @@ public class PageNode(
             return
         }
 
-        decodeJob?.cancel()
+        decodeJob?.cancel(true)
 
-        decodeJob = pageViewState.decodeScope.launch {
-            if (!isScopeActive()) return@launch
+        decodeJob = pageViewState.decodeService!!.submit {
+            if (!isScopeActive()) return@submit
 
             isDecoding = true
             activeDecodeKey = currentKey
@@ -270,7 +272,7 @@ public class PageNode(
             if (outWidth > MAX_BLOCK * 2 || outHeight > MAX_BLOCK * 2) {
                 println("[PageNode].decode:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
                 isDecoding = false
-                return@launch
+                return@submit
             }
 
             val decodeTask = DecodeTask(
@@ -291,7 +293,7 @@ public class PageNode(
                     ) {
                         if (bitmap != null && !pageViewState.isShutdown()) {
                             val newState = ImageCache.putNode(cacheKey, bitmap)
-                            pageViewState.decodeScope.launch(Dispatchers.Main) {
+                            CoroutineScope(Dispatchers.Main).launch {
                                 if (pageViewState.isTileVisible(
                                         tileSpec,
                                         strictMode = false

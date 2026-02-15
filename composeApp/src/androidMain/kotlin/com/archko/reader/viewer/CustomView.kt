@@ -220,6 +220,26 @@ private fun ToolbarContent(
                         }
                     }
 
+                    /*item {
+                        IconButton(onClick = { isReflow = !isReflow }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_reflow),
+                                contentDescription = stringResource(Res.string.reflow),
+                                tint = if (isReflow) Color.Green else Color.White
+                            )
+                        }
+                    }*/
+
+                    /*item {
+                        IconButton(onClick = { }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_search),
+                                contentDescription = stringResource(Res.string.search),
+                                tint = Color.White
+                            )
+                        }
+                    }*/
+
                     if (FileTypeUtils.isReflowable(currentPath)) {
                         item {
                             IconButton(onClick = { onFontDialogShow() }) {
