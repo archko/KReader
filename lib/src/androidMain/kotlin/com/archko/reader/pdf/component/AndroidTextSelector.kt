@@ -2,20 +2,27 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.state.OcrEngine
 import com.archko.reader.pdf.util.FileTypeUtils
 
 /**
  * Android平台的actual实现
  */
-public actual fun createTextSelector(path: String, getStructuredTextCallback: (Int) -> StructuredText?): TextSelector {
+public actual fun createTextSelector(
+    path: String,
+    structuredTextCallback: (Int) -> StructuredText?
+): TextSelector {
     if (FileTypeUtils.isDjvuFile(path)) {
-        DjvuTextSelector(getStructuredTextCallback)
+        DjvuTextSelector(structuredTextCallback)
     }
-    return AndroidTextSelector(getStructuredTextCallback)
+    return AndroidTextSelector(structuredTextCallback)
 }
 
-public actual fun createStructuredTextImpl(path: String, nativeStructuredText: Any): StructuredText {
+public actual fun createStructuredTextImpl(
+    path: String,
+    nativeStructuredText: Any
+): StructuredText {
     if (FileTypeUtils.isDjvuFile(path)) {
         return DjvuStructuredTextImpl(nativeStructuredText)
     }
@@ -87,7 +94,7 @@ public class AndroidStructuredTextImpl(
     }
 
     // 真正选中文本的方法
-    override fun selectText(startPoint: PagePoint, endPoint: PagePoint): String {
+    override fun selectText(index: Int, startPoint: PagePoint, endPoint: PagePoint): String {
         return try {
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
 
@@ -178,7 +185,7 @@ public class AndroidStructuredTextImpl(
         }
     }
 
-    override fun search(needle: String, flags: Int): Array<Array<MuPdfQuad>> {
+    override fun search(index: Int, needle: String, flags: Int): Array<Array<MuPdfQuad>> {
         return try {
             // 调用实际的MuPDF StructuredText.search方法
             val structuredText = nativeStructuredText as com.artifex.mupdf.fitz.StructuredText
@@ -228,6 +235,7 @@ public class DjvuTextSelector(
 }
 
 public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
+    //这个方法只要返回有数据就可以
     override fun highlight(startPoint: PagePoint, endPoint: PagePoint): Array<MuPdfQuad> {
         return try {
             val left = minOf(startPoint.x, endPoint.x)
@@ -254,15 +262,34 @@ public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
         }
     }
 
-    override fun selectText(startPoint: PagePoint, endPoint: PagePoint): String {
-        return text as String
+    override fun selectText(index: Int, startPoint: PagePoint, endPoint: PagePoint): String {
+        val loader = text as DjvuLoader
+        val result = loader.selectText(
+            index,
+            startPoint.x.toInt(),
+            startPoint.y.toInt(),
+            endPoint.x.toInt(),
+            endPoint.y.toInt()
+        )
+        println("selectText:start:$startPoint, end:$endPoint, text:$result")
+        if (null != result) {
+            return result.text
+        }
+        return ""
     }
 
     override fun snapSelection(startPoint: PagePoint, endPoint: PagePoint, mode: Int): MuPdfQuad? {
         return null
     }
 
-    override fun search(needle: String, flags: Int): Array<Array<MuPdfQuad>> {
+    override fun search(index: Int, needle: String, flags: Int): Array<Array<MuPdfQuad>> {
+        try {
+            val loader = text as DjvuLoader
+            val nativeResults = loader.searchText(index, needle)
+
+        } catch (e: Exception) {
+            println("djvu search error: ${e.message}")
+        }
         return emptyArray()
     }
 }

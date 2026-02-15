@@ -42,7 +42,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     public var viewSize: IntSize = IntSize.Zero
 
-    public override val aPageList: MutableList<APage>? = ArrayList()
+    public override val aPageList: MutableList<APage> = ArrayList()
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public override var cacheBean: ReflowCacheBean? = null
@@ -133,7 +133,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             if (null != psb && psb.list != null && psb.list!!.size == count) {
                 // 缓存存在且完整，直接使用
                 pageSizeBean = psb
-                aPageList!!.addAll(psb.list as MutableList)
+                aPageList.addAll(psb.list as MutableList)
 
                 // 从缓存构建 originalPageSizes，避免重复加载页面
                 val list = mutableListOf<Size>()
@@ -159,7 +159,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
             pageSizeBean!!.list = aPageList
         } catch (e: Exception) {
             println("DjvuDecoder.initPageSizeBean error: ${e.message}")
-            aPageList!!.clear()
+            aPageList.clear()
         }
     }
 
@@ -229,7 +229,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     override fun close() {
         djvuLoader?.close()
-        if (cachePage && !aPageList.isNullOrEmpty()) {
+        if (cachePage && aPageList.isNotEmpty()) {
             println("DjvuDecoder.close:${aPageList.size}")
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
@@ -266,12 +266,12 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
                 // 同时填充 aPageList
                 val aPage = APage(i, width, height, 1f)
-                aPageList!!.add(aPage)
+                aPageList.add(aPage)
             }
         }
 
         // 保存到缓存
-        if (cachePage && aPageList!!.isNotEmpty()) {
+        if (cachePage && aPageList.isNotEmpty()) {
             APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
         }
 
@@ -560,10 +560,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     override fun getStructuredText(index: Int): Any? {
-        if (djvuLoader == null) {
-            return null
-        }
-        return djvuLoader!!.getPageText(index)
+        return djvuLoader
     }
 
     /**

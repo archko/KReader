@@ -33,7 +33,7 @@ public interface StructuredText {
     /**
      * 复制选中的文本
      */
-    public fun selectText(startPoint: PagePoint, endPoint: PagePoint): String
+    public fun selectText(index: Int, startPoint: PagePoint, endPoint: PagePoint): String
 
     /**
      * 智能选择，自动调整选择边界
@@ -43,7 +43,7 @@ public interface StructuredText {
     /**
      * 搜索文本
      */
-    public fun search(needle: String, flags: Int = 0): Array<Array<MuPdfQuad>>
+    public fun search(index: Int,needle: String, flags: Int = 0): Array<Array<MuPdfQuad>>
 }
 
 /**
@@ -123,7 +123,7 @@ public object TextSelectionConstants {
 /**
  * 平台特定的TextSelector创建函数
  */
-public expect fun createTextSelector(path: String, getStructuredTextCallback: (Int) -> StructuredText?): TextSelector
+public expect fun createTextSelector(path: String, structuredTextCallback: (Int) -> StructuredText?): TextSelector
 
 /**
  * 平台特定的StructuredText实现创建函数
