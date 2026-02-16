@@ -3,6 +3,7 @@ package com.archko.reader.pdf.component
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.image.DjvuLoader
+import com.archko.reader.image.TextSearchResult
 import com.archko.reader.pdf.state.OcrEngine
 import com.archko.reader.pdf.util.FileTypeUtils
 
@@ -280,10 +281,24 @@ public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
         try {
             val loader = text as DjvuLoader
             val nativeResults = loader.searchText(index, needle)
-
+            
+            return nativeResults?.map { result ->
+                val x = result.x.toFloat()
+                val y = result.y.toFloat()
+                val width = result.width.toFloat()
+                val height = result.height.toFloat()
+                
+                val quad = MuPdfQuad(
+                    ul_x = x, ul_y = y,                      // 左上角
+                    ur_x = x + width, ur_y = y,             // 右上角
+                    ll_x = x, ll_y = y + height,            // 左下角
+                    lr_x = x + width, lr_y = y + height     // 右下角
+                )
+                arrayOf(quad)
+            }?.toTypedArray() ?: emptyArray()
         } catch (e: Exception) {
             println("djvu search error: ${e.message}")
+            return emptyArray()
         }
-        return emptyArray()
     }
 }
