@@ -292,7 +292,7 @@ public class PageNode(
                         error: Throwable?
                     ) {
                         if (bitmap != null && !pageViewState.isShutdown()) {
-                            val newState = ImageCache.putNode(cacheKey, bitmap)
+                            val newState = ImageCache.putNode(currentKey, bitmap)
                             CoroutineScope(Dispatchers.Main).launch {
                                 if (pageViewState.isTileVisible(
                                         tileSpec,

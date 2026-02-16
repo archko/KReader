@@ -5,11 +5,11 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-private const val CANDIDATE_TIMEOUT = 5000L
+private const val CANDIDATE_TIMEOUT = 60_000L
 private var MAX_MEMORY_BYTES = 128 * 1024 * 1024L
-private var MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 3
+private var MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 4
 
-private var PAGE_CACHE_MEMORY_BYTES = 24 * 1024 * 1024L
+private var PAGE_CACHE_MEMORY_BYTES = 32 * 1024 * 1024L
 private var PAGE_CANDIDATE_MEMORY_BYTES = PAGE_CACHE_MEMORY_BYTES / 4
 
 /**
@@ -95,7 +95,7 @@ public class BitmapState(
  */
 private class InnerImageCache(
     private val maxMemoryBytes: Long,
-    private val maxCandidateMemoryBytes: Long = maxMemoryBytes / 3
+    private val maxCandidateMemoryBytes: Long = maxMemoryBytes / 4
 ) {
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, BitmapState>()
@@ -334,9 +334,8 @@ public object ImageCache {
      * 设置最大内存限制（只影响 Node 缓存）
      */
     public fun setMaxMemory(maxMemoryBytes: Long) {
-        MAX_MEMORY_BYTES = maxMemoryBytes
-        MAX_CANDIDATE_MEMORY_BYTES = MAX_MEMORY_BYTES / 3
         nodeCache.setMaxMemory(maxMemoryBytes)
+        pageCache.setMaxMemory(maxMemoryBytes / 4)
     }
 
     /**

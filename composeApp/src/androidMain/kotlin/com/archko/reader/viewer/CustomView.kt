@@ -358,10 +358,9 @@ fun CustomView(
             }
         }
 
-        // 获取应用可用内存并设置缓存限制为1/4
         val runtime = Runtime.getRuntime()
         val maxMemory = runtime.maxMemory()
-        val cacheMemoryLimit = maxMemory / 4
+        val cacheMemoryLimit = maxMemory / 2
         com.archko.reader.pdf.cache.ImageCache.setMaxMemory(cacheMemoryLimit)
 
         println("ImageCache: 设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)")
