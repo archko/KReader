@@ -56,18 +56,18 @@ epub/mobi支持自定义字体,放在/sdcard/fonts/,ttf与otf两种字体
 - Gradle 8.0+
 
 ### Android
-
-git clone https://github.com/archko/dav4kmp.git -branch dev
-下载release页的压缩包,解压到用户目录的.m2下,这是mupdf等的aar包
+- cd kreader
+- git clone https://github.com/archko/dav4kmp.git -branch dev
+下载release页的压缩包,解压到用户目录的.m2下,这是mupdf等的aar包,mupdf, djvu, mobi, tiff, heif这些也可以自己编译,过得麻烦复杂
 
 ```bash
-./gradlew :composeApp:assembleDebug
+./gradlew assembleDebug installDebug
 ```
 
 ### 桌面端
 
 ```bash
-./gradlew :composeApp:run
+./gradlew composeApp:desktopRun -DmainClass=com.archko.reader.viewer.MainKt --quiet
 ```
 
 ## 许可证

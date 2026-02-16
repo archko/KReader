@@ -55,18 +55,18 @@ At present, epub/mobi supported custom font. It should be placed in the director
 - Gradle 8.0+
 
 ### Android
-
-git clone https://github.com/archko/dav4kmp.git -branch dev
+- cd kreader
+- git clone https://github.com/archko/dav4kmp.git -branch dev
 download release page zip, unzip to .m2下,aar for mupdf, tiff, djvu, mobi
 
 ```bash
-./gradlew :composeApp:assembleDebug
+./gradlew assembleDebug installDebug
 ```
 
 ### Desktop
 
 ```bash
-./gradlew :composeApp:run
+./gradlew composeApp:desktopRun -DmainClass=com.archko.reader.viewer.MainKt --quiet
 ```
 
 ## License
