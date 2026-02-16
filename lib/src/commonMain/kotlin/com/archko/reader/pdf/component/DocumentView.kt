@@ -41,6 +41,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+private const val max_zoom = 20f
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 public fun DocumentView(
@@ -625,7 +627,7 @@ public fun DocumentView(
                                             val centroid =
                                                 event.calculateCentroid(useCurrent = false)
                                             if (centroid.isSpecified && zoomChange != 1f) {
-                                                val newZoom = (vZoom * zoomChange).coerceIn(1f, 16f)
+                                                val newZoom = (vZoom * zoomChange).coerceIn(1f, max_zoom)
                                                 val zoomFactor = newZoom / vZoom
 
                                                 // 计算缩放中心点：手势中心相对于内容的位置
