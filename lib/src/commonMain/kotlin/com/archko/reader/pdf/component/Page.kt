@@ -37,6 +37,7 @@ public class Page(
 ) {
     public var totalScale: Float = 1f
     public var nodes: List<PageNode> = emptyList()
+    private var previousNodes: List<PageNode> = emptyList() // 保存上次绘制的节点列表
     private var currentTileConfig: TileConfig? = null
     private var needInvalidateNodes = true // 初始化为true，确保第一次draw时会重建nodes
 
@@ -377,13 +378,18 @@ public class Page(
         }
 
         if (config.isSingleBlock) {
-            nodes[0].draw(
+            val currentNode = nodes[0]
+            previousNodes.filter { it != currentNode }.forEach { it.recycle() }
+            // 绘制当前节点
+            currentNode.draw(
                 drawScope,
                 currentWidth,
                 currentHeight,
                 currentBounds.left,
                 currentBounds.top,
             )
+
+            previousNodes = listOf(currentNode)
             return
         }
 
@@ -403,28 +409,35 @@ public class Page(
         val maxBlockY =
             ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
 
-        // 只遍历可见range内的block
+        val nodesToDraw = mutableListOf<PageNode>()
         for (x in minBlockX..maxBlockX) {
             for (y in minBlockY..maxBlockY) {
                 val nodeIndex = y * config.xBlocks + x
                 if (nodeIndex < nodes.size) {
-                    nodes[nodeIndex].draw(
-                        drawScope,
-                        currentWidth,
-                        currentHeight,
-                        currentBounds.left,
-                        currentBounds.top,
-                    )
-                } else {
-                    println("Page[${aPage.index}], nodeIndex:${nodeIndex}, nodes.size:${nodes.size}")
+                    nodesToDraw.add(nodes[nodeIndex])
+                //} else {
+                    //println("Page[${aPage.index}], nodeIndex:${nodeIndex}, nodes.size:${nodes.size}")
                 }
             }
         }
-        //val renderedNodes = (maxBlockX - minBlockX + 1) * (maxBlockY - minBlockY + 1)
-        //val blockWidth = currentWidth / config.xBlocks
-        //val blockHeight = currentHeight / config.yBlocks
-        //val totalBlocks = config.xBlocks * config.yBlocks
-        //println("Page[${aPage.index}] rendering ${renderedNodes} nodes, range: x[$minBlockX-$maxBlockX] y[$minBlockY-$maxBlockY], blockSize: ${blockWidth}x${blockHeight}, totalBlocks: $totalBlocks")
+
+        for (node in nodesToDraw) {
+            node.draw(
+                drawScope,
+                currentWidth,
+                currentHeight,
+                currentBounds.left,
+                currentBounds.top,
+            )
+        }
+
+        val nodesToRecycle = previousNodes.filter { it !in nodesToDraw }
+        nodesToRecycle.forEach { 
+            //println("Page[${aPage.index}], node:${it}")
+            pageViewState.nodePool.release(it)
+        }
+
+        previousNodes = nodesToDraw
     }
 
     public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
@@ -739,6 +752,7 @@ public class Page(
         //println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
         recycleThumb()
         clearTextSelection()
+        previousNodes = emptyList()
         nodes.forEach { pageViewState.nodePool.release(it) }
         nodes = emptyList()
         currentTileConfig = null
@@ -772,6 +786,7 @@ public class Page(
                 listOf(pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
             // 回收旧nodes
             oldNodes.forEach { pageViewState.nodePool.release(it) }
+            previousNodes = emptyList()
             return
         }
 
@@ -798,6 +813,7 @@ public class Page(
         nodes = newNodes
         // 回收旧nodes
         oldNodes.forEach { pageViewState.nodePool.release(it) }
+        previousNodes = emptyList()
         //println("Page[${aPage.index}] total nodes.count=${nodes.size}, xBlocks=${config.xBlocks}, yBlocks=${config.yBlocks}")
     }
 
