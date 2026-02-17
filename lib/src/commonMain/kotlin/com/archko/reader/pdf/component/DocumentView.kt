@@ -41,7 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-private const val max_zoom = 20f
+private const val max_zoom = 24f
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

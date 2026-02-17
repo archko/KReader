@@ -225,6 +225,15 @@ private class InnerImageCache(
         }
     }
 
+    public fun hasNode(key: String): Boolean {
+        runBlocking {
+            mutex.withLock {
+                return@withLock cache.containsKey(key)
+            }
+        }
+        return false
+    }
+
     /**
      * 清空所有缓存
      */
@@ -250,6 +259,10 @@ private class InnerImageCache(
                 candidateMemoryBytes = 0L
             }
         }
+    }
+
+    public fun size():Int {
+        return cache.values.size
     }
 
     private fun addToCandidatePool(key: String, state: BitmapState) {
@@ -345,6 +358,7 @@ public object ImageCache {
     public fun releaseNode(state: BitmapState): Unit = nodeCache.release(state)
     public fun putNode(key: String, bitmap: ImageBitmap): BitmapState = nodeCache.put(key, bitmap)
     public fun removeNode(key: String): Unit = nodeCache.remove(key)
+    public fun hasNode(key: String): Boolean = nodeCache.hasNode(key)
     public fun clearNodes(): Unit = nodeCache.clear()
 
     /**
@@ -354,7 +368,9 @@ public object ImageCache {
     public fun releasePage(state: BitmapState): Unit = pageCache.release(state)
     public fun putPage(key: String, bitmap: ImageBitmap): BitmapState = pageCache.put(key, bitmap)
     public fun removePage(key: String): Unit = pageCache.remove(key)
+    public fun hasPage(key: String): Boolean = nodeCache.hasNode(key)
     public fun clearPages(): Unit = pageCache.clear()
+    public fun pageCount(): Int = pageCache.size()
 
     /**
      * 清空所有缓存
