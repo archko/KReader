@@ -193,7 +193,7 @@ public class PageNode(
                     state.bitmap,
                     dstOffset = IntOffset(dstLeft, dstTop),
                     // 关键点：给宽高各增加 1 像素的微量溢出，覆盖邻居边缘
-                    dstSize = IntSize(dstWidth + 1, dstHeight + 1)
+                    dstSize = IntSize(dstWidth, dstHeight)
                 )
             }
         }
