@@ -1,14 +1,15 @@
 package com.archko.reader.viewer.dialog
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,10 +39,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.archko.reader.pdf.entity.DavResourceItem
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.dokar.sonner.ToastType
@@ -51,7 +54,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.webdav_config_btn_do
+import kreader.composeapp.generated.resources.webdav_config_btn_save
+import kreader.composeapp.generated.resources.webdav_config_doing
+import kreader.composeapp.generated.resources.webdav_config_failed
+import kreader.composeapp.generated.resources.webdav_config_host
+import kreader.composeapp.generated.resources.webdav_config_input_name
+import kreader.composeapp.generated.resources.webdav_config_input_pass
+import kreader.composeapp.generated.resources.webdav_config_name
+import kreader.composeapp.generated.resources.webdav_config_no_files
+import kreader.composeapp.generated.resources.webdav_config_pass
+import kreader.composeapp.generated.resources.webdav_config_path
+import kreader.composeapp.generated.resources.webdav_config_path_eg
+import kreader.composeapp.generated.resources.webdav_config_success
+import kreader.composeapp.generated.resources.webdav_restore
+import kreader.composeapp.generated.resources.webdav_restore_failed
+import kreader.composeapp.generated.resources.webdav_restore_success
+import kreader.composeapp.generated.resources.webdav_title
+import kreader.composeapp.generated.resources.webdav_upload
+import kreader.composeapp.generated.resources.webdav_upload_failed
+import kreader.composeapp.generated.resources.webdav_upload_success
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -111,15 +135,22 @@ fun WebdavConfigDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 800.dp),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
         ) {
-            Box {
+            val width = maxWidth * 0.9f
+            val height = maxHeight * 0.9f
+            Surface(
+                modifier = Modifier.size(width, height),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -264,7 +295,8 @@ fun WebdavConfigDialog(
                             },
                             onFileClick = { item ->
                                 scope.launch {
-                                    val filePath = item.resource.location.encodedPath.trimEnd('/')
+                                    val filePath =
+                                        item.resource.location.encodedPath.trimEnd('/')
                                     val fileName = filePath.substringAfterLast('/')
                                     viewModel.restoreFromWebdav(filePath)
                                         .flowOn(Dispatchers.IO)
@@ -300,13 +332,13 @@ fun WebdavConfigDialog(
                         )
                     }
                 }
-
-                Toaster(
-                    state = toaster,
-                    maxVisibleToasts = 1,
-                    alignment = Alignment.Center,
-                )
             }
+
+            Toaster(
+                state = toaster,
+                maxVisibleToasts = 1,
+                alignment = Alignment.Center,
+            )
         }
     }
 }

@@ -3,15 +3,15 @@ package com.archko.reader.viewer.dialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,13 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -40,17 +38,17 @@ import com.archko.reader.pdf.component.AnnotationPath
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.state.AnnotationManager
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.annotation_empty
+import kreader.composeapp.generated.resources.annotation_tab
+import kreader.composeapp.generated.resources.annotations_count
+import kreader.composeapp.generated.resources.delete_annotation
 import kreader.composeapp.generated.resources.document_outline
 import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.ic_delete
 import kreader.composeapp.generated.resources.no_outline
-import kreader.composeapp.generated.resources.page_number
 import kreader.composeapp.generated.resources.outline_tab
-import kreader.composeapp.generated.resources.annotation_tab
-import kreader.composeapp.generated.resources.annotation_empty
-import kreader.composeapp.generated.resources.annotations_count
-import kreader.composeapp.generated.resources.delete_annotation
 import kreader.composeapp.generated.resources.page_label
+import kreader.composeapp.generated.resources.page_number
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -66,15 +64,11 @@ fun OutlineDialog(
     onAnnotationClick: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        var selectedTab by remember { mutableStateOf(0) }
+        var selectedTab by remember { mutableIntStateOf(0) }
 
         val hasOutline = outlineList.isNotEmpty()
 
@@ -90,66 +84,72 @@ fun OutlineDialog(
             initialFirstVisibleItemIndex = initialOutlineIndex.coerceAtLeast(0)
         )
 
-        Surface(
-            modifier = Modifier
-                .width(screenWidth * 0.95f)
-                .height(screenHeight * 0.9f),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 8.dp, top = 8.dp, end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_back),
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurface
+            val width = maxWidth * 0.9f
+            val height = maxHeight * 0.9f
+            Surface(
+                modifier = Modifier.size(width, height),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, top = 8.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Text(
+                            text = stringResource(Res.string.document_outline),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
                         )
                     }
-                    Text(
-                        text = stringResource(Res.string.document_outline),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
 
-                // Tab 标签页
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(Res.string.outline_tab)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(Res.string.annotation_tab)) }
-                    )
-                }
+                    // Tab 标签页
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Tab(
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0 },
+                            text = { Text(stringResource(Res.string.outline_tab)) }
+                        )
+                        Tab(
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1 },
+                            text = { Text(stringResource(Res.string.annotation_tab)) }
+                        )
+                    }
 
-                when (selectedTab) {
-                    0 -> OutlineTabContent(
-                        hasOutline = hasOutline,
-                        outlineList = outlineList,
-                        initialOutlineIndex = initialOutlineIndex,
-                        lazyListState = lazyListState,
-                        onOutlineClick = onOutlineClick
-                    )
-                    1 -> AnnotationTabContent(
-                        annotations = annotations,
-                        annotationManager = annotationManager,
-                        onAnnotationClick = onAnnotationClick
-                    )
+                    when (selectedTab) {
+                        0 -> OutlineTabContent(
+                            hasOutline = hasOutline,
+                            outlineList = outlineList,
+                            initialOutlineIndex = initialOutlineIndex,
+                            lazyListState = lazyListState,
+                            onOutlineClick = onOutlineClick
+                        )
+
+                        1 -> AnnotationTabContent(
+                            annotations = annotations,
+                            annotationManager = annotationManager,
+                            onAnnotationClick = onAnnotationClick
+                        )
+                    }
                 }
             }
         }
