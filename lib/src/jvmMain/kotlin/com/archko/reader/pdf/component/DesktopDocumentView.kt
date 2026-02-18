@@ -60,6 +60,7 @@ public fun DesktopDocumentView(
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
+    currentPath: String,
 ) {
     // 平台判断 - 只在初始化时判断一次
     val isMacOs by remember {
@@ -93,11 +94,11 @@ public fun DesktopDocumentView(
 
     // 创建文本选择器 - 使用expect/actual模式
     val textSelector = remember {
-        createTextSelector { pageIndex ->
+        createTextSelector(currentPath) { pageIndex ->
             // 从PdfDecoder获取真实的StructuredText
             val structuredText = state.getStructuredText(pageIndex)
             if (structuredText != null) {
-                createStructuredTextImpl(structuredText)
+                createStructuredTextImpl(currentPath, structuredText)
             } else {
                 null
             }

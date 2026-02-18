@@ -642,6 +642,7 @@ fun CustomView(
                             gestureMode = gestureMode,
                             pathConfig = pathConfig,
                             annotationManager = annotationManager,
+                            currentPath = currentPath,
                         )
                     }
 
