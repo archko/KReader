@@ -155,7 +155,7 @@ compose.desktop {
             modules("java.instrument", "java.sql", "jdk.unsupported")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "KReader"
-            packageVersion = "1.2.1"
+            packageVersion = "1.2.2"
 
             // 应用描述
             description = "A PDF and document reader application"
