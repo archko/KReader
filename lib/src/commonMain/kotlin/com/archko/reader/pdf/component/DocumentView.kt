@@ -41,7 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-private const val max_zoom = 24f
+private const val max_zoom = 30f
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -689,6 +689,7 @@ public fun DocumentView(
                                 }
 
                                 if (isZooming) {
+                                    //先计算偏移,否则绘制刷新会有问题
                                     pageViewState.updateOffset(offset)
                                     pageViewState.updateViewSize(viewSize, vZoom, orientation)
                                 }
