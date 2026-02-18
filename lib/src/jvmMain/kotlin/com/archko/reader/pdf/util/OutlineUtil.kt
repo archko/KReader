@@ -15,7 +15,7 @@ internal fun Document.loadOutlineItems(): List<Item> {
 internal fun Document.loadOutline(core: Document): List<OutlineLink> {
     val outlines = core.loadOutline()
     val links: MutableList<OutlineLink> = ArrayList()
-    outlines?.run { downOutline(outlines, links) }
+    outlines?.run { downOutline(outlines, links, 0) }
     return links
 }
 
@@ -23,15 +23,15 @@ internal fun Document.pageNumberFromLocation(node: Outline?): Int {
     return pageNumberFromLocation(resolveLink(node))
 }
 
-internal fun Document.downOutline(outlines: Array<Outline>, links: MutableList<OutlineLink>) {
+internal fun Document.downOutline(outlines: Array<Outline>, links: MutableList<OutlineLink>, level: Int = 0) {
     for (outline in outlines) {
         if (outline.title != null) {
             val page = pageNumberFromLocation(outline)
-            val link = OutlineLink(outline.title, outline.uri, 0)
+            val link = OutlineLink(outline.title, outline.uri, level)
             link.targetPage = page
             if (outline.down != null) {
                 val child: Array<Outline> = outline.down
-                downOutline(child, links)
+                downOutline(child, links, level + 1)
             }
             links.add(link)
         }
@@ -53,18 +53,18 @@ internal fun processOutline(outlines: List<OutlineLink>?): MutableList<Item> {
                         matcher.group(0).replace("#page=", "")
                             .replace("&", "")
                     )
-                    val item = Item(outline.title, page)
+                    val item = Item(outline.title, page, outline.level)
                     items.add(item)
                 } else {
                     try {
                         val page = Integer.parseInt(outline.targetUrl)
-                        val item = Item(outline.title, page)
+                        val item = Item(outline.title, page, outline.level)
                         items.add(item)
                     } catch (_: NumberFormatException) {
                     }
                 }
             } else if (outline.targetPage > 0) {
-                val item = Item(outline.title, outline.targetPage)
+                val item = Item(outline.title, outline.targetPage, outline.level)
                 items.add(item)
             }
 
@@ -83,19 +83,19 @@ internal fun convertDjvuOutlinesToItems(djvuOutlines: List<DjvuOutline>?): List<
     }
     
     for (outline in djvuOutlines) {
-        flattenDjvuOutline(outline, items)
+        flattenDjvuOutline(outline, items, 0)
     }
     
     return items
 }
 
-private fun flattenDjvuOutline(outline: DjvuOutline, items: MutableList<Item>) {
+private fun flattenDjvuOutline(outline: DjvuOutline, items: MutableList<Item>, level: Int = 0) {
     if (outline.page >= 0) {
-        val item = Item(outline.title, outline.page)
+        val item = Item(outline.title, outline.page, level)
         items.add(item)
     }
     
     for (child in outline.children) {
-        flattenDjvuOutline(child, items)
+        flattenDjvuOutline(child, items, level + 1)
     }
 }

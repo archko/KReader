@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -30,9 +31,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.archko.reader.pdf.component.AnnotationPath
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.state.AnnotationManager
@@ -63,7 +66,14 @@ fun OutlineDialog(
     onAnnotationClick: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         var selectedTab by remember { mutableStateOf(0) }
 
         val hasOutline = outlineList.isNotEmpty()
@@ -82,8 +92,8 @@ fun OutlineDialog(
 
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 600.dp),
+                .width(screenWidth * 0.95f)
+                .height(screenHeight * 0.9f),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface
         ) {
@@ -180,17 +190,22 @@ private fun OutlineTabContent(
                 outlineList,
                 key = { index, item -> index }) { index, item ->
                 val isSelected = index == initialOutlineIndex
+                val backgroundColor = if (isSelected) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.surfaceVariant
-                            else Color.Transparent
-                        )
-                        .clickable {
-                            onOutlineClick(item)
-                        }
-                        .padding(vertical = 8.dp, horizontal = 16.dp),
+                        .background(backgroundColor)
+                        .clickable { onOutlineClick(item) }
+                        .padding(
+                            start = (item.level * 6).dp + 8.dp,
+                            end = 8.dp,
+                            top = 8.dp,
+                            bottom = 8.dp
+                        ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -251,7 +266,7 @@ private fun AnnotationTabContent(
                                 .clickable {
                                     onAnnotationClick(pageIndex)
                                 }
-                                .padding(vertical = 8.dp, horizontal = 16.dp),
+                                .padding(vertical = 8.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
