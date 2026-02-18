@@ -14,7 +14,6 @@ import com.archko.reader.pdf.component.Page.Companion.MAX_BLOCK
 import com.archko.reader.pdf.entity.APage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.concurrent.Future
 import kotlin.math.ceil
@@ -184,16 +183,16 @@ public class PageNode(
             bitmapState?.let { state ->
                 //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${state.bitmap.width}x${state.bitmap.height}")
                 // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
-                val dstLeft = floor(pixelRect.left).toInt()
-                val dstTop = floor(pixelRect.top).toInt()
-                val dstWidth = ceil(pixelRect.width).toInt()
-                val dstHeight = ceil(pixelRect.height).toInt()
+                val dstLeft = (pixelRect.left).toInt()
+                val dstTop = (pixelRect.top).toInt()
+                val dstWidth = (pixelRect.width).toInt()
+                val dstHeight = (pixelRect.height).toInt()
 
                 drawScope.drawImage(
                     state.bitmap,
                     dstOffset = IntOffset(dstLeft, dstTop),
                     // 关键点：给宽高各增加 1 像素的微量溢出，覆盖邻居边缘
-                    dstSize = IntSize(dstWidth, dstHeight)
+                    dstSize = IntSize(dstWidth + 1, dstHeight + 1)
                 )
             }
         }

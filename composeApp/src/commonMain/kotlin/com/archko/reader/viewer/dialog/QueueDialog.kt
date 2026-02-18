@@ -48,7 +48,7 @@ fun QueueDialog(
     cacheBean: ReflowCacheBean?,
     onDismiss: () -> Unit,
     onItemClick: ((ReflowBean) -> Unit)? = null,
-    count: Int = 14,
+    count: Int = 16,
     currentSpeakingPage: String? = null, // 当前朗读的页面
 ) {
     Dialog(
