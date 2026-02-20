@@ -14,6 +14,7 @@ import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
+import com.archko.reader.pdf.component.TileTask
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
@@ -612,29 +613,15 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
         }
     }
 
-    public fun renderPageRegion(
-        rect: Rect,
-        index: Int,
-        scale: Float,
-        tileWidth: Int,
-        tileHeight: Int
-    ): ImageBitmap {
-        if (pdfRenderer == null) {
-            return ImageBitmap(tileWidth, tileHeight, ImageBitmapConfig.Rgb565)
-        }
-
-        // 计算tile在页面中的实际位置（rect已经是相对于页面的坐标）
-        val tileX = rect.left.toInt()
-        val tileY = rect.top.toInt()
-        val tileWidth = rect.width.toInt()
-        val tileHeight = rect.height.toInt()
-
-        println("PdfiumDecoder.renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
-
-        val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
-        decode(index, scale, bitmap, tileX, tileY, false)
-
-        return (bitmap.asImageBitmap())
+    public override fun renderPageRegion(
+        task: TileTask,
+        totalScale: Float
+    ): ImageBitmap{
+        return ImageBitmap(
+            task.width,
+            task.height,
+            ImageBitmapConfig.Rgb565
+        )
     }
 
     public override fun getStructuredText(index: Int): Any? {
