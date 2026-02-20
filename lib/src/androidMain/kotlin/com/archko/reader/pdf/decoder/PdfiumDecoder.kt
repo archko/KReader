@@ -467,6 +467,7 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
         try {
             val index = aPage.index
             if (aPage.cropBounds != null && crop) {
+                val start = System.currentTimeMillis()
                 val cropBounds = aPage.cropBounds!!
 
                 val scaleX = outWidth.toFloat() / cropBounds.width
@@ -478,12 +479,13 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
                 val height = scale * cropBounds.height
                 val bitmap =
                     acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
-                println("PdfiumDecoder.renderPage:croped page=$index, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
+                println("PdfiumDecoder.renderPage:croped page=$index, cos:${System.currentTimeMillis() - start}, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
                 val imageBitmap = bitmap.asImageBitmap()
                 return imageBitmap
             } else {
+                val start = System.currentTimeMillis()
                 val cropBounds = Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
 
                 val patchX = cropBounds.left.toInt()
@@ -495,7 +497,7 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
                 val scale = minOf(scaleX, scaleY)
                 val height = scale * aPage.getHeight(crop)
                 val bitmap = acquireReusableBitmap(outWidth, height.toInt())
-                println("PdfiumDecoder.renderPage:page=$index, 目标尺寸=$outWidth-$outHeight, patch:$patchX-$patchY, bounds=$cropBounds")
+                println("PdfiumDecoder.renderPage:page=$index, cos:${System.currentTimeMillis() - start}, 目标尺寸=$outWidth-$outHeight, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX, patchY, true)
                 val imageBitmap = bitmap.asImageBitmap()
@@ -596,10 +598,11 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
         try {
             val patchX = region.left.toInt()
             val patchY = region.top.toInt()
-            println("PdfiumDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
+            val start = System.currentTimeMillis()
             val bitmap = acquireReusableBitmap(outWidth, outHeight)
             decode(index, scale, bitmap, patchX, patchY, false)
+            println("PdfiumDecoder.renderPageRegion:index:$index, cos:${System.currentTimeMillis() - start}, scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
             return (bitmap.asImageBitmap())
         } catch (e: Exception) {

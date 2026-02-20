@@ -234,15 +234,15 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 doc.layout(w, h, fontSize)
             }
             pageCount = doc.countPages()
-            
+
             // 先尝试从缓存加载页面尺寸和切边数据
             initPageSizeBean()
-            
+
             // 如果缓存不存在或不完整，从文档加载页面尺寸
             if (originalPageSizes.isEmpty()) {
                 originalPageSizes = prepareSizes()
             }
-            
+
             outlineItems = prepareOutlines()
             cacheCoverIfNeeded()
         }
@@ -253,12 +253,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             val count: Int = pageCount
             val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
             println("PdfDecoder.initPageSizeBean:$psb")
-            
+
             if (null != psb && psb.list != null && psb.list!!.size == count) {
                 // 缓存存在且完整，直接使用
                 pageSizeBean = psb
                 aPageList!!.addAll(psb.list as MutableList)
-                
+
                 // 从缓存构建 originalPageSizes，避免重复加载页面
                 val list = mutableListOf<Size>()
                 var totalHeight = 0
@@ -277,7 +277,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 println("PdfDecoder.initPageSizeBean: 从缓存加载了 ${list.size} 个页面尺寸")
                 return
             }
-            
+
             // 缓存不存在或不完整，需要从文档加载
             pageSizeBean = PageSizeBean()
             pageSizeBean!!.list = aPageList
@@ -400,12 +400,12 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 totalHeight += size.height
                 page.destroy()
                 list.add(size)
-                
+
                 // 同时填充 aPageList
                 val aPage = APage(i, width, height, 1f)
                 aPageList!!.add(aPage)
             }
-            
+
             // 保存到缓存
             if (cachePage && aPageList!!.isNotEmpty()) {
                 APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
@@ -526,6 +526,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         try {
             val index = aPage.index
             if (aPage.cropBounds != null && crop) {
+                val start = System.currentTimeMillis()
                 val cropBounds = aPage.cropBounds!!
 
                 val scaleX = outWidth.toFloat() / cropBounds.width
@@ -537,12 +538,13 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val height = scale * cropBounds.height
                 val bitmap =
                     acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
-                println("PdfDecoder.renderPage:croped page=$index, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
+                println("PdfDecoder.renderPage:croped page=$index, cos:${System.currentTimeMillis() - start}, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
                 val imageBitmap = bitmap.asImageBitmap()
                 return imageBitmap
             } else {
+                val start = System.currentTimeMillis()
                 val cropBounds = Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
 
                 val patchX = cropBounds.left.toInt()
@@ -554,9 +556,9 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                 val scale = minOf(scaleX, scaleY)
                 val height = scale * aPage.getHeight(crop)
                 val bitmap = acquireReusableBitmap(outWidth, height.toInt())
-                println("PdfDecoder.renderPage:page=$index, 目标尺寸=$outWidth-$outHeight, patch:$patchX-$patchY, bounds=$cropBounds")
 
                 decode(index, scale, bitmap, patchX, patchY, true)
+                println("PdfDecoder.renderPage:page=$index, cos:${System.currentTimeMillis() - start}, 目标尺寸=$outWidth-$outHeight, patch:$patchX-$patchY, bounds=$cropBounds")
                 val imageBitmap = bitmap.asImageBitmap()
                 // 如果启用了切边功能但没有cropBounds，检测并设置
                 if (crop) {
@@ -678,10 +680,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
         try {
             val patchX = region.left.toInt()
             val patchY = region.top.toInt()
-            println("PdfDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
+            val start = System.currentTimeMillis()
             val bitmap = acquireReusableBitmap(outWidth, outHeight)
             decode(index, scale, bitmap, patchX, patchY, false)
+            println("PdfDecoder.renderPageRegion:index:$index, cos:${System.currentTimeMillis() - start}, scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
             /*val file = File(
                 Environment.getExternalStorageDirectory(),
@@ -695,31 +698,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             // 返回一个空的位图，避免崩溃
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-    }
-
-    public fun renderPageRegion(
-        rect: Rect,
-        index: Int,
-        scale: Float,
-        tileWidth: Int,
-        tileHeight: Int
-    ): ImageBitmap {
-        if (document == null || (!isAuthenticated && needsPassword)) {
-            return ImageBitmap(tileWidth, tileHeight, ImageBitmapConfig.Rgb565)
-        }
-
-        // 计算tile在页面中的实际位置（rect已经是相对于页面的坐标）
-        val tileX = rect.left.toInt()
-        val tileY = rect.top.toInt()
-        val tileWidth = rect.width.toInt()
-        val tileHeight = rect.height.toInt()
-
-        println("PdfDecoder.renderPageRegion:index:$index, scale:$scale, tile:$tileX-$tileY-$tileWidth-$tileHeight, bounds:$rect")
-
-        val bitmap: Bitmap = BitmapPool.acquire(tileWidth, tileHeight)
-        decode(index, scale, bitmap, tileX, tileY, false)
-
-        return (bitmap.asImageBitmap())
     }
 
     public override fun getStructuredText(index: Int): Any? {
