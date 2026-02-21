@@ -174,10 +174,10 @@ public class FileUtils private constructor() {
         public fun invertMountPrefix(fileName: String): String? {
             run {
                 var i = 0
-                val n: Int = min(Companion.aliases.size, Companion.mounts.size)
+                val n: Int = min(aliases.size, mounts.size)
                 while (i < n) {
-                    val alias: String? = Companion.aliases.get(i)
-                    val mount: String? = Companion.mounts.get(i)
+                    val alias: String? = aliases.get(i)
+                    val mount: String? = mounts.get(i)
                     if (fileName == alias) {
                         return mount
                     }
@@ -308,7 +308,7 @@ public class FileUtils private constructor() {
 
         public fun readAssetAsString(assetName: String): String? {
             try {
-                val assetManager: AssetManager = PdfApp.Companion.app!!.getAssets()
+                val assetManager: AssetManager = PdfApp.app!!.getAssets()
                 val `is`: InputStream = assetManager.open(assetName)
                 return StreamUtils.readStringFromInputStream(`is`)
             } catch (_: IOException) {

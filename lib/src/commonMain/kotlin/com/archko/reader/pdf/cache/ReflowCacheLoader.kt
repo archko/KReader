@@ -21,7 +21,7 @@ public object ReflowCacheLoader {
     /**
      * 从文件加载Reflow缓存
      * @param pageCount 文档总页数
-     * @param file 原始PDF文件
+     * @param path 原始PDF文件路径
      * @return ReflowCacheBean 如果缓存有效，否则返回null
      */
     public fun loadReflowFromFile(pageCount: Int, path: String?): ReflowCacheBean? {
@@ -65,7 +65,7 @@ public object ReflowCacheLoader {
 
     /**
      * 保存Reflow缓存到文件
-     * @param file 原始PDF文件
+     * @param path 原始PDF文件路径
      * @param reflowTexts 每页的文本内容列表
      */
     public fun saveReflowToFile(

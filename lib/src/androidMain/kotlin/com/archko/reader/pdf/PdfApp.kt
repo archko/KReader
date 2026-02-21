@@ -28,7 +28,7 @@ public class PdfApp : Application(), SingletonImageLoader.Factory {
         MMKV.initialize(this)
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler())
 
-        CrashReport.initCrashReport(applicationContext, "d34dc863a0", false);
+        CrashReport.initCrashReport(applicationContext, "d34dc863a0", false)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
@@ -45,7 +45,7 @@ public class PdfApp : Application(), SingletonImageLoader.Factory {
                 DiskCache.Builder()
                     //.directory(FileHelpers.getExternalCacheDir(this).resolve("image_cache"))
                     .maxSizePercent(0.04)
-                    .maxSizeBytes(200L * 1024 * 1024)
+                    .maxSizeBytes(MAX_CACHE)
                     .build()
             }
             .components {
@@ -60,6 +60,6 @@ public class PdfApp : Application(), SingletonImageLoader.Factory {
             private set
 
         //一张图片4-5mb,200mb大概缓存50张
-        public const val MAX_CACHE: Int = 300 * 1024 * 1024
+        public const val MAX_CACHE: Long = 100L * 1024 * 1024
     }
 }

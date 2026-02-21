@@ -34,7 +34,7 @@ public interface ImageDecoder {
 
     /**
      * 渲染页面区域（带切边参数）
-     * @param page 页面索引
+     * @param aPage 页面
      * @param viewSize 视图大小
      * @param outWidth 页面宽度
      * @param outHeight 页面高度

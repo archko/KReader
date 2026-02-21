@@ -36,7 +36,7 @@ class TtsUtils {
         }
 
         fun getConfigFilePath(): String {
-            val cacheDir = FileUtils.Companion.getCacheDirectory()
+            val cacheDir = FileUtils.getCacheDirectory()
             val fileName = "tts_voice_setting.json"
             return File(cacheDir, fileName).absolutePath
         }

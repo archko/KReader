@@ -33,6 +33,8 @@ interface TtsProgressListener {
     fun onFinish()
 }
 
+private const val max_text = 280
+
 class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     companion object {
@@ -108,14 +110,12 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun createNotification(): Notification {
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-
         val stopIntent = Intent(this, AndroidTtsForegroundService::class.java).apply {
             action = ACTION_STOP
         }
         val stopPendingIntent = PendingIntent.getService(
             this, 1, stopIntent, 
-            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -242,13 +242,13 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
     fun addToQueue(reflowBean: ReflowBean) {
         val data = reflowBean.data
-        val segmentCount = if (data.isNullOrBlank() || data.length <= 300) 1 else (data.length / 300.0).toInt() + 1
-        if (data.isNullOrBlank() || data.length <= 300) {
+        val segmentCount = if (data.isNullOrBlank() || data.length <= max_text) 1 else (data.length / max_text) + 1
+        if (data.isNullOrBlank() || data.length <= max_text) {
             beanList.add(reflowBean)
         } else {
             var index = 0
-            for (i in data.indices step 300) {
-                val sub = data.substring(i, (i + 300).coerceAtMost(data.length))
+            for (i in data.indices step max_text) {
+                val sub = data.substring(i, (i + max_text).coerceAtMost(data.length))
                 beanList.add(ReflowBean(sub, reflowBean.type, reflowBean.page + "-$index"))
                 index++
             }
@@ -264,10 +264,10 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         val allSegments = mutableListOf<ReflowBean>()
         for (bean in beans) {
             val data = bean.data
-            if (data != null && data.length > 300) {
+            if (data != null && data.length > max_text) {
                 var index = 0
-                for (i in data.indices step 300) {
-                    val sub = data.substring(i, (i + 300).coerceAtMost(data.length))
+                for (i in data.indices step max_text) {
+                    val sub = data.substring(i, (i + max_text).coerceAtMost(data.length))
                     allSegments.add(ReflowBean(sub, bean.type, bean.page + "-$index"))
                     index++
                 }

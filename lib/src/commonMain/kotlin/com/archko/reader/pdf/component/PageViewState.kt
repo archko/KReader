@@ -179,7 +179,7 @@ public class PageViewState(
         return if (strictMode) {
             isVisible(viewSize, viewOffset, pixelRect, spec.page)
         } else {
-            isVisibleWithPreload(viewSize, viewOffset, pixelRect, spec.page)
+            isVisibleWithPreload(viewSize, viewOffset, pixelRect)
         }
     }
 
@@ -187,27 +187,20 @@ public class PageViewState(
         viewSize: IntSize,
         offset: Offset,
         bounds: Rect,
-        page: Int
     ): Boolean {
-        val preloadDistance = if (orientation == Vertical) {
-            viewSize.height * preloadScreens
-        } else {
-            viewSize.width * preloadScreens
-        }
-
         // 获取包含预加载区域的可视区域
         val preloadRect = if (orientation == Vertical) {
             Rect(
                 left = -offset.x,
                 top = -offset.y,
                 right = viewSize.width - offset.x,
-                bottom = viewSize.height - offset.y + preloadDistance  // 向下扩展
+                bottom = viewSize.height - offset.y + viewSize.height * preloadScreens  // 向下扩展
             )
         } else {
             Rect(
                 left = -offset.x,
                 top = -offset.y,
-                right = viewSize.width - offset.x + preloadDistance,   // 向右扩展
+                right = viewSize.width - offset.x + viewSize.width * preloadScreens,   // 向右扩展
                 bottom = viewSize.height - offset.y
             )
         }

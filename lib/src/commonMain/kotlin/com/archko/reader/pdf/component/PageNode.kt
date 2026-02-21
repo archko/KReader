@@ -163,7 +163,7 @@ public class PageNode(
         val pixelRect = getCachedPixelRect(pageWidth, pageHeight, xOffset, yOffset)
 
         val width = aPage.getWidth(pageViewState.isCropEnabled())
-        val height = aPage.getHeight(pageViewState.isCropEnabled())
+        //val height = aPage.getHeight(pageViewState.isCropEnabled())
         val scale = pageWidth / width
         val tileSpec = getCachedTileSpec(pageWidth, pageHeight, scale)
 

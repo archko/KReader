@@ -74,11 +74,12 @@ public object BitmapUtils {
         var fos: FileOutputStream? = null
         try {
             fos = FileOutputStream(
-                Environment.getExternalStorageDirectory().getPath() + "/" + (i++) + ".jpg"
+                Environment.getExternalStorageDirectory().path + "/" + (i++) + ".jpg"
             )
             bitmap.compress(CompressFormat.JPEG, 100, fos)
         } catch (e: FileNotFoundException) {
             e.printStackTrace()
+            fos?.close()
         }
     }
 }

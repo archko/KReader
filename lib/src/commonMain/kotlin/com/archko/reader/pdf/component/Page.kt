@@ -287,7 +287,7 @@ public class Page(
                     ) {
                         if (bitmap != null && !pageViewState.isShutdown()) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
-                            CoroutineScope(Dispatchers.Main).launch() {
+                            CoroutineScope(Dispatchers.Main).launch {
                                 if (!pageViewState.isShutdown()) {
                                     thumbBitmapState?.let { ImageCache.releasePage(it) }
                                     thumbBitmapState = newState
@@ -522,7 +522,7 @@ public class Page(
                 // 绘制文本选择高亮
                 drawTextSelection(drawScope, currentBounds)
                 drawSpeakingIndicator(drawScope, currentBounds)
-                drawAnnotation(drawScope, currentBounds)
+                drawAnnotation(drawScope)
                 drawSeparator(drawScope, currentBounds)
             }
         }
@@ -645,8 +645,7 @@ public class Page(
     }
 
     private fun drawAnnotation(
-        drawScope: DrawScope,
-        currentBounds: Rect
+        drawScope: DrawScope
     ) {
         pageViewState.annotationManager.annotations[aPage.index]?.forEach { anno ->
             drawAnnotationPath(
@@ -756,7 +755,7 @@ public class Page(
     }
 
     public fun invalidateNodes() {
-        val config = calculateTileConfig(width, height, totalScale)
+        val config = calculateTileConfig(width, height)
         //println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
         if (config == currentTileConfig) {
             return
@@ -863,7 +862,6 @@ public class Page(
         private fun calculateTileConfig(
             width: Float,
             height: Float,
-            totalScale: Float
         ): TileConfig {
             val xBlocks = calcAxisBlocks(width)
             val yBlocks = calcAxisBlocks(height)

@@ -57,7 +57,7 @@ class TtsQueueService : SpeechService {
         @Volatile
         private var currentProcess: Process? = null
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
-        private val taskChannel = Channel<Unit>(Channel.Factory.UNLIMITED)
+        private val taskChannel = Channel<Unit>(Channel.UNLIMITED)
 
         init {
             isWindows = System.getProperty("os.name").lowercase().contains("windows")
@@ -113,11 +113,11 @@ class TtsQueueService : SpeechService {
 
                 val text = task.reflowBean.data ?: ""
                 val textVariants = listOf(
-                    TtsUtils.Companion.cleanTextForTts(text),
+                    TtsUtils.cleanTextForTts(text),
                     text.replace(Regex("-{2,}"), "")
                         .replace(Regex("[^\\p{L}\\p{N}\\s，。！？:/.\\-]"), ""),
                     text.replace(Regex("[^\\u4e00-\\u9fff\\w\\s:/.\\-]"), ""),
-                    TtsUtils.Companion.extractMeaningfulText(text),
+                    TtsUtils.extractMeaningfulText(text),
                     "跳过无法朗读的内容"
                 )
 
@@ -148,12 +148,12 @@ class TtsQueueService : SpeechService {
         private suspend fun attemptSpeak(text: String): Boolean {
             return try {
                 val command = if (isWindows) {
-                    TtsUtils.Companion.createWindowsCommand(text, voice, rate, volume)
+                    TtsUtils.createWindowsCommand(text, voice, rate, volume)
                 } else {
-                    TtsUtils.Companion.createMacCommand(text, voice, rate)
+                    TtsUtils.createMacCommand(text, voice, rate)
                 }
 
-                currentProcess = TtsUtils.Companion.createManagedProcess(isWindows, command)
+                currentProcess = TtsUtils.createManagedProcess(isWindows, command)
                 println("TTS: Process started for text: ${text.take(30)}...")
 
                 // 等待进程完成，但定期检查协程是否被取消
@@ -194,7 +194,7 @@ class TtsQueueService : SpeechService {
             scope.cancel()
 
             // 强制终止所有TTS进程
-            TtsUtils.Companion.forceKillAllTtsProcesses()
+            TtsUtils.forceKillAllTtsProcesses()
         }
     }
 
@@ -206,7 +206,7 @@ class TtsQueueService : SpeechService {
         // 添加 JVM 关闭钩子，确保应用退出时清理 TTS 进程
         Runtime.getRuntime().addShutdownHook(Thread {
             println("TTS: JVM shutdown hook triggered, cleaning up...")
-            TtsUtils.Companion.forceKillAllTtsProcesses()
+            TtsUtils.forceKillAllTtsProcesses()
         })
     }
 
@@ -349,12 +349,12 @@ class TtsQueueService : SpeechService {
         val isWindows = System.getProperty("os.name").lowercase().contains("windows")
         return try {
             val allVoices = if (isWindows) {
-                TtsUtils.Companion.getWindowsVoices()
+                TtsUtils.getWindowsVoices()
             } else {
-                TtsUtils.Companion.getMacVoices()
+                TtsUtils.getMacVoices()
             }
             // 只保留中文和英文语音
-            TtsUtils.Companion.filterChineseAndEnglishVoices(allVoices)
+            TtsUtils.filterChineseAndEnglishVoices(allVoices)
         } catch (e: Exception) {
             println("Get voices error: ${e.message}")
             emptyList()
@@ -414,18 +414,18 @@ class TtsQueueService : SpeechService {
         }
 
         // 强制终止所有可能的 TTS 进程
-        TtsUtils.Companion.forceKillAllTtsProcesses()
+        TtsUtils.forceKillAllTtsProcesses()
 
         println("TTS: Service destroyed")
     }
 
     override suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
-        TtsUtils.Companion.saveVoiceSetting(voice)
+        TtsUtils.saveVoiceSetting(voice)
     }
 
     override suspend fun getVoiceSetting(): Voice = withContext(Dispatchers.IO) {
         try {
-            val configFile = File(TtsUtils.Companion.getConfigFilePath())
+            val configFile = File(TtsUtils.getConfigFilePath())
             if (!configFile.exists()) {
                 println("TTS: No voice setting file found")
                 return@withContext getDefaultVoice()

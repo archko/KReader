@@ -82,7 +82,7 @@ public class DecoderAdapter(
         }
     }
 
-    override suspend fun decodeNode(task: DecodeTask): ImageBitmap? {
+    override suspend fun decodeNode(task: DecodeTask): ImageBitmap {
         return imageDecoder.renderPageRegion(
             task.pageSliceBounds,
             task.pageIndex,
