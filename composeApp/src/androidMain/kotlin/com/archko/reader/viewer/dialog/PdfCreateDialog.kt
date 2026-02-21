@@ -7,10 +7,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -177,154 +177,147 @@ fun PdfCreateDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.9f),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface
         ) {
-            val width = maxWidth * 0.9f
-            val height = maxHeight * 0.9f
-            Surface(
-                modifier = Modifier
-                    .width(width)
-                    .height(height),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = "返回",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(Res.string.create_pdf),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_back),
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(Res.string.create_pdf),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(20.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp)
+                ) {
+                    OutlinedTextField(
+                        value = pdfName,
+                        onValueChange = { pdfName = it },
+                        label = { Text(stringResource(Res.string.pdf_filename)) },
+                        placeholder = { Text(stringResource(Res.string.enter_pdf_filename)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedTextField(
-                            value = pdfName,
-                            onValueChange = { pdfName = it },
-                            label = { Text(stringResource(Res.string.pdf_filename)) },
-                            placeholder = { Text(stringResource(Res.string.enter_pdf_filename)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                        Button(
+                            onClick = { selectImages() },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isCreating
+                        ) {
+                            Text(stringResource(Res.string.select_images))
+                        }
+
+                        Button(
+                            onClick = { createPdf() },
+                            modifier = Modifier.weight(1f),
+                            enabled = selectedImages.isNotEmpty() && !isCreating
+                        ) {
+                            if (isCreating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(Res.string.creating))
+                            } else {
+                                Text(stringResource(Res.string.create_pdf_button))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (selectedImages.isNotEmpty()) {
+                        Text(
+                            text = stringResource(Res.string.selected_images_count).format(
+                                selectedImages.size
+                            ),
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val lazyListState = rememberLazyListState()
+                        val reorderableLazyListState = rememberReorderableLazyListState(
+                            lazyListState = lazyListState,
+                            onMove = { from, to ->
+                                selectedImages = selectedImages.toMutableList().apply {
+                                    add(to.index, removeAt(from.index))
+                                }
+                            }
                         )
 
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            state = lazyListState,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Button(
-                                onClick = { selectImages() },
-                                modifier = Modifier.weight(1f),
-                                enabled = !isCreating
-                            ) {
-                                Text(stringResource(Res.string.select_images))
-                            }
-
-                            Button(
-                                onClick = { createPdf() },
-                                modifier = Modifier.weight(1f),
-                                enabled = selectedImages.isNotEmpty() && !isCreating
-                            ) {
-                                if (isCreating) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary
+                            itemsIndexed(
+                                selectedImages,
+                                key = { _, item -> item }) { index, imagePath ->
+                                ReorderableItem(
+                                    state = reorderableLazyListState,
+                                    key = imagePath
+                                ) { isDragging ->
+                                    ImageItem(
+                                        imagePath = imagePath,
+                                        index = index + 1,
+                                        isDragging = isDragging,
+                                        dragModifier = Modifier.draggableHandle(),
+                                        onRemove = {
+                                            selectedImages =
+                                                selectedImages.filter { it != imagePath }
+                                        }
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(Res.string.creating))
-                                } else {
-                                    Text(stringResource(Res.string.create_pdf_button))
                                 }
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        if (selectedImages.isNotEmpty()) {
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = stringResource(Res.string.selected_images_count).format(
-                                    selectedImages.size
-                                ),
+                                text = stringResource(Res.string.select_images_to_create_pdf),
                                 style = TextStyle(
                                     fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            val lazyListState = rememberLazyListState()
-                            val reorderableLazyListState = rememberReorderableLazyListState(
-                                lazyListState = lazyListState,
-                                onMove = { from, to ->
-                                    selectedImages = selectedImages.toMutableList().apply {
-                                        add(to.index, removeAt(from.index))
-                                    }
-                                }
-                            )
-
-                            LazyColumn(
-                                modifier = Modifier.weight(1f),
-                                state = lazyListState,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                itemsIndexed(
-                                    selectedImages,
-                                    key = { _, item -> item }) { index, imagePath ->
-                                    ReorderableItem(
-                                        state = reorderableLazyListState,
-                                        key = imagePath
-                                    ) { isDragging ->
-                                        ImageItem(
-                                            imagePath = imagePath,
-                                            index = index + 1,
-                                            isDragging = isDragging,
-                                            dragModifier = Modifier.draggableHandle(),
-                                            onRemove = {
-                                                selectedImages =
-                                                    selectedImages.filter { it != imagePath }
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.select_images_to_create_pdf),
-                                    style = TextStyle(
-                                        fontSize = 16.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
-                                )
-                            }
                         }
                     }
                 }

@@ -42,6 +42,7 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
+import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.dialog.FontDialog
@@ -53,6 +54,7 @@ import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsProgressListener
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
+import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -346,6 +348,7 @@ fun CustomView(
     scrollOri: Long = 0,
     reflow: Long = 0,
     crop: Boolean? = null,
+    fontViewModel: FontViewModel,
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
@@ -1122,6 +1125,7 @@ fun CustomView(
             // 字体选择弹窗
             if (showFontDialog) {
                 FontDialog(
+                    viewModel = fontViewModel,
                     onDismiss = { showFontDialog = false },
                     onFontSelected = { fontPath ->
                         println("选择了字体: ${File(fontPath).name}")

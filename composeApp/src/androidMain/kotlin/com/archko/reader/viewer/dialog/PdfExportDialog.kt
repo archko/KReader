@@ -7,10 +7,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -262,171 +262,137 @@ fun PdfExportDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.9f),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface
         ) {
-            val width = maxWidth * 0.9f
-            val height = maxHeight * 0.9f
-            Surface(
-                modifier = Modifier
-                    .width(width)
-                    .height(height),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = "返回",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(Res.string.export_pdf),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_back),
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(Res.string.export_pdf),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(start = 20.dp, end = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 20.dp, end = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { selectPdf() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isExporting
+                    ) {
+                        Text(stringResource(Res.string.select_pdf_file))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
-                            onClick = { selectPdf() },
-                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { exportToImages() },
+                            modifier = Modifier.weight(1f),
                             enabled = !isExporting
                         ) {
-                            Text(stringResource(Res.string.select_pdf_file))
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Button(
-                                onClick = { exportToImages() },
-                                modifier = Modifier.weight(1f),
-                                enabled = !isExporting
-                            ) {
-                                if (isExporting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                } else {
-                                    Text(stringResource(Res.string.export_images))
-                                }
-                            }
-
-                            Button(
-                                onClick = { exportToHtml() },
-                                modifier = Modifier.weight(1f),
-                                enabled = !isExporting
-                            ) {
-                                if (isExporting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                } else {
-                                    Text(stringResource(Res.string.export_html))
-                                }
-                            }
-                        }
-
-                        if (selectedPdfPath != null) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(8.dp)
-                                ) {
-                                    Text(
-                                        text = stringResource(Res.string.pdf_info),
-                                        style = TextStyle(
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        stringResource(Res.string.file_label).format(
-                                            File(
-                                                selectedPdfPath!!
-                                            ).name
-                                        )
-                                    )
-                                    Text(stringResource(Res.string.pages_label).format(pageCount))
-                                    Text(
-                                        stringResource(Res.string.original_width_label).format(
-                                            originalWidth
-                                        )
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = stringResource(Res.string.page_range_label).format(
-                                    startPage,
-                                    endPage
-                                ),
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
+                            if (isExporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
-                            )
-
-                            if (pageCount > 1) {
-                                RangeSlider(
-                                    value = startPage.toFloat()..endPage.toFloat(),
-                                    onValueChange = { range ->
-                                        startPage = range.start.roundToInt()
-                                        endPage = range.endInclusive.roundToInt()
-                                    },
-                                    valueRange = 1f..pageCount.toFloat(),
-                                    steps = if (pageCount > 2) pageCount - 2 else 0,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(stringResource(Res.string.page_label).format(1))
-                                    Text(stringResource(Res.string.page_label).format(pageCount))
-                                }
                             } else {
-                                Text(stringResource(Res.string.single_page_document))
+                                Text(stringResource(Res.string.export_images))
                             }
+                        }
 
-                            Text(
-                                text = stringResource(Res.string.export_width_label).format(
-                                    exportWidth.roundToInt()
-                                ),
-                                style = TextStyle(
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
+                        Button(
+                            onClick = { exportToHtml() },
+                            modifier = Modifier.weight(1f),
+                            enabled = !isExporting
+                        ) {
+                            if (isExporting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
-                            )
+                            } else {
+                                Text(stringResource(Res.string.export_html))
+                            }
+                        }
+                    }
 
-                            Slider(
-                                value = exportWidth,
-                                onValueChange = { exportWidth = it },
-                                valueRange = 1080f..4000f,
+                    if (selectedPdfPath != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.pdf_info),
+                                    style = TextStyle(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    stringResource(Res.string.file_label).format(
+                                        File(
+                                            selectedPdfPath!!
+                                        ).name
+                                    )
+                                )
+                                Text(stringResource(Res.string.pages_label).format(pageCount))
+                                Text(
+                                    stringResource(Res.string.original_width_label).format(
+                                        originalWidth
+                                    )
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = stringResource(Res.string.page_range_label).format(
+                                startPage,
+                                endPage
+                            ),
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        if (pageCount > 1) {
+                            RangeSlider(
+                                value = startPage.toFloat()..endPage.toFloat(),
+                                onValueChange = { range ->
+                                    startPage = range.start.roundToInt()
+                                    endPage = range.endInclusive.roundToInt()
+                                },
+                                valueRange = 1f..pageCount.toFloat(),
+                                steps = if (pageCount > 2) pageCount - 2 else 0,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
@@ -434,26 +400,53 @@ fun PdfExportDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("1080px")
-                                Text("4000px")
+                                Text(stringResource(Res.string.page_label).format(1))
+                                Text(stringResource(Res.string.page_label).format(pageCount))
                             }
-
-                            Spacer(modifier = Modifier.height(16.dp))
                         } else {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.select_pdf_to_export),
-                                    style = TextStyle(
-                                        fontSize = 16.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
+                            Text(stringResource(Res.string.single_page_document))
+                        }
+
+                        Text(
+                            text = stringResource(Res.string.export_width_label).format(
+                                exportWidth.roundToInt()
+                            ),
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        Slider(
+                            value = exportWidth,
+                            onValueChange = { exportWidth = it },
+                            valueRange = 1080f..4000f,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("1080px")
+                            Text("4000px")
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.select_pdf_to_export),
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
-                            }
+                            )
                         }
                     }
                 }

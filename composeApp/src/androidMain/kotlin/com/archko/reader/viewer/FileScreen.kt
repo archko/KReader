@@ -13,17 +13,18 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -69,10 +70,10 @@ import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
-import com.archko.reader.pdf.util.toIntPx
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
+import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.browse_directory_message
@@ -97,6 +98,7 @@ data class OpenDocRequest(val paths: List<String>, val page: Int?)
 @Composable
 fun FileScreen(
     viewModel: PdfViewModel,
+    fontViewModel: FontViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
@@ -547,7 +549,8 @@ fun FileScreen(
                     initialZoom = viewModel.recent?.zoom ?: 1.0,
                     scrollOri = viewModel.recent?.scrollOri ?: 0,
                     reflow = viewModel.recent?.reflow ?: 0L,
-                    crop = 0L == viewModel.recent?.crop
+                    crop = 0L == viewModel.recent?.crop,
+                    fontViewModel = fontViewModel
                 )
             }
         }
@@ -571,86 +574,79 @@ private fun RecentItem(
                 onLongClick = { showMenu = true }
             )
     ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.0f / 1.3f)
         ) {
-            val itemWidth = maxWidth
-            val aspectRatio = 1.3f
-            val itemHeight = itemWidth * aspectRatio
-
             val leftBorder = 15.dp
             val topBorder = 10.dp
-            Box(
+
+            AsyncImage(
+                model = recent.path?.let {
+                    CustomImageData(
+                        getAbsolutePath(it),
+                        (160),
+                        (200)
+                    )
+                },
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .width(itemWidth)
-                    .height(itemHeight)
+                    .matchParentSize() // 占满父容器
+                    .padding(start = leftBorder, top = topBorder), // 留出装饰条位置
+                alignment = Alignment.Center
+            )
+
+            // 2. 顶部装饰
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .height(topBorder)
             ) {
-                // 顶部区域：左上角图片 + 顶部装饰条图片
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .width(itemWidth)
-                        .height(topBorder)
-                ) {
-                    Image(
-                        painter = painterResource(Res.drawable.components_thumbnail_corner),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .width(leftBorder)
-                            .height(topBorder)
-                            .offset(x = 0.7.dp)
-                    )
-                    Image(
-                        painter = painterResource(Res.drawable.components_thumbnail_top),
-                        contentDescription = null,
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier
-                            .width(itemWidth - leftBorder)
-                            .height(topBorder)
-                    )
-                }
-                // 左侧装饰条图片
                 Image(
-                    painter = painterResource(Res.drawable.components_thumbnail_left),
+                    painter = painterResource(Res.drawable.components_thumbnail_corner),
                     contentDescription = null,
-                    contentScale = ContentScale.FillHeight,
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .width(leftBorder)
-                        .height(itemHeight - topBorder)
-                        .offset(y = topBorder)
+                        .size(leftBorder, topBorder)
+                        .offset(x = 0.7.dp)
                 )
-                // 封面图片
-                AsyncImage(
-                    model = recent.path?.let {
-                        CustomImageData(
-                            getAbsolutePath(it),
-                            (itemWidth - leftBorder).toIntPx(),
-                            (itemHeight - topBorder).toIntPx()
-                        )
-                    },
+                Image(
+                    painter = painterResource(Res.drawable.components_thumbnail_top),
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.FillWidth,
                     modifier = Modifier
-                        .width(itemWidth - leftBorder)
-                        .height(itemHeight - topBorder)
-                        .offset(x = leftBorder - 1.dp, y = topBorder),
-                    alignment = Alignment.Center
-                )
-                // 页码进度
-                Text(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(2.dp))
-                        .padding(horizontal = 4.dp)
-                        .wrapContentSize(),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    text = "${recent.page?.plus(1)}/${recent.pageCount}",
-                    fontSize = 12.sp,
-                    overflow = TextOverflow.Ellipsis
+                        .weight(1f) // 自动填充剩余宽度
+                        .height(topBorder)
                 )
             }
+
+            // 3. 左侧装饰条
+            Image(
+                painter = painterResource(Res.drawable.components_thumbnail_left),
+                contentDescription = null,
+                contentScale = ContentScale.FillHeight,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .width(leftBorder)
+                    .fillMaxHeight()
+                    .padding(top = topBorder)
+            )
+
+            // 4. 页码进度
+            Text(
+                text = "${recent.page?.plus(1)}/${recent.pageCount}",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp)
+                    .background(Color.Black.copy(alpha = 0.20f), RoundedCornerShape(2.dp))
+                    .padding(horizontal = 4.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                fontSize = 12.sp,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         Text(

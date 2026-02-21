@@ -35,6 +35,7 @@ import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.navigation.MainDestinations
 import com.archko.reader.viewer.navigation.rememberKNavController
+import com.archko.reader.viewer.viewmodel.FontViewModel
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.home
 import kreader.composeapp.generated.resources.setting
@@ -54,6 +55,7 @@ fun KApp(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    fontViewModel: FontViewModel,
     externalPath: String? = null
 ) {
     // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
@@ -85,6 +87,7 @@ fun KApp(
                             screenHeightInPixels,
                             viewModel,
                             backupViewModel,
+                            fontViewModel,
                             modifier = Modifier,
                             externalPath = currentExternalPath,
                             onExternalPathConsumed = {
@@ -105,6 +108,7 @@ fun MainContainer(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    fontViewModel: FontViewModel,
     modifier: Modifier = Modifier,
     externalPath: String? = null,
     onExternalPathConsumed: () -> Unit = {}
@@ -135,6 +139,7 @@ fun MainContainer(
                 screenHeightInPixels,
                 viewModel,
                 backupViewModel,
+                fontViewModel,
                 modifier = Modifier.consumeWindowInsets(padding),
                 onShowBottomBarChanged = { showBottomBar = it },
                 externalPath = externalPath,
@@ -149,6 +154,7 @@ fun NavGraphBuilder.addHomeGraph(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    fontViewModel: FontViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
@@ -157,6 +163,7 @@ fun NavGraphBuilder.addHomeGraph(
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
             viewModel,
+            fontViewModel,
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
             externalPath = externalPath,

@@ -37,6 +37,7 @@ import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.viewer.viewmodel.FontViewModel
 
 class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
@@ -136,6 +137,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
+                val fontViewModel: FontViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
                 viewModel.database = database
                 backupViewModel.database = database
@@ -145,6 +147,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                     screenHeightInPixels.toInt(),
                     viewModel,
                     backupViewModel,
+                    fontViewModel,
                     externalPath
                 )
             }

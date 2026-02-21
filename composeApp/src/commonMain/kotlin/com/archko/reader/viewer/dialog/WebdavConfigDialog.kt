@@ -1,12 +1,11 @@
 package com.archko.reader.viewer.dialog
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,7 +38,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -139,127 +137,78 @@ fun WebdavConfigDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.9f),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface
         ) {
-            val width = maxWidth * 0.9f
-            val height = maxHeight * 0.9f
-            Surface(
-                modifier = Modifier.size(width, height),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_back),
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(Res.string.webdav_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (showListView) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 20.dp)
                     ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_back),
-                                contentDescription = "返回",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        Button(
+                            onClick = { showListView = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(Res.string.webdav_config_btn_do))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(Res.string.webdav_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    if (showListView) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp)
-                        ) {
-                            Button(
-                                onClick = { showListView = false },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(Res.string.webdav_config_btn_do))
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    isUploading = true
-                                    scope.launch {
-                                        viewModel.backupToWebdav(currentPath)
-                                            .flowOn(Dispatchers.IO)
-                                            .collectLatest { success ->
-                                                isUploading = false
-                                                if (success) {
-                                                    toaster.show(
-                                                        message = getString(Res.string.webdav_upload_success),
-                                                        type = ToastType.Success,
-                                                    )
-                                                    viewModel.loadFileList(currentPath)
-                                                } else {
-                                                    toaster.show(
-                                                        message = getString(Res.string.webdav_upload_failed),
-                                                        type = ToastType.Error,
-                                                    )
-                                                }
-                                            }
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                enabled = !isUploading
-                            ) {
-                                if (isUploading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(Res.string.webdav_config_doing))
-                                } else {
-                                    Text(stringResource(Res.string.webdav_upload))
-                                }
-                            }
-                        }
-                    } else {
                         Button(
                             onClick = {
-                                isConfiguring = true
+                                isUploading = true
                                 scope.launch {
-                                    viewModel.saveWebdavUser(username, password, host, path)
+                                    viewModel.backupToWebdav(currentPath)
                                         .flowOn(Dispatchers.IO)
                                         .collectLatest { success ->
-                                            isConfiguring = false
+                                            isUploading = false
                                             if (success) {
-                                                showListView = true
                                                 toaster.show(
-                                                    message = getString(Res.string.webdav_config_success),
+                                                    message = getString(Res.string.webdav_upload_success),
                                                     type = ToastType.Success,
                                                 )
+                                                viewModel.loadFileList(currentPath)
                                             } else {
                                                 toaster.show(
-                                                    message = getString(Res.string.webdav_config_failed),
-                                                    type = ToastType.Success,
+                                                    message = getString(Res.string.webdav_upload_failed),
+                                                    type = ToastType.Error,
                                                 )
                                             }
                                         }
                                 }
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp),
-                            enabled = username.isNotBlank()
-                                    && password.isNotBlank()
-                                    && host.isNotBlank()
-                                    && !isConfiguring
+                            modifier = Modifier.weight(1f),
+                            enabled = !isUploading
                         ) {
-                            if (isConfiguring) {
+                            if (isUploading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     color = MaterialTheme.colorScheme.onPrimary
@@ -267,79 +216,122 @@ fun WebdavConfigDialog(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(stringResource(Res.string.webdav_config_doing))
                             } else {
-                                Text(stringResource(Res.string.webdav_config_btn_save))
+                                Text(stringResource(Res.string.webdav_upload))
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (showListView) {
-                        val canNavigateUp = currentPath.length > rootPath.length &&
-                                currentPath.startsWith(rootPath) &&
-                                currentPath != rootPath
-
-                        FileListView(
-                            currentPath = currentPath,
-                            davResourceItems = davResources,
-                            onNavigateUp = if (canNavigateUp) {
-                                {
-                                    val parentPath = currentPath.substringBeforeLast('/', "")
-                                    if (parentPath.length >= rootPath.length && parentPath.isNotEmpty()) {
-                                        currentPath = parentPath
-                                    }
-                                }
-                            } else null,
-                            onDirectoryClick = { item ->
-                                currentPath = item.resource.location.encodedPath.trimEnd('/')
-                            },
-                            onFileClick = { item ->
-                                scope.launch {
-                                    val filePath =
-                                        item.resource.location.encodedPath.trimEnd('/')
-                                    val fileName = filePath.substringAfterLast('/')
-                                    viewModel.restoreFromWebdav(filePath)
-                                        .flowOn(Dispatchers.IO)
-                                        .collectLatest { success ->
-                                            if (success) {
-                                                println("Restore successful: $fileName")
-                                                toaster.show(
-                                                    message = getString(Res.string.webdav_restore_success),
-                                                    type = ToastType.Success,
-                                                )
-                                            } else {
-                                                println("Restore failed: $fileName")
-                                                toaster.show(
-                                                    message = getString(Res.string.webdav_restore_failed),
-                                                    type = ToastType.Error,
-                                                )
-                                            }
+                } else {
+                    Button(
+                        onClick = {
+                            isConfiguring = true
+                            scope.launch {
+                                viewModel.saveWebdavUser(username, password, host, path)
+                                    .flowOn(Dispatchers.IO)
+                                    .collectLatest { success ->
+                                        isConfiguring = false
+                                        if (success) {
+                                            showListView = true
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_config_success),
+                                                type = ToastType.Success,
+                                            )
+                                        } else {
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_config_failed),
+                                                type = ToastType.Success,
+                                            )
                                         }
-                                }
+                                    }
                             }
-                        )
-                    } else {
-                        ConfigFormView(
-                            username = username,
-                            password = password,
-                            host = host,
-                            path = path,
-                            isConfiguring = isConfiguring,
-                            onUsernameChange = { username = it },
-                            onPasswordChange = { password = it },
-                            onHostChange = { host = it },
-                            onPathChange = { path = it }
-                        )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        enabled = username.isNotBlank()
+                                && password.isNotBlank()
+                                && host.isNotBlank()
+                                && !isConfiguring
+                    ) {
+                        if (isConfiguring) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(Res.string.webdav_config_doing))
+                        } else {
+                            Text(stringResource(Res.string.webdav_config_btn_save))
+                        }
                     }
                 }
-            }
 
-            Toaster(
-                state = toaster,
-                maxVisibleToasts = 1,
-                alignment = Alignment.Center,
-            )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (showListView) {
+                    val canNavigateUp = currentPath.length > rootPath.length &&
+                            currentPath.startsWith(rootPath) &&
+                            currentPath != rootPath
+
+                    FileListView(
+                        currentPath = currentPath,
+                        davResourceItems = davResources,
+                        onNavigateUp = if (canNavigateUp) {
+                            {
+                                val parentPath = currentPath.substringBeforeLast('/', "")
+                                if (parentPath.length >= rootPath.length && parentPath.isNotEmpty()) {
+                                    currentPath = parentPath
+                                }
+                            }
+                        } else null,
+                        onDirectoryClick = { item ->
+                            currentPath = item.resource.location.encodedPath.trimEnd('/')
+                        },
+                        onFileClick = { item ->
+                            scope.launch {
+                                val filePath =
+                                    item.resource.location.encodedPath.trimEnd('/')
+                                val fileName = filePath.substringAfterLast('/')
+                                viewModel.restoreFromWebdav(filePath)
+                                    .flowOn(Dispatchers.IO)
+                                    .collectLatest { success ->
+                                        if (success) {
+                                            println("Restore successful: $fileName")
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_restore_success),
+                                                type = ToastType.Success,
+                                            )
+                                        } else {
+                                            println("Restore failed: $fileName")
+                                            toaster.show(
+                                                message = getString(Res.string.webdav_restore_failed),
+                                                type = ToastType.Error,
+                                            )
+                                        }
+                                    }
+                            }
+                        }
+                    )
+                } else {
+                    ConfigFormView(
+                        username = username,
+                        password = password,
+                        host = host,
+                        path = path,
+                        isConfiguring = isConfiguring,
+                        onUsernameChange = { username = it },
+                        onPasswordChange = { password = it },
+                        onHostChange = { host = it },
+                        onPathChange = { path = it }
+                    )
+                }
+            }
         }
+
+        Toaster(
+            state = toaster,
+            maxVisibleToasts = 1,
+            alignment = Alignment.Center,
+        )
     }
 }
 

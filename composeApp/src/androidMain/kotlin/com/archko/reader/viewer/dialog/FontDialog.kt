@@ -1,18 +1,17 @@
 package com.archko.reader.viewer.dialog
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,21 +23,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.compose.ui.window.DialogProperties
+import com.archko.reader.viewer.viewmodel.FontViewModel
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.back
 import kreader.composeapp.generated.resources.font_no
@@ -49,7 +46,6 @@ import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.ic_font
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import java.io.File
 
 /**
  * 字体选择对话框
@@ -57,37 +53,30 @@ import java.io.File
  */
 @Composable
 fun FontDialog(
+    viewModel: FontViewModel,
     onDismiss: () -> Unit,
     onFontSelected: (String) -> Unit
 ) {
-    var fontFiles by remember { mutableStateOf<List<File>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val fontFiles by viewModel.fontFiles.collectAsState()
+    val isLoading by viewModel.isFontLoading.collectAsState()
 
-    // 扫描字体文件
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val fontsDir = File("/sdcard/fonts")
-            val files = if (fontsDir.exists() && fontsDir.isDirectory) {
-                fontsDir.listFiles { file ->
-                    file.extension.equals("ttf", ignoreCase = true) ||
-                            file.extension.equals("otf", ignoreCase = true)
-                }?.toList() ?: emptyList()
-            } else {
-                emptyList()
-            }
-            fontFiles = files
-            isLoading = false
-        }
+        viewModel.loadFontsIfNeeded()
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
-            modifier = Modifier.wrapContentSize(),
+            modifier = Modifier
+                .fillMaxWidth(0.9f) // 使用百分比宽度
+                .fillMaxHeight(0.9f), // 使用百分比高度,
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
-                modifier = Modifier.wrapContentSize()
+                modifier = Modifier.fillMaxSize()
             ) {
                 Row(
                     modifier = Modifier
@@ -112,7 +101,7 @@ fun FontDialog(
 
                 if (isLoading) {
                     Box(
-                        modifier = Modifier.wrapContentSize(),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -128,7 +117,7 @@ fun FontDialog(
                     }
                 } else if (fontFiles.isEmpty()) {
                     Box(
-                        modifier = Modifier.wrapContentSize(),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -150,20 +139,32 @@ fun FontDialog(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier
-                            .wrapContentSize()
-                            .heightIn(max = 800.dp),
+                        modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        items(fontFiles.size) { index ->
-                            val fontFile = fontFiles[index]
+                        items(
+                            count = fontFiles.size,
+                            key = { index -> fontFiles[index].path }
+                        ) { index ->
+                            val fontItem = fontFiles[index]
+
+                            val customFontFamily = remember(fontItem.path) {
+                                if (fontItem.fontFile != null) {
+                                    try {
+                                        FontFamily(Font(fontItem.fontFile!!))
+                                    } catch (_: Exception) {
+                                        FontFamily.Default
+                                    }
+                                } else {
+                                    FontFamily.Default
+                                }
+                            }
+
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        onFontSelected(fontFile.absolutePath)
-                                    },
+                                    .padding(vertical = 4.dp),
+                                onClick = { onFontSelected(fontItem.path) },
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
                                         alpha = 0.5f
@@ -179,41 +180,30 @@ fun FontDialog(
                                     Icon(
                                         painter = painterResource(Res.drawable.ic_font),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = if (fontItem.path.isEmpty())
+                                            MaterialTheme.colorScheme.secondary
+                                        else MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = fontFile.nameWithoutExtension,
-                                            style = MaterialTheme.typography.headlineMedium,
+                                            text = fontItem.displayName,
+                                            style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurface,
-                                            fontFamily = FontFamily(
-                                                Font(
-                                                    fontFile,
-                                                    FontWeight.Normal,
-                                                    FontStyle.Normal
-                                                )
-                                            )
+                                            maxLines = 1
                                         )
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
                                         Text(
-                                            text = "${fontFile.extension.uppercase()} • ${
-                                                String.format(
-                                                    "%.1f KB",
-                                                    fontFile.length() / 1024.0
-                                                )
-                                            }",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontFamily = FontFamily(
-                                                Font(
-                                                    fontFile,
-                                                    FontWeight.Normal,
-                                                    FontStyle.Normal
-                                                )
-                                            )
+                                            text = "天地玄黄，宇宙洪荒。日月盈昃，辰宿列张。",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontFamily = customFontFamily,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }

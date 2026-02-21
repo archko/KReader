@@ -37,12 +37,12 @@ public object FontCSSGenerator {
                 val fontName = getFontNameFromPath(fontPath)
                 buffer.apply {
                     appendLine("@font-face {")
-                    appendLine("    font-family: '$fontName' !important;")
+                    appendLine("    font-family: '$fontName', 'Droid Sans Fallback', sans-serif !important;")
                     appendLine("    src: url('file://$fontPath');")
                     appendLine("}")
 
-                    appendLine("* {")
-                    appendLine("    font-family: '$fontName', serif !important;")
+                    appendLine("html, body, p, div {")
+                    appendLine("    font-family: '$fontName', 'Droid Sans Fallback', sans-serif !important;")
                     appendLine("}")
                 }
             }
