@@ -608,6 +608,7 @@ private fun RecentItem(
                 Image(
                     painter = painterResource(Res.drawable.components_thumbnail_corner),
                     contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
                     modifier = Modifier
                         .size(leftBorder, topBorder)
                         .offset(x = 0.7.dp)
