@@ -374,7 +374,7 @@ public fun DesktopDocumentView(
     LaunchedEffect(jumpToPage, initialOrientation, pageViewState.init) {
         //println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pageViewState.init}")
 
-        if (initialOrientation != orientation && pageViewState.init) {
+        if (columnCount == 1 && initialOrientation != orientation && pageViewState.init) {
             isJumping = true // 设置跳转标志
             val firstPageIndex =
                 ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)

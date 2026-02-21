@@ -164,11 +164,8 @@ public fun DocumentView(
     // 监听外部参数的变化
     LaunchedEffect(jumpToPage, initialOrientation, pageViewState.init) {
         //println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pageViewState.init}")
-        if (columnCount > 1) {
-            return@LaunchedEffect
-        }
 
-        if (initialOrientation != orientation && pageViewState.init) {
+        if (columnCount == 1 && initialOrientation != orientation && pageViewState.init) {
             isJumping = true // 设置跳转标志
             val currentPage = jumpToPage ?: 0  // 方向变化应该使用页码，而不依赖offset计算
             println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$currentPage")
