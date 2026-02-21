@@ -412,7 +412,7 @@ public class Page(
                 val nodeIndex = y * config.xBlocks + x
                 if (nodeIndex < nodes.size) {
                     nodesToDraw.add(nodes[nodeIndex])
-                //} else {
+                    //} else {
                     //println("Page[${aPage.index}], nodeIndex:${nodeIndex}, nodes.size:${nodes.size}")
                 }
             }
@@ -829,6 +829,10 @@ public class Page(
         result = 31 * result + nodes.hashCode()
         result = 31 * result + bounds.hashCode()
         return result
+    }
+
+    override fun toString(): String {
+        return "Page(page=${aPage.index}, w-h=$width-$height), x-y:$xOffset-$yOffset, $bounds"
     }
 
     public companion object {

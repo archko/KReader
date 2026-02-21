@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -191,26 +192,23 @@ private fun OutlineTabContent(
                 key = { index, item -> index }) { index, item ->
                 val isSelected = index == initialOutlineIndex
                 val backgroundColor = if (isSelected) {
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 } else {
-                    MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                    MaterialTheme.colorScheme.surfaceVariant
                 }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(backgroundColor)
+                        .padding(vertical = 1.dp)
+                        .padding(start = (item.level * 8).dp)
+                        .background(color = backgroundColor, shape = RoundedCornerShape(4.dp))
                         .clickable { onOutlineClick(item) }
-                        .padding(
-                            start = (item.level * 6).dp + 8.dp,
-                            end = 8.dp,
-                            top = 8.dp,
-                            bottom = 8.dp
-                        ),
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = item.title ?: "",
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -263,10 +261,13 @@ private fun AnnotationTabContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    onAnnotationClick(pageIndex)
-                                }
-                                .padding(vertical = 8.dp, horizontal = 8.dp),
+                                .padding(vertical = 1.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .clickable { onAnnotationClick(pageIndex) }
+                                .padding(start = 16.dp, end = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -286,7 +287,7 @@ private fun AnnotationTabContent(
                                 onClick = {
                                     annotationManager?.deletePaths(pageIndex)
                                 },
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(start = 4.dp)
                             ) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_delete),

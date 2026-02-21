@@ -47,6 +47,7 @@ public fun DesktopDocumentView(
     state: ImageDecoder,
     jumpToPage: Int? = null,
     initialOrientation: Int,
+    columnCount: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
@@ -107,7 +108,20 @@ public fun DesktopDocumentView(
 
     val pageViewState = remember(list) {
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PageViewState(list, state, annotationManager, orientation, crop, textSelector)
+        PageViewState(
+            list,
+            state,
+            annotationManager,
+            orientation,
+            crop = crop,
+            columnCount = columnCount,
+            textSelector = textSelector
+        )
+    }
+
+    LaunchedEffect(columnCount) {
+        pageViewState.updateColumnCount(columnCount)
+        pageViewState.updateVisiblePages(offset, viewSize, vZoom)
     }
 
     // 文本选择相关状态

@@ -51,6 +51,7 @@ public fun DocumentView(
     jumpToPage: Int? = null,
     jumpMode: JumpMode = JumpMode.PageRestore,
     initialOrientation: Int,
+    columnCount: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null, // 新增参数
@@ -103,7 +104,20 @@ public fun DocumentView(
 
     val pageViewState = remember(list) {
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
-        PageViewState(list, state, annotationManager, orientation, crop, textSelector)
+        PageViewState(
+            list,
+            state,
+            annotationManager,
+            orientation,
+            crop,
+            columnCount = columnCount,
+            textSelector = textSelector
+        )
+    }
+
+    LaunchedEffect(columnCount) {
+        pageViewState.updateColumnCount(columnCount)
+        pageViewState.updateVisiblePages(offset, viewSize, vZoom)
     }
 
     LaunchedEffect(speakingPageIndex) {
@@ -150,6 +164,9 @@ public fun DocumentView(
     // 监听外部参数的变化
     LaunchedEffect(jumpToPage, initialOrientation, pageViewState.init) {
         //println("DocumentView: jumpToPage:$jumpToPage, initialOrientation:$initialOrientation, orientation:$orientation, init: ${pageViewState.init}")
+        if (columnCount > 1) {
+            return@LaunchedEffect
+        }
 
         if (initialOrientation != orientation && pageViewState.init) {
             isJumping = true // 设置跳转标志
@@ -627,7 +644,8 @@ public fun DocumentView(
                                             val centroid =
                                                 event.calculateCentroid(useCurrent = false)
                                             if (centroid.isSpecified && zoomChange != 1f) {
-                                                val newZoom = (vZoom * zoomChange).coerceIn(1f, max_zoom)
+                                                val newZoom =
+                                                    (vZoom * zoomChange).coerceIn(1f, max_zoom)
                                                 val zoomFactor = newZoom / vZoom
 
                                                 // 计算缩放中心点：手势中心相对于内容的位置

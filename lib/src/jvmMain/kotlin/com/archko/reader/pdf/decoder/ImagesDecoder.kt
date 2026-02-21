@@ -9,6 +9,7 @@ import com.archko.reader.image.HeifLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
+import com.archko.reader.pdf.component.TileTask
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
@@ -387,6 +388,17 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             println("renderPageRegion error for file ${files[index].absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
+    }
+
+    public override fun renderPageRegion(
+        task: TileTask,
+        totalScale: Float
+    ): ImageBitmap{
+        return ImageBitmap(
+            task.width,
+            task.height,
+            ImageBitmapConfig.Rgb565
+        )
     }
 
     override fun renderPage(

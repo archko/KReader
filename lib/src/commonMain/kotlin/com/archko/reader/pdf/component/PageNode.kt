@@ -53,21 +53,23 @@ public class PageNode(
         this.aPage = newAPage
     }
 
-    // 逻辑rect转实际像素，直接用Page的width/height
+    // 逻辑rect转实际像素
+    // pageWidth/pageHeight: Page的缩放后尺寸（currentWidth/currentHeight）
+    // xOffset/yOffset: Page在文档中的缩放后偏移（currentBounds.left/top）
+    // bounds: Node在Page中的逻辑坐标[0,1]
+    // 返回: Node在文档中的绝对像素坐标
     public fun toPixelRect(
         pageWidth: Float,
         pageHeight: Float,
         xOffset: Float,
         yOffset: Float
     ): Rect {
-        val left =
-            floor(bounds.left * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
-        val top =
-            floor(bounds.top * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
-        val right =
-            ceil(bounds.right * pageWidth + (if (pageViewState.orientation == Vertical) 0f else xOffset))
-        val bottom =
-            ceil(bounds.bottom * pageHeight + (if (pageViewState.orientation == Vertical) yOffset else 0f))
+        // bounds是[0,1]的逻辑坐标，乘以pageWidth/pageHeight得到Node在Page中的像素尺寸
+        // 然后加上xOffset/yOffset（Page在文档中的偏移）得到Node在文档中的绝对坐标
+        val left = floor(bounds.left * pageWidth + xOffset)
+        val top = floor(bounds.top * pageHeight + yOffset)
+        val right = ceil(bounds.right * pageWidth + xOffset)
+        val bottom = ceil(bounds.bottom * pageHeight + yOffset)
 
         return Rect(left, top, right, bottom)
     }
@@ -143,6 +145,8 @@ public class PageNode(
     /**
      * @param pageWidth page的缩放后的宽
      * @param pageHeight page的缩放后的高
+     * @param xOffset 缩放后的绝对X偏移（currentBounds.left）
+     * @param yOffset 缩放后的绝对Y偏移（currentBounds.top）
      */
     public fun draw(
         drawScope: DrawScope,
@@ -165,7 +169,7 @@ public class PageNode(
 
         // 1. 首先检查是否在预加载区域内
         val isInPreloadArea = pageViewState.isTileVisible(tileSpec, strictMode = false)
-        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, isInPreloadArea:$isInPreloadArea, isDecoding=$isDecoding, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=$bitmapState")
+        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, isInPreloadArea:$isInPreloadArea, isDecoding=$isDecoding, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=$bitmapState")
         if (!isInPreloadArea) {
             recycle()  // 完全超出预加载区域，回收
             return
@@ -201,13 +205,6 @@ public class PageNode(
         if (bitmapState == null) {
             decode(pageWidth, pageHeight)
         }
-
-        /*drawScope.drawRect(
-            color = Color.Red,
-            topLeft = Offset(pixelRect.left, pixelRect.top),
-            size = androidx.compose.ui.geometry.Size(pixelRect.width, pixelRect.height),
-            style = Stroke(width = 2f)
-        )*/
     }
 
     private fun decode(pageWidth: Float, pageHeight: Float) {
@@ -244,12 +241,6 @@ public class PageNode(
                 cacheKey,
                 null
             )
-
-            // 使用预加载区域判断（包含可见区域）
-            /*if (!pageViewState.isTileVisible(tileSpec, strictMode = false)) {
-                isDecoding = false
-                return@launch
-            }*/
 
             val left =
                 (if (null != aPage.cropBounds && pageViewState.isCropEnabled()) aPage.cropBounds!!.left

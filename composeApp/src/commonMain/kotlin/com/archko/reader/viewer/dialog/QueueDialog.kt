@@ -1,6 +1,7 @@
 package com.archko.reader.viewer.dialog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -14,8 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -114,21 +114,21 @@ fun QueueDialog(
                             itemsIndexed(
                                 cacheBean.reflow,
                                 key = { index, item -> index }) { index, item ->
-                                val isCurrentSpeaking = item.page == currentSpeakingPage
-                                Card(
+                                val backgroundColor = if (item.page == currentSpeakingPage) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                }
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 2.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isCurrentSpeaking) {
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                        }
-                                    ),
-                                    onClick = {
-                                        onItemClick?.invoke(item)
-                                    }
+                                        .padding(vertical = 4.dp)
+                                        .background(
+                                            color = backgroundColor,
+                                            shape = RoundedCornerShape(4.dp)
+                                        )
+                                        .clickable { onItemClick?.invoke(item) }
+                                        .padding(horizontal = 10.dp, vertical = 10.dp),
                                 ) {
                                     val pageNumber = (item.page?.toIntOrNull() ?: 0) + 1
                                     Text(
@@ -139,7 +139,6 @@ fun QueueDialog(
                                             ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Clip,
-                                        modifier = Modifier.padding(12.dp),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )

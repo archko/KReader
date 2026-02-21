@@ -13,7 +13,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.GestureMode
@@ -58,7 +57,9 @@ private fun ToolbarContent(
     isVertical: Boolean,
     onOrientationChange: () -> Unit,
     onCloseDocument: (() -> Unit)?,
+    paths: List<String>,
     currentPath: String,
+    columnCount: Int,
     speechService: SpeechService,
     currentPage: Int,
     decoder: ImageDecoder,
@@ -71,6 +72,7 @@ private fun ToolbarContent(
     onOutlineDialogShow: () -> Unit,
     onQueueDialogShow: () -> Unit,
     onThumbnailDialogShow: () -> Unit,
+    onColumnCountChanged: (Int) -> Unit,
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, SpeechService) -> Unit,
     isReflow: Boolean,
@@ -82,6 +84,15 @@ private fun ToolbarContent(
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
     ) {
+        var showColumn by remember {
+            mutableStateOf(
+                if (paths.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
+                    false
+                } else {
+                    true
+                }
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -98,19 +109,45 @@ private fun ToolbarContent(
             }
             Text(
                 text = currentPath,
+                modifier = Modifier.weight(1f),
                 color = Color.White,
                 style = MaterialTheme.typography.bodySmall,
             )
-            Spacer(Modifier.weight(1f))
 
-            IconButton(onClick = { onOrientationChange() }) {
-                Icon(
-                    painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                    contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                        Res.string.horizontal
-                    ),
-                    tint = Color.White
-                )
+            if (columnCount <= 1) {
+                IconButton(onClick = { onOrientationChange() }) {
+                    Icon(
+                        painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                        contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                            Res.string.horizontal
+                        ),
+                        tint = Color.White
+                    )
+                }
+            }
+
+            if (showColumn && isVertical) {
+                if (columnCount == 1) {
+                    IconButton(
+                        onClick = { onColumnCountChanged(2) },
+                    ) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_column_two),
+                            contentDescription = "",
+                            tint = Color.White
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = { onColumnCountChanged(1) },
+                    ) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_column_one),
+                            contentDescription = "",
+                            tint = Color.White
+                        )
+                    }
+                }
             }
 
             if (FileTypeUtils.isDocumentFile(currentPath)) {
@@ -522,6 +559,8 @@ fun CustomView(
             val pageCount: Int = list.size
             // 跳转页面状态
             var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+            var columnCount by remember { mutableIntStateOf(1) }
+
             val annotationManager = remember(paths) {
                 var absolutePath = ""
                 if (paths.size == 1) {
@@ -541,9 +580,11 @@ fun CustomView(
                     isVertical = isVertical,
                     onOrientationChange = { isVertical = !isVertical },
                     onCloseDocument = onCloseDocument,
+                    paths = paths,
                     currentPath = currentPath,
                     speechService = speechService,
                     currentPage = currentPage,
+                    columnCount = columnCount,
                     decoder = decoder!!,
                     onGestureModeChange = { mode -> gestureMode = mode },
                     gestureMode = gestureMode,
@@ -552,6 +593,7 @@ fun CustomView(
                     onOutlineDialogShow = { showOutlineDialog = true },
                     onQueueDialogShow = { showQueueDialog = true },
                     onThumbnailDialogShow = { showThumbnailDialog = true },
+                    onColumnCountChanged = { columnCount = it },
                     scope = scope,
                     onStartSpeaking = { page, dec, binder ->
                         scope.launch {
@@ -611,6 +653,7 @@ fun CustomView(
                             state = decoder!!,
                             jumpToPage = jumpToPage,
                             initialOrientation = orientation,
+                            columnCount = columnCount,
                             onSaveDocument = onSaveDocument,
                             onCloseDocument = {
                                 println("onCloseDocument.isReflow:$isReflow")

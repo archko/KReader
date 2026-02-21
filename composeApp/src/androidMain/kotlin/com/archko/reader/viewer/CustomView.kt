@@ -1,5 +1,6 @@
 package com.archko.reader.viewer
 
+import android.content.pm.ActivityInfo
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
@@ -79,6 +80,7 @@ private fun ToolbarContent(
     ttsServiceBinder: TtsServiceBinder?,
     isSpeaking: Boolean,
     currentPage: Int,
+    columnCount: Int,
     decoder: ImageDecoder,
     onGestureModeChange: (gestureMode: GestureMode) -> Unit,
     gestureMode: GestureMode,
@@ -117,17 +119,19 @@ private fun ToolbarContent(
                 horizontalArrangement = Arrangement.End,
                 contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                item {
-                    IconButton(onClick = {
-                        onOrientationChange()
-                    }) {
-                        Icon(
-                            painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                            contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                Res.string.horizontal
-                            ),
-                            tint = Color.White
-                        )
+                if (columnCount <= 1) {
+                    item {
+                        IconButton(onClick = {
+                            onOrientationChange()
+                        }) {
+                            Icon(
+                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                    Res.string.horizontal
+                                ),
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
 
@@ -346,7 +350,8 @@ fun CustomView(
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
 
-    LaunchedEffect(Unit) {
+    // 全屏设置函数
+    fun applyFullScreen() {
         val activity = context as? ComponentActivity
         activity?.window?.let { window ->
             WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -357,6 +362,10 @@ fun CustomView(
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
+    }
+
+    LaunchedEffect(Unit) {
+        applyFullScreen()
 
         val runtime = Runtime.getRuntime()
         val maxMemory = runtime.maxMemory()
@@ -480,6 +489,8 @@ fun CustomView(
                 println("CustomView.onDispose:$currentPath, $decoder")
                 ttsServiceBinder?.unbindService()
                 decoder?.close()
+                val activity = context as? ComponentActivity
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
         }
 
@@ -608,6 +619,16 @@ fun CustomView(
 
             var isSpeaking by remember { mutableStateOf(false) }
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
+            var columnCount by remember { mutableIntStateOf(1) }
+            var showColumn by remember {
+                mutableStateOf(
+                    if (paths.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
+                        false
+                    } else {
+                        true
+                    }
+                )
+            }
 
             val annotationManager = remember(paths) {
                 var absolutePath = ""
@@ -745,6 +766,7 @@ fun CustomView(
                     jumpToPage = jumpIntent.page,
                     jumpMode = jumpIntent.mode,
                     initialOrientation = orientation,
+                    columnCount = columnCount,
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
                     onCloseDocument = {
                         println("onCloseDocument.isReflow:$isReflow")
@@ -791,6 +813,7 @@ fun CustomView(
                     ttsServiceBinder = ttsServiceBinder,
                     isSpeaking = isSpeaking,
                     currentPage = currentPage,
+                    columnCount = columnCount,
                     decoder = decoder!!,
                     onGestureModeChange = { mode -> gestureMode = mode },
                     gestureMode = gestureMode,
@@ -865,70 +888,137 @@ fun CustomView(
                 visible = showToolbar,
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                Surface(
-                    color = Color(0xCC222222),
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                 ) {
-                    var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-                    // 当currentPage变化时更新sliderValue
-                    LaunchedEffect(currentPage) {
-                        isExternalChange = true
-                        sliderValue = (currentPage + 1).toFloat()
-                        isExternalChange = false
-                    }
-                    Column(
+                    Surface(
+                        color = Color(0xCC222222),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        Text(
-                            text = "${sliderValue.toInt()} / $pageCount",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { sliderValue = it },
-                            valueRange = 1f..pageCount.toFloat(),
-                            steps = (pageCount - 2).coerceAtLeast(0),
-                            onValueChangeFinished = {
-                                if (!isExternalChange) {
-                                    val targetPage = sliderValue.toInt() - 1
-                                    if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                        jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
-                                    }
-                                }
-                            },
+                        // Activity屏幕方向状态
+                        var isActivityPortrait by remember { mutableStateOf(true) }
+
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(20.dp),
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color.White,
-                                activeTrackColor = Color.White,
-                                inactiveTrackColor = Color.Gray
-                            ),
-                            track = { sliderState ->
-                                SliderDefaults.Track(
-                                    sliderState = sliderState,
-                                    modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
-                                    colors = SliderDefaults.colors(
-                                        activeTrackColor = Color.White,
-                                        inactiveTrackColor = Color.Gray
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp, end = 8.dp),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        isActivityPortrait = !isActivityPortrait
+                                        val activity = context as? ComponentActivity
+                                        activity?.requestedOrientation = if (isActivityPortrait) {
+                                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                        } else {
+                                            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                        }
+
+                                        scope.launch {
+                                            // 等待方向改变完成
+                                            delay(50)
+                                            applyFullScreen()
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        painter = painterResource(if (isActivityPortrait) Res.drawable.ic_portrait else Res.drawable.ic_landscape),
+                                        contentDescription = if (isActivityPortrait) "竖屏" else "横屏",
+                                        tint = Color.White
                                     )
-                                )
-                            },
-                            thumb = {
-                                SliderDefaults.Thumb(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color.White
-                                    )
-                                )
+                                }
+
+                                if (showColumn && isVertical) {
+                                    VerticalDivider(modifier = Modifier.height(20.dp))
+                                    if (columnCount == 1) {
+                                        IconButton(
+                                            onClick = { columnCount = 2 },
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_column_two),
+                                                contentDescription = "",
+                                                tint = Color.White
+                                            )
+                                        }
+                                    } else {
+                                        IconButton(
+                                            onClick = { columnCount = 1 },
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_column_one),
+                                                contentDescription = "",
+                                                tint = Color.White
+                                            )
+                                        }
+                                    }
+                                }
                             }
-                        )
+
+                            var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
+                            // 当currentPage变化时更新sliderValue
+                            LaunchedEffect(currentPage) {
+                                isExternalChange = true
+                                sliderValue = (currentPage + 1).toFloat()
+                                isExternalChange = false
+                            }
+
+                            Text(
+                                text = "${sliderValue.toInt()} / $pageCount",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                            Slider(
+                                value = sliderValue,
+                                onValueChange = { sliderValue = it },
+                                valueRange = 1f..pageCount.toFloat(),
+                                steps = (pageCount - 2).coerceAtLeast(0),
+                                onValueChangeFinished = {
+                                    if (!isExternalChange) {
+                                        val targetPage = sliderValue.toInt() - 1
+                                        if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                            jumpIntent =
+                                                JumpIntent(targetPage, JumpMode.PageNavigation)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(20.dp),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color.White,
+                                    activeTrackColor = Color.White,
+                                    inactiveTrackColor = Color.Gray
+                                ),
+                                track = { sliderState ->
+                                    SliderDefaults.Track(
+                                        sliderState = sliderState,
+                                        modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
+                                        colors = SliderDefaults.colors(
+                                            activeTrackColor = Color.White,
+                                            inactiveTrackColor = Color.Gray
+                                        )
+                                    )
+                                },
+                                thumb = {
+                                    SliderDefaults.Thumb(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = Color.White
+                                        )
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }

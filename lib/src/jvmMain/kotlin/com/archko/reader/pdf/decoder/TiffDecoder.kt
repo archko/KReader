@@ -2,12 +2,14 @@ package com.archko.reader.pdf.decoder
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Size
+import com.archko.reader.pdf.component.TileTask
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
@@ -201,6 +203,17 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
             println("renderPageRegion error for file ${file.absolutePath}: $e")
             CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
+    }
+
+    override fun renderPageRegion(
+        task: TileTask,
+        totalScale: Float
+    ): ImageBitmap {
+        return ImageBitmap(
+            task.width,
+            task.height,
+            ImageBitmapConfig.Rgb565
+        )
     }
 
     override fun renderPage(
