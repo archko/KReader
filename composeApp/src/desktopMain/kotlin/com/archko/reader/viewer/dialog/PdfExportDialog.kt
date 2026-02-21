@@ -226,7 +226,7 @@ fun PdfExportDialog(
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 1000.dp),
+                .widthIn(max = 800.dp),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface
         ) {

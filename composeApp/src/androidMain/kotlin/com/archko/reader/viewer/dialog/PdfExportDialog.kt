@@ -5,9 +5,9 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,8 +37,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +51,29 @@ import com.artifex.mupdf.fitz.Document
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.error_read_pdf_info
+import kreader.composeapp.generated.resources.export_cancelled_partial
+import kreader.composeapp.generated.resources.export_html
+import kreader.composeapp.generated.resources.export_images
+import kreader.composeapp.generated.resources.export_pdf
+import kreader.composeapp.generated.resources.export_width_label
+import kreader.composeapp.generated.resources.file_label
+import kreader.composeapp.generated.resources.html_export_failed
+import kreader.composeapp.generated.resources.html_export_success
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.images_export_failed
+import kreader.composeapp.generated.resources.images_export_success
+import kreader.composeapp.generated.resources.invalid_page_range
+import kreader.composeapp.generated.resources.original_width_label
+import kreader.composeapp.generated.resources.page_label
+import kreader.composeapp.generated.resources.page_range_label
+import kreader.composeapp.generated.resources.pages_label
+import kreader.composeapp.generated.resources.pdf_info
+import kreader.composeapp.generated.resources.please_select_pdf_first
+import kreader.composeapp.generated.resources.select_pdf_file
+import kreader.composeapp.generated.resources.select_pdf_to_export
+import kreader.composeapp.generated.resources.single_page_document
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -238,24 +258,20 @@ fun PdfExportDialog(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            val width = maxWidth * 0.9f
+            val height = maxHeight * 0.9f
             Surface(
                 modifier = Modifier
-                    .width(screenWidth * 0.95f)
-                    .height(screenHeight * 0.8f),
+                    .width(width)
+                    .height(height),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surface
             ) {

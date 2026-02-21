@@ -5,9 +5,9 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,8 +38,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +51,22 @@ import com.archko.reader.viewer.utils.PDFCreaterHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.creating
+import kreader.composeapp.generated.resources.delete
+import kreader.composeapp.generated.resources.enter_pdf_filename
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_delete
+import kreader.composeapp.generated.resources.ic_menu
+import kreader.composeapp.generated.resources.merge_btn
+import kreader.composeapp.generated.resources.merge_error
+import kreader.composeapp.generated.resources.merge_pdf_to_split
+import kreader.composeapp.generated.resources.merge_select_pdf
+import kreader.composeapp.generated.resources.merge_success
+import kreader.composeapp.generated.resources.merge_title
+import kreader.composeapp.generated.resources.pdf_filename
+import kreader.composeapp.generated.resources.please_select_pdf_first
+import kreader.composeapp.generated.resources.selected_images_count
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -157,24 +170,20 @@ fun PdfMergeDialog(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            val width = maxWidth * 0.9f
+            val height = maxHeight * 0.9f
             Surface(
                 modifier = Modifier
-                    .width(screenWidth * 0.95f)
-                    .height(screenHeight * 0.9f),
+                    .width(width)
+                    .height(height),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surface
             ) {

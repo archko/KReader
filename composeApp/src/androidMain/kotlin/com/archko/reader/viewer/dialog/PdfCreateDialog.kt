@@ -5,9 +5,9 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,9 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +55,22 @@ import com.archko.reader.viewer.utils.PDFCreaterHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.create_pdf
+import kreader.composeapp.generated.resources.create_pdf_button
+import kreader.composeapp.generated.resources.creating
+import kreader.composeapp.generated.resources.delete
+import kreader.composeapp.generated.resources.enter_pdf_filename
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_delete
+import kreader.composeapp.generated.resources.ic_menu
+import kreader.composeapp.generated.resources.pdf_created_successfully
+import kreader.composeapp.generated.resources.pdf_creation_failed
+import kreader.composeapp.generated.resources.pdf_filename
+import kreader.composeapp.generated.resources.please_select_images_first
+import kreader.composeapp.generated.resources.select_images
+import kreader.composeapp.generated.resources.select_images_to_create_pdf
+import kreader.composeapp.generated.resources.selected_images_count
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -160,24 +173,20 @@ fun PdfCreateDialog(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            val width = maxWidth * 0.9f
+            val height = maxHeight * 0.9f
             Surface(
                 modifier = Modifier
-                    .width(screenWidth * 0.95f)
-                    .height(screenHeight * 0.9f),
+                    .width(width)
+                    .height(height),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surface
             ) {

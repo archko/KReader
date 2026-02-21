@@ -187,8 +187,8 @@ fun PdfSplitDialog(
         ) {
             Surface(
                 modifier = Modifier
-                    .width(screenWidth * 0.95f)
-                    .height(screenHeight * 0.8f),
+                    .width(screenWidth * 0.9f)
+                    .height(screenHeight * 0.9f),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surface
             ) {

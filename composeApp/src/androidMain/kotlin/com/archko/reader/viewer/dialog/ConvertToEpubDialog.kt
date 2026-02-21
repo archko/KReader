@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -38,7 +38,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +52,22 @@ import com.archko.reader.viewer.utils.PDFCreaterHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kreader.composeapp.generated.resources.*
+import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.convert_btn
+import kreader.composeapp.generated.resources.convert_doing
+import kreader.composeapp.generated.resources.convert_enter_epub_filename
+import kreader.composeapp.generated.resources.convert_error
+import kreader.composeapp.generated.resources.convert_select_file
+import kreader.composeapp.generated.resources.convert_select_to_create_epub
+import kreader.composeapp.generated.resources.convert_successfully
+import kreader.composeapp.generated.resources.convert_tip
+import kreader.composeapp.generated.resources.convert_title
+import kreader.composeapp.generated.resources.convert_to_filename
+import kreader.composeapp.generated.resources.delete
+import kreader.composeapp.generated.resources.ic_back
+import kreader.composeapp.generated.resources.ic_delete
+import kreader.composeapp.generated.resources.ic_menu
+import kreader.composeapp.generated.resources.please_select_images_first
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -171,153 +185,156 @@ fun ConvertToEpubDialog(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            modifier = Modifier
-                .width(screenWidth * 0.95f)
-                .height(screenHeight * 0.9f),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+            val width = maxWidth * 0.9f
+            val height = maxHeight * 0.9f
+            Surface(
+                modifier = Modifier
+                    .width(width)
+                    .height(height),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            painter = painterResource(Res.drawable.ic_back),
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.convert_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(20.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    OutlinedTextField(
-                        value = outName,
-                        onValueChange = { outName = it },
-                        label = { Text(stringResource(Res.string.convert_to_filename)) },
-                        placeholder = { Text(stringResource(Res.string.convert_enter_epub_filename)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(
-                            onClick = { selectImages() },
-                            modifier = Modifier.weight(1f),
-                            enabled = !isCreating
-                        ) {
-                            Text(stringResource(Res.string.convert_select_file))
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_back),
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
-
-                        Button(
-                            onClick = { convert() },
-                            modifier = Modifier.weight(1f),
-                            enabled = selectedFiles.isNotEmpty() && !isCreating
-                        ) {
-                            if (isCreating) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(Res.string.convert_doing))
-                            } else {
-                                Text(stringResource(Res.string.convert_btn))
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(Res.string.convert_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    if (selectedFiles.isNotEmpty()) {
-                        Text(
-                            text = stringResource(Res.string.convert_tip),
-                            style = TextStyle(
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        val lazyListState = rememberLazyListState()
-                        val reorderableLazyListState = rememberReorderableLazyListState(
-                            lazyListState = lazyListState,
-                            onMove = { from, to ->
-                                selectedFiles = selectedFiles.toMutableList().apply {
-                                    add(to.index, removeAt(from.index))
-                                }
-                            }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = outName,
+                            onValueChange = { outName = it },
+                            label = { Text(stringResource(Res.string.convert_to_filename)) },
+                            placeholder = { Text(stringResource(Res.string.convert_enter_epub_filename)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
                         )
 
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            state = lazyListState,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            itemsIndexed(
-                                selectedFiles,
-                                key = { _, item -> item }) { index, imagePath ->
-                                ReorderableItem(
-                                    state = reorderableLazyListState,
-                                    key = imagePath
-                                ) { isDragging ->
-                                    ImageItem(
-                                        imagePath = imagePath,
-                                        index = index + 1,
-                                        isDragging = isDragging,
-                                        dragModifier = Modifier.draggableHandle(),
-                                        onRemove = {
-                                            selectedFiles =
-                                                selectedFiles.filter { it != imagePath }
-                                        }
+                            Button(
+                                onClick = { selectImages() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !isCreating
+                            ) {
+                                Text(stringResource(Res.string.convert_select_file))
+                            }
+
+                            Button(
+                                onClick = { convert() },
+                                modifier = Modifier.weight(1f),
+                                enabled = selectedFiles.isNotEmpty() && !isCreating
+                            ) {
+                                if (isCreating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
                                     )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(Res.string.convert_doing))
+                                } else {
+                                    Text(stringResource(Res.string.convert_btn))
                                 }
                             }
                         }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        if (selectedFiles.isNotEmpty()) {
                             Text(
-                                text = stringResource(Res.string.convert_select_to_create_epub),
+                                text = stringResource(Res.string.convert_tip),
                                 style = TextStyle(
                                     fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            val lazyListState = rememberLazyListState()
+                            val reorderableLazyListState = rememberReorderableLazyListState(
+                                lazyListState = lazyListState,
+                                onMove = { from, to ->
+                                    selectedFiles = selectedFiles.toMutableList().apply {
+                                        add(to.index, removeAt(from.index))
+                                    }
+                                }
+                            )
+
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                state = lazyListState,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                itemsIndexed(
+                                    selectedFiles,
+                                    key = { _, item -> item }) { index, imagePath ->
+                                    ReorderableItem(
+                                        state = reorderableLazyListState,
+                                        key = imagePath
+                                    ) { isDragging ->
+                                        ImageItem(
+                                            imagePath = imagePath,
+                                            index = index + 1,
+                                            isDragging = isDragging,
+                                            dragModifier = Modifier.draggableHandle(),
+                                            onRemove = {
+                                                selectedFiles =
+                                                    selectedFiles.filter { it != imagePath }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.convert_select_to_create_epub),
+                                    style = TextStyle(
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                )
+                            }
                         }
                     }
                 }
