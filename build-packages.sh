@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # 项目配置
 PROJECT_NAME="KReader"
-VERSION="1.2.1"
+VERSION="1.2.2"
 BUILD_DIR="build/packages"
 COMPOSE_BUILD_DIR="composeApp/build/compose/binaries/main"
 
@@ -41,6 +41,8 @@ check_os() {
         OS_TYPE="macos"
     elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
         OS_TYPE="windows"
+    elif [[ "$OSTYPE" == "linux"* ]]; then
+        OS_TYPE="linux"
     else
         print_error "不支持的操作系统: $OSTYPE"
         exit 1
@@ -77,6 +79,10 @@ compile_project() {
         "windows")
             task_name="createDistributableWindows"
             print_info "编译 Windows 版本..."
+            ;;
+        "linux")
+            task_name="createDistributable"
+            print_info "编译 Linux 版本..."
             ;;
         *)
             print_info "编译默认版本..."
@@ -226,6 +232,86 @@ build_windows() {
     fi
 }
 
+# 创建 Linux 包
+build_linux() {
+    if [[ "$OS_TYPE" != "linux" ]]; then
+        print_warning "Linux 包只能在 Linux 系统上构建，跳过..."
+        return
+    fi
+    
+    # 编译 Linux 版本
+    compile_project "linux"
+    
+    print_info "构建 Linux 包..."
+    
+    local output_dir="$BUILD_DIR/linux"
+    mkdir -p "$output_dir"
+    
+    # 复制应用文件
+    cp -R "$COMPOSE_BUILD_DIR/app/"* "$output_dir/"
+    
+    # 构建 DEB 包
+    print_info "创建 Linux DEB 包..."
+    ./gradlew :composeApp:packageDeb
+    
+    # 查找生成的 DEB 文件并复制到输出目录
+    local deb_file=$(find composeApp/build/compose/binaries/main -name "*.deb" | head -1)
+    if [ -f "$deb_file" ]; then
+        cp "$deb_file" "$BUILD_DIR/${PROJECT_NAME}-${VERSION}-Linux.deb"
+        print_success "Linux DEB 包构建完成: ${PROJECT_NAME}-${VERSION}-Linux.deb"
+    else
+        print_warning "未找到 DEB 文件，创建 TAR 包..."
+        # 如果没有 DEB，创建 TAR 包
+        (cd "$output_dir" && tar -czf "../${PROJECT_NAME}-${VERSION}-Linux.tar.gz" .)
+        print_success "Linux TAR 包构建完成: ${PROJECT_NAME}-${VERSION}-Linux.tar.gz"
+    fi
+    
+    # 创建 AppImage（如果支持）
+    print_info "尝试创建 AppImage..."
+    if command -v appimagetool &> /dev/null; then
+        # 查找可执行文件
+        local executable=$(find "$output_dir" -name "KReader" -type f -executable | head -1)
+        if [ -f "$executable" ]; then
+            # 创建 AppImage 目录结构
+            local appimage_dir="$BUILD_DIR/appimage"
+            mkdir -p "$appimage_dir"
+            cp -R "$output_dir/"* "$appimage_dir/"
+            
+            # 创建 .desktop 文件
+            cat > "$appimage_dir/KReader.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=KReader
+Comment=A PDF and document reader application
+Exec=KReader
+Icon=KReader
+Categories=Office;Viewer;
+Terminal=false
+EOF
+            
+            # 创建 AppRun 文件
+            cat > "$appimage_dir/AppRun" << 'EOF'
+#!/bin/bash
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "\$HERE/KReader" "\$@"
+EOF
+            chmod +x "$appimage_dir/AppRun"
+            
+            # 创建 AppImage
+            appimagetool "$appimage_dir" "$BUILD_DIR/${PROJECT_NAME}-${VERSION}-Linux.AppImage"
+            print_success "Linux AppImage 构建完成: ${PROJECT_NAME}-${VERSION}-Linux.AppImage"
+        else
+            print_warning "未找到可执行文件，跳过 AppImage 创建"
+        fi
+    else
+        print_warning "未找到 appimagetool，跳过 AppImage 创建"
+        print_info "要创建 AppImage，请安装 appimagetool:"
+        print_info "  wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+        print_info "  chmod +x appimagetool-x86_64.AppImage"
+        print_info "  sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool"
+    fi
+}
+
 # 创建 DMG 文件（仅 macOS）
 create_dmg() {
     if [[ "$OS_TYPE" != "macos" ]]; then
@@ -261,6 +347,7 @@ show_help() {
     echo "  intel             构建 Intel 包（含运行时 + 仅x64 dylib）[仅 macOS]"
     echo "  arm               构建 ARM 包（含运行时 + 仅aarch64 dylib）[仅 macOS]"
     echo "  windows           构建 Windows 包（含运行时 + x64 dll）[仅 Windows]"
+    echo "  linux             构建 Linux 包（含运行时 + x64 so）[仅 Linux]"
     echo "  platform-specific 构建当前平台的包（自动检测架构和系统）"
     echo "  all               构建所有适用于当前系统的包"
     echo "  help              显示此帮助信息"
@@ -269,6 +356,7 @@ show_help() {
     echo "  $0 all               # 构建所有适用包"
     echo "  $0 universal         # 只构建 Universal 包（macOS）"
     echo "  $0 windows           # 只构建 Windows 包（Windows）"
+    echo "  $0 linux             # 只构建 Linux 包（Linux）"
     echo "  $0 intel arm         # 构建 Intel 和 ARM 包（macOS）"
     echo "  $0 platform-specific # 构建当前平台的包"
     echo ""
@@ -277,6 +365,7 @@ show_help() {
     echo "  - 平台特定包包含运行时，开箱即用"
     echo "  - Windows 包生成 MSI 安装程序或 ZIP 压缩包"
     echo "  - macOS 包生成 DMG 磁盘映像"
+    echo "  - Linux 包生成 DEB 包或 TAR 压缩包"
 }
 
 # 显示构建结果
@@ -305,6 +394,30 @@ show_results() {
         if [ -f "$zip" ]; then
             local size=$(du -h "$zip" | cut -f1)
             echo "  📦 $(basename "$zip") (${size})"
+        fi
+    done
+    
+    # 显示 DEB 文件（Linux）
+    for deb in "$BUILD_DIR"/*.deb; do
+        if [ -f "$deb" ]; then
+            local size=$(du -h "$deb" | cut -f1)
+            echo "  📦 $(basename "$deb") (${size})"
+        fi
+    done
+    
+    # 显示 TAR 文件（Linux 备选）
+    for tar in "$BUILD_DIR"/*.tar.gz; do
+        if [ -f "$tar" ]; then
+            local size=$(du -h "$tar" | cut -f1)
+            echo "  📦 $(basename "$tar") (${size})"
+        fi
+    done
+    
+    # 显示 AppImage 文件（Linux）
+    for appimage in "$BUILD_DIR"/*.AppImage; do
+        if [ -f "$appimage" ]; then
+            local size=$(du -h "$appimage" | cut -f1)
+            echo "  📦 $(basename "$appimage") (${size})"
         fi
     done
     
@@ -339,6 +452,9 @@ main() {
             windows)
                 build_windows
                 ;;
+            linux)
+                build_linux
+                ;;
             platform-specific)
                 # 构建当前平台的包
                 if [[ "$OS_TYPE" == "macos" ]]; then
@@ -350,6 +466,8 @@ main() {
                     fi
                 elif [[ "$OS_TYPE" == "windows" ]]; then
                     build_windows
+                elif [[ "$OS_TYPE" == "linux" ]]; then
+                    build_linux
                 fi
                 ;;
             all)
@@ -359,6 +477,8 @@ main() {
                     build_platform_specific "aarch64" "ARM"
                 elif [[ "$OS_TYPE" == "windows" ]]; then
                     build_windows
+                elif [[ "$OS_TYPE" == "linux" ]]; then
+                    build_linux
                 fi
                 ;;
             *)
