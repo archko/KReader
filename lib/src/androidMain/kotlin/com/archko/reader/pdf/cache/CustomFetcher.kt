@@ -122,7 +122,7 @@ public class CustomImageFetcher(
                 )
 
                 // 特效 B: 添加淡淡的投影
-                setShadowLayer(12f, 6f, 6f, Color.argb(80, 0, 0, 0))
+                setShadowLayer(10f, 6f, 6f, Color.argb(70, 0, 0, 0))
             }
 
             // 4. 绘制文字

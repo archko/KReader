@@ -579,60 +579,52 @@ private fun RecentItem(
                 .fillMaxWidth()
                 .aspectRatio(1.0f / 1.3f)
         ) {
-            val leftBorder = 15.dp
-            val topBorder = 10.dp
+            val leftWidth = 15.dp  // 书脊宽度
+            val topHeight = 10.dp  // 顶部厚度
 
+            // 1. 底层封面图：向下和向右偏移，留出位置
             AsyncImage(
-                model = recent.path?.let {
-                    CustomImageData(
-                        getAbsolutePath(it),
-                        (160),
-                        (200)
-                    )
-                },
+                model = recent.path?.let { CustomImageData(getAbsolutePath(it), 160, 200) },
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .matchParentSize() // 占满父容器
-                    .padding(start = leftBorder, top = topBorder), // 留出装饰条位置
+                    .matchParentSize()
+                    .padding(start = leftWidth, top = topHeight),
                 alignment = Alignment.Center
             )
 
-            // 2. 顶部装饰
-            Row(
+            // 2. 顶部厚度条
+            Image(
+                painter = painterResource(Res.drawable.components_thumbnail_top),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds, // 强制填满容器，防止缩放缝隙
                 modifier = Modifier
-                    .align(Alignment.TopStart)
+                    .align(Alignment.TopEnd) // 靠右对齐
                     .fillMaxWidth()
-                    .height(topBorder)
-            ) {
-                Image(
-                    painter = painterResource(Res.drawable.components_thumbnail_corner),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier
-                        .size(leftBorder, topBorder)
-                        .offset(x = 0.7.dp)
-                )
-                Image(
-                    painter = painterResource(Res.drawable.components_thumbnail_top),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .weight(1f) // 自动填充剩余宽度
-                        .height(topBorder)
-                )
-            }
+                    .height(topHeight)
+                    .padding(start = leftWidth) // 给左侧“角”留出位置
+            )
 
-            // 3. 左侧装饰条
+            // 3. 左侧书脊条
             Image(
                 painter = painterResource(Res.drawable.components_thumbnail_left),
                 contentDescription = null,
-                contentScale = ContentScale.FillHeight,
+                contentScale = ContentScale.FillBounds, // 强制填满容器
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .width(leftBorder)
+                    .align(Alignment.BottomStart) // 靠下对齐
+                    .width(leftWidth)
                     .fillMaxHeight()
-                    .padding(top = topBorder)
+                    .padding(top = topHeight) // 给顶部“角”留出位置
+            )
+
+            // 4. 关键的“角”图片：不使用 offset，直接放在左上角，并确保大小与两条边完全一致
+            Image(
+                painter = painterResource(Res.drawable.components_thumbnail_corner),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds, // 关键：让图片拉伸填满这块小正方形/长方形
+                modifier = Modifier
+                    .size(width = leftWidth, height = topHeight)
+                    .align(Alignment.TopStart)
             )
 
             // 4. 页码进度

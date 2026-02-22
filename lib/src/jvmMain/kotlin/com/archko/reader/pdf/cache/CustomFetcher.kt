@@ -109,7 +109,7 @@ public class CustomImageFetcher(
                 0f, 0f, Color(0xF5F5F5),
                 width.toFloat(), height.toFloat(), Color.WHITE
             )
-            g2.setPaint(bgGradient)
+            g2.paint = bgGradient
             g2.fillRect(0, 0, width, height)
 
             // 3. 绘制书脊阴影折痕
@@ -138,7 +138,7 @@ public class CustomImageFetcher(
                 0f, height.toFloat() / 3, Color(0x424242),
                 0f, height.toFloat() * 1.5f / 2, Color(0x9E9E9E)
             )
-            g2.setPaint(textGradient)
+            g2.paint = textGradient
             g2.drawString(text, x.toFloat(), y.toFloat())
 
             // 5. 绘制底部的“作者名”横线
