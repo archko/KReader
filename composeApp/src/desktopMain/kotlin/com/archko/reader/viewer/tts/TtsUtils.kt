@@ -24,10 +24,12 @@ class TtsUtils {
                     // ProcessBuilder("taskkill", "/F", "/IM", "powershell.exe").start()
                 } else {
                     // macOS: 终止所有 say 进程
-                    ProcessBuilder("pkill", "say").start().waitFor()
+                    ProcessBuilder("pkill", "-9", "say").start().waitFor()
 
                     // 如果 pkill 不工作，尝试 killall
                     ProcessBuilder("killall", "say").start().waitFor()
+                    // 尝试清理可能导致 -108 错误的系统语音守护进程
+                    ProcessBuilder("pkill", "-9", "com.apple.speech.speechsynthesisd").start().waitFor()
                 }
                 println("TTS: Force killed all TTS processes")
             } catch (e: Exception) {
@@ -322,13 +324,7 @@ class TtsUtils {
                 // Windows: 创建新的进程组，当父进程退出时子进程也会退出
                 processBuilder.environment()["CREATE_NEW_PROCESS_GROUP"] = "true"
             } else {
-                // macOS/Linux: 设置进程组，使子进程在父进程退出时收到 SIGHUP
-                // 这里我们通过 shell 包装来确保进程能被正确清理
-                val wrappedCommand = arrayOf(
-                    "sh", "-c",
-                    "trap 'kill 0' TERM; ${command.joinToString(" ")} & wait"
-                )
-                return ProcessBuilder(*wrappedCommand).start()
+                return processBuilder.start()
             }
 
             return processBuilder.start()

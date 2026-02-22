@@ -25,6 +25,8 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
+// 如果语音又不可以了,sudo killall com.apple.speech.speechsynthesisd或
+//重启服务 sudo launchctl kickstart -k system/com.apple.audio.coreaudiod
 @OptIn(DelicateCoroutinesApi::class)
 class TtsQueueService : SpeechService {
     private var rate: Float = 0.20f
