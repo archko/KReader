@@ -1,6 +1,8 @@
 package com.archko.reader.pdf.component
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector2D
+import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,10 +38,9 @@ import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
 import com.archko.reader.pdf.util.ViewUtils
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 private const val max_zoom = 30f
 
@@ -300,6 +301,13 @@ public fun DocumentView(
         if (!isJumping) {
             ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
         }
+
+        /*snapshotFlow { offset }
+            .collectLatest { targetOffset ->
+                delay(16L)
+                //println("DocumentView.snapshotFlow:$offset")
+                pageViewState.updateOffset(targetOffset)
+            }*/
     }
 
     // 获取生命周期所有者
@@ -368,47 +376,29 @@ public fun DocumentView(
 
     // 优化的 Fling 执行器
     fun performFling(velocity: Velocity, viewSize: IntSize, pageViewState: PageViewState) {
-        val decay = exponentialDecay<Float>(
+        val decay = exponentialDecay<Offset>(
             frictionMultiplier = 0.35f, // (摩擦系数) 作用：它决定了减速度的大小。数值越大，摩擦力越大，速度降得越快，滑动距离越短。
             absVelocityThreshold = 0.50f //(绝对速度阈值) 作用：它定义了动画“停止”的临界点。当滑动速度降到这个值以下时，动画会立即结束（不再继续计算微小的位移）。
         )
 
+        val velocity = Offset(velocity.x * 1.1f, velocity.y * 1.1f)
         flingJob = scope.launch {
-            val animX = Animatable(offset.x)
-            val animY = Animatable(offset.y)
+            val animatable = Animatable(
+                initialValue = offset,
+                typeConverter = OffsetToVector
+            )
 
-            launch {
-                animX.animateDecay(velocity.x * 1.1f, decay) {
-                    val boundOffset = calculateBounds(
-                        Offset(value, offset.y),
-                        vZoom,
-                        viewSize,
-                        pageViewState,
-                        orientation
-                    )
-                    if (abs(value - boundOffset.x) > 0.5f) {
-                        this@launch.cancel() // 撞边停止
-                    }
-                    offset = Offset(boundOffset.x, offset.y)
-                    pageViewState.updateOffset(offset)
-                }
-            }
-
-            launch {
-                animY.animateDecay(velocity.y * 1.1f, decay) {
-                    val boundOffset = calculateBounds(
-                        Offset(offset.x, value),
-                        vZoom,
-                        viewSize,
-                        pageViewState,
-                        orientation
-                    )
-                    if (abs(value - boundOffset.y) > 0.5f) {
-                        this@launch.cancel() // 撞边停止
-                    }
-                    offset = Offset(offset.x, boundOffset.y)
-                    pageViewState.updateOffset(offset)
-                }
+            animatable.animateDecay(velocity, decay) {
+                val boundOffset = calculateBounds(
+                    value,
+                    vZoom,
+                    viewSize,
+                    pageViewState,
+                    orientation
+                )
+                offset = boundOffset
+                //println("DocumentView.animateDecay:$offset")
+                pageViewState.updateOffset(offset)
             }
         }
     }
@@ -798,3 +788,8 @@ private fun calculateBounds(
         targetOffset.y.coerceIn(minY, 0f)
     )
 }
+
+private val OffsetToVector: TwoWayConverter<Offset, AnimationVector2D> = TwoWayConverter(
+    convertFromVector = { Offset(it.v1, it.v2) },
+    convertToVector = { AnimationVector2D(it.x, it.y) }
+)
