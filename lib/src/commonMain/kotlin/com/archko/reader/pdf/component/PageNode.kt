@@ -266,9 +266,9 @@ public class PageNode(
             }
 
             val decodeTask = DecodeTask(
-                type = DecodeTask.TaskType.NODE,
+                type = TaskType.NODE,
                 pageIndex = aPage.index,
-                decodeKey = currentKey,
+                key = currentKey,
                 aPage = aPage,
                 zoom = scale,
                 pageSliceBounds = srcRect,

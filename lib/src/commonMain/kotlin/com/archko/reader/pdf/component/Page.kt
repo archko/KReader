@@ -270,9 +270,9 @@ public class Page(
             }
 
             val decodeTask = DecodeTask(
-                type = DecodeTask.TaskType.PAGE,
+                type = TaskType.PAGE,
                 pageIndex = aPage.index,
-                decodeKey = cacheKey,
+                key = cacheKey,
                 aPage = aPage,
                 zoom = 1f,
                 bounds,
