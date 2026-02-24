@@ -18,8 +18,8 @@ import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
-import com.archko.reader.pdf.component.TileTask
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
@@ -702,14 +702,14 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     public override fun renderPageRegion(
-        task: TileTask,
+        task: DecodeTask,
         totalScale: Float
     ): ImageBitmap {
         // 1. 从对象池获取 Bitmap 并清空
         val bitmap: Bitmap = BitmapPool.acquire(task.width, task.height)
         bitmap.eraseColor(android.graphics.Color.WHITE)
 
-        decode(task.pageIndex, totalScale, bitmap,task.patchX, task.patchY,false)
+        decode(task.pageIndex, totalScale, bitmap,task.pageSliceBounds.left.toInt(), task.pageSliceBounds.top.toInt(),false)
 
         return bitmap.asImageBitmap()
     }

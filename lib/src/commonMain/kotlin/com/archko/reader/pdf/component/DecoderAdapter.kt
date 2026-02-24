@@ -151,9 +151,9 @@ public class DecoderAdapter(
         imageDecoder.aPageList?.forEachIndexed { index, aPage ->
             if (aPage.cropBounds == null) {
                 val task = DecodeTask(
-                    type = DecodeTask.TaskType.CROP,
+                    type = TaskType.CROP,
                     pageIndex = index,
-                    decodeKey = "crop-$index",
+                    key = "crop-$index",
                     aPage = aPage,
                     1f,
                     Rect(0f, 0f, 1f, 1f),

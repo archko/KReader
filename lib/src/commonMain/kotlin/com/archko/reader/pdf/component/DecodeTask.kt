@@ -11,20 +11,24 @@ import com.archko.reader.pdf.entity.APage
 public data class DecodeTask(
     public val type: TaskType,
     public val pageIndex: Int,
-    public val decodeKey: String,
+    public val key: String,
     public val aPage: APage,
     public val zoom: Float = 1f,
     public val pageSliceBounds: Rect,
     public val width: Int,
     public val height: Int,
     public val crop: Boolean = false,
-    public val callback: DecodeCallback? = null
+    public val callback: DecodeCallback? = null,
 ) {
-    public enum class TaskType {
-        PAGE,
-        NODE,
-        CROP
+    override fun toString(): String {
+        return "DecodeTask(type=$type, pageIndex=$pageIndex, key='$key', zoom=$zoom, pageSliceBounds=$pageSliceBounds, width=$width, height=$height, crop=$crop, aPage=$aPage)"
     }
+}
+
+public enum class TaskType {
+    PAGE,
+    NODE,
+    CROP
 }
 
 /**

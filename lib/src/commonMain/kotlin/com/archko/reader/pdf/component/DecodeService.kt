@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.component
 
+import com.archko.reader.pdf.cache.ImageCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -8,6 +9,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.Collections.synchronizedMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -38,6 +40,7 @@ public class DecodeService(
 
     private val decodeDispatcher = Dispatchers.Default.limitedParallelism(1)
     private val serviceScope = CoroutineScope(SupervisorJob() + decodeDispatcher)
+    private val pendingJobs = synchronizedMap(mutableMapOf<String, DecodeTask>())
 
     private var processingJob: Job? = null
     private var isShutdown = false
@@ -87,13 +90,18 @@ public class DecodeService(
         if (isShutdown) return
 
         when (task.type) {
-            DecodeTask.TaskType.PAGE -> pageTaskQueue.add(task)
-            DecodeTask.TaskType.NODE -> nodeTaskQueue.add(task)
-            DecodeTask.TaskType.CROP -> cropTaskQueue.add(task)
+            TaskType.PAGE -> pageTaskQueue.add(task)
+            TaskType.NODE -> nodeTaskQueue.add(task)
+            TaskType.CROP -> cropTaskQueue.add(task)
         }
+        pendingJobs[task.key] = task
 
         // 发出信号唤醒 taskProcessorLoop。trySend 是非阻塞原子操作。
         taskNotificationChannel.trySend(Unit)
+    }
+
+    public fun hasTask(key: String): Boolean {
+        return pendingJobs.contains(key)
     }
 
     /**
@@ -110,14 +118,31 @@ public class DecodeService(
         taskNotificationChannel.trySend(Unit)
     }
 
+    private fun hasCache(task: DecodeTask): Boolean {
+        if (task.type == TaskType.PAGE && ImageCache.hasPage(task.key)) {
+            return true
+        }
+        if (task.type == TaskType.NODE && ImageCache.hasNode(task.key)) {
+            return true
+        }
+        return false
+    }
+
     private suspend fun executeTask(task: DecodeTask) {
         if (isShutdown) return
 
+        if (hasCache(task)) {
+            pendingJobs.remove(task.key)
+            task.callback?.onFinish(task.pageIndex)
+            return
+        }
+
         // 执行前检查任务是否仍然需要渲染
         val shouldRender =
-            task.callback?.shouldRender(task.pageIndex, task.type == DecodeTask.TaskType.PAGE)
+            task.callback?.shouldRender(task.pageIndex, task.type == TaskType.PAGE)
                 ?: true
         if (!shouldRender) {
+            pendingJobs.remove(task.key)
             // 保证node的状态可以恢复
             task.callback.onFinish(task.pageIndex)
             //println("DecodeService.executeTask: 跳过不可见任务 - page: ${task.pageIndex}, type: ${task.type}")
@@ -126,17 +151,17 @@ public class DecodeService(
 
         try {
             when (task.type) {
-                DecodeTask.TaskType.PAGE -> {
+                TaskType.PAGE -> {
                     val bitmap = decoder.decodePage(task)
                     task.callback?.onDecodeComplete(bitmap, true, null)
                 }
 
-                DecodeTask.TaskType.NODE -> {
+                TaskType.NODE -> {
                     val bitmap = decoder.decodeNode(task)
                     task.callback?.onDecodeComplete(bitmap, false, null)
                 }
 
-                DecodeTask.TaskType.CROP -> {
+                TaskType.CROP -> {
                     val result = decoder.processCrop(task)
                     result?.let {
                         task.aPage.cropBounds = it.cropBounds
@@ -146,6 +171,8 @@ public class DecodeService(
         } catch (e: Exception) {
             println("DecodeService.executeTask error: ${e.message}")
             task.callback?.onDecodeComplete(null, false, e)
+        } finally {
+            pendingJobs.remove(task.key)
         }
     }
 
@@ -158,5 +185,6 @@ public class DecodeService(
         cropTaskQueue.clear()
         serviceScope.cancel()
         dispatchScope.shutdownNow()
+        pendingJobs.clear()
     }
 }

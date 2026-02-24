@@ -8,8 +8,8 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
+import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
-import com.archko.reader.pdf.component.TileTask
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
@@ -198,7 +198,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     }
 
     public override fun renderPageRegion(
-        task: TileTask,
+        task: DecodeTask,
         totalScale: Float
     ): ImageBitmap{
         return ImageBitmap(

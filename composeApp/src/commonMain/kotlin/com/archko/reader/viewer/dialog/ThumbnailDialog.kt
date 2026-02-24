@@ -47,6 +47,7 @@ import com.archko.reader.pdf.component.DecodeCallback
 import com.archko.reader.pdf.component.DecodeService
 import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.DecoderAdapter
+import com.archko.reader.pdf.component.TaskType
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import kreader.composeapp.generated.resources.Res
@@ -225,9 +226,9 @@ private fun ThumbnailItem(
 
         val loadJob = decodeScope.submit {
             val decodeTask = DecodeTask(
-                type = DecodeTask.TaskType.PAGE,
+                type = TaskType.PAGE,
                 pageIndex = index,
-                decodeKey = cacheKey,
+                key = cacheKey,
                 aPage = aPage,
                 zoom = 1f,
                 Rect(0f, 0f, 1f, 1f),

@@ -103,39 +103,20 @@ public class SimplePage(
     }
 }
 
-// 任务类型
-public enum class TileType { PAGE, NODE }
-
-public data class TileTask(
-    val key: String,
-    val pageIndex: Int,
-    val node: SimpleNode?,
-    val type: TileType,
-    val width: Int,
-    val height: Int,
-    val totalScale: Float,
-    val patchX: Int, // 该 node 在缩放后页面中的像素 X 偏移
-    val patchY: Int  // 该 node 在缩放后页面中的像素 Y 偏移
-) {
-    override fun toString(): String {
-        return "TileTask(pageIndex=$pageIndex, type=$type, width=$width, height=$height, key='$key')"
-    }
-}
-
 public class DecoderService(
     private val scope: CoroutineScope,
     private val decoder: ImageDecoder,
     private val onTileDecoded: (String) -> Unit // 解码完成的回调){}
 ) {
     private val decoderDispatcher = Dispatchers.Default.limitedParallelism(1)
-    private val taskChannel = Channel<TileTask>(Channel.UNLIMITED)
+    private val taskChannel = Channel<DecodeTask>(Channel.UNLIMITED)
     private val runningJobs = synchronizedMap(mutableMapOf<String, Job>())
 
     init {
         scope.launch(decoderDispatcher) {
             for (task in taskChannel) {
                 val job = runningJobs[task.key] ?: continue
-                if (job.isCancelled){
+                if (job.isCancelled) {
                     runningJobs.remove(task.key)
                     continue
                 }
@@ -146,7 +127,7 @@ public class DecoderService(
         }
     }
 
-    public fun requestDecode(task: TileTask) {
+    public fun requestDecode(task: DecodeTask) {
         if (hasCache(task)) return
         if (runningJobs.contains(task.key)) return
 
@@ -155,11 +136,11 @@ public class DecoderService(
         taskChannel.trySend(task)
     }
 
-    private fun hasCache(task: TileTask): Boolean {
-        if (task.type == TileType.PAGE && ImageCache.hasPage(task.key)) {
+    private fun hasCache(task: DecodeTask): Boolean {
+        if (task.type == TaskType.PAGE && ImageCache.hasPage(task.key)) {
             return true
         }
-        if (task.type == TileType.NODE && ImageCache.hasNode(task.key)) {
+        if (task.type == TaskType.NODE && ImageCache.hasNode(task.key)) {
             return true
         }
         return false
@@ -174,7 +155,7 @@ public class DecoderService(
         }
     }
 
-    private suspend fun decode(task: TileTask) {
+    private suspend fun decode(task: DecodeTask) {
         if (hasCache(task)) {
             withContext(Dispatchers.Main) {
                 onTileDecoded(task.key)
@@ -182,8 +163,8 @@ public class DecoderService(
             return
         }
         val start = System.currentTimeMillis()
-        val bitmap = if (task.type == TileType.PAGE) {
-            decoder.renderPageRegion(task, task.totalScale)
+        val bitmap = if (task.type == TaskType.PAGE) {
+            decoder.renderPageRegion(task, task.zoom)
             /*val imageBitmap = ImageBitmap(task.width, task.height)
             val canvas = Canvas(imageBitmap)
             val paint = Paint().apply {
@@ -201,7 +182,7 @@ public class DecoderService(
             imageBitmap*/
         } else {
             // 这里需要用到上面修改的 renderPageRegion
-            decoder.renderPageRegion(task, task.totalScale)
+            decoder.renderPageRegion(task, task.zoom)
             /*delay(10)
             val imageBitmap = ImageBitmap(task.width, task.height)
             val canvas = Canvas(imageBitmap)
@@ -221,7 +202,7 @@ public class DecoderService(
         }
 
         // 存入缓存
-        if (task.type == TileType.PAGE) {
+        if (task.type == TaskType.PAGE) {
             ImageCache.putPage(task.key, bitmap)
         } else {
             ImageCache.putNode(task.key, bitmap)
@@ -439,16 +420,15 @@ public fun TiledDocumentViewer(
                 val thumbHeight = (aPage.getHeight(false) * thumbScale).toInt()
 
                 state.decoder.requestDecode(
-                    TileTask(
-                        key = pageKey,
+                    DecodeTask(
+                        type = TaskType.PAGE,
                         pageIndex = page.index,
-                        node = null,
-                        type = TileType.PAGE,
+                        key = pageKey,
                         width = thumbWidth,
                         height = thumbHeight,
-                        totalScale = thumbScale,
-                        patchX = 0,
-                        patchY = 0
+                        zoom = thumbScale,
+                        aPage = state.aPages[page.index],
+                        pageSliceBounds = Rect(0f, 0f, 0f, 0f)
                     )
                 )
             }
@@ -460,20 +440,19 @@ public fun TiledDocumentViewer(
                 visibleKeys.add(nodeKey)
                 if (!ImageCache.hasNode(nodeKey)) {
                     // node.rect 现在是基础逻辑坐标，需要乘以 renderZoom 得到物理像素
-                    val pdfX = (node.rect.left * state.renderZoom).toInt()
-                    val pdfY = (node.rect.top * state.renderZoom).toInt()
+                    val pdfX = (node.rect.left * state.renderZoom)
+                    val pdfY = (node.rect.top * state.renderZoom)
                     state.decoder.requestDecode(
-                        TileTask(
-                            key = nodeKey,
+                        DecodeTask(
+                            type = TaskType.NODE,
                             pageIndex = page.index,
-                            node = node,
-                            type = TileType.NODE,
+                            key = nodeKey,
                             // 物理像素大小 = 基础逻辑尺寸 * renderZoom
                             width = (node.rect.width * state.renderZoom).toInt(),
                             height = (node.rect.height * state.renderZoom).toInt(),
-                            totalScale,
-                            pdfX,
-                            pdfY,
+                            zoom = totalScale,
+                            aPage = state.aPages[page.index],
+                            pageSliceBounds = Rect(pdfX, pdfY, 0f, 0f)
                         )
                     )
                 }

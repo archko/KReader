@@ -3,8 +3,8 @@ package com.archko.reader.pdf.decoder.internal
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
+import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
-import com.archko.reader.pdf.component.TileTask
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
@@ -60,7 +60,7 @@ public interface ImageDecoder {
     ): ImageBitmap
 
     public fun renderPageRegion(
-        task: TileTask,
+        task: DecodeTask,
         totalScale: Float
     ): ImageBitmap
 
