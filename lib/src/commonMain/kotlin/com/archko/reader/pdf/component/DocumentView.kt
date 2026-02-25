@@ -15,6 +15,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -301,13 +303,6 @@ public fun DocumentView(
         if (!isJumping) {
             ViewUtils.firstPage(pageViewState, offset, orientation, viewSize, onPageChanged)
         }
-
-        /*snapshotFlow { offset }
-            .collectLatest { targetOffset ->
-                delay(16L)
-                //println("DocumentView.snapshotFlow:$offset")
-                pageViewState.updateOffset(targetOffset)
-            }*/
     }
 
     // 获取生命周期所有者
@@ -474,14 +469,6 @@ public fun DocumentView(
             },
         contentAlignment = Alignment.TopStart
     ) {
-        var renderTrigger by remember { mutableIntStateOf(0) }
-
-        LaunchedEffect(pageViewState.renderFlow, Unit) {
-            pageViewState.renderFlow.collect {
-                //println("收到渲染更新通知")
-                renderTrigger++
-            }
-        }
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -703,17 +690,22 @@ public fun DocumentView(
                         }
                     }
                 }
+                .graphicsLayer {
+                    // graphicsLayer 中读取 offset，只触发绘图层位移，不触发 Recomposition
+                    translationX = offset.x
+                    translationY = offset.y
+                }
         ) {
             //居中绘制不够屏幕高宽
-            val centerOffsetX =
+            /*val centerOffsetX =
                 if (orientation == Horizontal && pageViewState.totalWidth < viewSize.width) {
                     (viewSize.width - pageViewState.totalWidth) / 2
                 } else 0f
             val centerOffsetY =
                 if (orientation == Vertical && pageViewState.totalHeight < viewSize.height) {
                     (viewSize.height - pageViewState.totalHeight) / 2
-                } else 0f
-            translate(left = offset.x + centerOffsetX, top = offset.y + centerOffsetY) {
+                } else 0f*/
+            //translate(left = offset.x + centerOffsetX, top = offset.y + centerOffsetY) {
                 pageViewState.drawVisiblePages(this, offset, vZoom)
 
                 if (isTextSelecting && selectionStartPos != null && selectionEndPos != null) {
@@ -730,7 +722,7 @@ public fun DocumentView(
                         size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
                     )
                 }
-            }
+            //}
         }
     }
 
