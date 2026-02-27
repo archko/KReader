@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -122,7 +123,7 @@ fun ThumbnailDialog(
                 }
 
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(160.dp),
                     modifier = Modifier
                         .fillMaxSize(),
                     state = gridState,
@@ -159,7 +160,7 @@ private fun ThumbnailItem(
     val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
         aPage.width,
         aPage.height,
-        baseSize = 240
+        baseSize = 200
     )
 
     val cacheKey = "thumb-${index}-${thumbWidth}x${thumbHeight}"
@@ -169,8 +170,8 @@ private fun ThumbnailItem(
     val isDisposed = remember { mutableStateOf(false) }
 
     val itemModifier = Modifier
-        .fillMaxWidth()
-        .height(140.dp)
+        .width(160.dp)
+        .height(200.dp)
         .clickable(onClick = onClick)
         .then(
             if (isSelected) {
