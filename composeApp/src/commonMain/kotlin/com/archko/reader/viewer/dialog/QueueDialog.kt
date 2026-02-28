@@ -99,7 +99,7 @@ fun QueueDialog(
                         state = listState,
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(
-                            horizontal = 8.dp,
+                            horizontal = 12.dp,
                             vertical = 8.dp
                         )
                     ) {

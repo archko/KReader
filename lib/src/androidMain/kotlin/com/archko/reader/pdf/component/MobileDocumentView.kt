@@ -3,11 +3,7 @@ package com.archko.reader.pdf.component
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -20,7 +16,7 @@ import com.archko.reader.pdf.state.AnnotationManager
 @Composable
 public fun MobileDocumentView(
     list: MutableList<APage>,
-    state: ImageDecoder,
+    decoder: ImageDecoder,
     jumpToPage: Int? = null,
     jumpMode: JumpMode = JumpMode.PageRestore,
     initialOrientation: Int,
@@ -44,7 +40,7 @@ public fun MobileDocumentView(
     // 创建文档视图状态
     val stateHolder = rememberDocumentViewState(
         list = list,
-        state = state,
+        decoder = decoder,
         initialScrollX = initialScrollX,
         initialScrollY = initialScrollY,
         initialZoom = initialZoom,
@@ -59,7 +55,7 @@ public fun MobileDocumentView(
     // 创建文本选择器
     val textSelector = remember {
         createTextSelector(currentPath) { pageIndex ->
-            val structuredText = state.getStructuredText(pageIndex)
+            val structuredText = decoder.getStructuredText(pageIndex)
             if (structuredText != null) {
                 createStructuredTextImpl(currentPath, structuredText)
             } else {
@@ -104,14 +100,6 @@ public fun MobileDocumentView(
             },
         contentAlignment = androidx.compose.ui.Alignment.TopStart
     ) {
-        var renderTrigger by remember { mutableIntStateOf(0) }
-
-        LaunchedEffect(stateHolder.pageViewState.renderFlow, Unit) {
-            stateHolder.pageViewState.renderFlow.collect {
-                renderTrigger++
-            }
-        }
-
         // 统一的手势处理器
         CommonGestureHandler(
             state = stateHolder,

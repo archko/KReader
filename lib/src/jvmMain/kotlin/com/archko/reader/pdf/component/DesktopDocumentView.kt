@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -43,7 +41,7 @@ import kotlin.math.min
 @Composable
 public fun DesktopDocumentView(
     list: MutableList<APage>,
-    state: ImageDecoder,
+    decoder: ImageDecoder,
     jumpToPage: Int? = null,
     jumpMode: JumpMode = JumpMode.PageRestore,
     initialOrientation: Int,
@@ -76,7 +74,7 @@ public fun DesktopDocumentView(
     // 创建文档视图状态（speakingPageIndex 传 null）
     val stateHolder = rememberDocumentViewState(
         list = list,
-        state = state,
+        decoder = decoder,
         initialScrollX = initialScrollX,
         initialScrollY = initialScrollY,
         initialZoom = initialZoom,
@@ -91,7 +89,7 @@ public fun DesktopDocumentView(
     // 创建文本选择器
     val textSelector = remember {
         createTextSelector(currentPath) { pageIndex ->
-            val structuredText = state.getStructuredText(pageIndex)
+            val structuredText = decoder.getStructuredText(pageIndex)
             if (structuredText != null) {
                 createStructuredTextImpl(currentPath, structuredText)
             } else {
@@ -392,14 +390,6 @@ public fun DesktopDocumentView(
             },
         contentAlignment = Alignment.TopStart
     ) {
-        var renderTrigger by remember { mutableIntStateOf(0) }
-
-        LaunchedEffect(stateHolder.pageViewState.renderFlow, Unit) {
-            stateHolder.pageViewState.renderFlow.collect {
-                renderTrigger++
-            }
-        }
-
         // 统一的手势处理器 + 桌面端扩展修饰符
         CommonGestureHandler(
             state = stateHolder,

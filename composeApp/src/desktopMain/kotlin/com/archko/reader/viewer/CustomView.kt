@@ -665,7 +665,7 @@ fun CustomView(
                     } else {
                         DesktopDocumentView(
                             list = list,
-                            state = decoder!!,
+                            decoder = decoder!!,
                             jumpToPage = jumpIntent.page,
                             jumpMode = jumpIntent.mode,
                             initialOrientation = orientation,

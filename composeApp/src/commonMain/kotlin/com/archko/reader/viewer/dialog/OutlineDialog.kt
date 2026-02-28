@@ -175,7 +175,7 @@ private fun OutlineTabContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                horizontal = 8.dp,
+                horizontal = 12.dp,
                 vertical = 8.dp
             ),
             state = lazyListState
@@ -192,7 +192,7 @@ private fun OutlineTabContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 1.dp)
+                        .padding(vertical = 2.dp)
                         .padding(start = (item.level * 8).dp)
                         .background(color = backgroundColor, shape = RoundedCornerShape(4.dp))
                         .clickable { onOutlineClick(item) }
@@ -243,7 +243,7 @@ private fun AnnotationTabContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                horizontal = 8.dp,
+                horizontal = 12.dp,
                 vertical = 8.dp
             )
         ) {
@@ -253,7 +253,7 @@ private fun AnnotationTabContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 1.dp)
+                                .padding(vertical = 4.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                     shape = RoundedCornerShape(4.dp)

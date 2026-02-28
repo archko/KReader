@@ -80,7 +80,7 @@ internal class DocumentViewState(
 @Composable
 internal fun rememberDocumentViewState(
     list: MutableList<APage>,
-    state: ImageDecoder,
+    decoder: ImageDecoder,
     initialScrollX: Long,
     initialScrollY: Long,
     initialZoom: Double,
@@ -112,7 +112,7 @@ internal fun rememberDocumentViewState(
     // 创建文本选择器 - 使用expect/actual模式
     val textSelector = remember {
         createTextSelector(currentPath) { pageIndex ->
-            val structuredText = state.getStructuredText(pageIndex)
+            val structuredText = decoder.getStructuredText(pageIndex)
             if (structuredText != null) {
                 createStructuredTextImpl(currentPath, structuredText)
             } else {
@@ -125,7 +125,7 @@ internal fun rememberDocumentViewState(
         println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PageViewState(
             list,
-            state,
+            decoder,
             annotationManager,
             orientation.intValue,
             crop,

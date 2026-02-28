@@ -42,7 +42,6 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
-import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.dialog.FontDialog
@@ -765,7 +764,7 @@ fun CustomView(
                 // 文档视图（最底层）
                 MobileDocumentView(
                     list = list,
-                    state = decoder!!,
+                    decoder = decoder!!,
                     jumpToPage = jumpIntent.page,
                     jumpMode = jumpIntent.mode,
                     initialOrientation = orientation,
