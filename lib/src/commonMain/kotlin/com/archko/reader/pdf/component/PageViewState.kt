@@ -531,16 +531,18 @@ public class PageViewState(
             return
         }
 
+        // 计算当前可见区域（包含预加载范围）
+        val visibleRect = Rect(
+            left = -offset.x,
+            top = -offset.y,
+            right = viewSize.width - offset.x,
+            bottom = viewSize.height - offset.y
+        )
+
+        val scaleRatio = currentVZoom / this.vZoom
+
         if (columnCount > 1) {
             // 多列布局：需要同时考虑水平和垂直方向的可见性
-            val scaleRatio = currentVZoom / this.vZoom
-            val visibleRect = Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = viewSize.width - offset.x,
-                bottom = viewSize.height - offset.y
-            )
-
             val tilesToRenderCopy = pages.filter { page ->
                 val scaledBounds = Rect(
                     left = page.bounds.left * scaleRatio,
@@ -557,12 +559,17 @@ public class PageViewState(
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->
                 val page = pages.getOrNull(key) ?: return@forEach
-                page.recycle()
+                page.clearVisibleNodes()
             }
             lastPageKeys = newPageKeys
 
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
+            }
+
+            // 更新每个可见页面的可见 nodes
+            tilesToRenderCopy.forEach { page ->
+                page.updateVisibleNodes(visibleRect, scaleRatio)
             }
             println("updateVisiblePages.multiColumn: visible=${tilesToRenderCopy.map { it.aPage.index }}")
         } else if (orientation == Vertical) {
@@ -570,6 +577,12 @@ public class PageViewState(
             val visibleBottom = viewSize.height - offset.y
             // 预加载区域：向下扩展一屏
             val preloadBottom = visibleBottom + viewSize.height * preloadScreens
+            val preloadRect = Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = viewSize.width - offset.x,
+                bottom = preloadBottom
+            )
 
             val first = findVerticalFirstVisible(visibleTop, currentVZoom)
             val last = findVerticalLastVisible(preloadBottom, currentVZoom)
@@ -587,21 +600,32 @@ public class PageViewState(
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->
                 val page = pages.getOrNull(key) ?: return@forEach
-                page.recycle()
+                page.clearVisibleNodes()
             }
             lastPageKeys = newPageKeys
 
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
             }
+
+            // 更新每个可见页面的可见 nodes
+            tilesToRenderCopy.forEach { page ->
+                page.updateVisibleNodes(preloadRect, scaleRatio)
+            }
         } else {
             val visibleLeft = -offset.x
             val visibleRight = viewSize.width - offset.x
             // 预加载区域：向右扩展一屏
             val preloadRight = visibleRight + viewSize.width * preloadScreens
+            val preloadRect = Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = preloadRight,
+                bottom = viewSize.height - offset.y
+            )
 
             val first = findHorizontalFirstVisible(visibleLeft, currentVZoom)
-            val last = findHorizontalLastVisible(preloadRight, currentVZoom) // 直接使用预加载范围
+            val last = findHorizontalLastVisible(preloadRight, currentVZoom)
 
             // pageToRender 包含可见页面 + 预加载页面
             val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
@@ -616,12 +640,17 @@ public class PageViewState(
             val toRemove = lastPageKeys - newPageKeys
             toRemove.forEach { key ->
                 val page = pages.getOrNull(key) ?: return@forEach
-                page.recycle()
+                page.clearVisibleNodes()
             }
             lastPageKeys = newPageKeys
 
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
+            }
+
+            // 更新每个可见页面的可见 nodes
+            tilesToRenderCopy.forEach { page ->
+                page.updateVisibleNodes(preloadRect, scaleRatio)
             }
         }
     }

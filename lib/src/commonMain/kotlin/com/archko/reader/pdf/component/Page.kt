@@ -36,9 +36,9 @@ public class Page(
     public var xOffset: Float = 0f
 ) {
     public var totalScale: Float = 1f
-    public var nodes: List<PageNode> = emptyList()
+    // 可见的 nodes 映射：(x, y) -> PageNode，按需创建
+    private val visibleNodes: MutableMap<Pair<Int, Int>, PageNode> = mutableMapOf()
     private var currentTileConfig: TileConfig? = null
-    private var needInvalidateNodes = true // 初始化为true，确保第一次draw时会重建nodes
 
     //page bound, should be caculate after view measured
     internal var bounds = Rect(0f, 0f, 1f, 1f)
@@ -361,64 +361,41 @@ public class Page(
         if (aspectRatio == 0f) {
             aspectRatio = width * 1.0f / height
         }
-        needInvalidateNodes = true
+        // 尺寸变化，重新计算节点配置
+        invalidateNodes()
     }
 
     private fun drawNodes(
         drawScope: DrawScope,
         currentWidth: Float,
         currentHeight: Float,
-        currentBounds: Rect,
-        visibleRect: Rect
+        currentBounds: Rect
     ) {
-        val config = currentTileConfig ?: run {
-            invalidateNodes()
-            currentTileConfig!!
+        val config = currentTileConfig
+
+        // 如果没有配置或没有可见nodes，不绘制
+        if (config == null || visibleNodes.isEmpty()) {
+            return
         }
 
         if (config.isSingleBlock) {
-            val currentNode = nodes[0]
-            // 绘制当前节点
-            currentNode.draw(
+            // 单块模式：只绘制 (0, 0) 节点
+            visibleNodes[Pair(0, 0)]?.draw(
                 drawScope,
                 currentWidth,
                 currentHeight,
                 currentBounds.left,
                 currentBounds.top,
             )
-
             return
         }
 
-        // 计算visible区域相对页面 [0,1]
-        val pageVisibleLeft = (visibleRect.left - currentBounds.left) / currentWidth
-        val pageVisibleRight = (visibleRect.right - currentBounds.left) / currentWidth
-        val pageVisibleTop = (visibleRect.top - currentBounds.top) / currentHeight
-        val pageVisibleBottom = (visibleRect.bottom - currentBounds.top) / currentHeight
+        // 分块模式：按行列顺序绘制可见的 nodes
+        val sortedNodes = visibleNodes.entries
+            .sortedBy { it.key.second * config.xBlocks + it.key.first }
+            .map { it.value }
 
-        // 计算覆盖的block x/y indices范围
-        val minBlockX =
-            floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
-        val maxBlockX =
-            ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
-        val minBlockY =
-            floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
-        val maxBlockY =
-            ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
-
-        val nodesToDraw = mutableListOf<PageNode>()
-        for (x in minBlockX..maxBlockX) {
-            for (y in minBlockY..maxBlockY) {
-                val nodeIndex = y * config.xBlocks + x
-                if (nodeIndex < nodes.size) {
-                    nodesToDraw.add(nodes[nodeIndex])
-                    //} else {
-                    //println("Page[${aPage.index}], nodeIndex:${nodeIndex}, nodes.size:${nodes.size}")
-                }
-            }
-        }
-
-        for (node in nodesToDraw) {
+        for (node in sortedNodes) {
             node.draw(
                 drawScope,
                 currentWidth,
@@ -489,11 +466,6 @@ public class Page(
         val currentWidth = width * scaleRatio
         val currentHeight = height * scaleRatio
 
-        if (nodes.isEmpty() || needInvalidateNodes) {
-            invalidateNodes()
-            needInvalidateNodes = false
-        }
-
         // 只有真正可见的页面才绘制缩略图和UI元素
         if (isActuallyVisible) {
             //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
@@ -512,7 +484,7 @@ public class Page(
             }
         }
 
-        drawNodes(drawScope, currentWidth, currentHeight, currentBounds, visibleRect)
+        drawNodes(drawScope, currentWidth, currentHeight, currentBounds)
 
         // 绘制分割线
         if (isActuallyVisible) {
@@ -740,11 +712,11 @@ public class Page(
         //println("Page.recycle:${aPage.index}, $width-$height, $yOffset")
         recycleThumb()
         clearTextSelection()
-        nodes.forEach { pageViewState.nodePool.release(it) }
-        nodes = emptyList()
+        // 清理所有可见 nodes
+        visibleNodes.values.forEach { pageViewState.nodePool.release(it) }
+        visibleNodes.clear()
         currentTileConfig = null
         aspectRatio = 0f
-        needInvalidateNodes = true
     }
 
     // 计算分块配置
@@ -754,6 +726,9 @@ public class Page(
         val isSingleBlock: Boolean get() = xBlocks == 1 && yBlocks == 1
     }
 
+    /**
+     * 只计算行列配置，不创建实际的 nodes
+     */
     public fun invalidateNodes() {
         val config = calculateTileConfig(width, height)
         //println("Page.invalidateNodes: currentConfig=$currentTileConfig, config=$config, ${aPage.index}, $width-$height, $yOffset")
@@ -761,45 +736,101 @@ public class Page(
             return
         }
 
-        // 先回收旧的nodes
-        val oldNodes = nodes
-
         // 保存当前配置
         currentTileConfig = config
 
-        // 如果是单个块，直接返回原始页面
+        // 配置变化，清空所有可见 nodes
+        visibleNodes.values.forEach { pageViewState.nodePool.release(it) }
+        visibleNodes.clear()
+    }
+
+    /**
+     * 根据可见区域按需创建/释放 nodes
+     * @param visibleRect 可见区域（屏幕坐标）
+     * @param scaleRatio 缩放比例
+     */
+    public fun updateVisibleNodes(visibleRect: Rect, scaleRatio: Float) {
+        val config = currentTileConfig ?: run {
+            invalidateNodes()
+            currentTileConfig!!
+        }
+
+        // 计算当前缩放下的页面边界
+        val currentBounds = Rect(
+            bounds.left * scaleRatio,
+            bounds.top * scaleRatio,
+            bounds.right * scaleRatio,
+            bounds.bottom * scaleRatio
+        )
+
+        // 单块模式：只有一个 node
         if (config.isSingleBlock) {
-            nodes =
-                listOf(pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage))
-            // 回收旧nodes
-            oldNodes.forEach { pageViewState.nodePool.release(it) }
+            val key = Pair(0, 0)
+            if (!visibleNodes.containsKey(key)) {
+                val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
+                visibleNodes[key] = node
+            }
+
+            // 清理其他可能的
+            val keysToRemove = visibleNodes.keys.filter { it != key }
+            keysToRemove.forEach { removeKey ->
+                visibleNodes.remove(removeKey)?.let { pageViewState.nodePool.release(it) }
+            }
             return
         }
 
-        // 创建分块节点，确保边界重叠以避免间隙
-        val newNodes = mutableListOf<PageNode>()
-        for (y in 0 until config.yBlocks) {
-            for (x in 0 until config.xBlocks) {
-                // 计算基础边界
-                val baseLeft = x / config.xBlocks.toFloat()
-                val baseTop = y / config.yBlocks.toFloat()
-                val baseRight = (x + 1) / config.xBlocks.toFloat()
-                val baseBottom = (y + 1) / config.yBlocks.toFloat()
+        // 分块模式：计算可见区域在页面中的相对位置 [0, 1]
+        val pageVisibleLeft = (visibleRect.left - currentBounds.left) / (width * scaleRatio)
+        val pageVisibleRight = (visibleRect.right - currentBounds.left) / (width * scaleRatio)
+        val pageVisibleTop = (visibleRect.top - currentBounds.top) / (height * scaleRatio)
+        val pageVisibleBottom = (visibleRect.bottom - currentBounds.top) / (height * scaleRatio)
 
-                val left = if (x == 0) baseLeft else baseLeft
-                val top = if (y == 0) baseTop else baseTop
-                val right = if (x == config.xBlocks - 1) baseRight else baseRight
-                val bottom = if (y == config.yBlocks - 1) baseBottom else baseBottom
+        // 计算需要可见的 block x/y indices 范围
+        val minBlockX = floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val maxBlockX = ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val minBlockY = floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+        val maxBlockY = ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
 
-                val rect = Rect(left, top, right, bottom)
-                newNodes.add(pageViewState.nodePool.acquire(pageViewState, rect, aPage))
-                //println("Page[${aPage.index}], scaled.w-h:$width-$height, , orignal:${aPage.getWidth(false)}-${aPage.getHeight(false)}, tile:$rect")
+        // 新的可见 nodes 集合
+        val newVisibleKeys = mutableSetOf<Pair<Int, Int>>()
+
+        for (y in minBlockY..maxBlockY) {
+            for (x in minBlockX..maxBlockX) {
+                val key = Pair(x, y)
+                newVisibleKeys.add(key)
+
+                // 按需创建 node
+                if (!visibleNodes.containsKey(key)) {
+                    val left = x / config.xBlocks.toFloat()
+                    val top = y / config.yBlocks.toFloat()
+                    val right = (x + 1) / config.xBlocks.toFloat()
+                    val bottom = (y + 1) / config.yBlocks.toFloat()
+                    val rect = Rect(left, top, right, bottom)
+
+                    val node = pageViewState.nodePool.acquire(pageViewState, rect, aPage)
+                    visibleNodes[key] = node
+                }
             }
         }
-        nodes = newNodes
-        // 回收旧nodes
-        oldNodes.forEach { pageViewState.nodePool.release(it) }
-        //println("Page[${aPage.index}] total nodes.count=${nodes.size}, xBlocks=${config.xBlocks}, yBlocks=${config.yBlocks}")
+        //println("updateVisibleNodes:${visibleNodes.size}")
+
+        // 清理不再可见的 nodes
+        val iterator = visibleNodes.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.key !in newVisibleKeys) {
+                pageViewState.nodePool.release(entry.value)
+                iterator.remove()
+            }
+        }
+    }
+
+    /**
+     * 清理可见 nodes（页面不再可见时调用）
+     */
+    public fun clearVisibleNodes() {
+        visibleNodes.values.forEach { pageViewState.nodePool.release(it) }
+        visibleNodes.clear()
     }
 
     override fun equals(other: Any?): Boolean {
@@ -813,7 +844,6 @@ public class Page(
         if (aPage != other.aPage) return false
         if (yOffset != other.yOffset) return false
         if (xOffset != other.xOffset) return false
-        if (nodes != other.nodes) return false
         if (bounds != other.bounds) return false
 
         return true
@@ -825,7 +855,6 @@ public class Page(
         result = 31 * result + aPage.hashCode()
         result = 31 * result + yOffset.hashCode()
         result = 31 * result + xOffset.hashCode()
-        result = 31 * result + nodes.hashCode()
         result = 31 * result + bounds.hashCode()
         return result
     }
