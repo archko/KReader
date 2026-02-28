@@ -53,7 +53,7 @@ public fun DesktopDocumentView(
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
-    initialZoom: Double = 1.0,
+    zoom: Double = 1.0,
     reflow: Long = 0,
     crop: Boolean = false,
     gestureMode: GestureMode = GestureMode.VIEW,
@@ -77,7 +77,7 @@ public fun DesktopDocumentView(
         decoder = decoder,
         initialScrollX = initialScrollX,
         initialScrollY = initialScrollY,
-        initialZoom = initialZoom,
+        initialZoom = zoom,
         initialOrientation = initialOrientation,
         crop = crop,
         columnCount = columnCount,
@@ -107,7 +107,7 @@ public fun DesktopDocumentView(
         initialOrientation = initialOrientation,
         initialScrollX = initialScrollX,
         initialScrollY = initialScrollY,
-        initialZoom = initialZoom,
+        initialZoom = zoom,
         reflow = reflow,
         crop = crop,
         speakingPageIndex = null,
@@ -116,6 +116,33 @@ public fun DesktopDocumentView(
         onCloseDocument = onCloseDocument,
         onPageChanged = onPageChanged,
     )
+
+    // 处理外部缩放变化
+    LaunchedEffect(zoom) {
+        if (zoom != stateHolder.vZoom.value) {
+            val centerX = stateHolder.viewSize.value.width / 2f
+            val centerY = stateHolder.viewSize.value.height / 2f
+            handleZoom(
+                zoom.toFloat(),
+                centerX,
+                centerY,
+                stateHolder.vZoom.value,
+                stateHolder.offset.value,
+                stateHolder.pageViewState,
+                stateHolder.viewSize.value,
+                stateHolder.orientation.value
+            ) { newOffset, newVZoom ->
+                stateHolder.offset.value = newOffset
+                stateHolder.vZoom.value = newVZoom
+                stateHolder.pageViewState.updateViewSize(
+                    stateHolder.viewSize.value,
+                    stateHolder.vZoom.value,
+                    stateHolder.orientation.value
+                )
+                stateHolder.pageViewState.updateOffset(newOffset)
+            }
+        }
+    }
 
     // 桌面端特有的键盘事件处理器
     val handleKeyboardEvent = { event: KeyEvent ->

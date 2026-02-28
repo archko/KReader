@@ -696,7 +696,7 @@ fun CustomView(
                             },
                             initialScrollX = initialScrollX,
                             initialScrollY = initialScrollY,
-                            initialZoom = vZoom,
+                            zoom = vZoom,
                             crop = isCrop,
                             gestureMode = gestureMode,
                             pathConfig = pathConfig,
