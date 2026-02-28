@@ -117,31 +117,16 @@ public fun DesktopDocumentView(
         onPageChanged = onPageChanged,
     )
 
-    // 处理外部缩放变化
+    // 监听外部zoom参数的变化，并更新内部vZoom
     LaunchedEffect(zoom) {
-        if (zoom != stateHolder.vZoom.value) {
-            val centerX = stateHolder.viewSize.value.width / 2f
-            val centerY = stateHolder.viewSize.value.height / 2f
-            handleZoom(
-                zoom.toFloat(),
-                centerX,
-                centerY,
-                stateHolder.vZoom.value,
-                stateHolder.offset.value,
-                stateHolder.pageViewState,
-                stateHolder.viewSize.value,
-                stateHolder.orientation.value
-            ) { newOffset, newVZoom ->
-                stateHolder.offset.value = newOffset
-                stateHolder.vZoom.value = newVZoom
-                stateHolder.pageViewState.updateViewSize(
-                    stateHolder.viewSize.value,
-                    stateHolder.vZoom.value,
-                    stateHolder.orientation.value
-                )
-                stateHolder.pageViewState.updateOffset(newOffset)
-            }
-        }
+        println("DesktopDocumentView: 新的zoom: $zoom, 旧的vZoom=${stateHolder.vZoom.value}")
+        stateHolder.vZoom.value = zoom.toFloat()
+
+        stateHolder.pageViewState.updateViewSize(
+            stateHolder.viewSize.value,
+            stateHolder.vZoom.value,
+            stateHolder.orientation.value
+        )
     }
 
     // 桌面端特有的键盘事件处理器
