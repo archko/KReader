@@ -307,7 +307,8 @@ public class Page(
                     }
 
                     override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                        return !pageViewState.isShutdown() && isPageInRenderList(pageNumber)
+                        // 优化：使用快速查找方法
+                        return !pageViewState.isShutdown() && pageViewState.isPageInVisibleList(pageNumber)
                     }
 
                     override fun onFinish(pageNumber: Int) {
@@ -319,10 +320,6 @@ public class Page(
             // 提交任务到DecodeService
             pageViewState.decodeService?.submitTask(decodeTask)
         }
-    }
-
-    private fun isPageInRenderList(pageNumber: Int): Boolean {
-        return pageViewState.pageToRender.any { it.aPage.index == pageNumber }
     }
 
     private fun isScopeActive(): Boolean {
@@ -429,7 +426,7 @@ public class Page(
         val isActuallyVisible = isPageVisible(visibleRect, currentBounds)
 
         // 如果页面不在可见区域且不在预加载列表中，直接返回
-        if (!isActuallyVisible && !isPageInRenderList(aPage.index)) {
+        if (!isActuallyVisible && !pageViewState.isPageInVisibleList(aPage.index)) {
             return
         }
 

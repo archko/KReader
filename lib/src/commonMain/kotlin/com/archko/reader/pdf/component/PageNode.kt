@@ -66,10 +66,11 @@ public class PageNode(
     ): Rect {
         // bounds是[0,1]的逻辑坐标，乘以pageWidth/pageHeight得到Node在Page中的像素尺寸
         // 然后加上xOffset/yOffset（Page在文档中的偏移）得到Node在文档中的绝对坐标
-        val left = floor(bounds.left * pageWidth + xOffset)
-        val top = floor(bounds.top * pageHeight + yOffset)
-        val right = ceil(bounds.right * pageWidth + xOffset)
-        val bottom = ceil(bounds.bottom * pageHeight + yOffset)
+        // 优化：减少 floor/ceil 调用，直接计算并转换为整数对齐
+        val left = (bounds.left * pageWidth + xOffset).toInt().toFloat()
+        val top = (bounds.top * pageHeight + yOffset).toInt().toFloat()
+        val right = (bounds.right * pageWidth + xOffset).toInt().toFloat()
+        val bottom = (bounds.bottom * pageHeight + yOffset).toInt().toFloat()
 
         return Rect(left, top, right, bottom)
     }
@@ -311,10 +312,8 @@ public class PageNode(
                             return false
                         }
 
-                        // 检查页面是否在当前可见页面列表中
-                        val isPageVisible =
-                            pageViewState.pageToRender.any { it.aPage.index == pageNumber }
-                        if (!isPageVisible) {
+                        // 优化：O(1) 快速检查页面是否在可见列表中
+                        if (!pageViewState.isPageInVisibleList(pageNumber)) {
                             return false
                         }
 

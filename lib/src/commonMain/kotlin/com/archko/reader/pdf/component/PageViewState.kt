@@ -654,6 +654,14 @@ public class PageViewState(
             }
         }
     }
+    
+    /**
+     * 可见,有可能是预加载
+     * 优化：O(1) 快速检查页面是否在可见列表中
+     */
+    public fun isPageInVisibleList(pageIndex: Int): Boolean {
+        return lastPageKeys.contains(pageIndex)
+    }
 
     public fun updateOffset(newOffset: Offset) {
         if (viewOffset != newOffset) {
