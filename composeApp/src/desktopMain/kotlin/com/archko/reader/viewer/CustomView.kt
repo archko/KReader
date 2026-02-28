@@ -17,6 +17,8 @@ import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.DesktopDocumentView
 import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
+import com.archko.reader.pdf.component.JumpIntent
+import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
@@ -557,8 +559,21 @@ fun CustomView(
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
             val pageCount: Int = list.size
-            // 跳转页面状态
-            var jumpToPage by remember { mutableIntStateOf(progressPage ?: -1) }
+
+            var jumpIntent by remember {
+                mutableStateOf(
+                    when {
+                        progressPage != null && (initialScrollX != 0L || initialScrollY != 0L) ->
+                            JumpIntent(progressPage, JumpMode.PageRestore)
+
+                        progressPage != null ->
+                            JumpIntent(progressPage, JumpMode.PageNavigation)
+
+                        else -> JumpIntent(0, JumpMode.PageRestore)
+                    }
+                )
+            }
+
             var columnCount by remember { mutableIntStateOf(1) }
 
             val annotationManager = remember(paths) {
@@ -614,7 +629,7 @@ fun CustomView(
                 if (showQueueDialog) {
                     QueueDialog(
                         decoder!!.cacheBean,
-                        currentSpeakingPage = jumpToPage.toString(),
+                        currentSpeakingPage = jumpIntent.page.toString(),
                         count = 30,
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->
@@ -624,7 +639,7 @@ fun CustomView(
                             reflowBean.page?.let { pageStr ->
                                 val targetPage = pageStr.toIntOrNull() ?: 0
                                 // 跳转到目标页面
-                                jumpToPage = targetPage
+                                jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
 
                                 scope.launch {
                                     speechService.stop()
@@ -651,7 +666,8 @@ fun CustomView(
                         DesktopDocumentView(
                             list = list,
                             state = decoder!!,
-                            jumpToPage = jumpToPage,
+                            jumpToPage = jumpIntent.page,
+                            jumpMode = jumpIntent.mode,
                             initialOrientation = orientation,
                             columnCount = columnCount,
                             onSaveDocument = onSaveDocument,
@@ -712,11 +728,11 @@ fun CustomView(
                             outlineList,
                             annotationManager,
                             onOutlineClick = { item ->
-                                jumpToPage = item.page
+                                jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
                                 showOutlineDialog = false
                             },
                             onAnnotationClick = { pageIndex ->
-                                jumpToPage = pageIndex
+                                jumpIntent = JumpIntent(pageIndex, JumpMode.PageNavigation)
                                 showOutlineDialog = false
                             },
                             onDismiss = { showOutlineDialog = false },
@@ -761,7 +777,7 @@ fun CustomView(
                                         if (!isExternalChange) {
                                             val targetPage = sliderValue.toInt() - 1
                                             if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                                jumpToPage = targetPage
+                                                jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
                                             }
                                         }
                                     },
@@ -803,7 +819,7 @@ fun CustomView(
                             list,
                             decoder!!,
                             onPageClick = { page ->
-                                jumpToPage = page
+                                jumpIntent = JumpIntent(page, JumpMode.PageNavigation)
                                 showThumbnailDialog = false
                             },
                             onDismiss = { showThumbnailDialog = false },

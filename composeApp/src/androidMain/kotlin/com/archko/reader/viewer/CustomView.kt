@@ -25,11 +25,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ReflowCacheLoader
-import com.archko.reader.pdf.component.DocumentView
 import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
+import com.archko.reader.pdf.component.MobileDocumentView
 import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
@@ -763,7 +763,7 @@ fun CustomView(
                 )
             } else {
                 // 文档视图（最底层）
-                DocumentView(
+                MobileDocumentView(
                     list = list,
                     state = decoder!!,
                     jumpToPage = jumpIntent.page,
