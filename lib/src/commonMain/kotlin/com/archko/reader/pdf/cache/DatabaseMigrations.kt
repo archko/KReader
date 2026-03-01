@@ -65,3 +65,61 @@ public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
         // 不需要为path创建索引，因为它已经是PRIMARY KEY
     }
 }
+
+public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(connection: SQLiteConnection) {
+        // Create ai_provider table
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS ai_provider (
+                id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                api_key TEXT NOT NULL,
+                base_url TEXT NOT NULL,
+                model TEXT NOT NULL,
+                max_tokens INTEGER NOT NULL DEFAULT 2000,
+                temperature REAL NOT NULL DEFAULT 0.7,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+        """.trimIndent())
+        
+        // Create ai_cache table
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS ai_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                document_path TEXT NOT NULL,
+                feature_type TEXT NOT NULL,
+                input_hash TEXT NOT NULL,
+                input_text TEXT NOT NULL,
+                output_text TEXT NOT NULL,
+                provider_id TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+        """.trimIndent())
+        
+        // Create indexes for ai_cache
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_cache_document_path ON ai_cache(document_path)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_cache_input_hash ON ai_cache(input_hash)")
+        connection.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_ai_cache_document_path_feature_type_input_hash ON ai_cache(document_path, feature_type, input_hash)")
+        
+        // Create ai_conversation table
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS ai_conversation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                document_path TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                context_type TEXT,
+                created_at INTEGER NOT NULL
+            )
+        """.trimIndent())
+        
+        // Create indexes for ai_conversation
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_conversation_session_id ON ai_conversation(session_id)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_conversation_document_path ON ai_conversation(document_path)")
+    }
+}
+

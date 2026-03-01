@@ -195,6 +195,13 @@
     <string name="save">Save</string>
     <string name="model_name">Model Name</string>
     <string name="token">Token</string>
+    <string name="ai_provider_name">Provider Name</string>
+    <string name="api_key">API Key</string>
+    <string name="api_url">API URL</string>
+    <string name="enabled">Enabled</string>
+    <string name="set_as_default">Set as Default</string>
+    <string name="edit_provider">Edit Provider</string>
+    <string name="default_provider">Default</string>
 
     <string name="draw_line_title">Line Type</string>
     <string name="draw_curve">Curve</string>

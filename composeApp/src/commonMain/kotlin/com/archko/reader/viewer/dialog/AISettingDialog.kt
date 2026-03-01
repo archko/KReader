@@ -1,159 +1,108 @@
 package com.archko.reader.viewer.dialog
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.archko.reader.viewer.utils.Utils
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import com.archko.reader.pdf.entity.AIProvider
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ai_setting
 import kreader.composeapp.generated.resources.cancel
-import kreader.composeapp.generated.resources.input_token
 import kreader.composeapp.generated.resources.save
-import kreader.composeapp.generated.resources.select_model
 import org.jetbrains.compose.resources.stringResource
 
-@Serializable
-data class AIModel(
-    val modelName: String,
-    val token: String
-)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AISettingDialog(
+    viewModel: AIViewModel,
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
-    var models by remember { mutableStateOf<List<AIModel>>(emptyList()) }
-    var expanded by remember { mutableStateOf(false) }
-    var selectedModelIndex by remember { mutableIntStateOf(-1) }
-    var tokenInput by remember { mutableStateOf("") }
+    val providers by viewModel.providers.collectAsState()
+    val defaultProvider by viewModel.defaultProvider.collectAsState()
+    
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingProvider by remember { mutableStateOf<AIProvider?>(null) }
 
-    // Load models from Utils
     LaunchedEffect(Unit) {
-        loadModelsFromUtils()?.let { loadedModels ->
-            models = loadedModels
-            if (loadedModels.isNotEmpty() && selectedModelIndex == -1) {
-                selectedModelIndex = 0
-                tokenInput = loadedModels[0].token
-            }
-        }
+        viewModel.initializeDefaultProviders()
     }
 
-    // Update token when selected model changes
-    LaunchedEffect(selectedModelIndex) {
-        tokenInput = if (selectedModelIndex >= 0 && selectedModelIndex < models.size) {
-            models[selectedModelIndex].token
-        } else {
-            ""
-        }
+    if (showEditDialog && editingProvider != null) {
+        AIProviderEditDialog(
+            provider = editingProvider!!,
+            onDismiss = { showEditDialog = false },
+            onSave = { updatedProvider ->
+                viewModel.updateProvider(updatedProvider)
+                showEditDialog = false
+            }
+        )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(Res.string.ai_setting)) },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Model selection dropdown
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(Res.string.select_model),
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
-                    ) {
-                        OutlinedTextField(
-                            value = if (selectedModelIndex >= 0 && selectedModelIndex < models.size) {
-                                models[selectedModelIndex].modelName
-                            } else {
-                                ""
-                            },
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier.menuAnchor(
-                                ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                false
-                            ).fillMaxWidth(0.6f),
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                        )
-
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            models.forEachIndexed { index, model ->
-                                DropdownMenuItem(
-                                    text = { Text(model.modelName) },
-                                    onClick = {
-                                        selectedModelIndex = index
-                                        expanded = false
-                                    }
-                                )
-                            }
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(providers) { provider ->
+                    AIProviderItem(
+                        provider = provider,
+                        isDefault = provider.id == defaultProvider?.id,
+                        onSetDefault = {
+                            viewModel.setDefaultProvider(provider.id)
+                        },
+                        onToggleEnabled = {
+                            viewModel.toggleEnabled(provider)
+                        },
+                        onEdit = {
+                            editingProvider = provider
+                            showEditDialog = true
                         }
-                    }
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Token input field
-                OutlinedTextField(
-                    value = tokenInput,
-                    onValueChange = { tokenInput = it },
-                    label = { Text(stringResource(Res.string.input_token)) },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    // Save the updated model with its token
-                    if (selectedModelIndex >= 0 && selectedModelIndex < models.size) {
-                        val updatedModels = models.toMutableList()
-                        updatedModels[selectedModelIndex] =
-                            updatedModels[selectedModelIndex].copy(token = tokenInput)
-                        saveModelsToUtils(updatedModels)
-                        onSave()
-                        onDismiss()
-                    } else {
-                        // If no model is selected, don't save
-                        onDismiss()
-                    }
-                }
-            ) {
+            TextButton(onClick = {
+                onSave()
+                onDismiss()
+            }) {
                 Text(stringResource(Res.string.save))
             }
         },
@@ -165,21 +114,148 @@ fun AISettingDialog(
     )
 }
 
-private fun loadModelsFromUtils(): List<AIModel>? {
-    val jsonStr = Utils.getString("ai_models", "")
-    return if (jsonStr.isNotEmpty()) {
-        try {
-            Json.decodeFromString<List<AIModel>>(jsonStr)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            listOf()
+
+@Composable
+private fun AIProviderItem(
+    provider: AIProvider,
+    isDefault: Boolean,
+    onSetDefault: () -> Unit,
+    onToggleEnabled: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDefault) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSetDefault() }
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 默认选择
+            RadioButton(
+                selected = isDefault,
+                onClick = onSetDefault
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // 提供商信息
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = provider.name,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = provider.model,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (provider.apiKey.isNotEmpty()) {
+                    Text(
+                        text = "API Key: ${provider.apiKey.take(8)}...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            // 启用开关
+            Switch(
+                checked = provider.enabled,
+                onCheckedChange = { onToggleEnabled() }
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // 编辑按钮
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit")
+            }
         }
-    } else {
-        listOf()
     }
 }
 
-private fun saveModelsToUtils(models: List<AIModel>) {
-    val jsonStr = Json.encodeToString(models)
-    Utils.saveString("ai_models", jsonStr)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AIProviderEditDialog(
+    provider: AIProvider,
+    onDismiss: () -> Unit,
+    onSave: (AIProvider) -> Unit
+) {
+    var apiKey by remember { mutableStateOf(provider.apiKey) }
+    var baseUrl by remember { mutableStateOf(provider.baseUrl) }
+    var model by remember { mutableStateOf(provider.model) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "编辑 ${provider.name}") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text("API Key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = { baseUrl = it },
+                    label = { Text("API 地址") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    label = { Text("模型名称") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val updated = AIProvider(
+                        id = provider.id,
+                        name = provider.name,
+                        apiKey = apiKey,
+                        baseUrl = baseUrl,
+                        model = model,
+                        maxTokens = provider.maxTokens,
+                        temperature = provider.temperature,
+                        enabled = provider.enabled,
+                        isDefault = provider.isDefault
+                    ).apply {
+                        this.id = provider.id
+                        this.createdAt = provider.createdAt
+                    }
+                    onSave(updated)
+                }
+            ) {
+                Text(stringResource(Res.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(Res.string.cancel))
+            }
+        }
+    )
 }
