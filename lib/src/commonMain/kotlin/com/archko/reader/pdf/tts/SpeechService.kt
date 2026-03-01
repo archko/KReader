@@ -22,6 +22,13 @@ public data class Voice(
     }
 }
 
+// TTS进度监听器接口
+public interface TtsProgressListener {
+    public fun onStart(bean: ReflowBean)
+    public fun onDone(bean: ReflowBean)
+    public fun onFinish()
+}
+
 public interface SpeechService {
     public val isSpeakingFlow: StateFlow<Boolean>
 
@@ -43,4 +50,5 @@ public interface SpeechService {
     public fun getDefaultVoice(): Voice
     public suspend fun saveVoiceSetting(voice: Voice)
     public suspend fun getVoiceSetting(): Voice
+    public fun setProgressListener(listener: TtsProgressListener?)
 }

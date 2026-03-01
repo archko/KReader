@@ -14,6 +14,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
 import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.tts.TtsProgressListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,13 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
-
-// TTS监听器接口
-interface TtsProgressListener {
-    fun onStart(bean: ReflowBean)
-    fun onDone(bean: ReflowBean)
-    fun onFinish()
-}
 
 private const val max_text = 280
 

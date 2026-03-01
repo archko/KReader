@@ -30,6 +30,7 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.SpeechService
+import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.dialog.OutlineDialog
@@ -396,6 +397,7 @@ fun CustomView(
                 println("CustomView.onDispose:$currentPath, $decoder")
                 decoder?.close()
                 if (speechService is TtsQueueService) {
+                    speechService.setProgressListener(null)
                     speechService.destroy()
                 } else {
                     speechService.stop()
@@ -559,6 +561,9 @@ fun CustomView(
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
             val pageCount: Int = list.size
+            
+            // 正在朗读的页面索引
+            var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
             var jumpIntent by remember {
                 mutableStateOf(
@@ -575,6 +580,50 @@ fun CustomView(
             }
 
             var columnCount by remember { mutableIntStateOf(1) }
+            
+            // 设置TTS进度监听器
+            LaunchedEffect(speechService) {
+                speechService.setProgressListener(object : TtsProgressListener {
+                    override fun onStart(bean: ReflowBean) {
+                        // Segment开始朗读，更新speakingPageIndex和跳转
+                        val newPageStr = bean.page?.split("-")?.firstOrNull()
+                        val newPage = newPageStr?.toIntOrNull()
+                        println("TTS: onStart - page: ${bean.page}, newPage: $newPage, currentPage: $currentPage")
+                        if (newPage != null) {
+                            scope.launch {
+                                speakingPageIndex = newPage
+                                if (newPage != currentPage && newPage != jumpIntent.page) {
+                                    jumpIntent = JumpIntent(newPage, JumpMode.PageNavigation)
+                                }
+                            }
+                        }
+                    }
+
+                    override fun onDone(bean: ReflowBean) {
+                        // Segment完成
+                        val newPageStr = bean.page?.split("-")?.firstOrNull()
+                        val newPage = newPageStr?.toIntOrNull()
+                        println("TTS: onDone - page: ${bean.page}, newPage: $newPage, currentPage: $currentPage")
+                    }
+
+                    override fun onFinish() {
+                        // 朗读完成
+                        println("TTS: onFinish")
+                        scope.launch {
+                            speakingPageIndex = null
+                        }
+                    }
+                })
+            }
+            
+            // 监听朗读状态
+            LaunchedEffect(speechService) {
+                speechService.isSpeakingFlow.collect { speaking ->
+                    if (!speaking) {
+                        speakingPageIndex = null
+                    }
+                }
+            }
 
             val annotationManager = remember(paths) {
                 var absolutePath = ""
@@ -612,9 +661,11 @@ fun CustomView(
                     scope = scope,
                     onStartSpeaking = { page, dec, binder ->
                         scope.launch {
-                            speakFromCurrentPage(currentPage, decoder!!, speechService)
+                            speakingPageIndex = page
+                            speakFromCurrentPage(page, decoder!!, speechService)
                             if (!speechService.isSpeaking()) {
                                 showQueueDialog = false
+                                speakingPageIndex = null
                             }
                         }
                     },
@@ -629,7 +680,7 @@ fun CustomView(
                 if (showQueueDialog) {
                     QueueDialog(
                         decoder!!.cacheBean,
-                        currentSpeakingPage = jumpIntent.page.toString(),
+                        currentSpeakingPage = speechService.getCurrentReflowBean()?.page?.split("-")?.firstOrNull() ?: jumpIntent.page.toString(),
                         count = 30,
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->
@@ -637,7 +688,8 @@ fun CustomView(
 
                             // 从选中的页面重新开始朗读
                             reflowBean.page?.let { pageStr ->
-                                val targetPage = pageStr.toIntOrNull() ?: 0
+                                val targetPageStr = pageStr.split("-").firstOrNull()
+                                val targetPage = targetPageStr?.toIntOrNull() ?: 0
                                 // 跳转到目标页面
                                 jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
 
@@ -647,7 +699,11 @@ fun CustomView(
                                     // 等待一小段时间确保停止操作完成
                                     delay(500)
 
+                                    speakingPageIndex = targetPage
                                     speakFromCurrentPage(targetPage, decoder!!, speechService)
+                                    if (!speechService.isSpeaking()) {
+                                        speakingPageIndex = null
+                                    }
                                 }
                             }
                         }
@@ -698,6 +754,7 @@ fun CustomView(
                             initialScrollY = initialScrollY,
                             zoom = vZoom,
                             crop = isCrop,
+                            speakingPageIndex = speakingPageIndex,
                             gestureMode = gestureMode,
                             pathConfig = pathConfig,
                             annotationManager = annotationManager,

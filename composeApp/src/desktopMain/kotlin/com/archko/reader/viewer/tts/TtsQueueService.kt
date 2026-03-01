@@ -2,6 +2,7 @@ package com.archko.reader.viewer.tts
 
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.SpeechService
+import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.tts.TtsTask
 import com.archko.reader.pdf.tts.Voice
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +45,9 @@ class TtsQueueService : SpeechService {
     private val taskQueue = mutableListOf<TtsTask>()
     private val queueMutex = Mutex()
     private val currentReflowBean = AtomicReference<ReflowBean?>(null)
+    
+    // TTS进度监听器
+    private var progressListener: TtsProgressListener? = null
 
     @Volatile
     private var ttsWorker: TtsWorker? = null
@@ -81,6 +85,8 @@ class TtsQueueService : SpeechService {
                     val queueSize = queueMutex.withLock { taskQueue.size }
                     if (queueSize == 0) {
                         _isSpeakingFlow.value = false
+                        // 通知朗读完成
+                        progressListener?.onFinish()
                     }
                     continue
                 }
@@ -112,6 +118,9 @@ class TtsQueueService : SpeechService {
         private suspend fun executeTask(task: TtsTask) {
             try {
                 _isSpeakingFlow.value = true
+                
+                // 通知开始朗读
+                progressListener?.onStart(task.reflowBean)
 
                 val text = task.reflowBean.data ?: ""
                 val textVariants = listOf(
@@ -133,6 +142,9 @@ class TtsQueueService : SpeechService {
                         val success = attemptSpeak(text)
                         if (success) {
                             println("TTS: Successfully spoke text on attempt ${index + 1}")
+                            
+                            // 通知完成朗读
+                            progressListener?.onDone(task.reflowBean)
                             return
                         }
                     } catch (e: Exception) {
@@ -141,8 +153,9 @@ class TtsQueueService : SpeechService {
                 }
 
                 println("TTS: All attempts failed")
+                // 即使失败也通知完成
+                progressListener?.onDone(task.reflowBean)
             } finally {
-                _isSpeakingFlow.value = false
                 currentProcess = null
             }
         }
@@ -308,6 +321,9 @@ class TtsQueueService : SpeechService {
 
             // 清空队列
             clearQueueSync()
+            
+            // 通知朗读完成
+            progressListener?.onFinish()
 
             println("TTS: Stopped")
         }
@@ -443,5 +459,9 @@ class TtsQueueService : SpeechService {
             println("TTS: Failed to load voice setting: ${e.message}")
         }
         return@withContext getDefaultVoice()
+    }
+    
+    override fun setProgressListener(listener: TtsProgressListener?) {
+        progressListener = listener
     }
 }

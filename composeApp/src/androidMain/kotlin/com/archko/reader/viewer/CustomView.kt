@@ -50,7 +50,7 @@ import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.dialog.SleepTimerDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
-import com.archko.reader.viewer.tts.TtsProgressListener
+import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import com.archko.reader.viewer.viewmodel.FontViewModel

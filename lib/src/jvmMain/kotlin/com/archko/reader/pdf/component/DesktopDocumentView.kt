@@ -56,6 +56,7 @@ public fun DesktopDocumentView(
     zoom: Double = 1.0,
     reflow: Long = 0,
     crop: Boolean = false,
+    speakingPageIndex: Int? = null,
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
@@ -71,7 +72,7 @@ public fun DesktopDocumentView(
     // 焦点请求器
     val focusRequester = remember { FocusRequester() }
 
-    // 创建文档视图状态（speakingPageIndex 传 null）
+    // 创建文档视图状态
     val stateHolder = rememberDocumentViewState(
         list = list,
         decoder = decoder,
@@ -83,7 +84,7 @@ public fun DesktopDocumentView(
         columnCount = columnCount,
         currentPath = currentPath,
         annotationManager = annotationManager,
-        speakingPageIndex = null,
+        speakingPageIndex = speakingPageIndex,
     )
 
     // 创建文本选择器
@@ -110,7 +111,7 @@ public fun DesktopDocumentView(
         initialZoom = zoom,
         reflow = reflow,
         crop = crop,
-        speakingPageIndex = null,
+        speakingPageIndex = speakingPageIndex,
         columnCount = columnCount,
         onSaveDocument = onSaveDocument,
         onCloseDocument = onCloseDocument,
@@ -126,6 +127,11 @@ public fun DesktopDocumentView(
             stateHolder.viewSize.value,
             stateHolder.vZoom.value,
             stateHolder.orientation.value
+        )
+        stateHolder.pageViewState.updateVisiblePages(
+            stateHolder.offset.value, 
+            stateHolder.viewSize.value, 
+            stateHolder.vZoom.value
         )
     }
 

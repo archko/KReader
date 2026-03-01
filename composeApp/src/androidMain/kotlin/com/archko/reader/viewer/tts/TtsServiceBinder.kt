@@ -7,6 +7,7 @@ import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
 import com.archko.reader.pdf.entity.ReflowBean
+import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.tts.TtsTask
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
