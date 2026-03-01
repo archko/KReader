@@ -6,13 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,9 +38,10 @@ import com.archko.reader.pdf.viewmodel.AIViewModel
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ai_setting
 import kreader.composeapp.generated.resources.cancel
+import kreader.composeapp.generated.resources.ic_edit
 import kreader.composeapp.generated.resources.save
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-
 
 @Composable
 fun AISettingDialog(
@@ -178,7 +176,10 @@ private fun AIProviderItem(
             
             // 编辑按钮
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit")
+                Icon(
+                    painter = painterResource(Res.drawable.ic_edit),
+                    contentDescription = "Edit"
+                )
             }
         }
     }

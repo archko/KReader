@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.archko.reader.pdf.viewmodel.BackupViewModel
+import com.archko.reader.viewer.dialog.AISettingDialog
 import com.archko.reader.viewer.dialog.AboutDialog
 import com.archko.reader.viewer.dialog.ConvertToEpubDialog
 import com.archko.reader.viewer.dialog.PdfCreateDialog
@@ -48,6 +49,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun SettingScreen(
     viewModel: BackupViewModel,
+    aiViewModel: AIViewModel,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -133,6 +135,7 @@ fun SettingCategory(viewModel: BackupViewModel) {
     var showPdfConvertDialog by remember { mutableStateOf(false) }
     var showWebdavDialog by remember { mutableStateOf(false) }
     var showTtsDialog by remember { mutableStateOf(false) }
+    var showAISettingDialog by remember { mutableStateOf(false) }
 
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -256,6 +259,20 @@ fun SettingCategory(viewModel: BackupViewModel) {
 
         item {
             SettingItem(
+                title = stringResource(Res.string.ai_setting),
+                onClick = { showAISettingDialog = true },
+                icon = {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_android),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            )
+        }
+
+        item {
+            SettingItem(
                 title = stringResource(Res.string.about),
                 onClick = { showAboutDialog = true },
                 icon = {
@@ -330,6 +347,13 @@ fun SettingCategory(viewModel: BackupViewModel) {
     if (showTtsDialog) {
         TtsDialog(
             onDismiss = { showTtsDialog = false }
+        )
+    }
+
+    // AI 设置Dialog
+    if (showAISettingDialog) {
+        AISettingDialog(
+            onDismiss = { showAISettingDialog = false }
         )
     }
 }
