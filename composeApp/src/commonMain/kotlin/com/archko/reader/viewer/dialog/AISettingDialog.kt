@@ -85,9 +85,6 @@ fun AISettingDialog(
                         onSetDefault = {
                             viewModel.setDefaultProvider(provider.id)
                         },
-                        onToggleEnabled = {
-                            viewModel.toggleEnabled(provider)
-                        },
                         onEdit = {
                             editingProvider = provider
                             showEditDialog = true
@@ -118,7 +115,6 @@ private fun AIProviderItem(
     provider: AIProvider,
     isDefault: Boolean,
     onSetDefault: () -> Unit,
-    onToggleEnabled: () -> Unit,
     onEdit: () -> Unit
 ) {
     Card(
@@ -165,14 +161,6 @@ private fun AIProviderItem(
                     )
                 }
             }
-            
-            // 启用开关
-            Switch(
-                checked = provider.enabled,
-                onCheckedChange = { onToggleEnabled() }
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
             
             // 编辑按钮
             IconButton(onClick = onEdit) {

@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.viewer.dialog.AISettingDialog
 import com.archko.reader.viewer.dialog.AboutDialog
@@ -116,7 +117,7 @@ fun SettingScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    SettingCategory(viewModel)
+                    SettingCategory(viewModel, aiViewModel)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -125,7 +126,7 @@ fun SettingScreen(
 }
 
 @Composable
-fun SettingCategory(viewModel: BackupViewModel) {
+fun SettingCategory(viewModel: BackupViewModel, aiViewModel: AIViewModel) {
     var showAboutDialog by remember { mutableStateOf(false) }
     var showPdfCreateDialog by remember { mutableStateOf(false) }
     var showPdfExportDialog by remember { mutableStateOf(false) }
@@ -353,7 +354,9 @@ fun SettingCategory(viewModel: BackupViewModel) {
     // AI 设置Dialog
     if (showAISettingDialog) {
         AISettingDialog(
-            onDismiss = { showAISettingDialog = false }
+            viewModel = aiViewModel,
+            onDismiss = { showAISettingDialog = false },
+            onSave = { }
         )
     }
 }

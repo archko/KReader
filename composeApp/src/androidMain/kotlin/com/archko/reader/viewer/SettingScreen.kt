@@ -29,6 +29,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.viewer.dialog.AISettingDialog
 import com.archko.reader.viewer.dialog.AboutDialog
@@ -46,6 +47,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun SettingScreen(
     viewModel: BackupViewModel,
+    aiViewModel: AIViewModel,
     modifier: Modifier = Modifier,
 ) {
     Theme {
@@ -91,7 +93,7 @@ fun SettingScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                SettingCategory(viewModel)
+                SettingCategory(viewModel, aiViewModel)
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
@@ -100,7 +102,7 @@ fun SettingScreen(
 }
 
 @Composable
-fun SettingCategory(viewModel: BackupViewModel) {
+fun SettingCategory(viewModel: BackupViewModel, aiViewModel: AIViewModel) {
     val context = LocalContext.current
     var showAISettingDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -279,6 +281,7 @@ fun SettingCategory(viewModel: BackupViewModel) {
     // AI设置 Dialog
     if (showAISettingDialog) {
         AISettingDialog(
+            viewModel = aiViewModel,
             onDismiss = { showAISettingDialog = false },
             onSave = {}
         )

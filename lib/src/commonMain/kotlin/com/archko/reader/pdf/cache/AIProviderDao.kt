@@ -24,7 +24,7 @@ public interface AIProviderDao {
     @Delete
     public suspend fun deleteProvider(provider: AIProvider)
 
-    @Query("SELECT * FROM ai_provider ORDER BY is_default DESC, id ASC")
+    @Query("SELECT * FROM ai_provider")
     public suspend fun getAllProviders(): List<AIProvider>
 
     @Query("SELECT * FROM ai_provider WHERE id = :id LIMIT 1")

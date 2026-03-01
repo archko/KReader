@@ -38,7 +38,6 @@ public class AIViewModel : ViewModel() {
                         model = "deepseek-chat",
                         maxTokens = 2000,
                         temperature = 0.7f,
-                        enabled = true,
                         isDefault = true
                     ),
                     AIProvider(
@@ -49,7 +48,6 @@ public class AIViewModel : ViewModel() {
                         model = "qwen-turbo",
                         maxTokens = 2000,
                         temperature = 0.7f,
-                        enabled = false,
                         isDefault = false
                     ),
                     AIProvider(
@@ -60,7 +58,6 @@ public class AIViewModel : ViewModel() {
                         model = "glm-4-flash",
                         maxTokens = 2000,
                         temperature = 0.7f,
-                        enabled = false,
                         isDefault = false
                     )
                 )
@@ -77,7 +74,7 @@ public class AIViewModel : ViewModel() {
         viewModelScope.launch {
             val providers = database?.aiProviderDao()?.getAllProviders() ?: emptyList()
             _providers.value = providers
-            _defaultProvider.value = providers.find { it.isDefault && it.enabled }
+            _defaultProvider.value = providers.find { it.isDefault }
         }
     }
 
@@ -99,20 +96,6 @@ public class AIViewModel : ViewModel() {
         viewModelScope.launch {
             database?.aiProviderDao()?.clearAllDefaults()
             database?.aiProviderDao()?.setDefault(id)
-            loadProviders()
-        }
-    }
-
-    /**
-     * 切换启用状态
-     */
-    public fun toggleEnabled(provider: AIProvider) {
-        viewModelScope.launch {
-            val updated = provider.apply {
-                enabled = !enabled
-                updatedAt = System.currentTimeMillis()
-            }
-            database?.aiProviderDao()?.updateProvider(updated)
             loadProviders()
         }
     }

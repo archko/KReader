@@ -60,6 +60,7 @@ import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -97,6 +98,7 @@ data class OpenDocRequest(val paths: List<String>, val page: Int?)
 fun FileScreen(
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    aiViewModel: AIViewModel,
     bookmarkViewModel: BookmarkViewModel,
     readingStatsViewModel: ReadingStatsViewModel,
     initialFilePath: String? = null,
@@ -470,6 +472,7 @@ fun FileScreen(
         if (showSettingDialog) {
             SettingScreen(
                 backupViewModel,
+                aiViewModel,
                 onDismiss = { showSettingDialog = false }
             )
         }

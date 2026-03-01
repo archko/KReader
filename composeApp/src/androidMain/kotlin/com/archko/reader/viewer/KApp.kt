@@ -31,6 +31,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.navigation.MainDestinations
@@ -55,6 +56,7 @@ fun KApp(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    aiViewModel: AIViewModel,
     fontViewModel: FontViewModel,
     bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
     readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
@@ -89,6 +91,7 @@ fun KApp(
                             screenHeightInPixels,
                             viewModel,
                             backupViewModel,
+                            aiViewModel,
                             fontViewModel,
                             bookmarkViewModel,
                             readingStatsViewModel,
@@ -112,6 +115,7 @@ fun MainContainer(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    aiViewModel: AIViewModel,
     fontViewModel: FontViewModel,
     bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
     readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
@@ -145,6 +149,7 @@ fun MainContainer(
                 screenHeightInPixels,
                 viewModel,
                 backupViewModel,
+                aiViewModel,
                 fontViewModel,
                 bookmarkViewModel,
                 readingStatsViewModel,
@@ -162,6 +167,7 @@ fun NavGraphBuilder.addHomeGraph(
     screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
+    aiViewModel: AIViewModel,
     fontViewModel: FontViewModel,
     bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
     readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
@@ -185,6 +191,7 @@ fun NavGraphBuilder.addHomeGraph(
     composable(HomeSections.SETTING.route) { from ->
         SettingScreen(
             backupViewModel,
+            aiViewModel,
             modifier
         )
     }

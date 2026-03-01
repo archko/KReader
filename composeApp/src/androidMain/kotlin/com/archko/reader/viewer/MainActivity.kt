@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.util.IntentFile
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.viewer.viewmodel.FontViewModel
@@ -139,10 +140,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 val viewModel: PdfViewModel = viewModel()
                 val fontViewModel: FontViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
+                val aiViewModel: AIViewModel = viewModel()
                 val bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel = viewModel()
                 val readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel = viewModel()
                 viewModel.database = database
                 backupViewModel.database = database
+                aiViewModel.database = database
                 bookmarkViewModel.database = database
                 readingStatsViewModel.database = database
 
@@ -151,6 +154,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                     screenHeightInPixels.toInt(),
                     viewModel,
                     backupViewModel,
+                    aiViewModel,
                     fontViewModel,
                     bookmarkViewModel,
                     readingStatsViewModel,
