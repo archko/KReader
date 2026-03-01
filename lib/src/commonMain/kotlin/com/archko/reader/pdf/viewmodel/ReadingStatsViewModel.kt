@@ -29,6 +29,41 @@ public class ReadingStatsViewModel : ViewModel() {
             println("ReadingStatsViewModel.loadStats: path=$path, stats=$stats")
         }
     }
+    
+    /**
+     * 实时更新统计数据（用于在文档打开期间查看统计）
+     */
+    public fun updateCurrentStats(
+        path: String,
+        sessionDuration: Long,
+        currentPage: Int,
+        annotationCount: Int,
+        bookmarkCount: Int
+    ) {
+        viewModelScope.launch {
+            val stats = database?.readingStatsDao()?.getStatsByPath(path)
+            if (stats != null) {
+                // 临时更新当前显示的统计数据（不保存到数据库）
+                val updatedStats = stats.copy().apply {
+                    val tempTotalTime = stats.totalReadingTime + sessionDuration
+                    val tempSessionCount = stats.sessionCount + 1
+                    
+                    totalReadingTime = tempTotalTime
+                    lastSessionTime = sessionDuration
+                    averageSessionTime = if (tempSessionCount > 0) tempTotalTime / tempSessionCount else 0
+                    
+                    if (currentPage > completedPages) {
+                        completedPages = currentPage
+                    }
+                    
+                    this.annotationCount = annotationCount
+                    this.bookmarkCount = bookmarkCount
+                }
+                _currentStats.value = updatedStats
+                println("ReadingStatsViewModel.updateCurrentStats: 临时更新统计 $updatedStats")
+            }
+        }
+    }
 
     /**
      * 开始新的阅读会话

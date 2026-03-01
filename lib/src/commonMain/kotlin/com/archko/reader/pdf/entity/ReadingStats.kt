@@ -79,4 +79,22 @@ public class ReadingStats {
     override fun toString(): String {
         return "ReadingStats(path='$path', totalReadingTime=$totalReadingTime, sessionCount=$sessionCount, completedPages=$completedPages/$totalPages, consecutiveDays=$consecutiveDays)"
     }
+    
+    public fun copy(): ReadingStats {
+        return ReadingStats().apply {
+            this.path = this@ReadingStats.path
+            this.totalReadingTime = this@ReadingStats.totalReadingTime
+            this.lastSessionTime = this@ReadingStats.lastSessionTime
+            this.averageSessionTime = this@ReadingStats.averageSessionTime
+            this.firstReadAt = this@ReadingStats.firstReadAt
+            this.lastReadAt = this@ReadingStats.lastReadAt
+            this.completedPages = this@ReadingStats.completedPages
+            this.totalPages = this@ReadingStats.totalPages
+            this.sessionCount = this@ReadingStats.sessionCount
+            this.lastSessionDate = this@ReadingStats.lastSessionDate
+            this.consecutiveDays = this@ReadingStats.consecutiveDays
+            this.annotationCount = this@ReadingStats.annotationCount
+            this.bookmarkCount = this@ReadingStats.bookmarkCount
+        }
+    }
 }

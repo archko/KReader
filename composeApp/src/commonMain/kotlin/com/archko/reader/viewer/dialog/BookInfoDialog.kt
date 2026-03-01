@@ -88,10 +88,16 @@ fun BookInfoDialog(
     LaunchedEffect(recent.path) {
         recent.path?.let { path ->
             val absolutePath = getAbsolutePath(path)
+            // 先加载统计数据
             readingStatsViewModel?.loadStats(absolutePath)
+            // 加载书签
             bookmarkViewModel?.loadBookmarks(absolutePath)
         }
     }
+    
+    // 如果stats为null，显示提示信息
+    val displayStats = stats
+    val hasAnyData = displayStats != null || bookmarkCount > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -172,8 +178,8 @@ fun BookInfoDialog(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     
-                    // 阅读统计部分
-                    stats?.let { readingStats ->
+                    // 阅读统计部分 - 如果有统计数据或书签就显示
+                    if (hasAnyData) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                         
                         Text(
@@ -183,82 +189,94 @@ fun BookInfoDialog(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         
-                        Text(
-                            text = stringResource(Res.string.total_reading_time)
-                                .format(formatDuration(readingStats.totalReadingTime)),
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        displayStats?.let { readingStats ->
                             Text(
-                                text = stringResource(Res.string.session_count)
-                                    .format(readingStats.sessionCount),
+                                text = stringResource(Res.string.total_reading_time)
+                                    .format(formatDuration(readingStats.totalReadingTime)),
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.session_count)
+                                        .format(readingStats.sessionCount),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                Text(
+                                    text = stringResource(Res.string.average_session_time)
+                                        .format(formatDuration(readingStats.averageSessionTime)),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.completed_pages)
+                                        .format(readingStats.completedPages, readingStats.totalPages),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                Text(
+                                    text = stringResource(Res.string.consecutive_days)
+                                        .format(readingStats.consecutiveDays),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.annotation_count_stats)
+                                        .format(readingStats.annotationCount),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                Text(
+                                    text = stringResource(Res.string.bookmark_count_stats)
+                                        .format(bookmarkCount),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                            
+                            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                            
                             Text(
-                                text = stringResource(Res.string.average_session_time)
-                                    .format(formatDuration(readingStats.averageSessionTime)),
+                                text = stringResource(Res.string.first_read_at)
+                                    .format(dateFormat.format(Date(readingStats.firstReadAt))),
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
+                            
+                            Text(
+                                text = stringResource(Res.string.last_read_at)
+                                    .format(dateFormat.format(Date(readingStats.lastReadAt))),
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        } ?: run {
+                            // 如果没有阅读统计但有书签，只显示书签数量
+                            if (bookmarkCount > 0) {
+                                Text(
+                                    text = stringResource(Res.string.bookmark_count_stats)
+                                        .format(bookmarkCount),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
                         }
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.completed_pages)
-                                    .format(readingStats.completedPages, readingStats.totalPages),
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                            Text(
-                                text = stringResource(Res.string.consecutive_days)
-                                    .format(readingStats.consecutiveDays),
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                        }
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.annotation_count_stats)
-                                    .format(readingStats.annotationCount),
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                            Text(
-                                text = stringResource(Res.string.bookmark_count_stats)
-                                    .format(bookmarkCount),
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                        }
-                        
-                        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                        
-                        Text(
-                            text = stringResource(Res.string.first_read_at)
-                                .format(dateFormat.format(Date(readingStats.firstReadAt))),
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                        
-                        Text(
-                            text = stringResource(Res.string.last_read_at)
-                                .format(dateFormat.format(Date(readingStats.lastReadAt))),
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
                     }
                 }
             }
