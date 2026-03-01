@@ -34,4 +34,10 @@ public interface ReadingStatsDao {
 
     @Query("DELETE FROM reading_stats WHERE path = :path")
     public suspend fun deleteStatsByPath(path: String)
+
+    @Query("DELETE FROM reading_stats")
+    public suspend fun deleteAllStats()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    public suspend fun insertAllStats(stats: List<ReadingStats>)
 }

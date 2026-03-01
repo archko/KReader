@@ -38,4 +38,10 @@ public interface BookmarkDao {
 
     @Query("DELETE FROM bookmark WHERE path = :path")
     public suspend fun deleteBookmarksByPath(path: String)
+
+    @Query("DELETE FROM bookmark")
+    public suspend fun deleteAllBookmarks()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    public suspend fun insertAllBookmarks(bookmarks: List<Bookmark>)
 }

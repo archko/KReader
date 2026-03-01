@@ -4,6 +4,8 @@ import BackupEventBus
 import androidx.lifecycle.ViewModel
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.cache.BookProgressParser
+import com.archko.reader.pdf.cache.BookmarkParser
+import com.archko.reader.pdf.cache.ReadingStatsParser
 import com.archko.reader.pdf.cache.getWebdavCacheDir
 import com.archko.reader.pdf.cache.saveWebdavCacheFile
 import com.archko.reader.pdf.entity.DavResourceItem
@@ -150,6 +152,76 @@ public class BackupViewModel : ViewModel() {
         }
     }.flowOn(Dispatchers.IO)
 
+    public fun backupReadingStatsToWebdav(currentPath: String): Flow<Boolean> = flow {
+        try {
+            if (!checkAndLoadUser() || httpClient == null || database == null) {
+                emit(false)
+                return@flow
+            }
+
+            val list = database!!.readingStatsDao().getAllStats()
+            val content = if (list.isNullOrEmpty()) {
+                """{"version":"1.0","lastBackupTime":${System.currentTimeMillis()},"stats":[]}"""
+            } else {
+                ReadingStatsParser.statsToJson(list)
+            }
+            println("backupReadingStatsToWebdav.content:$content")
+
+            // 使用 dav4kmp 上传文件到指定路径
+            val fileName = READING_STATS_JSON
+            val fileUrl = "${webdavUser!!.host}$currentPath/$fileName"
+            println("backupReadingStatsToWebdav - fileUrl: $fileUrl")
+
+            val davResource = DavCollection(httpClient!!, Url(fileUrl))
+            davResource.put(
+                body = content.toByteArray(),
+                contentType = ContentType.Application.Json
+            ) { response ->
+                println("Upload successful: ${response.status}")
+            }
+            emit(true)
+        } catch (e: Exception) {
+            emit(false)
+            println("backupReadingStatsToWebdav error: ${e.message}")
+            e.printStackTrace()
+        }
+    }.flowOn(Dispatchers.IO)
+
+    public fun backupBookmarksToWebdav(currentPath: String): Flow<Boolean> = flow {
+        try {
+            if (!checkAndLoadUser() || httpClient == null || database == null) {
+                emit(false)
+                return@flow
+            }
+
+            val list = database!!.bookmarkDao().getAllBookmarks()
+            val content = if (list.isNullOrEmpty()) {
+                """{"version":"1.0","lastBackupTime":${System.currentTimeMillis()},"bookmarks":[]}"""
+            } else {
+                BookmarkParser.bookmarksToJson(list)
+            }
+            println("backupBookmarksToWebdav.content:$content")
+
+            // 使用 dav4kmp 上传文件到指定路径
+            val fileName = BOOKMARKS_JSON
+            val fileUrl = "${webdavUser!!.host}$currentPath/$fileName"
+            println("backupBookmarksToWebdav - fileUrl: $fileUrl")
+
+            val davResource = DavCollection(httpClient!!, Url(fileUrl))
+            davResource.put(
+                body = content.toByteArray(),
+                contentType = ContentType.Application.Json
+            ) { response ->
+                println("Upload successful: ${response.status}")
+            }
+            emit(true)
+        } catch (e: Exception) {
+            emit(false)
+            println("backupBookmarksToWebdav error: ${e.message}")
+            e.printStackTrace()
+        }
+    }.flowOn(Dispatchers.IO)
+
     public fun restoreFromWebdav(filePath: String): Flow<Boolean> = flow {
         try {
             if (!checkAndLoadUser() || davCollection == null) {
@@ -174,6 +246,58 @@ public class BackupViewModel : ViewModel() {
         } catch (e: Exception) {
             emit(false)
             println("restoreFromWebdav error: ${e.message}")
+            e.printStackTrace()
+        }
+    }.flowOn(Dispatchers.IO)
+
+    public fun restoreReadingStatsFromWebdav(filePath: String): Flow<Boolean> = flow {
+        try {
+            if (!checkAndLoadUser() || davCollection == null) {
+                emit(false)
+                return@flow
+            }
+
+            // 使用 dav4kmp 下载文件
+            val fileUrl = "${webdavUser!!.host}$filePath"
+            println("restoreReadingStatsFromWebdav - fileUrl: $fileUrl")
+            val davResource = DavCollection(httpClient!!, Url(fileUrl))
+
+            var content = ""
+            davResource.get(accept = "*/*", headers = null) { response ->
+                content = response.bodyAsText()
+            }
+
+            val result = restoreReadingStats(database, content)
+            emit(result)
+        } catch (e: Exception) {
+            emit(false)
+            println("restoreReadingStatsFromWebdav error: ${e.message}")
+            e.printStackTrace()
+        }
+    }.flowOn(Dispatchers.IO)
+
+    public fun restoreBookmarksFromWebdav(filePath: String): Flow<Boolean> = flow {
+        try {
+            if (!checkAndLoadUser() || davCollection == null) {
+                emit(false)
+                return@flow
+            }
+
+            // 使用 dav4kmp 下载文件
+            val fileUrl = "${webdavUser!!.host}$filePath"
+            println("restoreBookmarksFromWebdav - fileUrl: $fileUrl")
+            val davResource = DavCollection(httpClient!!, Url(fileUrl))
+
+            var content = ""
+            davResource.get(accept = "*/*", headers = null) { response ->
+                content = response.bodyAsText()
+            }
+
+            val result = restoreBookmarks(database, content)
+            emit(result)
+        } catch (e: Exception) {
+            emit(false)
+            println("restoreBookmarksFromWebdav error: ${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -322,6 +446,8 @@ public class BackupViewModel : ViewModel() {
     public companion object {
 
         public const val DEFAULT_JSON: String = "kreader_lastest.json"
+        public const val READING_STATS_JSON: String = "kreader_reading_stats.json"
+        public const val BOOKMARKS_JSON: String = "kreader_bookmarks.json"
         public const val KEY_CONFIG_JSON: String = "webdav_config_json"
         public const val KEY_CONFIG_USER: String = "webdav_config_user"
         public const val KEY_NAME: String = "name"
@@ -475,6 +601,114 @@ public class BackupViewModel : ViewModel() {
                 return true
             } catch (e: Exception) {
                 println("restore error: ${e.message}")
+                e.printStackTrace()
+            }
+            return false
+        }
+
+        public suspend fun restoreReadingStats(
+            database: AppDatabase?,
+            content: String
+        ): Boolean {
+            try {
+                if (database == null) {
+                    println("restoreReadingStats: database is null")
+                    return false
+                }
+
+                // Parse JSON content
+                val stats = ReadingStatsParser.parseStats(content)
+                if (stats.isEmpty()) {
+                    println("restoreReadingStats: no stats found in content")
+                    return false
+                }
+
+                // Get all recent records to match filenames to paths
+                val recents = database.recentDao().getAllRecents() ?: emptyList()
+                val filenameToPathMap = recents.associate { recent ->
+                    java.io.File(recent.path ?: "").name to recent.path
+                }
+
+                // Match filenames to local paths
+                val statsWithPaths = stats.mapNotNull { stat ->
+                    val filename = stat.path // path field contains filename from JSON
+                    val localPath = filenameToPathMap[filename]
+                    if (localPath != null) {
+                        stat.path = localPath
+                        stat
+                    } else {
+                        println("restoreReadingStats: no local file found for filename: $filename")
+                        null
+                    }
+                }
+
+                if (statsWithPaths.isEmpty()) {
+                    println("restoreReadingStats: no matching files found")
+                    return false
+                }
+
+                // Clear and insert in sequence (Room handles transactions internally)
+                database.readingStatsDao().deleteAllStats()
+                database.readingStatsDao().insertAllStats(statsWithPaths)
+
+                println("restoreReadingStats: successfully restored ${statsWithPaths.size} records")
+                return true
+            } catch (e: Exception) {
+                println("restoreReadingStats error: ${e.message}")
+                e.printStackTrace()
+            }
+            return false
+        }
+
+        public suspend fun restoreBookmarks(
+            database: AppDatabase?,
+            content: String
+        ): Boolean {
+            try {
+                if (database == null) {
+                    println("restoreBookmarks: database is null")
+                    return false
+                }
+
+                // Parse JSON content
+                val bookmarks = BookmarkParser.parseBookmarks(content)
+                if (bookmarks.isEmpty()) {
+                    println("restoreBookmarks: no bookmarks found in content")
+                    return false
+                }
+
+                // Get all recent records to match filenames to paths
+                val recents = database.recentDao().getAllRecents() ?: emptyList()
+                val filenameToPathMap = recents.associate { recent ->
+                    java.io.File(recent.path ?: "").name to recent.path
+                }
+
+                // Match filenames to local paths
+                val bookmarksWithPaths = bookmarks.mapNotNull { bookmark ->
+                    val filename = bookmark.path // path field contains filename from JSON
+                    val localPath = filenameToPathMap[filename]
+                    if (localPath != null) {
+                        bookmark.path = localPath
+                        bookmark
+                    } else {
+                        println("restoreBookmarks: no local file found for filename: $filename")
+                        null
+                    }
+                }
+
+                if (bookmarksWithPaths.isEmpty()) {
+                    println("restoreBookmarks: no matching files found")
+                    return false
+                }
+
+                // Clear and insert in sequence (Room handles transactions internally)
+                database.bookmarkDao().deleteAllBookmarks()
+                database.bookmarkDao().insertAllBookmarks(bookmarksWithPaths)
+
+                println("restoreBookmarks: successfully restored ${bookmarksWithPaths.size} records")
+                return true
+            } catch (e: Exception) {
+                println("restoreBookmarks error: ${e.message}")
                 e.printStackTrace()
             }
             return false
