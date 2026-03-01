@@ -216,4 +216,36 @@
     <string name="book_read_count">Read Times: %d</string>
     <string name="book_progress">Progress: %.1f%%</string>
     <string name="book_read">Read</string>
+
+    <!-- Bookmark -->
+    <string name="bookmark">Bookmark</string>
+    <string name="bookmark_tab">Bookmarks</string>
+    <string name="add_bookmark">Add Bookmark</string>
+    <string name="edit_bookmark">Edit Bookmark</string>
+    <string name="delete_bookmark">Delete Bookmark</string>
+    <string name="bookmark_title">Title (Optional)</string>
+    <string name="bookmark_note">Note (Optional)</string>
+    <string name="bookmark_color">Color</string>
+    <string name="bookmark_empty">No bookmarks</string>
+    <string name="bookmarks_count">%d bookmarks</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search in document...</string>
+    <string name="search_results">%d/%d</string>
+    <string name="search_no_results">No results found</string>
+    <string name="search_prev">Previous</string>
+    <string name="search_next">Next</string>
+    <string name="search_close">Close Search</string>
+
+    <!-- Reading Stats -->
+    <string name="reading_stats">Reading Statistics</string>
+    <string name="total_reading_time">Total Reading Time: %s</string>
+    <string name="session_count">Reading Sessions: %d</string>
+    <string name="average_session_time">Average Session: %s</string>
+    <string name="completed_pages">Pages Read: %d/%d</string>
+    <string name="consecutive_days">Consecutive Days: %d</string>
+    <string name="first_read_at">First Read: %s</string>
+    <string name="last_read_at">Last Read: %s</string>
+    <string name="annotation_count_stats">Annotations: %d</string>
+    <string name="bookmark_count_stats">Bookmarks: %d</string>
 </resources>

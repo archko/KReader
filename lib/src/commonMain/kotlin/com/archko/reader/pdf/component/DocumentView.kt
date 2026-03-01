@@ -176,6 +176,7 @@ internal fun DocumentViewEffects(
     list: MutableList<APage>,
     jumpToPage: Int?,
     jumpMode: JumpMode,
+    jumpOffsetY: Float? = null,
     initialOrientation: Int,
     initialScrollX: Long,
     initialScrollY: Long,
@@ -184,6 +185,8 @@ internal fun DocumentViewEffects(
     crop: Boolean,
     speakingPageIndex: Int?,
     columnCount: Int,
+    searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>>,
+    currentSearchPageIndex: Int?,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)?,
     onCloseDocument: (() -> Unit)?,
     onPageChanged: ((page: Int) -> Unit)?,
@@ -204,6 +207,11 @@ internal fun DocumentViewEffects(
     LaunchedEffect(speakingPageIndex) {
         flingJob.value?.cancel()
         pageViewState.updateSpeakingPageIndex(speakingPageIndex)
+    }
+
+    // 更新搜索高亮
+    LaunchedEffect(searchHighlightQuads, currentSearchPageIndex) {
+        pageViewState.updateSearchHighlight(searchHighlightQuads, currentSearchPageIndex)
     }
 
     // 设置页面跳转回调
@@ -232,7 +240,7 @@ internal fun DocumentViewEffects(
     }
 
     // 监听外部参数的变化
-    LaunchedEffect(jumpToPage, initialOrientation, pageViewState.init) {
+    LaunchedEffect(jumpToPage, jumpOffsetY, initialOrientation, pageViewState.init) {
         if (columnCount == 1 && initialOrientation != orientation.value && pageViewState.init) {
             isJumping.value = true
             val currentPage = jumpToPage ?: 0
@@ -267,7 +275,7 @@ internal fun DocumentViewEffects(
             return@LaunchedEffect
         }
 
-        if (null != jumpToPage && state.toPage.value != jumpToPage && pageViewState.init) {
+        if (null != jumpToPage && (state.toPage.value != jumpToPage || jumpOffsetY != null) && pageViewState.init) {
             isJumping.value = true
             state.toPage.value = jumpToPage
 
@@ -321,7 +329,14 @@ internal fun DocumentViewEffects(
                     val page = pageViewState.pages.getOrNull(state.toPage.value)
                     if (page != null) {
                         if (orientation.value == Vertical) {
-                            val clampedTargetY = page.bounds.top.coerceIn(
+                            // 如果有精确的offsetY，使用它；否则跳转到页面顶部
+                            val targetY = if (jumpOffsetY != null) {
+                                page.bounds.top + jumpOffsetY
+                            } else {
+                                page.bounds.top
+                            }
+                            
+                            val clampedTargetY = targetY.coerceIn(
                                 0f,
                                 (pageViewState.totalHeight - viewSize.value.height).coerceAtLeast(0f)
                             )
@@ -335,7 +350,7 @@ internal fun DocumentViewEffects(
                             val clampedX = -clampedTargetX
                             offset.value = Offset(clampedX, offset.value.y)
                         }
-                        println("DocumentView: PageNavigation跳转到:${offset.value}, top:${page.bounds.top}, toPage:${state.toPage.value}")
+                        println("DocumentView: PageNavigation跳转到:${offset.value}, top:${page.bounds.top}, offsetY:$jumpOffsetY, toPage:${state.toPage.value}")
                     } else {
                         println("DocumentView: PageNavigation找不到页面:${state.toPage.value}")
                     }

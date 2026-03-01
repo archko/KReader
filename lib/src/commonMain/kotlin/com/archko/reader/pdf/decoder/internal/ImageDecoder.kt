@@ -77,4 +77,14 @@ public interface ImageDecoder {
      * 解析所有页面的文本内容（用于TTS后台缓存）
      */
     public fun decodeReflowAllPages(): List<ReflowBean>
+    
+    /**
+     * 在文档中搜索文本
+     * @param query 搜索关键词
+     * @param caseSensitive 是否区分大小写
+     * @return 搜索结果列表
+     */
+    public fun search(query: String, caseSensitive: Boolean = false): List<com.archko.reader.pdf.component.SearchResult> {
+        return emptyList()  // 默认实现，子类可以覆盖
+    }
 }

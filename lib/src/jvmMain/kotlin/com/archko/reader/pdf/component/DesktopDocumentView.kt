@@ -44,6 +44,7 @@ public fun DesktopDocumentView(
     decoder: ImageDecoder,
     jumpToPage: Int? = null,
     jumpMode: JumpMode = JumpMode.PageRestore,
+    jumpOffsetY: Float? = null,
     initialOrientation: Int,
     columnCount: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
@@ -61,6 +62,8 @@ public fun DesktopDocumentView(
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
     currentPath: String,
+    searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>> = emptyMap(),
+    currentSearchPageIndex: Int? = null,
 ) {
     // 平台判断
     val isMacOs by remember {
@@ -105,6 +108,7 @@ public fun DesktopDocumentView(
         list = list,
         jumpToPage = jumpToPage,
         jumpMode = jumpMode,
+        jumpOffsetY = jumpOffsetY,
         initialOrientation = initialOrientation,
         initialScrollX = initialScrollX,
         initialScrollY = initialScrollY,
@@ -113,6 +117,8 @@ public fun DesktopDocumentView(
         crop = crop,
         speakingPageIndex = speakingPageIndex,
         columnCount = columnCount,
+        searchHighlightQuads = searchHighlightQuads,
+        currentSearchPageIndex = currentSearchPageIndex,
         onSaveDocument = onSaveDocument,
         onCloseDocument = onCloseDocument,
         onPageChanged = onPageChanged,

@@ -56,6 +56,8 @@ fun KApp(
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
     fontViewModel: FontViewModel,
+    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
+    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
     externalPath: String? = null
 ) {
     // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
@@ -88,6 +90,8 @@ fun KApp(
                             viewModel,
                             backupViewModel,
                             fontViewModel,
+                            bookmarkViewModel,
+                            readingStatsViewModel,
                             modifier = Modifier,
                             externalPath = currentExternalPath,
                             onExternalPathConsumed = {
@@ -109,6 +113,8 @@ fun MainContainer(
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
     fontViewModel: FontViewModel,
+    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
+    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
     modifier: Modifier = Modifier,
     externalPath: String? = null,
     onExternalPathConsumed: () -> Unit = {}
@@ -140,6 +146,8 @@ fun MainContainer(
                 viewModel,
                 backupViewModel,
                 fontViewModel,
+                bookmarkViewModel,
+                readingStatsViewModel,
                 modifier = Modifier.consumeWindowInsets(padding),
                 onShowBottomBarChanged = { showBottomBar = it },
                 externalPath = externalPath,
@@ -155,6 +163,8 @@ fun NavGraphBuilder.addHomeGraph(
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
     fontViewModel: FontViewModel,
+    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
+    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
@@ -164,6 +174,8 @@ fun NavGraphBuilder.addHomeGraph(
         FileScreen(
             viewModel,
             fontViewModel,
+            bookmarkViewModel,
+            readingStatsViewModel,
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
             externalPath = externalPath,

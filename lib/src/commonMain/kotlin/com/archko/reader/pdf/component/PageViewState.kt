@@ -44,6 +44,14 @@ public class PageViewState(
     public var speakingPageIndex: Int? by mutableStateOf(null)
         private set
 
+    // 搜索高亮状态
+    public var searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>> by mutableStateOf(emptyMap())
+        private set
+    public var currentSearchPageIndex: Int? by mutableStateOf(null)
+        private set
+    public var currentSearchResultIndex: Int by mutableStateOf(-1)
+        private set
+
     // 预加载配置
     private var preloadScreens: Float = 0.8f // 预加载1屏的距离
 
@@ -158,6 +166,30 @@ public class PageViewState(
     public fun updateSpeakingPageIndex(pageIndex: Int?) {
         println("PageViewState: updateSpeakingPageIndex from $speakingPageIndex to $pageIndex")
         speakingPageIndex = pageIndex
+    }
+
+    /**
+     * 更新搜索高亮状态
+     * @param highlightQuads 每个页面的高亮区域映射
+     * @param currentPageIndex 当前搜索结果所在的页面索引
+     */
+    public fun updateSearchHighlight(
+        highlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>>,
+        currentPageIndex: Int?,
+        currentResultIndex: Int = -1
+    ) {
+        searchHighlightQuads = highlightQuads
+        currentSearchPageIndex = currentPageIndex
+        currentSearchResultIndex = currentResultIndex
+    }
+
+    /**
+     * 清除搜索高亮
+     */
+    public fun clearSearchHighlight() {
+        searchHighlightQuads = emptyMap()
+        currentSearchPageIndex = null
+        currentSearchResultIndex = -1
     }
 
     public fun isTileVisible(spec: TileSpec, strictMode: Boolean = false): Boolean {

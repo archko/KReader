@@ -931,4 +931,78 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
         return mutableBitmap
     }
+
+    /**
+     * 在文档中搜索文本
+     */
+    override fun search(query: String, caseSensitive: Boolean): List<com.archko.reader.pdf.component.SearchResult> {
+        if (query.isBlank() || document == null) {
+            return emptyList()
+        }
+
+        val results = mutableListOf<com.archko.reader.pdf.component.SearchResult>()
+        
+        try {
+            for (pageIndex in 0 until pageCount) {
+                val page = getPage(pageIndex) ?: continue
+                
+                // 使用MuPDF的search功能 - 返回 Quad[][]（二维数组）
+                val searchQuery = if (caseSensitive) query else query.lowercase()
+                val quadArrays = page.search(searchQuery)
+                
+                if (quadArrays.isNotEmpty()) {
+                    // 获取页面文本用于上下文
+                    val structuredText = getStructuredText(pageIndex) as? com.artifex.mupdf.fitz.StructuredText
+                    val pageText = structuredText?.asText() ?: ""
+                    
+                    // 为每个匹配创建结果 - quadArrays是二维数组，每个匹配可能有多个quad
+                    quadArrays.forEach { quadArray ->
+                        if (quadArray.isNotEmpty()) {
+                            // 提取上下文（匹配文本前后各30个字符）
+                            val matchIndex = if (caseSensitive && pageText.isNotEmpty()) {
+                                pageText.indexOf(query)
+                            } else if (pageText.isNotEmpty()) {
+                                pageText.lowercase().indexOf(searchQuery)
+                            } else {
+                                -1
+                            }
+                            
+                            val contextStart = (matchIndex - 30).coerceAtLeast(0)
+                            val contextEnd = (matchIndex + query.length + 30).coerceAtMost(pageText.length)
+                            val context = if (matchIndex >= 0 && pageText.isNotEmpty()) {
+                                pageText.substring(contextStart, contextEnd).trim()
+                            } else {
+                                query
+                            }
+                            
+                            // 转换所有quad到我们的MuPdfQuad格式
+                            val convertedQuads = quadArray.map { quad ->
+                                com.archko.reader.pdf.entity.MuPdfQuad(
+                                    ul = androidx.compose.ui.geometry.Offset(quad.ul_x, quad.ul_y),
+                                    ur = androidx.compose.ui.geometry.Offset(quad.ur_x, quad.ur_y),
+                                    ll = androidx.compose.ui.geometry.Offset(quad.ll_x, quad.ll_y),
+                                    lr = androidx.compose.ui.geometry.Offset(quad.lr_x, quad.lr_y)
+                                )
+                            }
+                            
+                            results.add(
+                                com.archko.reader.pdf.component.SearchResult(
+                                    pageIndex = pageIndex,
+                                    text = query,
+                                    quads = convertedQuads,
+                                    context = context
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            println("PdfDecoder.search error: ${e.message}")
+            e.printStackTrace()
+        }
+        
+        println("PdfDecoder.search: query='$query', found ${results.size} results")
+        return results
+    }
 }

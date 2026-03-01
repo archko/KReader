@@ -19,6 +19,7 @@ public fun MobileDocumentView(
     decoder: ImageDecoder,
     jumpToPage: Int? = null,
     jumpMode: JumpMode = JumpMode.PageRestore,
+    jumpOffsetY: Float? = null,
     initialOrientation: Int,
     columnCount: Int,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
@@ -36,6 +37,8 @@ public fun MobileDocumentView(
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
     currentPath: String,
+    searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>> = emptyMap(),
+    currentSearchPageIndex: Int? = null,
 ) {
     // 创建文档视图状态
     val stateHolder = rememberDocumentViewState(
@@ -70,6 +73,7 @@ public fun MobileDocumentView(
         list = list,
         jumpToPage = jumpToPage,
         jumpMode = jumpMode,
+        jumpOffsetY = jumpOffsetY,
         initialOrientation = initialOrientation,
         initialScrollX = initialScrollX,
         initialScrollY = initialScrollY,
@@ -78,6 +82,8 @@ public fun MobileDocumentView(
         crop = crop,
         speakingPageIndex = speakingPageIndex,
         columnCount = columnCount,
+        searchHighlightQuads = searchHighlightQuads,
+        currentSearchPageIndex = currentSearchPageIndex,
         onSaveDocument = onSaveDocument,
         onCloseDocument = onCloseDocument,
         onPageChanged = onPageChanged,

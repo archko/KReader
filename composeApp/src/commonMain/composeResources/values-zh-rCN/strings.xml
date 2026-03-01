@@ -217,4 +217,36 @@
     <string name="book_read_count">阅读次数: %d</string>
     <string name="book_progress">进度: %.1f%%</string>
     <string name="book_read">阅读</string>
+
+    <!-- 书签 -->
+    <string name="bookmark">书签</string>
+    <string name="bookmark_tab">书签</string>
+    <string name="add_bookmark">添加书签</string>
+    <string name="edit_bookmark">编辑书签</string>
+    <string name="delete_bookmark">删除书签</string>
+    <string name="bookmark_title">标题（可选）</string>
+    <string name="bookmark_note">笔记（可选）</string>
+    <string name="bookmark_color">颜色</string>
+    <string name="bookmark_empty">没有书签</string>
+    <string name="bookmarks_count">%d个书签</string>
+
+    <!-- 搜索 -->
+    <string name="search_hint">在文档中搜索...</string>
+    <string name="search_results">%d/%d</string>
+    <string name="search_no_results">未找到结果</string>
+    <string name="search_prev">上一个</string>
+    <string name="search_next">下一个</string>
+    <string name="search_close">关闭搜索</string>
+
+    <!-- 阅读统计 -->
+    <string name="reading_stats">阅读统计</string>
+    <string name="total_reading_time">总阅读时长: %s</string>
+    <string name="session_count">阅读次数: %d</string>
+    <string name="average_session_time">平均时长: %s</string>
+    <string name="completed_pages">已读页数: %d/%d</string>
+    <string name="consecutive_days">连续阅读: %d天</string>
+    <string name="first_read_at">首次阅读: %s</string>
+    <string name="last_read_at">最后阅读: %s</string>
+    <string name="annotation_count_stats">批注数: %d</string>
+    <string name="bookmark_count_stats">书签数: %d</string>
 </resources>

@@ -20,7 +20,7 @@ public actual class DriverFactory(
             )
             //.setDriver(BundledSQLiteDriver())
             .setQueryCoroutineContext(Dispatchers.IO)
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .fallbackToDestructiveMigration(dropAllTables = false)
             .build()
     }

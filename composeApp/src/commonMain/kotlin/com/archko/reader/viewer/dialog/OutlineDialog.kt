@@ -30,26 +30,38 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.archko.reader.pdf.component.AnnotationPath
+import com.archko.reader.pdf.entity.Bookmark
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.state.AnnotationManager
+import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.annotation_empty
 import kreader.composeapp.generated.resources.annotation_tab
 import kreader.composeapp.generated.resources.annotations_count
+import kreader.composeapp.generated.resources.bookmark_empty
+import kreader.composeapp.generated.resources.bookmark_tab
+import kreader.composeapp.generated.resources.bookmarks_count
 import kreader.composeapp.generated.resources.delete_annotation
+import kreader.composeapp.generated.resources.delete_bookmark
 import kreader.composeapp.generated.resources.document_outline
+import kreader.composeapp.generated.resources.edit_bookmark
 import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.ic_delete
+import kreader.composeapp.generated.resources.ic_edit
 import kreader.composeapp.generated.resources.no_outline
 import kreader.composeapp.generated.resources.outline_tab
 import kreader.composeapp.generated.resources.page_label
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * @author: archko 2025/11/4 :15:17
@@ -59,8 +71,11 @@ fun OutlineDialog(
     currentPage: Int,
     outlineList: List<Item>,
     annotationManager: AnnotationManager?,
+    bookmarkViewModel: BookmarkViewModel?,
     onOutlineClick: (Item) -> Unit,
     onAnnotationClick: (Int) -> Unit,
+    onBookmarkClick: (Bookmark) -> Unit,
+    onEditBookmark: (Bookmark) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -74,6 +89,10 @@ fun OutlineDialog(
         // 使用 Flow 来监听批注数据的变化
         val annotations = annotationManager?.annotationsFlow?.collectAsState()?.value
             ?: emptyMap()
+
+        // 使用 Flow 来监听书签数据的变化
+        val bookmarks = bookmarkViewModel?.currentPathBookmarks?.collectAsState()?.value
+            ?: emptyList()
 
         // 根据当前页码找到最接近的大纲项位置
         val initialOutlineIndex = outlineList.indexOfFirst { it.page >= currentPage }
@@ -128,6 +147,11 @@ fun OutlineDialog(
                         onClick = { selectedTab = 1 },
                         text = { Text(stringResource(Res.string.annotation_tab)) }
                     )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text(stringResource(Res.string.bookmark_tab)) }
+                    )
                 }
 
                 when (selectedTab) {
@@ -143,6 +167,15 @@ fun OutlineDialog(
                         annotations = annotations,
                         annotationManager = annotationManager,
                         onAnnotationClick = onAnnotationClick
+                    )
+
+                    2 -> BookmarkTabContent(
+                        bookmarks = bookmarks,
+                        onBookmarkClick = onBookmarkClick,
+                        onEditBookmark = onEditBookmark,
+                        onDeleteBookmark = { bookmark ->
+                            bookmarkViewModel?.deleteBookmark(bookmark)
+                        }
                     )
                 }
             }
@@ -291,6 +324,148 @@ private fun AnnotationTabContent(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BookmarkTabContent(
+    bookmarks: List<Bookmark>,
+    onBookmarkClick: (Bookmark) -> Unit,
+    onEditBookmark: (Bookmark) -> Unit,
+    onDeleteBookmark: (Bookmark) -> Unit
+) {
+    if (bookmarks.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(Res.string.bookmark_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                horizontal = 12.dp,
+                vertical = 8.dp
+            )
+        ) {
+            itemsIndexed(
+                bookmarks,
+                key = { _, bookmark -> bookmark.id }
+            ) { _, bookmark ->
+                BookmarkListItem(
+                    bookmark = bookmark,
+                    onClick = { onBookmarkClick(bookmark) },
+                    onEdit = { onEditBookmark(bookmark) },
+                    onDelete = { onDeleteBookmark(bookmark) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BookmarkListItem(
+    bookmark: Bookmark,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val bookmarkColor = bookmark.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val createTime = dateFormat.format(Date(bookmark.createAt))
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(4.dp)
+            )
+            .clickable { onClick() }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 颜色标记
+        Box(
+            modifier = Modifier
+                .padding(end = 12.dp)
+                .background(bookmarkColor, RoundedCornerShape(2.dp))
+                .padding(horizontal = 3.dp, vertical = 16.dp)
+        )
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.page_label).format(bookmark.pageIndex + 1),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (!bookmark.title.isNullOrBlank()) {
+                    Text(
+                        text = " - ${bookmark.title}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            if (!bookmark.note.isNullOrBlank()) {
+                Text(
+                    text = bookmark.note!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            Text(
+                text = createTime,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        // 编辑按钮
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier.padding(start = 4.dp)
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_edit),
+                contentDescription = stringResource(Res.string.edit_bookmark),
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // 删除按钮
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.padding(start = 4.dp)
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_delete),
+                contentDescription = stringResource(Res.string.delete_bookmark),
+                tint = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

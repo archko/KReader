@@ -657,4 +657,75 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
         return allTexts
     }
+    
+    /**
+     * 在文档中搜索文本
+     */
+    override fun search(query: String, caseSensitive: Boolean): List<com.archko.reader.pdf.component.SearchResult> {
+        if (query.isBlank() || djvuLoader == null || !djvuLoader!!.isOpened) {
+            return emptyList()
+        }
+
+        val results = mutableListOf<com.archko.reader.pdf.component.SearchResult>()
+        
+        try {
+            for (pageIndex in 0 until pageCount) {
+                // 使用DjvuLoader的searchText功能
+                val searchResults = djvuLoader!!.searchText(pageIndex, query)
+                
+                if (searchResults != null && searchResults.isNotEmpty()) {
+                    // 获取页面文本用于上下文
+                    val pageText = djvuLoader!!.getPageText(pageIndex) ?: ""
+                    
+                    // 为每个匹配创建结果
+                    searchResults.forEach { searchResult ->
+                        // 提取上下文（匹配文本前后各30个字符）
+                        val matchIndex = if (caseSensitive && pageText.isNotEmpty()) {
+                            pageText.indexOf(query)
+                        } else if (pageText.isNotEmpty()) {
+                            pageText.lowercase().indexOf(query.lowercase())
+                        } else {
+                            -1
+                        }
+                        
+                        val contextStart = (matchIndex - 30).coerceAtLeast(0)
+                        val contextEnd = (matchIndex + query.length + 30).coerceAtMost(pageText.length)
+                        val context = if (matchIndex >= 0 && pageText.isNotEmpty()) {
+                            pageText.substring(contextStart, contextEnd).trim()
+                        } else {
+                            query
+                        }
+                        
+                        // 转换搜索结果到MuPdfQuad
+                        val x = searchResult.x.toFloat()
+                        val y = searchResult.y.toFloat()
+                        val width = searchResult.width.toFloat()
+                        val height = searchResult.height.toFloat()
+                        
+                        val quad = com.archko.reader.pdf.entity.MuPdfQuad(
+                            ul = androidx.compose.ui.geometry.Offset(x, y),
+                            ur = androidx.compose.ui.geometry.Offset(x + width, y),
+                            ll = androidx.compose.ui.geometry.Offset(x, y + height),
+                            lr = androidx.compose.ui.geometry.Offset(x + width, y + height)
+                        )
+                        
+                        results.add(
+                            com.archko.reader.pdf.component.SearchResult(
+                                pageIndex = pageIndex,
+                                text = query,
+                                quads = listOf(quad),
+                                context = context
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            println("DjvuDecoder.search error: ${e.message}")
+            e.printStackTrace()
+        }
+        
+        println("DjvuDecoder.search: query='$query', found ${results.size} results")
+        return results
+    }
 }

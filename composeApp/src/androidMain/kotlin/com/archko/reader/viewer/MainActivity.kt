@@ -139,8 +139,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 val viewModel: PdfViewModel = viewModel()
                 val fontViewModel: FontViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
+                val bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel = viewModel()
+                val readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel = viewModel()
                 viewModel.database = database
                 backupViewModel.database = database
+                bookmarkViewModel.database = database
+                readingStatsViewModel.database = database
 
                 KApp(
                     screenWidthInPixels.toInt(),
@@ -148,6 +152,8 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                     viewModel,
                     backupViewModel,
                     fontViewModel,
+                    bookmarkViewModel,
+                    readingStatsViewModel,
                     externalPath
                 )
             }

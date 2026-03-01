@@ -20,6 +20,7 @@ import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.PathConfig
+import com.archko.reader.pdf.component.SearchState
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -33,6 +34,8 @@ import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.viewer.component.DrawingToolbar
+import com.archko.reader.viewer.component.SearchBar
+import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
@@ -73,6 +76,8 @@ private fun ToolbarContent(
     onZoomChange: (zoom: Double) -> Unit,
     vZoom: Double,
     onOutlineDialogShow: () -> Unit,
+    onBookmarkDialogShow: () -> Unit,
+    onSearchBarShow: () -> Unit,
     onQueueDialogShow: () -> Unit,
     onThumbnailDialogShow: () -> Unit,
     onColumnCountChanged: (Int) -> Unit,
@@ -274,7 +279,20 @@ private fun ToolbarContent(
                 //        tint = if (isReflow) Color.Green else Color.White
                 //    )
                 //}
-                IconButton(onClick = { }) {
+                
+                // 书签按钮
+                if (FileTypeUtils.isDocumentFile(currentPath)) {
+                    IconButton(onClick = { onBookmarkDialogShow() }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_bookmark),
+                            contentDescription = stringResource(Res.string.bookmark),
+                            tint = Color.White
+                        )
+                    }
+                }
+                
+                // 搜索按钮
+                IconButton(onClick = { onSearchBarShow() }) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_search),
                         contentDescription = stringResource(Res.string.search),
@@ -307,6 +325,8 @@ fun CustomView(
     scrollOri: Long = 0,
     reflow: Long = 0,
     crop: Boolean? = null,
+    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
+    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
 ) {
     var vZoom by remember { mutableDoubleStateOf(initialZoom) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
@@ -321,11 +341,67 @@ fun CustomView(
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
     var pathConfig by remember { mutableStateOf(PathConfig()) }
+    
+    // 书签相关状态
+    var showAddBookmarkDialog by remember { mutableStateOf(false) }
+    var editingBookmark by remember { mutableStateOf<com.archko.reader.pdf.entity.Bookmark?>(null) }
+    
+    // 阅读时长追踪
+    val readingTimeTracker = remember { com.archko.reader.pdf.util.ReadingTimeTracker() }
+    
+    // 用于保存当前页码的引用
+    var currentPageRef = remember { mutableIntStateOf(progressPage ?: 0) }
+    
+    // 搜索相关状态
+    var showSearchBar by remember { mutableStateOf(false) }
+    var searchState by remember { mutableStateOf(SearchState()) }
+    
+    // 构建搜索高亮映射（按页面分组）
+    // 当前结果的quads放在最前面，这样Page.kt绘制时第一个quad会被特殊高亮
+    val searchHighlightQuads = remember(searchState.results, searchState.currentIndex) {
+        val highlightMap = mutableMapOf<Int, MutableList<com.archko.reader.pdf.entity.MuPdfQuad>>()
+        
+        // 先添加当前结果的quads
+        val currentResult = searchState.currentResult
+        if (currentResult != null) {
+            highlightMap.getOrPut(currentResult.pageIndex) { mutableListOf() }.addAll(currentResult.quads)
+        }
+        
+        // 再添加其他结果的quads
+        searchState.results.forEachIndexed { index, r ->
+            if (index != searchState.currentIndex) {
+                highlightMap.getOrPut(r.pageIndex) { mutableListOf() }.addAll(r.quads)
+            }
+        }
+        
+        highlightMap
+    }
+    
+    val currentSearchPageIndex = searchState.currentResult?.pageIndex
 
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
 
     val speechService: SpeechService = remember { TtsQueueService() }
+    
+    LaunchedEffect(Unit) {
+        // 加载书签
+        if (paths.size == 1 && FileTypeUtils.isDocumentFile(paths[0])) {
+            bookmarkViewModel.loadBookmarks(paths[0])
+        }
+    }
+    
+    // 阅读时长追踪 - 启动
+    LaunchedEffect(currentPath) {
+        if (FileTypeUtils.isDocumentFile(currentPath)) {
+            readingTimeTracker.startSession()
+            // 初始化统计数据
+            decoder?.let { dec ->
+                readingStatsViewModel.startSession(currentPath, dec.originalPageSizes.size)
+            }
+        }
+    }
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -388,19 +464,6 @@ fun CustomView(
                     println("文档加载失败: $currentPath, 错误: ${e.message}")
                     loadingError = "document_open_failed"
                     decoder = null
-                }
-            }
-        }
-
-        DisposableEffect(currentPath) {
-            onDispose {
-                println("CustomView.onDispose:$currentPath, $decoder")
-                decoder?.close()
-                if (speechService is TtsQueueService) {
-                    speechService.setProgressListener(null)
-                    speechService.destroy()
-                } else {
-                    speechService.stop()
                 }
             }
         }
@@ -581,6 +644,78 @@ fun CustomView(
 
             var columnCount by remember { mutableIntStateOf(1) }
             
+            // 搜索辅助函数 - 必须在performSearch之前定义
+            fun goToSearchResult(index: Int) {
+                if (index < 0 || index >= searchState.results.size) return
+                
+                val result = searchState.results[index]
+                searchState = searchState.copy(currentIndex = index)
+                
+                // 计算搜索结果在页面中的Y坐标（取第一个quad的顶部）
+                // 减去80dp避免被工具栏覆盖
+                val offsetY = result.quads.firstOrNull()?.ul?.y?.let { y ->
+                    (y - 80f).coerceAtLeast(0f)
+                }
+                
+                // 跳转到结果所在页面，带上精确偏移
+                jumpIntent = JumpIntent(
+                    page = result.pageIndex,
+                    mode = JumpMode.PageNavigation,
+                    offsetY = offsetY
+                )
+            }
+            
+            fun goToNextResult() {
+                if (searchState.results.isEmpty()) return
+                val nextIndex = (searchState.currentIndex + 1) % searchState.results.size
+                goToSearchResult(nextIndex)
+            }
+            
+            fun goToPreviousResult() {
+                if (searchState.results.isEmpty()) return
+                val prevIndex = if (searchState.currentIndex <= 0) {
+                    searchState.results.size - 1
+                } else {
+                    searchState.currentIndex - 1
+                }
+                goToSearchResult(prevIndex)
+            }
+            
+            // 搜索功能函数
+            fun performSearch(query: String) {
+                if (query.isBlank()) {
+                    searchState = SearchState()
+                    return
+                }
+                
+                searchState = searchState.copy(isSearching = true)
+                
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val results = decoder!!.search(query, caseSensitive = false)
+                        withContext(Dispatchers.Main) {
+                            searchState = SearchState(
+                                query = query,
+                                results = results,
+                                currentIndex = if (results.isNotEmpty()) 0 else -1,
+                                isSearching = false,
+                                totalCount = results.size
+                            )
+                            
+                            // 如果有结果，跳转到第一个结果
+                            if (results.isNotEmpty()) {
+                                goToSearchResult(0)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        println("搜索失败: ${e.message}")
+                        withContext(Dispatchers.Main) {
+                            searchState = searchState.copy(isSearching = false)
+                        }
+                    }
+                }
+            }
+            
             // 设置TTS进度监听器
             LaunchedEffect(speechService) {
                 speechService.setProgressListener(object : TtsProgressListener {
@@ -635,6 +770,36 @@ fun CustomView(
                 }
                 AnnotationManager(absolutePath)
             }
+            
+            // 清理资源
+            DisposableEffect(currentPath) {
+                onDispose {
+                    println("CustomView.onDispose:$currentPath, $decoder")
+                    decoder?.close()
+                    if (speechService is TtsQueueService) {
+                        speechService.setProgressListener(null)
+                        speechService.destroy()
+                    } else {
+                        speechService.stop()
+                    }
+                    
+                    // 保存阅读统计
+                    if (FileTypeUtils.isDocumentFile(currentPath)) {
+                        val sessionDuration = readingTimeTracker.pauseSession()
+                        val annotationCount = annotationManager.annotations.values.sumOf { it.size }
+                        val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
+                        scope.launch {
+                            readingStatsViewModel.endSession(
+                                path = currentPath,
+                                sessionDuration = sessionDuration,
+                                currentPage = currentPageRef.intValue,
+                                annotationCount = annotationCount,
+                                bookmarkCount = bookmarkCount
+                            )
+                        }
+                    }
+                }
+            }
 
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -655,6 +820,8 @@ fun CustomView(
                     onCropChange = { isCrop = !isCrop },
                     isCrop = isCrop,
                     onOutlineDialogShow = { showOutlineDialog = true },
+                    onBookmarkDialogShow = { showAddBookmarkDialog = true },
+                    onSearchBarShow = { showSearchBar = !showSearchBar },
                     onQueueDialogShow = { showQueueDialog = true },
                     onThumbnailDialogShow = { showThumbnailDialog = true },
                     onColumnCountChanged = { columnCount = it },
@@ -724,6 +891,7 @@ fun CustomView(
                             decoder = decoder!!,
                             jumpToPage = jumpIntent.page,
                             jumpMode = jumpIntent.mode,
+                            jumpOffsetY = jumpIntent.offsetY,
                             initialOrientation = orientation,
                             columnCount = columnCount,
                             onSaveDocument = onSaveDocument,
@@ -734,7 +902,10 @@ fun CustomView(
                                 }
                             }, // 只在非重排模式下传递关闭回调
                             onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
-                            onPageChanged = { page -> currentPage = page },
+                            onPageChanged = { page -> 
+                                currentPage = page
+                                currentPageRef.intValue = page
+                            },
                             onTapNonPageArea = { clickedPageIndex ->
                                 // 点击非翻页区域时隐藏底部工具栏
                                 if (showBottomToolbar) {
@@ -759,6 +930,8 @@ fun CustomView(
                             pathConfig = pathConfig,
                             annotationManager = annotationManager,
                             currentPath = currentPath,
+                            searchHighlightQuads = searchHighlightQuads,
+                            currentSearchPageIndex = currentSearchPageIndex,
                         )
                     }
 
@@ -766,13 +939,40 @@ fun CustomView(
                         visible = gestureMode == GestureMode.DRAW,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 0.dp)
                     ) {
                         DrawingToolbar(
                             annotationManager = annotationManager,
                             pathConfig = pathConfig,
                             onClose = { config ->
                                 pathConfig = config
+                            }
+                        )
+                    }
+                    
+                    // 搜索栏 - 在画线工具条下方
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showSearchBar,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = if (gestureMode == GestureMode.DRAW) 48.dp else 0.dp)
+                    ) {
+                        SearchBar(
+                            searchState = searchState,
+                            onQueryChange = { query ->
+                                searchState = searchState.copy(query = query)
+                            },
+                            onSearch = {
+                                performSearch(searchState.query)
+                            },
+                            onPrevious = {
+                                goToPreviousResult()
+                            },
+                            onNext = {
+                                goToNextResult()
+                            },
+                            onClose = {
+                                showSearchBar = false
+                                searchState = SearchState()
                             }
                         )
                     }
@@ -784,6 +984,7 @@ fun CustomView(
                             currentPage,
                             outlineList,
                             annotationManager,
+                            bookmarkViewModel = bookmarkViewModel,
                             onOutlineClick = { item ->
                                 jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
                                 showOutlineDialog = false
@@ -791,6 +992,14 @@ fun CustomView(
                             onAnnotationClick = { pageIndex ->
                                 jumpIntent = JumpIntent(pageIndex, JumpMode.PageNavigation)
                                 showOutlineDialog = false
+                            },
+                            onBookmarkClick = { bookmark ->
+                                jumpIntent = JumpIntent(bookmark.pageIndex, JumpMode.PageNavigation)
+                                showOutlineDialog = false
+                            },
+                            onEditBookmark = { bookmark ->
+                                editingBookmark = bookmark
+                                showAddBookmarkDialog = true
                             },
                             onDismiss = { showOutlineDialog = false },
                         )
@@ -880,6 +1089,39 @@ fun CustomView(
                                 showThumbnailDialog = false
                             },
                             onDismiss = { showThumbnailDialog = false },
+                        )
+                    }
+                    
+                    // 添加/编辑书签对话框
+                    if (showAddBookmarkDialog) {
+                        AddBookmarkDialog(
+                            pageIndex = currentPage,
+                            existingBookmark = editingBookmark,
+                            onSave = { title, note, color ->
+                                if (editingBookmark != null) {
+                                    // 编辑现有书签
+                                    editingBookmark!!.apply {
+                                        this.title = title
+                                        this.note = note
+                                        this.color = color
+                                    }
+                                    bookmarkViewModel.updateBookmark(editingBookmark!!)
+                                } else {
+                                    // 添加新书签
+                                    bookmarkViewModel.addBookmark(
+                                        path = currentPath,
+                                        pageIndex = currentPage,
+                                        title = title,
+                                        note = note,
+                                        color = color
+                                    )
+                                }
+                                editingBookmark = null
+                            },
+                            onDismiss = {
+                                showAddBookmarkDialog = false
+                                editingBookmark = null
+                            }
                         )
                     }
                 }

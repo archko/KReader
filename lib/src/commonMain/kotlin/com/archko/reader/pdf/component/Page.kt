@@ -490,6 +490,7 @@ public class Page(
 
                 // 绘制文本选择高亮
                 drawTextSelection(drawScope, currentBounds)
+                drawSearchHighlight(drawScope, currentBounds)
                 drawSpeakingIndicator(drawScope, currentBounds)
                 drawAnnotation(drawScope)
                 drawSeparator(drawScope, currentBounds)
@@ -587,6 +588,63 @@ public class Page(
                 size = Size(right - left, bottom - top)
             )
         }
+    }
+
+    /**
+     * 绘制搜索结果高亮
+     */
+    private fun drawSearchHighlight(drawScope: DrawScope, currentBounds: Rect) {
+        val highlightQuads = pageViewState.searchHighlightQuads[aPage.index] ?: return
+        val isCurrentPage = pageViewState.currentSearchPageIndex == aPage.index
+        
+        // 所有结果用黄色半透明
+        val normalHighlightColor = Color(0x55FFFF00)
+        
+        highlightQuads.forEach { quad ->
+            // 将Page坐标的Quad转换为屏幕坐标
+            val screenQuad = quadToScreenQuad(quad, currentBounds)
+
+            // 绘制高亮矩形（使用quad的边界框）
+            val left = minOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
+            val top = minOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
+            val right = maxOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
+            val bottom = maxOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
+
+            drawScope.drawRect(
+                color = normalHighlightColor,
+                topLeft = Offset(left, top),
+                size = Size(right - left, bottom - top)
+            )
+        }
+        
+        // 如果是当前页面，在第一个结果上再绘制一层橙色高亮
+        if (isCurrentPage && highlightQuads.isNotEmpty()) {
+            val currentQuad = highlightQuads[0]
+            val screenQuad = quadToScreenQuad(currentQuad, currentBounds)
+            
+            val left = minOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
+            val top = minOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
+            val right = maxOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
+            val bottom = maxOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
+
+            drawScope.drawRect(
+                color = Color(0x88FFA500), // 橙色，更不透明
+                topLeft = Offset(left, top),
+                size = Size(right - left, bottom - top)
+            )
+        }
+    }
+
+    /**
+     * 将Page坐标的Quad转换为屏幕坐标的Quad
+     */
+    private fun quadToScreenQuad(quad: com.archko.reader.pdf.entity.MuPdfQuad, currentBounds: Rect): com.archko.reader.pdf.entity.MuPdfQuad {
+        return com.archko.reader.pdf.entity.MuPdfQuad(
+            ul = pagePointToScreenPoint(quad.ul.x, quad.ul.y, currentBounds),
+            ur = pagePointToScreenPoint(quad.ur.x, quad.ur.y, currentBounds),
+            ll = pagePointToScreenPoint(quad.ll.x, quad.ll.y, currentBounds),
+            lr = pagePointToScreenPoint(quad.lr.x, quad.lr.y, currentBounds)
+        )
     }
 
     /**

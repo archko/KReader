@@ -29,7 +29,9 @@ import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.DriverFactory
 import com.archko.reader.pdf.cache.FileUtils
 import com.archko.reader.pdf.viewmodel.BackupViewModel
+import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -521,8 +523,12 @@ fun main(args: Array<String>) {
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 val viewModel: PdfViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
+                val bookmarkViewModel: BookmarkViewModel = viewModel()
+                val readingStatsViewModel: ReadingStatsViewModel = viewModel()
                 viewModel.database = database
                 backupViewModel.database = database
+                bookmarkViewModel.database = database
+                readingStatsViewModel.database = database
 
                 // 文档管理状态
                 var currentFilePath by remember { mutableStateOf(initialFilePath) }
@@ -579,7 +585,7 @@ fun main(args: Array<String>) {
                 // FileScreen 将使用 currentFilePath 来加载文件
                 // 使用 key 确保文档切换时正确重新加载
                 key(currentFilePath) {
-                    FileScreen(viewModel, backupViewModel, currentFilePath)
+                    FileScreen(viewModel, backupViewModel, bookmarkViewModel, readingStatsViewModel, currentFilePath)
                 }
             }
         }
