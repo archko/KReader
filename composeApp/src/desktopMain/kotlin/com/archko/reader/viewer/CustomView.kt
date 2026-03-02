@@ -999,10 +999,12 @@ fun CustomView(
                     if (showOutlineDialog && FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
                         val outlineList = decoder?.outlineItems ?: emptyList()
                         OutlineDialog(
-                            currentPage,
-                            outlineList,
-                            annotationManager,
+                            currentPage = currentPage,
+                            currentPath = currentPath,
+                            outlineList = outlineList,
+                            annotationManager = annotationManager,
                             bookmarkViewModel = bookmarkViewModel,
+                            aiViewModel = aiViewModel,
                             onOutlineClick = { item ->
                                 jumpIntent = JumpIntent(item.page, JumpMode.PageNavigation)
                                 showOutlineDialog = false
@@ -1018,6 +1020,10 @@ fun CustomView(
                             onEditBookmark = { bookmark ->
                                 editingBookmark = bookmark
                                 showAddBookmarkDialog = true
+                            },
+                            onAIConversationClick = { pageIndex ->
+                                jumpIntent = JumpIntent(pageIndex, JumpMode.PageNavigation)
+                                showOutlineDialog = false
                             },
                             onDismiss = { showOutlineDialog = false },
                         )

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.entity.AIPageConversation
 import com.archko.reader.pdf.entity.AIProvider
+import com.archko.reader.pdf.service.AIService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -16,6 +17,8 @@ import kotlinx.coroutines.launch
 public class AIViewModel : ViewModel() {
 
     public var database: AppDatabase? = null
+    
+    private val aiService = AIService()
 
     private val _providers = MutableStateFlow<List<AIProvider>>(emptyList())
     public val providers: StateFlow<List<AIProvider>> = _providers
@@ -174,5 +177,79 @@ public class AIViewModel : ViewModel() {
      */
     public fun setLoading(loading: Boolean) {
         _isLoading.value = loading
+    }
+
+    /**
+     * 发送问题到 AI 并保存对话
+     */
+    public fun askQuestion(
+        documentPath: String,
+        documentName: String,
+        pageIndex: Int,
+        question: String,
+        pageContent: String,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            
+            try {
+                // 获取当前默认的 AI 提供商
+                val provider = getCurrentProvider()
+                if (provider == null) {
+                    onError("请先配置 AI 提供商")
+                    _isLoading.value = false
+                    return@launch
+                }
+                
+                if (provider.apiKey.isBlank()) {
+                    onError("请先配置 ${provider.name} 的 API Key")
+                    _isLoading.value = false
+                    return@launch
+                }
+                
+                // 调用 AI 服务
+                val result = aiService.chat(provider, question, pageContent)
+                
+                result.fold(
+                    onSuccess = { answer ->
+                        // 保存对话
+                        saveConversation(
+                            documentPath = documentPath,
+                            documentName = documentName,
+                            pageIndex = pageIndex,
+                            question = question,
+                            answer = answer,
+                            pageContent = pageContent
+                        )
+                        onSuccess(answer)
+                    },
+                    onFailure = { error ->
+                        onError(error.message ?: "AI 调用失败")
+                    }
+                )
+            } catch (e: Exception) {
+                onError("发生错误: ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * 获取所有文档的对话记录（按页面分组）
+     */
+    public fun loadAllConversations(documentPath: String) {
+        viewModelScope.launch {
+            val allConversations = database?.aiPageConversationDao()
+                ?.getConversationsByDocument(documentPath) ?: emptyList()
+            _conversations.value = allConversations
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        aiService.close()
     }
 }

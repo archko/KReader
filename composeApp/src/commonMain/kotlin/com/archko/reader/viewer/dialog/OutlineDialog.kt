@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,6 +24,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,11 +38,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.archko.reader.pdf.component.AnnotationPath
+import com.archko.reader.pdf.entity.AIPageConversation
 import com.archko.reader.pdf.entity.Bookmark
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.state.AnnotationManager
+import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ai_chat_empty
+import kreader.composeapp.generated.resources.ai_chat_tab
+import kreader.composeapp.generated.resources.ai_conversations_count
 import kreader.composeapp.generated.resources.annotation_empty
 import kreader.composeapp.generated.resources.annotation_tab
 import kreader.composeapp.generated.resources.annotations_count
@@ -51,6 +58,7 @@ import kreader.composeapp.generated.resources.delete_annotation
 import kreader.composeapp.generated.resources.delete_bookmark
 import kreader.composeapp.generated.resources.document_outline
 import kreader.composeapp.generated.resources.edit_bookmark
+import kreader.composeapp.generated.resources.ic_ai
 import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.ic_delete
 import kreader.composeapp.generated.resources.ic_edit
@@ -69,13 +77,16 @@ import java.util.Locale
 @Composable
 fun OutlineDialog(
     currentPage: Int,
+    currentPath: String,
     outlineList: List<Item>,
     annotationManager: AnnotationManager?,
     bookmarkViewModel: BookmarkViewModel?,
+    aiViewModel: AIViewModel?,
     onOutlineClick: (Item) -> Unit,
     onAnnotationClick: (Int) -> Unit,
     onBookmarkClick: (Bookmark) -> Unit,
     onEditBookmark: (Bookmark) -> Unit,
+    onAIConversationClick: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -86,13 +97,19 @@ fun OutlineDialog(
 
         val hasOutline = outlineList.isNotEmpty()
 
-        // 使用 Flow 来监听批注数据的变化
         val annotations = annotationManager?.annotationsFlow?.collectAsState()?.value
             ?: emptyMap()
 
-        // 使用 Flow 来监听书签数据的变化
         val bookmarks = bookmarkViewModel?.currentPathBookmarks?.collectAsState()?.value
             ?: emptyList()
+
+        val aiConversations = aiViewModel?.conversations?.collectAsState()?.value
+            ?: emptyList()
+
+        // 加载 AI 对话记录
+        LaunchedEffect(currentPath) {
+            aiViewModel?.loadAllConversations(currentPath)
+        }
 
         // 根据当前页码找到最接近的大纲项位置
         val initialOutlineIndex = outlineList.indexOfFirst { it.page >= currentPage }
@@ -152,6 +169,11 @@ fun OutlineDialog(
                         onClick = { selectedTab = 2 },
                         text = { Text(stringResource(Res.string.bookmark_tab)) }
                     )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text(stringResource(Res.string.ai_chat_tab)) }
+                    )
                 }
 
                 when (selectedTab) {
@@ -176,6 +198,11 @@ fun OutlineDialog(
                         onDeleteBookmark = { bookmark ->
                             bookmarkViewModel?.deleteBookmark(bookmark)
                         }
+                    )
+
+                    3 -> AIConversationTabContent(
+                        conversations = aiConversations,
+                        onConversationClick = onAIConversationClick
                     )
                 }
             }
@@ -466,6 +493,89 @@ private fun BookmarkListItem(
                 contentDescription = stringResource(Res.string.delete_bookmark),
                 tint = MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+@Composable
+private fun AIConversationTabContent(
+    conversations: List<AIPageConversation>,
+    onConversationClick: (Int) -> Unit
+) {
+    if (conversations.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(Res.string.ai_chat_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        // 按页面分组
+        val conversationsByPage = conversations.groupBy { it.pageIndex }
+        
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                horizontal = 12.dp,
+                vertical = 8.dp
+            )
+        ) {
+            conversationsByPage.forEach { (pageIndex, pageConversations) ->
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .clickable { onConversationClick(pageIndex) }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.page_label).format(pageIndex + 1),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(Res.string.ai_conversations_count)
+                                    .format(pageConversations.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            // 显示最后一条对话的问题预览
+                            pageConversations.firstOrNull()?.let { lastConv ->
+                                Text(
+                                    text = lastConv.question,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_ai),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

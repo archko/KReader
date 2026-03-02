@@ -1,6 +1,5 @@
 package com.archko.reader.viewer.dialog
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -21,7 +19,6 @@ import com.archko.reader.pdf.viewmodel.AIViewModel
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import java.io.File
 
 /**
  * AI页面对话框
@@ -43,14 +40,18 @@ fun AIPageDialog(
     var isLoadingText by remember { mutableStateOf(true) }
     var question by remember { mutableStateOf("") }
     
+    // 在 Composable 上下文中获取字符串资源
+    val unableToGetTextMsg = stringResource(Res.string.unable_to_get_page_text)
+    val unableToGetTextErrorMsg = stringResource(Res.string.unable_to_get_page_text_error, "")
+    
     // 加载页面文本
     LaunchedEffect(pageIndex) {
         isLoadingText = true
         try {
             val reflowBean = decoder.decodeReflowSinglePage(pageIndex)
-            pageText = reflowBean?.data ?: "无法获取页面文本"
+            pageText = reflowBean?.data ?: unableToGetTextMsg
         } catch (e: Exception) {
-            pageText = "无法获取页面文本: ${e.message}"
+            pageText = unableToGetTextErrorMsg.replace("%s", e.message ?: "")
         } finally {
             isLoadingText = false
         }
@@ -80,7 +81,7 @@ fun AIPageDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "AI 助手 - 第 ${pageIndex + 1} 页",
+                        text = stringResource(Res.string.ai_assistant_page, pageIndex + 1),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -88,7 +89,7 @@ fun AIPageDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_close),
-                            contentDescription = "关闭",
+                            contentDescription = stringResource(Res.string.close),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -119,13 +120,13 @@ fun AIPageDialog(
                                 .padding(12.dp)
                         ) {
                             Text(
-                                text = "页面内容",
+                                text = stringResource(Res.string.page_content),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = pageText ?: "无内容",
+                                text = pageText ?: stringResource(Res.string.no_content),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
@@ -153,7 +154,7 @@ fun AIPageDialog(
                             .padding(12.dp)
                     ) {
                         Text(
-                            text = "对话历史",
+                            text = stringResource(Res.string.conversation_history),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -165,7 +166,7 @@ fun AIPageDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "暂无对话记录",
+                                    text = stringResource(Res.string.no_conversation_records),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
@@ -195,7 +196,7 @@ fun AIPageDialog(
                         value = question,
                         onValueChange = { question = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("基于此内容提问...") },
+                        placeholder = { Text(stringResource(Res.string.ask_based_on_content)) },
                         enabled = !isLoading && !isLoadingText,
                         singleLine = false,
                         maxLines = 3
@@ -204,14 +205,22 @@ fun AIPageDialog(
                     Button(
                         onClick = {
                             if (question.isNotBlank() && pageText != null) {
-                                // TODO: 调用AI接口
-                                // 暂时显示提示
-                                aiViewModel.setLoading(true)
-                                // 这里需要检查AI配置并调用
-                                // 如果没有配置，显示Toast
-                                onShowToast?.invoke("AI功能尚未配置，请先在设置中配置AI服务")
+                                val currentQuestion = question
                                 question = ""
-                                aiViewModel.setLoading(false)
+                                
+                                aiViewModel.askQuestion(
+                                    documentPath = currentPath,
+                                    documentName = currentPath.substringAfterLast('/'),
+                                    pageIndex = pageIndex,
+                                    question = currentQuestion,
+                                    pageContent = pageText ?: "",
+                                    onSuccess = { answer ->
+                                        // 对话已保存，会自动刷新列表
+                                    },
+                                    onError = { error ->
+                                        onShowToast?.invoke(error)
+                                    }
+                                )
                             }
                         },
                         enabled = !isLoading && !isLoadingText && question.isNotBlank()
@@ -222,7 +231,7 @@ fun AIPageDialog(
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
                         } else {
-                            Text("发送")
+                            Text(stringResource(Res.string.send))
                         }
                     }
                 }

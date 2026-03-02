@@ -261,4 +261,19 @@
     <string name="last_read_at">最后阅读: %s</string>
     <string name="annotation_count_stats">批注数: %d</string>
     <string name="bookmark_count_stats">书签数: %d</string>
+
+    <!-- AI 页面对话框 -->
+    <string name="ai_assistant_page">AI 助手 - 第 %d 页</string>
+    <string name="page_content">页面内容</string>
+    <string name="no_content">无内容</string>
+    <string name="conversation_history">对话历史</string>
+    <string name="no_conversation_records">暂无对话记录</string>
+    <string name="ask_based_on_content">基于此内容提问...</string>
+    <string name="send">发送</string>
+    <string name="unable_to_get_page_text">无法获取页面文本</string>
+    <string name="unable_to_get_page_text_error">无法获取页面文本: %s</string>
+    <string name="ai_not_configured">AI功能尚未配置，请先在设置中配置AI服务</string>
+    <string name="ai_chat_tab">AI对话</string>
+    <string name="ai_chat_empty">暂无AI对话记录</string>
+    <string name="ai_conversations_count">%d条对话</string>
 </resources>

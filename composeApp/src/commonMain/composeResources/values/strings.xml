@@ -260,4 +260,19 @@
     <string name="last_read_at">Last Read: %s</string>
     <string name="annotation_count_stats">Annotations: %d</string>
     <string name="bookmark_count_stats">Bookmarks: %d</string>
+
+    <!-- AI Page Dialog -->
+    <string name="ai_assistant_page">AI Assistant - Page %d</string>
+    <string name="page_content">Page Content</string>
+    <string name="no_content">No content</string>
+    <string name="conversation_history">Conversation History</string>
+    <string name="no_conversation_records">No conversation records</string>
+    <string name="ask_based_on_content">Ask based on this content...</string>
+    <string name="send">Send</string>
+    <string name="unable_to_get_page_text">Unable to get page text</string>
+    <string name="unable_to_get_page_text_error">Unable to get page text: %s</string>
+    <string name="ai_not_configured">AI feature not configured, please configure AI service in settings first</string>
+    <string name="ai_chat_tab">AI Chat</string>
+    <string name="ai_chat_empty">No AI conversations</string>
+    <string name="ai_conversations_count">%d conversations</string>
 </resources>
