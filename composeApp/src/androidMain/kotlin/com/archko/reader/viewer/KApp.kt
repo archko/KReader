@@ -182,6 +182,7 @@ fun NavGraphBuilder.addHomeGraph(
             fontViewModel,
             bookmarkViewModel,
             readingStatsViewModel,
+            aiViewModel,
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
             externalPath = externalPath,

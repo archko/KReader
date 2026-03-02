@@ -123,3 +123,24 @@ public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
     }
 }
 
+
+public val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(connection: SQLiteConnection) {
+        // Create ai_page_conversation table
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS ai_page_conversation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                document_path TEXT NOT NULL,
+                document_name TEXT NOT NULL,
+                page_index INTEGER NOT NULL,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                page_content TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+        """.trimIndent())
+        
+        // Create indexes for ai_page_conversation
+        connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_page_conversation_document_path_page_index ON ai_page_conversation(document_path, page_index)")
+    }
+}

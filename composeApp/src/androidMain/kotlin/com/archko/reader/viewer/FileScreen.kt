@@ -101,6 +101,7 @@ fun FileScreen(
     fontViewModel: FontViewModel,
     bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
     readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
+    aiViewModel: com.archko.reader.pdf.viewmodel.AIViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,
@@ -556,7 +557,8 @@ fun FileScreen(
                     crop = 0L == viewModel.recent?.crop,
                     fontViewModel = fontViewModel,
                     bookmarkViewModel = bookmarkViewModel,
-                    readingStatsViewModel = readingStatsViewModel
+                    readingStatsViewModel = readingStatsViewModel,
+                    aiViewModel = aiViewModel
                 )
             }
         }

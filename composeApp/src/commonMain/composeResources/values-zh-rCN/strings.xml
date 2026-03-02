@@ -191,6 +191,11 @@
     <string name="split_merge_pdf">PDF拆分/合并</string>
     
     <string name="ai_setting">AI 设置</string>
+    <string name="ai_setting_title">AI 设置</string>
+    <string name="ai_edit_provider">编辑 %s</string>
+    <string name="ai_api_key_label">API Key</string>
+    <string name="ai_api_url_label">API 地址</string>
+    <string name="ai_model_name_label">模型名称</string>
     <string name="select_model">选择模型</string>
     <string name="input_token">输入 Token</string>
     <string name="save">保存</string>

@@ -36,7 +36,11 @@ import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.entity.AIProvider
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.ai_setting
+import kreader.composeapp.generated.resources.ai_api_key_label
+import kreader.composeapp.generated.resources.ai_api_url_label
+import kreader.composeapp.generated.resources.ai_edit_provider
+import kreader.composeapp.generated.resources.ai_model_name_label
+import kreader.composeapp.generated.resources.ai_setting_title
 import kreader.composeapp.generated.resources.cancel
 import kreader.composeapp.generated.resources.ic_edit
 import kreader.composeapp.generated.resources.save
@@ -72,7 +76,7 @@ fun AISettingDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(Res.string.ai_setting)) },
+        title = { Text(text = stringResource(Res.string.ai_setting_title)) },
         text = {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,7 +190,7 @@ private fun AIProviderEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = "编辑 ${provider.name}") },
+        title = { Text(text = stringResource(Res.string.ai_edit_provider, provider.name)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -195,7 +199,7 @@ private fun AIProviderEditDialog(
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
-                    label = { Text("API Key") },
+                    label = { Text(stringResource(Res.string.ai_api_key_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true
@@ -204,7 +208,7 @@ private fun AIProviderEditDialog(
                 OutlinedTextField(
                     value = baseUrl,
                     onValueChange = { baseUrl = it },
-                    label = { Text("API 地址") },
+                    label = { Text(stringResource(Res.string.ai_api_url_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -212,7 +216,7 @@ private fun AIProviderEditDialog(
                 OutlinedTextField(
                     value = model,
                     onValueChange = { model = it },
-                    label = { Text("模型名称") },
+                    label = { Text(stringResource(Res.string.ai_model_name_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )

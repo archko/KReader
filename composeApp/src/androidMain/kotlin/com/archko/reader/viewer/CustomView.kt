@@ -46,6 +46,7 @@ import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.component.SearchBar
+import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.FontDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
@@ -78,7 +79,6 @@ import java.io.File
 @Composable
 private fun ToolbarContent(
     isVertical: Boolean,
-    onOrientationChange: () -> Unit,
     onCloseDocument: (() -> Unit)?,
     currentPath: String,
     ttsServiceBinder: TtsServiceBinder?,
@@ -91,6 +91,7 @@ private fun ToolbarContent(
     onCropChange: () -> Unit,
     isCrop: Boolean,
     onOutlineDialogShow: () -> Unit,
+    onAIDialogShow: () -> Unit,
     onBookmarkDialogShow: () -> Unit,
     onSearchBarShow: () -> Unit,
     onFontDialogShow: () -> Unit,
@@ -125,22 +126,6 @@ private fun ToolbarContent(
                 horizontalArrangement = Arrangement.End,
                 contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                if (columnCount <= 1) {
-                    item {
-                        IconButton(onClick = {
-                            onOrientationChange()
-                        }) {
-                            Icon(
-                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                    Res.string.horizontal
-                                ),
-                                tint = Color.White
-                            )
-                        }
-                    }
-                }
-
                 // 只有文档文件才显示其他按钮
                 if (FileTypeUtils.isDocumentFile(currentPath)) {
                     ttsServiceBinder?.let { binder ->
@@ -230,6 +215,19 @@ private fun ToolbarContent(
                         }
                     }
                     
+                    // AI按钮
+                    if (FileTypeUtils.isDocumentFile(currentPath)) {
+                        item {
+                            IconButton(onClick = { onAIDialogShow() }) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_ai),
+                                    contentDescription = "AI",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                    
                     // 书签按钮
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
                         item {
@@ -262,16 +260,6 @@ private fun ToolbarContent(
                                 painter = painterResource(Res.drawable.ic_reflow),
                                 contentDescription = stringResource(Res.string.reflow),
                                 tint = if (isReflow) Color.Green else Color.White
-                            )
-                        }
-                    }*/
-
-                    /*item {
-                        IconButton(onClick = { }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_search),
-                                contentDescription = stringResource(Res.string.search),
-                                tint = Color.White
                             )
                         }
                     }*/
@@ -381,6 +369,7 @@ fun CustomView(
     fontViewModel: FontViewModel,
     bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
     readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
+    aiViewModel: com.archko.reader.pdf.viewmodel.AIViewModel,
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
@@ -444,6 +433,9 @@ fun CustomView(
 
     // 字体选择相关状态
     var showFontDialog by remember { mutableStateOf(false) }
+    
+    // AI对话相关状态
+    var showAIDialog by remember { mutableStateOf(false) }
     
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
@@ -1016,7 +1008,6 @@ fun CustomView(
             ) {
                 ToolbarContent(
                     isVertical = isVertical,
-                    onOrientationChange = { isVertical = !isVertical },
                     onCloseDocument = onCloseDocument,
                     currentPath = currentPath,
                     ttsServiceBinder = ttsServiceBinder,
@@ -1029,6 +1020,7 @@ fun CustomView(
                     onCropChange = { isCrop = !isCrop },
                     isCrop = isCrop,
                     onOutlineDialogShow = { showOutlineDialog = true },
+                    onAIDialogShow = { showAIDialog = true },
                     onBookmarkDialogShow = { showAddBookmarkDialog = true },
                     onSearchBarShow = { showSearchBar = !showSearchBar },
                     onFontDialogShow = { showFontDialog = true },
@@ -1149,6 +1141,23 @@ fun CustomView(
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // 方向按钮（仅在单列且文档文件时显示）
+                                if (columnCount <= 1) {
+                                    IconButton(
+                                        onClick = { isVertical = !isVertical },
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                                            contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                                Res.string.horizontal
+                                            ),
+                                            tint = Color.White
+                                        )
+                                    }
+                                    
+                                    VerticalDivider(modifier = Modifier.height(20.dp))
+                                }
+                                
                                 IconButton(
                                     onClick = {
                                         isActivityPortrait = !isActivityPortrait
@@ -1375,6 +1384,20 @@ fun CustomView(
                         println("选择了字体: ${File(fontPath).name}")
                         FontCSSGenerator.setFontFace(fontPath)
                         showFontDialog = false
+                    }
+                )
+            }
+            
+            // AI对话框
+            if (showAIDialog) {
+                AIPageDialog(
+                    currentPath = currentPath,
+                    pageIndex = currentPage,
+                    decoder = decoder!!,
+                    aiViewModel = aiViewModel,
+                    onDismiss = { showAIDialog = false },
+                    onShowToast = { message ->
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
                 )
             }

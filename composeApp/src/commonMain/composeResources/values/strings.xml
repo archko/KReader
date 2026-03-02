@@ -190,6 +190,11 @@
     <string name="split_merge_pdf">PDF Split/Merge</string>
 
     <string name="ai_setting">AI Settings</string>
+    <string name="ai_setting_title">AI Settings</string>
+    <string name="ai_edit_provider">Edit %s</string>
+    <string name="ai_api_key_label">API Key</string>
+    <string name="ai_api_url_label">API URL</string>
+    <string name="ai_model_name_label">Model Name</string>
     <string name="select_model">Select Model</string>
     <string name="input_token">Input Token</string>
     <string name="save">Save</string>

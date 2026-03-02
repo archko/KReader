@@ -466,6 +466,7 @@ fun FileScreen(
                     crop = 0L == viewModel.recent?.crop,
                     bookmarkViewModel = bookmarkViewModel,
                     readingStatsViewModel = readingStatsViewModel,
+                    aiViewModel = aiViewModel,
                 )
             }
         }

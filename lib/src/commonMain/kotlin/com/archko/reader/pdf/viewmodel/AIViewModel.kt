@@ -3,6 +3,7 @@ package com.archko.reader.pdf.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
+import com.archko.reader.pdf.entity.AIPageConversation
 import com.archko.reader.pdf.entity.AIProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,13 @@ public class AIViewModel : ViewModel() {
 
     private val _defaultProvider = MutableStateFlow<AIProvider?>(null)
     public val defaultProvider: StateFlow<AIProvider?> = _defaultProvider
+
+    // AI页面对话相关状态
+    private val _conversations = MutableStateFlow<List<AIPageConversation>>(emptyList())
+    public val conversations: StateFlow<List<AIPageConversation>> = _conversations
+
+    private val _isLoading = MutableStateFlow(false)
+    public val isLoading: StateFlow<Boolean> = _isLoading
 
     /**
      * 初始化默认提供商
@@ -105,5 +113,66 @@ public class AIViewModel : ViewModel() {
      */
     public suspend fun getCurrentProvider(): AIProvider? {
         return database?.aiProviderDao()?.getDefaultProvider()
+    }
+
+    // ========== AI页面对话功能 ==========
+
+    /**
+     * 加载指定页面的对话历史
+     */
+    public fun loadConversations(path: String, pageIndex: Int) {
+        viewModelScope.launch {
+            val list = database?.aiPageConversationDao()?.getConversationsByPage(path, pageIndex) ?: emptyList()
+            _conversations.value = list
+            println("AIViewModel.loadConversations: path=$path, page=$pageIndex, count=${list.size}")
+        }
+    }
+
+    /**
+     * 保存对话
+     */
+    public fun saveConversation(
+        documentPath: String,
+        documentName: String,
+        pageIndex: Int,
+        question: String,
+        answer: String,
+        pageContent: String
+    ) {
+        viewModelScope.launch {
+            val conversation = AIPageConversation(
+                documentPath = documentPath,
+                documentName = documentName,
+                pageIndex = pageIndex,
+                question = question,
+                answer = answer,
+                pageContent = pageContent
+            )
+            database?.aiPageConversationDao()?.insertConversation(conversation)
+            println("AIViewModel.saveConversation: $conversation")
+            
+            // 重新加载对话列表
+            loadConversations(documentPath, pageIndex)
+        }
+    }
+
+    /**
+     * 删除对话
+     */
+    public fun deleteConversation(conversation: AIPageConversation) {
+        viewModelScope.launch {
+            database?.aiPageConversationDao()?.deleteConversation(conversation)
+            println("AIViewModel.deleteConversation: $conversation")
+            
+            // 重新加载对话列表
+            loadConversations(conversation.documentPath, conversation.pageIndex)
+        }
+    }
+
+    /**
+     * 设置加载状态
+     */
+    public fun setLoading(loading: Boolean) {
+        _isLoading.value = loading
     }
 }

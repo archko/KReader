@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import com.archko.reader.pdf.entity.AICache
 import com.archko.reader.pdf.entity.AIConversation
+import com.archko.reader.pdf.entity.AIPageConversation
 import com.archko.reader.pdf.entity.AIProvider
 import com.archko.reader.pdf.entity.Bookmark
 import com.archko.reader.pdf.entity.ReadingStats
@@ -18,8 +19,9 @@ import com.archko.reader.pdf.entity.Recent
         AIProvider::class,
         AICache::class,
         AIConversation::class,
+        AIPageConversation::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 public abstract class AppDatabase : RoomDatabase() {
@@ -29,6 +31,7 @@ public abstract class AppDatabase : RoomDatabase() {
     public abstract fun aiProviderDao(): AIProviderDao
     public abstract fun aiCacheDao(): AICacheDao
     public abstract fun aiConversationDao(): AIConversationDao
+    public abstract fun aiPageConversationDao(): AIPageConversationDao
 }
 
 // The Room compiler generates the `actual` implementations.

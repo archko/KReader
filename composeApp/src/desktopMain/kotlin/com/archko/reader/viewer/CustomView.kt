@@ -35,6 +35,7 @@ import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.SearchBar
+import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
@@ -76,6 +77,7 @@ private fun ToolbarContent(
     onZoomChange: (zoom: Double) -> Unit,
     vZoom: Double,
     onOutlineDialogShow: () -> Unit,
+    onAIDialogShow: () -> Unit,
     onBookmarkDialogShow: () -> Unit,
     onSearchBarShow: () -> Unit,
     onQueueDialogShow: () -> Unit,
@@ -280,6 +282,17 @@ private fun ToolbarContent(
                 //    )
                 //}
                 
+                // AI按钮
+                if (FileTypeUtils.isDocumentFile(currentPath)) {
+                    IconButton(onClick = { onAIDialogShow() }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_ai),
+                            contentDescription = "AI助手",
+                            tint = Color.White
+                        )
+                    }
+                }
+                
                 // 书签按钮
                 if (FileTypeUtils.isDocumentFile(currentPath)) {
                     IconButton(onClick = { onBookmarkDialogShow() }) {
@@ -327,6 +340,7 @@ fun CustomView(
     crop: Boolean? = null,
     bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
     readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
+    aiViewModel: com.archko.reader.pdf.viewmodel.AIViewModel,
 ) {
     var vZoom by remember { mutableDoubleStateOf(initialZoom) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
@@ -341,6 +355,9 @@ fun CustomView(
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
     var pathConfig by remember { mutableStateOf(PathConfig()) }
+    
+    // AI对话相关状态
+    var showAIDialog by remember { mutableStateOf(false) }
     
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
@@ -820,6 +837,7 @@ fun CustomView(
                     onCropChange = { isCrop = !isCrop },
                     isCrop = isCrop,
                     onOutlineDialogShow = { showOutlineDialog = true },
+                    onAIDialogShow = { showAIDialog = true },
                     onBookmarkDialogShow = { showAddBookmarkDialog = true },
                     onSearchBarShow = { showSearchBar = !showSearchBar },
                     onQueueDialogShow = { showQueueDialog = true },
@@ -1089,6 +1107,22 @@ fun CustomView(
                                 showThumbnailDialog = false
                             },
                             onDismiss = { showThumbnailDialog = false },
+                        )
+                    }
+                    
+                    // AI对话框
+                    if (showAIDialog) {
+                        AIPageDialog(
+                            currentPath = currentPath,
+                            pageIndex = currentPage,
+                            decoder = decoder!!,
+                            aiViewModel = aiViewModel,
+                            onDismiss = { showAIDialog = false },
+                            onShowToast = { message ->
+                                scope.launch {
+                                    toaster.show(message, type = ToastType.Info)
+                                }
+                            }
                         )
                     }
                     
