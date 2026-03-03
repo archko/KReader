@@ -34,7 +34,6 @@ import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.viewer.component.DrawingToolbar
-import com.archko.reader.viewer.component.SearchBar
 import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
@@ -281,7 +280,7 @@ private fun ToolbarContent(
                 //        tint = if (isReflow) Color.Green else Color.White
                 //    )
                 //}
-                
+
                 // AI按钮
                 if (FileTypeUtils.isDocumentFile(currentPath)) {
                     IconButton(onClick = { onAIDialogShow() }) {
@@ -292,7 +291,7 @@ private fun ToolbarContent(
                         )
                     }
                 }
-                
+
                 // 书签按钮
                 if (FileTypeUtils.isDocumentFile(currentPath)) {
                     IconButton(onClick = { onBookmarkDialogShow() }) {
@@ -303,7 +302,7 @@ private fun ToolbarContent(
                         )
                     }
                 }
-                
+
                 // 搜索按钮
                 IconButton(onClick = { onSearchBarShow() }) {
                     Icon(
@@ -355,59 +354,60 @@ fun CustomView(
     var isCrop by remember { mutableStateOf(crop == true) }
     var isNeedPass by remember { mutableStateOf(false) }
     var pathConfig by remember { mutableStateOf(PathConfig()) }
-    
+
     // AI对话相关状态
     var showAIDialog by remember { mutableStateOf(false) }
-    
+
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
     var editingBookmark by remember { mutableStateOf<com.archko.reader.pdf.entity.Bookmark?>(null) }
-    
+
     // 阅读时长追踪
     val readingTimeTracker = remember { com.archko.reader.pdf.util.ReadingTimeTracker() }
-    
+
     // 用于保存当前页码的引用
     var currentPageRef = remember { mutableIntStateOf(progressPage ?: 0) }
-    
+
     // 搜索相关状态
     var showSearchBar by remember { mutableStateOf(false) }
     var searchState by remember { mutableStateOf(SearchState()) }
-    
+
     // 构建搜索高亮映射（按页面分组）
     // 当前结果的quads放在最前面，这样Page.kt绘制时第一个quad会被特殊高亮
     val searchHighlightQuads = remember(searchState.results, searchState.currentIndex) {
         val highlightMap = mutableMapOf<Int, MutableList<com.archko.reader.pdf.entity.MuPdfQuad>>()
-        
+
         // 先添加当前结果的quads
         val currentResult = searchState.currentResult
         if (currentResult != null) {
-            highlightMap.getOrPut(currentResult.pageIndex) { mutableListOf() }.addAll(currentResult.quads)
+            highlightMap.getOrPut(currentResult.pageIndex) { mutableListOf() }
+                .addAll(currentResult.quads)
         }
-        
+
         // 再添加其他结果的quads
         searchState.results.forEachIndexed { index, r ->
             if (index != searchState.currentIndex) {
                 highlightMap.getOrPut(r.pageIndex) { mutableListOf() }.addAll(r.quads)
             }
         }
-        
+
         highlightMap
     }
-    
+
     val currentSearchPageIndex = searchState.currentResult?.pageIndex
 
     // 多文件支持
     val currentPath = paths.getOrNull(0) ?: paths.first()
 
     val speechService: SpeechService = remember { TtsQueueService() }
-    
+
     LaunchedEffect(Unit) {
         // 加载书签
         if (paths.size == 1 && FileTypeUtils.isDocumentFile(paths[0])) {
             bookmarkViewModel.loadBookmarks(paths[0])
         }
     }
-    
+
     // 阅读时长追踪 - 启动
     LaunchedEffect(currentPath) {
         if (FileTypeUtils.isDocumentFile(currentPath)) {
@@ -418,7 +418,7 @@ fun CustomView(
             }
         }
     }
-    
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -641,7 +641,7 @@ fun CustomView(
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
             val pageCount: Int = list.size
-            
+
             // 正在朗读的页面索引
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -660,20 +660,20 @@ fun CustomView(
             }
 
             var columnCount by remember { mutableIntStateOf(1) }
-            
+
             // 搜索辅助函数 - 必须在performSearch之前定义
             fun goToSearchResult(index: Int) {
                 if (index < 0 || index >= searchState.results.size) return
-                
+
                 val result = searchState.results[index]
                 searchState = searchState.copy(currentIndex = index)
-                
+
                 // 计算搜索结果在页面中的Y坐标（取第一个quad的顶部）
                 // 减去80dp避免被工具栏覆盖
                 val offsetY = result.quads.firstOrNull()?.ul?.y?.let { y ->
                     (y - 80f).coerceAtLeast(0f)
                 }
-                
+
                 // 跳转到结果所在页面，带上精确偏移
                 jumpIntent = JumpIntent(
                     page = result.pageIndex,
@@ -681,13 +681,13 @@ fun CustomView(
                     offsetY = offsetY
                 )
             }
-            
+
             fun goToNextResult() {
                 if (searchState.results.isEmpty()) return
                 val nextIndex = (searchState.currentIndex + 1) % searchState.results.size
                 goToSearchResult(nextIndex)
             }
-            
+
             fun goToPreviousResult() {
                 if (searchState.results.isEmpty()) return
                 val prevIndex = if (searchState.currentIndex <= 0) {
@@ -697,16 +697,16 @@ fun CustomView(
                 }
                 goToSearchResult(prevIndex)
             }
-            
+
             // 搜索功能函数
             fun performSearch(query: String) {
                 if (query.isBlank()) {
                     searchState = SearchState()
                     return
                 }
-                
+
                 searchState = searchState.copy(isSearching = true)
-                
+
                 scope.launch(Dispatchers.IO) {
                     try {
                         val results = decoder!!.search(query, caseSensitive = false)
@@ -718,7 +718,7 @@ fun CustomView(
                                 isSearching = false,
                                 totalCount = results.size
                             )
-                            
+
                             // 如果有结果，跳转到第一个结果
                             if (results.isNotEmpty()) {
                                 goToSearchResult(0)
@@ -732,7 +732,7 @@ fun CustomView(
                     }
                 }
             }
-            
+
             // 设置TTS进度监听器
             LaunchedEffect(speechService) {
                 speechService.setProgressListener(object : TtsProgressListener {
@@ -767,7 +767,7 @@ fun CustomView(
                     }
                 })
             }
-            
+
             // 监听朗读状态
             LaunchedEffect(speechService) {
                 speechService.isSpeakingFlow.collect { speaking ->
@@ -787,7 +787,7 @@ fun CustomView(
                 }
                 AnnotationManager(absolutePath)
             }
-            
+
             // 清理资源
             DisposableEffect(currentPath) {
                 onDispose {
@@ -799,7 +799,7 @@ fun CustomView(
                     } else {
                         speechService.stop()
                     }
-                    
+
                     // 保存阅读统计
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
                         val sessionDuration = readingTimeTracker.pauseSession()
@@ -865,7 +865,8 @@ fun CustomView(
                 if (showQueueDialog) {
                     QueueDialog(
                         decoder!!.cacheBean,
-                        currentSpeakingPage = speechService.getCurrentReflowBean()?.page?.split("-")?.firstOrNull() ?: jumpIntent.page.toString(),
+                        currentSpeakingPage = speechService.getCurrentReflowBean()?.page?.split("-")
+                            ?.firstOrNull() ?: jumpIntent.page.toString(),
                         count = 30,
                         onDismiss = { showQueueDialog = false },
                         onItemClick = { reflowBean ->
@@ -920,7 +921,7 @@ fun CustomView(
                                 }
                             }, // 只在非重排模式下传递关闭回调
                             onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
-                            onPageChanged = { page -> 
+                            onPageChanged = { page ->
                                 currentPage = page
                                 currentPageRef.intValue = page
                             },
@@ -966,7 +967,7 @@ fun CustomView(
                             }
                         )
                     }
-                    
+
                     // 搜索栏 - 在画线工具条下方
                     androidx.compose.animation.AnimatedVisibility(
                         visible = showSearchBar,
@@ -1067,7 +1068,8 @@ fun CustomView(
                                         if (!isExternalChange) {
                                             val targetPage = sliderValue.toInt() - 1
                                             if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                                jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
+                                                jumpIntent =
+                                                    JumpIntent(targetPage, JumpMode.PageNavigation)
                                             }
                                         }
                                     },
@@ -1115,7 +1117,7 @@ fun CustomView(
                             onDismiss = { showThumbnailDialog = false },
                         )
                     }
-                    
+
                     // AI对话框
                     if (showAIDialog) {
                         AIPageDialog(
@@ -1131,7 +1133,7 @@ fun CustomView(
                             }
                         )
                     }
-                    
+
                     // 添加/编辑书签对话框
                     if (showAddBookmarkDialog) {
                         AddBookmarkDialog(

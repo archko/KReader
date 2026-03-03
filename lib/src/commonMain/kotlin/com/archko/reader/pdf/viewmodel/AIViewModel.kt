@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 public class AIViewModel : ViewModel() {
 
     public var database: AppDatabase? = null
-    
+
     private val aiService = AIService()
 
     private val _providers = MutableStateFlow<List<AIProvider>>(emptyList())
@@ -125,7 +125,8 @@ public class AIViewModel : ViewModel() {
      */
     public fun loadConversations(path: String, pageIndex: Int) {
         viewModelScope.launch {
-            val list = database?.aiPageConversationDao()?.getConversationsByPage(path, pageIndex) ?: emptyList()
+            val list = database?.aiPageConversationDao()?.getConversationsByPage(path, pageIndex)
+                ?: emptyList()
             _conversations.value = list
             println("AIViewModel.loadConversations: path=$path, page=$pageIndex, count=${list.size}")
         }
@@ -153,7 +154,7 @@ public class AIViewModel : ViewModel() {
             )
             database?.aiPageConversationDao()?.insertConversation(conversation)
             println("AIViewModel.saveConversation: $conversation")
-            
+
             // 重新加载对话列表
             loadConversations(documentPath, pageIndex)
         }
@@ -166,7 +167,7 @@ public class AIViewModel : ViewModel() {
         viewModelScope.launch {
             database?.aiPageConversationDao()?.deleteConversation(conversation)
             println("AIViewModel.deleteConversation: $conversation")
-            
+
             // 重新加载对话列表
             loadConversations(conversation.documentPath, conversation.pageIndex)
         }
@@ -193,7 +194,7 @@ public class AIViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             _isLoading.value = true
-            
+
             try {
                 // 获取当前默认的 AI 提供商
                 val provider = getCurrentProvider()
@@ -202,16 +203,16 @@ public class AIViewModel : ViewModel() {
                     _isLoading.value = false
                     return@launch
                 }
-                
+
                 if (provider.apiKey.isBlank()) {
                     onError("请先配置 ${provider.name} 的 API Key")
                     _isLoading.value = false
                     return@launch
                 }
-                
+
                 // 调用 AI 服务
                 val result = aiService.chat(provider, question, pageContent)
-                
+
                 result.fold(
                     onSuccess = { answer ->
                         // 保存对话

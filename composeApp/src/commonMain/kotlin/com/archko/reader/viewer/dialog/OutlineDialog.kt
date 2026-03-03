@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,9 +18,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,27 +43,7 @@ import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.ai_chat_empty
-import kreader.composeapp.generated.resources.ai_chat_tab
-import kreader.composeapp.generated.resources.ai_conversations_count
-import kreader.composeapp.generated.resources.annotation_empty
-import kreader.composeapp.generated.resources.annotation_tab
-import kreader.composeapp.generated.resources.annotations_count
-import kreader.composeapp.generated.resources.bookmark_empty
-import kreader.composeapp.generated.resources.bookmark_tab
-import kreader.composeapp.generated.resources.bookmarks_count
-import kreader.composeapp.generated.resources.delete_annotation
-import kreader.composeapp.generated.resources.delete_bookmark
-import kreader.composeapp.generated.resources.document_outline
-import kreader.composeapp.generated.resources.edit_bookmark
-import kreader.composeapp.generated.resources.ic_ai
-import kreader.composeapp.generated.resources.ic_back
-import kreader.composeapp.generated.resources.ic_delete
-import kreader.composeapp.generated.resources.ic_edit
-import kreader.composeapp.generated.resources.no_outline
-import kreader.composeapp.generated.resources.outline_tab
-import kreader.composeapp.generated.resources.page_label
+import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.text.SimpleDateFormat
@@ -149,7 +128,7 @@ fun OutlineDialog(
                 }
 
                 // Tab 标签页
-                TabRow(
+                SecondaryTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.fillMaxWidth()
@@ -518,7 +497,7 @@ private fun AIConversationTabContent(
     } else {
         // 按页面分组
         val conversationsByPage = conversations.groupBy { it.pageIndex }
-        
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(

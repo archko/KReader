@@ -1,12 +1,15 @@
 package com.archko.reader.pdf.service
 
 import com.archko.reader.pdf.entity.AIProvider
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -54,7 +57,7 @@ public class AIService {
         pageContent: String
     ): Result<String> {
         val url = "${provider.baseUrl}/v1/chat/completions"
-        
+
         val requestBody = OpenAIRequest(
             model = provider.model,
             messages = listOf(
@@ -80,7 +83,7 @@ public class AIService {
 
             val answer = response.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("AI 返回空响应"))
-            
+
             Result.success(answer)
         } catch (e: Exception) {
             Result.failure(Exception("DeepSeek API 调用失败: ${e.message}", e))
@@ -96,7 +99,7 @@ public class AIService {
         pageContent: String
     ): Result<String> {
         val url = "${provider.baseUrl}/compatible-mode/v1/chat/completions"
-        
+
         val requestBody = OpenAIRequest(
             model = provider.model,
             messages = listOf(
@@ -122,7 +125,7 @@ public class AIService {
 
             val answer = response.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("AI 返回空响应"))
-            
+
             Result.success(answer)
         } catch (e: Exception) {
             Result.failure(Exception("通义千问 API 调用失败: ${e.message}", e))
@@ -138,7 +141,7 @@ public class AIService {
         pageContent: String
     ): Result<String> {
         val url = "${provider.baseUrl}/api/paas/v4/chat/completions"
-        
+
         val requestBody = OpenAIRequest(
             model = provider.model,
             messages = listOf(
@@ -164,7 +167,7 @@ public class AIService {
 
             val answer = response.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("AI 返回空响应"))
-            
+
             Result.success(answer)
         } catch (e: Exception) {
             Result.failure(Exception("智谱清言 API 调用失败: ${e.message}", e))

@@ -21,7 +21,10 @@ public interface AIPageConversationDao {
     public suspend fun deleteConversation(conversation: AIPageConversation)
 
     @Query("SELECT * FROM ai_page_conversation WHERE document_path = :path AND page_index = :pageIndex ORDER BY created_at DESC")
-    public suspend fun getConversationsByPage(path: String, pageIndex: Int): List<AIPageConversation>
+    public suspend fun getConversationsByPage(
+        path: String,
+        pageIndex: Int
+    ): List<AIPageConversation>
 
     @Query("SELECT * FROM ai_page_conversation WHERE document_path = :path ORDER BY page_index ASC, created_at DESC")
     public suspend fun getConversationsByDocument(path: String): List<AIPageConversation>

@@ -25,7 +25,8 @@ public val MIGRATION_1_2: Migration = object : Migration(1, 2) {
 public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
     override fun migrate(connection: SQLiteConnection) {
         // Create bookmark table
-        connection.execSQL("""
+        connection.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS bookmark (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 path TEXT NOT NULL,
@@ -37,14 +38,16 @@ public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
                 createAt INTEGER NOT NULL,
                 updateAt INTEGER NOT NULL
             )
-        """.trimIndent())
-        
+        """.trimIndent()
+        )
+
         // Create index for bookmark table
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_bookmark_path ON bookmark(path)")
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_bookmark_path_page ON bookmark(path, pageIndex)")
-        
+
         // Create reading_stats table
-        connection.execSQL("""
+        connection.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS reading_stats (
                 path TEXT PRIMARY KEY NOT NULL,
                 totalReadingTime INTEGER NOT NULL,
@@ -60,8 +63,9 @@ public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
                 annotationCount INTEGER NOT NULL,
                 bookmarkCount INTEGER NOT NULL
             )
-        """.trimIndent())
-        
+        """.trimIndent()
+        )
+
         // 不需要为path创建索引，因为它已经是PRIMARY KEY
     }
 }
@@ -69,7 +73,8 @@ public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
 public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
     override fun migrate(connection: SQLiteConnection) {
         // Create ai_provider table
-        connection.execSQL("""
+        connection.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS ai_provider (
                 id TEXT PRIMARY KEY NOT NULL,
                 name TEXT NOT NULL,
@@ -83,10 +88,12 @@ public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
             )
-        """.trimIndent())
-        
+        """.trimIndent()
+        )
+
         // Create ai_cache table
-        connection.execSQL("""
+        connection.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS ai_cache (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 document_path TEXT NOT NULL,
@@ -97,15 +104,17 @@ public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
                 provider_id TEXT NOT NULL,
                 created_at INTEGER NOT NULL
             )
-        """.trimIndent())
-        
+        """.trimIndent()
+        )
+
         // Create indexes for ai_cache
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_cache_document_path ON ai_cache(document_path)")
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_cache_input_hash ON ai_cache(input_hash)")
         connection.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_ai_cache_document_path_feature_type_input_hash ON ai_cache(document_path, feature_type, input_hash)")
-        
+
         // Create ai_conversation table
-        connection.execSQL("""
+        connection.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS ai_conversation (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 document_path TEXT NOT NULL,
@@ -115,8 +124,9 @@ public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
                 context_type TEXT,
                 created_at INTEGER NOT NULL
             )
-        """.trimIndent())
-        
+        """.trimIndent()
+        )
+
         // Create indexes for ai_conversation
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_conversation_session_id ON ai_conversation(session_id)")
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_conversation_document_path ON ai_conversation(document_path)")
@@ -127,7 +137,8 @@ public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
 public val MIGRATION_4_5: Migration = object : Migration(4, 5) {
     override fun migrate(connection: SQLiteConnection) {
         // Create ai_page_conversation table
-        connection.execSQL("""
+        connection.execSQL(
+            """
             CREATE TABLE IF NOT EXISTS ai_page_conversation (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 document_path TEXT NOT NULL,
@@ -138,8 +149,9 @@ public val MIGRATION_4_5: Migration = object : Migration(4, 5) {
                 page_content TEXT NOT NULL,
                 created_at INTEGER NOT NULL
             )
-        """.trimIndent())
-        
+        """.trimIndent()
+        )
+
         // Create indexes for ai_page_conversation
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_page_conversation_document_path_page_index ON ai_page_conversation(document_path, page_index)")
     }
