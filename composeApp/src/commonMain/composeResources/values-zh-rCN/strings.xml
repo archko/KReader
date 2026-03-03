@@ -245,6 +245,7 @@
     <!-- 搜索 -->
     <string name="search_hint">在文档中搜索...</string>
     <string name="search_results">%d/%d</string>
+    <string name="search_results_title">搜索结果</string>
     <string name="search_no_results">未找到结果</string>
     <string name="search_prev">上一个</string>
     <string name="search_next">下一个</string>

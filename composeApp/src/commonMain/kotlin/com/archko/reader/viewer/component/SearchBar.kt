@@ -25,6 +25,7 @@ import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ic_back
 import kreader.composeapp.generated.resources.ic_close
 import kreader.composeapp.generated.resources.ic_search
+import kreader.composeapp.generated.resources.ic_toc
 import kreader.composeapp.generated.resources.search
 import kreader.composeapp.generated.resources.search_close
 import kreader.composeapp.generated.resources.search_hint
@@ -46,6 +47,7 @@ fun SearchBar(
     onSearch: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onShowResultList: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -139,6 +141,18 @@ fun SearchBar(
                         contentDescription = stringResource(Res.string.search_next),
                         tint = Color.White,
                         modifier = Modifier.graphicsLayer(rotationZ = 180f)
+                    )
+                }
+
+                // 搜索结果列表按钮
+                IconButton(
+                    onClick = onShowResultList,
+                    enabled = searchState.totalCount > 0
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_toc),
+                        contentDescription = "搜索结果列表",
+                        tint = Color.White
                     )
                 }
             } else if (searchState.query.isNotBlank() && !searchState.isSearching) {

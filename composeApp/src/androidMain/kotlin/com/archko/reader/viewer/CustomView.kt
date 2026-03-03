@@ -536,6 +536,8 @@ fun CustomView(
                 println("CustomView.onDispose:$currentPath, $decoder")
                 ttsServiceBinder?.unbindService()
                 decoder?.close()
+
+                bookmarkViewModel.resetAll()
                 val activity = context as? ComponentActivity
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
@@ -622,7 +624,8 @@ fun CustomView(
 
             // 搜索相关状态
             var showSearchBar by remember { mutableStateOf(false) }
-            var searchState by remember { mutableStateOf(SearchState()) }
+            var showSearchResultDialog by remember { mutableStateOf(false) }
+            val searchState by bookmarkViewModel.searchState.collectAsState()
 
             // 构建搜索高亮映射（按页面分组）
             // 当前结果的quads放在最前面，这样Page.kt绘制时第一个quad会被特殊高亮
@@ -719,10 +722,11 @@ fun CustomView(
 
             // 搜索辅助函数 - 在jumpIntent定义之后
             fun goToSearchResult(index: Int) {
-                if (index < 0 || index >= searchState.results.size) return
+                val state = bookmarkViewModel.searchState.value
+                if (index < 0 || index >= state.results.size) return
 
-                val result = searchState.results[index]
-                searchState = searchState.copy(currentIndex = index)
+                val result = state.results[index]
+                bookmarkViewModel.goToSearchResult(index)
 
                 // 计算搜索结果在页面中的Y坐标（取第一个quad的顶部）
                 // 减去80dp避免被工具栏覆盖
@@ -736,57 +740,6 @@ fun CustomView(
                     mode = JumpMode.PageNavigation,
                     offsetY = offsetY
                 )
-            }
-
-            fun goToNextResult() {
-                if (searchState.results.isEmpty()) return
-                val nextIndex = (searchState.currentIndex + 1) % searchState.results.size
-                goToSearchResult(nextIndex)
-            }
-
-            fun goToPreviousResult() {
-                if (searchState.results.isEmpty()) return
-                val prevIndex = if (searchState.currentIndex <= 0) {
-                    searchState.results.size - 1
-                } else {
-                    searchState.currentIndex - 1
-                }
-                goToSearchResult(prevIndex)
-            }
-
-            // 搜索功能函数
-            fun performSearch(state: SearchState) {
-                val query: String = state.query
-                if (query.isBlank()) {
-                    return
-                }
-
-                searchState = state.copy(isSearching = true)
-
-                scope.launch(Dispatchers.IO) {
-                    try {
-                        val results = decoder!!.search(query, caseSensitive = false)
-                        withContext(Dispatchers.Main) {
-                            searchState = SearchState(
-                                query = query,
-                                results = results,
-                                currentIndex = if (results.isNotEmpty()) 0 else -1,
-                                isSearching = false,
-                                totalCount = results.size
-                            )
-
-                            // 如果有结果，跳转到第一个结果并高亮
-                            if (results.isNotEmpty()) {
-                                goToSearchResult(0)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        println("搜索失败: ${e.message}")
-                        withContext(Dispatchers.Main) {
-                            searchState = searchState.copy(isSearching = false)
-                        }
-                    }
-                }
             }
 
             // 阅读时长追踪 - 启动会话
@@ -1078,20 +1031,41 @@ fun CustomView(
                         SearchBar(
                             searchState = searchState,
                             onQueryChange = { query ->
-                                searchState = searchState.copy(query = query)
+                                bookmarkViewModel.updateSearchQuery(query)
                             },
                             onSearch = {
-                                performSearch(searchState)
+                                decoder?.let { dec ->
+                                    bookmarkViewModel.performSearch(searchState.query, dec)
+                                    // 如果有结果，跳转到第一个结果
+                                    scope.launch {
+                                        delay(100) // 等待搜索完成
+                                        val state = bookmarkViewModel.searchState.value
+                                        if (state.results.isNotEmpty()) {
+                                            goToSearchResult(0)
+                                        }
+                                    }
+                                }
                             },
                             onPrevious = {
-                                goToPreviousResult()
+                                bookmarkViewModel.goToPreviousResult()
+                                val state = bookmarkViewModel.searchState.value
+                                if (state.currentIndex >= 0) {
+                                    goToSearchResult(state.currentIndex)
+                                }
                             },
                             onNext = {
-                                goToNextResult()
+                                bookmarkViewModel.goToNextResult()
+                                val state = bookmarkViewModel.searchState.value
+                                if (state.currentIndex >= 0) {
+                                    goToSearchResult(state.currentIndex)
+                                }
+                            },
+                            onShowResultList = {
+                                showSearchResultDialog = true
                             },
                             onClose = {
                                 showSearchBar = false
-                                searchState = SearchState()
+                                bookmarkViewModel.resetSearch()
                             }
                         )
                     }
@@ -1425,6 +1399,21 @@ fun CustomView(
                         showAddBookmarkDialog = false
                         editingBookmark = null
                     }
+                )
+            }
+
+            // 搜索结果列表弹窗
+            if (showSearchResultDialog && searchState.hasResults) {
+                com.archko.reader.viewer.dialog.SearchResultDialog(
+                    query = searchState.query,
+                    results = searchState.results,
+                    currentIndex = searchState.currentIndex,
+                    onResultClick = { index ->
+                        goToSearchResult(index)
+                        showSearchResultDialog = false
+                        showToolbar = false
+                    },
+                    onDismiss = { showSearchResultDialog = false }
                 )
             }
         }

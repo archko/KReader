@@ -40,7 +40,6 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
-import com.archko.reader.pdf.util.ReadingTimeTracker
 import com.archko.reader.pdf.util.ViewUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -200,9 +199,6 @@ internal fun DocumentViewEffects(
     val orientation = state.orientation
     val isJumping = state.isJumping
     val flingJob = state.flingJob
-
-    // 阅读时长追踪
-    val readingTimeTracker = remember { ReadingTimeTracker() }
 
     LaunchedEffect(columnCount) {
         pageViewState.updateColumnCount(columnCount)
