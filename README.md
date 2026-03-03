@@ -19,6 +19,13 @@ At present, epub/mobi supported custom font. It should be placed in the director
 - **Tts**: Use System Tts
 - **Text Selection**: text selection for pdf/epub/mobi
 - **Support album**: support album/image
+- **AI Q&A**: Intelligent question answering for selected page text
+- **Search Function**: Quick search within documents
+- **Bookmark Management**: Add and manage bookmarks
+- **Dual Page Display**: Support side-by-side two-page view mode
+- **Annotations & Highlights**: Support document annotations and highlighting
+- **Thumbnail List**: Quick page preview and navigation
+- **Custom Fonts**: Support more system-installed fonts, epub/mobi can use ttf and otf fonts from /sdcard/fonts/ directory
 - **Multi-platform Support**: Android, iOS, and Desktop
 - **Modern UI**: Built with Jetpack Compose
 - **Support format**: pdf, epub, mobi, djvu, xps, fb, cbz, images, (docx, pptx)
