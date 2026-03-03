@@ -78,6 +78,9 @@ fun AIPageDialog(
     var pageText by remember { mutableStateOf<String?>(null) }
     var isLoadingText by remember { mutableStateOf(true) }
     var question by remember { mutableStateOf("") }
+    
+    // Token 使用信息（仅显示本次消耗）
+    var lastUsage by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) } // (prompt, completion, total)
 
     // 加载页面文本
     LaunchedEffect(pageIndex) {
@@ -131,6 +134,17 @@ fun AIPageDialog(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Token 使用信息显示
+                if (lastUsage != null) {
+                    Text(
+                        text = "本次消耗: 输入${lastUsage!!.first} 输出${lastUsage!!.second} 总计${lastUsage!!.third} tokens",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // 页面文本区域 - 占一半高度
                 Card(
@@ -253,8 +267,9 @@ fun AIPageDialog(
                                     pageIndex = pageIndex,
                                     question = currentQuestion,
                                     pageContent = pageText ?: "",
-                                    onSuccess = { answer ->
-                                        // 对话已保存，会自动刷新列表
+                                    onSuccess = { answer, promptTokens, completionTokens, totalTokens ->
+                                        // 更新本次 token 使用信息
+                                        lastUsage = Triple(promptTokens, completionTokens, totalTokens)
                                     },
                                     onError = { error ->
                                         onShowToast?.invoke(error)

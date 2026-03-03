@@ -29,13 +29,23 @@ public class AIService {
     }
 
     /**
+     * AI 响应结果，包含回答和 token 使用信息
+     */
+    public data class AIResponse(
+        val answer: String,
+        val promptTokens: Int = 0,
+        val completionTokens: Int = 0,
+        val totalTokens: Int = 0
+    )
+
+    /**
      * 调用 AI 接口进行问答
      */
     public suspend fun chat(
         provider: AIProvider,
         question: String,
         pageContent: String
-    ): Result<String> {
+    ): Result<AIResponse> {
         return try {
             when (provider.id) {
                 "deepseek" -> chatWithDeepSeek(provider, question, pageContent)
@@ -55,7 +65,7 @@ public class AIService {
         provider: AIProvider,
         question: String,
         pageContent: String
-    ): Result<String> {
+    ): Result<AIResponse> {
         val url = "${provider.baseUrl}/v1/chat/completions"
 
         val requestBody = OpenAIRequest(
@@ -84,7 +94,14 @@ public class AIService {
             val answer = response.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("AI 返回空响应"))
 
-            Result.success(answer)
+            Result.success(
+                AIResponse(
+                    answer = answer,
+                    promptTokens = response.usage?.prompt_tokens ?: 0,
+                    completionTokens = response.usage?.completion_tokens ?: 0,
+                    totalTokens = response.usage?.total_tokens ?: 0
+                )
+            )
         } catch (e: Exception) {
             Result.failure(Exception("DeepSeek API 调用失败: ${e.message}", e))
         }
@@ -97,7 +114,7 @@ public class AIService {
         provider: AIProvider,
         question: String,
         pageContent: String
-    ): Result<String> {
+    ): Result<AIResponse> {
         val url = "${provider.baseUrl}/compatible-mode/v1/chat/completions"
 
         val requestBody = OpenAIRequest(
@@ -126,7 +143,14 @@ public class AIService {
             val answer = response.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("AI 返回空响应"))
 
-            Result.success(answer)
+            Result.success(
+                AIResponse(
+                    answer = answer,
+                    promptTokens = response.usage?.prompt_tokens ?: 0,
+                    completionTokens = response.usage?.completion_tokens ?: 0,
+                    totalTokens = response.usage?.total_tokens ?: 0
+                )
+            )
         } catch (e: Exception) {
             Result.failure(Exception("通义千问 API 调用失败: ${e.message}", e))
         }
@@ -139,7 +163,7 @@ public class AIService {
         provider: AIProvider,
         question: String,
         pageContent: String
-    ): Result<String> {
+    ): Result<AIResponse> {
         val url = "${provider.baseUrl}/api/paas/v4/chat/completions"
 
         val requestBody = OpenAIRequest(
@@ -168,7 +192,14 @@ public class AIService {
             val answer = response.choices.firstOrNull()?.message?.content
                 ?: return Result.failure(Exception("AI 返回空响应"))
 
-            Result.success(answer)
+            Result.success(
+                AIResponse(
+                    answer = answer,
+                    promptTokens = response.usage?.prompt_tokens ?: 0,
+                    completionTokens = response.usage?.completion_tokens ?: 0,
+                    totalTokens = response.usage?.total_tokens ?: 0
+                )
+            )
         } catch (e: Exception) {
             Result.failure(Exception("智谱清言 API 调用失败: ${e.message}", e))
         }
@@ -196,10 +227,18 @@ private data class Message(
 
 @Serializable
 private data class OpenAIResponse(
-    val choices: List<Choice>
+    val choices: List<Choice>,
+    val usage: Usage? = null
 )
 
 @Serializable
 private data class Choice(
     val message: Message
+)
+
+@Serializable
+private data class Usage(
+    val prompt_tokens: Int = 0,
+    val completion_tokens: Int = 0,
+    val total_tokens: Int = 0
 )

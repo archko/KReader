@@ -47,13 +47,18 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun AddBookmarkDialog(
     pageIndex: Int,
-    existingBookmark: Bookmark? = null,
-    onSave: (title: String?, note: String?, color: Long?) -> Unit,
+    bookmarks: List<Bookmark>,
+    onSave: (existingBookmark: Bookmark?, title: String?, note: String?, color: Long?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var title by remember { mutableStateOf(existingBookmark?.title ?: "") }
-    var note by remember { mutableStateOf(existingBookmark?.note ?: "") }
-    var selectedColor by remember { mutableStateOf(existingBookmark?.color) }
+    // 在弹窗内部查询当前页是否已有书签
+    val existingBookmark = remember(pageIndex, bookmarks) {
+        bookmarks.find { it.pageIndex == pageIndex }
+    }
+    
+    var title by remember(existingBookmark) { mutableStateOf(existingBookmark?.title ?: "") }
+    var note by remember(existingBookmark) { mutableStateOf(existingBookmark?.note ?: "") }
+    var selectedColor by remember(existingBookmark) { mutableStateOf(existingBookmark?.color) }
 
     val bookmarkColors = listOf(
         null to Color.Gray,           // 默认
@@ -151,6 +156,7 @@ fun AddBookmarkDialog(
                     Button(
                         onClick = {
                             onSave(
+                                existingBookmark,
                                 title.ifBlank { null },
                                 note.ifBlank { null },
                                 selectedColor

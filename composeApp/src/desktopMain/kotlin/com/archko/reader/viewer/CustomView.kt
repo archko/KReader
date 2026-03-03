@@ -1118,16 +1118,16 @@ fun CustomView(
                     if (showAddBookmarkDialog) {
                         AddBookmarkDialog(
                             pageIndex = currentPage,
-                            existingBookmark = editingBookmark,
-                            onSave = { title, note, color ->
-                                if (editingBookmark != null) {
-                                    // 编辑现有书签
-                                    editingBookmark!!.apply {
+                            bookmarks = bookmarkViewModel.currentPathBookmarks.value,
+                            onSave = { existingBookmark, title, note, color ->
+                                if (existingBookmark != null) {
+                                    // 更新现有书签
+                                    existingBookmark.apply {
                                         this.title = title
                                         this.note = note
                                         this.color = color
                                     }
-                                    bookmarkViewModel.updateBookmark(editingBookmark!!)
+                                    bookmarkViewModel.updateBookmark(existingBookmark)
                                 } else {
                                     // 添加新书签
                                     bookmarkViewModel.addBookmark(
@@ -1138,11 +1138,9 @@ fun CustomView(
                                         color = color
                                     )
                                 }
-                                editingBookmark = null
                             },
                             onDismiss = {
                                 showAddBookmarkDialog = false
-                                editingBookmark = null
                             }
                         )
                     }

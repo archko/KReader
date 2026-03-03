@@ -189,7 +189,7 @@ public class AIViewModel : ViewModel() {
         pageIndex: Int,
         question: String,
         pageContent: String,
-        onSuccess: (String) -> Unit,
+        onSuccess: (answer: String, promptTokens: Int, completionTokens: Int, totalTokens: Int) -> Unit,
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
@@ -214,17 +214,22 @@ public class AIViewModel : ViewModel() {
                 val result = aiService.chat(provider, question, pageContent)
 
                 result.fold(
-                    onSuccess = { answer ->
+                    onSuccess = { aiResponse ->
                         // 保存对话
                         saveConversation(
                             documentPath = documentPath,
                             documentName = documentName,
                             pageIndex = pageIndex,
                             question = question,
-                            answer = answer,
+                            answer = aiResponse.answer,
                             pageContent = pageContent
                         )
-                        onSuccess(answer)
+                        onSuccess(
+                            aiResponse.answer,
+                            aiResponse.promptTokens,
+                            aiResponse.completionTokens,
+                            aiResponse.totalTokens
+                        )
                     },
                     onFailure = { error ->
                         onError(error.message ?: "AI 调用失败")
