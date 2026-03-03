@@ -186,19 +186,24 @@ fun WebdavConfigDialog(
                             onClick = {
                                 isUploading = true
                                 scope.launch {
-                                    viewModel.backupToWebdav(currentPath)
+                                    viewModel.backupAllToWebdav(currentPath)
                                         .flowOn(Dispatchers.IO)
-                                        .collectLatest { success ->
+                                        .collectLatest { result ->
                                             isUploading = false
-                                            if (success) {
+                                            if (result.success) {
                                                 toaster.show(
                                                     message = getString(Res.string.webdav_upload_success),
                                                     type = ToastType.Success,
                                                 )
                                                 viewModel.loadFileList(currentPath)
                                             } else {
+                                                val message = if (result.successCount > 0) {
+                                                    "部分备份成功 (${result.successCount}/${result.totalCount})"
+                                                } else {
+                                                    getString(Res.string.webdav_upload_failed)
+                                                }
                                                 toaster.show(
-                                                    message = getString(Res.string.webdav_upload_failed),
+                                                    message = message,
                                                     type = ToastType.Error,
                                                 )
                                             }
@@ -293,11 +298,17 @@ fun WebdavConfigDialog(
                                 val fileName = filePath.substringAfterLast('/')
                                 viewModel.restoreFromWebdav(filePath)
                                     .flowOn(Dispatchers.IO)
-                                    .collectLatest { success ->
-                                        if (success) {
-                                            println("Restore successful: $fileName")
+                                    .collectLatest { result ->
+                                        if (result.success) {
+                                            val typeText = when (result.type) {
+                                                com.archko.reader.pdf.viewmodel.RestoreType.HISTORY -> "历史记录"
+                                                com.archko.reader.pdf.viewmodel.RestoreType.READING_STATS -> "阅读统计"
+                                                com.archko.reader.pdf.viewmodel.RestoreType.BOOKMARKS -> "书签"
+                                                else -> "数据"
+                                            }
+                                            println("Restore successful: $fileName ($typeText)")
                                             toaster.show(
-                                                message = getString(Res.string.webdav_restore_success),
+                                                message = "恢复${typeText}成功",
                                                 type = ToastType.Success,
                                             )
                                         } else {

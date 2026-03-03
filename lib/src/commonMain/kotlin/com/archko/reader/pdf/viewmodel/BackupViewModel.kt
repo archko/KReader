@@ -37,6 +37,33 @@ import java.io.File
 import java.net.URLDecoder
 
 /**
+ * 备份结果
+ */
+public data class BackupResult(
+    val success: Boolean,
+    val successCount: Int,
+    val totalCount: Int
+)
+
+/**
+ * 恢复类型
+ */
+public enum class RestoreType {
+    HISTORY,
+    READING_STATS,
+    BOOKMARKS,
+    UNKNOWN
+}
+
+/**
+ * 恢复结果
+ */
+public data class RestoreResult(
+    val success: Boolean,
+    val type: RestoreType
+)
+
+/**
  * @author: archko 2020/11/16 :11:23
  */
 public class BackupViewModel : ViewModel() {
@@ -88,32 +115,89 @@ public class BackupViewModel : ViewModel() {
         return true
     }
 
-    /*fun backupFiles() = flow {
+    /**
+     * 备份所有数据到 WebDAV（历史记录、阅读统计、书签）
+     */
+    public fun backupAllToWebdav(currentPath: String): Flow<BackupResult> = flow {
         try {
-            var files: Array<File>? = null
-            val dir = getWebdavCacheFile("webdav")
-            if (dir.exists()) {
-                files = dir.listFiles { pathname: File -> pathname.name.startsWith("mupdf_") }
-                if (files != null) {
-                    Arrays.sort(files) { f1: File?, f2: File? ->
-                        if (f1 == null) throw RuntimeException("f1 is null inside sort")
-                        if (f2 == null) throw RuntimeException("f2 is null inside sort")
-                        return@sort f2.lastModified().compareTo(f1.lastModified())
-                    }
-                }
-            }
-            val list = ArrayList<File>()
-            if (files != null) {
-                for (f in files) {
-                    list.add(f)
-                }
+            if (!checkAndLoadUser() || httpClient == null || database == null) {
+                emit(BackupResult(false, 0, 3))
+                return@flow
             }
 
-            //emit(ResponseHandler.Success(list))
+            var successCount = 0
+            val totalCount = 3
+
+            // 1. 备份历史记录
+            try {
+                val list = database!!.recentDao().getAllRecents()
+                val content = if (list.isNullOrEmpty()) {
+                    """{"root":[]}"""
+                } else {
+                    BookProgressParser.recentsToJson(list)
+                }
+                val fileUrl = "${webdavUser!!.host}$currentPath/$DEFAULT_JSON"
+                val davResource = DavCollection(httpClient!!, Url(fileUrl))
+                davResource.put(
+                    body = content.toByteArray(),
+                    contentType = ContentType.Application.Json
+                ) { response ->
+                    println("Upload history successful: ${response.status}")
+                }
+                successCount++
+            } catch (e: Exception) {
+                println("Backup history error: ${e.message}")
+            }
+
+            // 2. 备份阅读统计
+            try {
+                val list = database!!.readingStatsDao().getAllStats()
+                val content = if (list.isNullOrEmpty()) {
+                    """{"version":"1.0","lastBackupTime":${System.currentTimeMillis()},"stats":[]}"""
+                } else {
+                    ReadingStatsParser.statsToJson(list)
+                }
+                val fileUrl = "${webdavUser!!.host}$currentPath/$READING_STATS_JSON"
+                val davResource = DavCollection(httpClient!!, Url(fileUrl))
+                davResource.put(
+                    body = content.toByteArray(),
+                    contentType = ContentType.Application.Json
+                ) { response ->
+                    println("Upload reading stats successful: ${response.status}")
+                }
+                successCount++
+            } catch (e: Exception) {
+                println("Backup reading stats error: ${e.message}")
+            }
+
+            // 3. 备份书签
+            try {
+                val list = database!!.bookmarkDao().getAllBookmarks()
+                val content = if (list.isNullOrEmpty()) {
+                    """{"version":"1.0","lastBackupTime":${System.currentTimeMillis()},"bookmarks":[]}"""
+                } else {
+                    BookmarkParser.bookmarksToJson(list)
+                }
+                val fileUrl = "${webdavUser!!.host}$currentPath/$BOOKMARKS_JSON"
+                val davResource = DavCollection(httpClient!!, Url(fileUrl))
+                davResource.put(
+                    body = content.toByteArray(),
+                    contentType = ContentType.Application.Json
+                ) { response ->
+                    println("Upload bookmarks successful: ${response.status}")
+                }
+                successCount++
+            } catch (e: Exception) {
+                println("Backup bookmarks error: ${e.message}")
+            }
+
+            emit(BackupResult(successCount == totalCount, successCount, totalCount))
         } catch (e: Exception) {
-            //emit(ResponseHandler.Failure())
+            emit(BackupResult(false, 0, 3))
+            println("backupAllToWebdav error: ${e.message}")
+            e.printStackTrace()
         }
-    }*/
+    }.flowOn(Dispatchers.IO)
 
     public fun backupToWebdav(currentPath: String): Flow<Boolean> = flow {
         try {
@@ -220,29 +304,50 @@ public class BackupViewModel : ViewModel() {
         }
     }.flowOn(Dispatchers.IO)
 
-    public fun restoreFromWebdav(filePath: String): Flow<Boolean> = flow {
+    /**
+     * 根据文件名自动识别类型并恢复数据
+     */
+    public fun restoreFromWebdav(filePath: String): Flow<RestoreResult> = flow {
         try {
             if (!checkAndLoadUser() || davCollection == null) {
-                emit(false)
+                emit(RestoreResult(false, RestoreType.UNKNOWN))
                 return@flow
             }
 
             // 使用 dav4kmp 下载文件
-            // filePath 是完整路径，例如：/dav/path/file.json
             val fileUrl = "${webdavUser!!.host}$filePath"
-            println("restoreFromWebdav - fileUrl: $fileUrl")
+            val fileName = filePath.substringAfterLast('/')
+            println("restoreFromWebdav - fileUrl: $fileUrl, fileName: $fileName")
+            
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
-
             var content = ""
             davResource.get(accept = "*/*", headers = null) { response ->
                 content = response.bodyAsText()
             }
 
-            val result = restore(database, content)
-            BackupEventBus.emitRestoreCompleted(result)
+            // 根据文件名判断类型并恢复
+            val result = when {
+                fileName == DEFAULT_JSON -> {
+                    val success = restore(database, content)
+                    BackupEventBus.emitRestoreCompleted(success)
+                    RestoreResult(success, RestoreType.HISTORY)
+                }
+                fileName == READING_STATS_JSON -> {
+                    val success = restoreReadingStats(database, content)
+                    RestoreResult(success, RestoreType.READING_STATS)
+                }
+                fileName == BOOKMARKS_JSON -> {
+                    val success = restoreBookmarks(database, content)
+                    RestoreResult(success, RestoreType.BOOKMARKS)
+                }
+                else -> {
+                    RestoreResult(false, RestoreType.UNKNOWN)
+                }
+            }
+            
             emit(result)
         } catch (e: Exception) {
-            emit(false)
+            emit(RestoreResult(false, RestoreType.UNKNOWN))
             println("restoreFromWebdav error: ${e.message}")
             e.printStackTrace()
         }
