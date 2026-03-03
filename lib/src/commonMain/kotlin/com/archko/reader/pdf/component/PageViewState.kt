@@ -45,7 +45,7 @@ public class PageViewState(
         private set
 
     // 搜索高亮状态
-    public var searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>> by mutableStateOf(emptyMap())
+    public var searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.DocQuad>> by mutableStateOf(emptyMap())
         private set
     public var currentSearchPageIndex: Int? by mutableStateOf(null)
         private set
@@ -174,7 +174,7 @@ public class PageViewState(
      * @param currentPageIndex 当前搜索结果所在的页面索引
      */
     public fun updateSearchHighlight(
-        highlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>>,
+        highlightQuads: Map<Int, List<com.archko.reader.pdf.entity.DocQuad>>,
         currentPageIndex: Int?,
         currentResultIndex: Int = -1
     ) {

@@ -638,8 +638,8 @@ public class Page(
     /**
      * 将Page坐标的Quad转换为屏幕坐标的Quad
      */
-    private fun quadToScreenQuad(quad: com.archko.reader.pdf.entity.MuPdfQuad, currentBounds: Rect): com.archko.reader.pdf.entity.MuPdfQuad {
-        return com.archko.reader.pdf.entity.MuPdfQuad(
+    private fun quadToScreenQuad(quad: com.archko.reader.pdf.entity.DocQuad, currentBounds: Rect): com.archko.reader.pdf.entity.DocQuad {
+        return com.archko.reader.pdf.entity.DocQuad(
             ul = pagePointToScreenPoint(quad.ul.x, quad.ul.y, currentBounds),
             ur = pagePointToScreenPoint(quad.ur.x, quad.ur.y, currentBounds),
             ll = pagePointToScreenPoint(quad.ll.x, quad.ll.y, currentBounds),

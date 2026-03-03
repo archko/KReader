@@ -24,6 +24,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.GestureMode
 import com.archko.reader.pdf.component.Horizontal
@@ -39,13 +40,20 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.Bookmark
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.FontCSSGenerator
+import com.archko.reader.pdf.util.ReadingTimeTracker
+import com.archko.reader.pdf.viewmodel.AIViewModel
+import com.archko.reader.pdf.viewmodel.BookmarkViewModel
+import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
+import com.archko.reader.viewer.component.SearchBar
 import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.FontDialog
@@ -77,13 +85,11 @@ import java.io.File
  */
 @Composable
 private fun ToolbarContent(
-    isVertical: Boolean,
     onCloseDocument: (() -> Unit)?,
     currentPath: String,
     ttsServiceBinder: TtsServiceBinder?,
     isSpeaking: Boolean,
     currentPage: Int,
-    columnCount: Int,
     decoder: ImageDecoder,
     onGestureModeChange: (gestureMode: GestureMode) -> Unit,
     gestureMode: GestureMode,
@@ -366,9 +372,9 @@ fun CustomView(
     reflow: Long = 0,
     crop: Boolean? = null,
     fontViewModel: FontViewModel,
-    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
-    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
-    aiViewModel: com.archko.reader.pdf.viewmodel.AIViewModel,
+    bookmarkViewModel: BookmarkViewModel,
+    readingStatsViewModel: ReadingStatsViewModel,
+    aiViewModel: AIViewModel,
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
@@ -393,7 +399,7 @@ fun CustomView(
         val runtime = Runtime.getRuntime()
         val maxMemory = runtime.maxMemory()
         val cacheMemoryLimit = maxMemory / 2
-        com.archko.reader.pdf.cache.ImageCache.setMaxMemory(cacheMemoryLimit)
+        ImageCache.setMaxMemory(cacheMemoryLimit)
 
         println("ImageCache: 设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)")
 
@@ -438,10 +444,10 @@ fun CustomView(
 
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
-    var editingBookmark by remember { mutableStateOf<com.archko.reader.pdf.entity.Bookmark?>(null) }
+    var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
 
     // 阅读时长追踪
-    val readingTimeTracker = remember { com.archko.reader.pdf.util.ReadingTimeTracker() }
+    val readingTimeTracker = remember { ReadingTimeTracker() }
 
     // 用于保存当前页码的引用（在DisposableEffect中使用）
     var currentPageRef = remember { mutableIntStateOf(progressPage ?: 0) }
@@ -622,7 +628,7 @@ fun CustomView(
             // 当前结果的quads放在最前面，这样Page.kt绘制时第一个quad会被特殊高亮
             val searchHighlightQuads = remember(searchState.results, searchState.currentIndex) {
                 val highlightMap =
-                    mutableMapOf<Int, MutableList<com.archko.reader.pdf.entity.MuPdfQuad>>()
+                    mutableMapOf<Int, MutableList<DocQuad>>()
 
                 // 先添加当前结果的quads
                 val currentResult = searchState.currentResult
@@ -749,13 +755,13 @@ fun CustomView(
             }
 
             // 搜索功能函数
-            fun performSearch(query: String) {
+            fun performSearch(state: SearchState) {
+                val query: String = state.query
                 if (query.isBlank()) {
-                    searchState = SearchState()
                     return
                 }
 
-                searchState = searchState.copy(isSearching = true)
+                searchState = state.copy(isSearching = true)
 
                 scope.launch(Dispatchers.IO) {
                     try {
@@ -790,48 +796,6 @@ fun CustomView(
                     // 初始化统计数据
                     decoder?.let { dec ->
                         readingStatsViewModel.startSession(currentPath, dec.originalPageSizes.size)
-                    }
-                }
-            }
-
-            // 监听生命周期 - 暂停和恢复追踪
-            val lifecycleOwner = LocalLifecycleOwner.current
-            DisposableEffect(lifecycleOwner) {
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_PAUSE -> {
-                            if (FileTypeUtils.isDocumentFile(currentPath)) {
-                                readingTimeTracker.pauseSession()
-                            }
-                        }
-
-                        Lifecycle.Event.ON_RESUME -> {
-                            if (FileTypeUtils.isDocumentFile(currentPath)) {
-                                readingTimeTracker.resumeSession()
-                            }
-                        }
-
-                        else -> {}
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
-
-                    // 保存阅读统计
-                    if (FileTypeUtils.isDocumentFile(currentPath)) {
-                        val sessionDuration = readingTimeTracker.pauseSession()
-                        val annotationCount = annotationManager.annotations.values.sumOf { it.size }
-                        val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
-                        scope.launch {
-                            readingStatsViewModel.endSession(
-                                path = currentPath,
-                                sessionDuration = sessionDuration,
-                                currentPage = currentPageRef.intValue,
-                                annotationCount = annotationCount,
-                                bookmarkCount = bookmarkCount
-                            )
-                        }
                     }
                 }
             }
@@ -894,8 +858,8 @@ fun CustomView(
             }
 
             // 监听生命周期，当从后台返回前台时同步到正在朗读的页面
-            val lifecycleOwner2 = LocalLifecycleOwner.current
-            DisposableEffect(lifecycleOwner2, ttsServiceBinder) {
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner, ttsServiceBinder) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
                         ttsServiceBinder?.let { binder ->
@@ -912,11 +876,19 @@ fun CustomView(
                                 }
                             }
                         }
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            readingTimeTracker.resumeSession()
+                        }
+                    }
+                    if (event == Lifecycle.Event.ON_PAUSE) {
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            readingTimeTracker.pauseSession()
+                        }
                     }
                 }
-                lifecycleOwner2.lifecycle.addObserver(observer)
+                lifecycleOwner.lifecycle.addObserver(observer)
                 onDispose {
-                    lifecycleOwner2.lifecycle.removeObserver(observer)
+                    lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
 
@@ -936,7 +908,6 @@ fun CustomView(
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page ->
                         currentPage = page
-                        currentPageRef.intValue = page
                     },
                     onTapNonPageArea = { clickedPageIndex ->
                         // 点击非翻页区域时隐藏工具栏，但朗读时保持朗读工具条显示
@@ -969,6 +940,20 @@ fun CustomView(
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
                     onCloseDocument = {
                         println("onCloseDocument.isReflow:$isReflow")
+                        // 保存阅读统计
+                        if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            val sessionDuration = readingTimeTracker.pauseSession()
+                            val annotationCount =
+                                annotationManager.annotations.values.sumOf { it.size }
+                            val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
+                            readingStatsViewModel.endSession(
+                                path = currentPath,
+                                sessionDuration = sessionDuration,
+                                currentPage = currentPageRef.intValue,
+                                annotationCount = annotationCount,
+                                bookmarkCount = bookmarkCount
+                            )
+                        }
                         if (!isReflow) {
                             onCloseDocument?.invoke()
                         }
@@ -1010,13 +995,11 @@ fun CustomView(
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
                 ToolbarContent(
-                    isVertical = isVertical,
                     onCloseDocument = onCloseDocument,
                     currentPath = currentPath,
                     ttsServiceBinder = ttsServiceBinder,
                     isSpeaking = isSpeaking,
                     currentPage = currentPage,
-                    columnCount = columnCount,
                     decoder = decoder!!,
                     onGestureModeChange = { mode -> gestureMode = mode },
                     gestureMode = gestureMode,
@@ -1098,7 +1081,7 @@ fun CustomView(
                                 searchState = searchState.copy(query = query)
                             },
                             onSearch = {
-                                performSearch(searchState.query)
+                                performSearch(searchState)
                             },
                             onPrevious = {
                                 goToPreviousResult()

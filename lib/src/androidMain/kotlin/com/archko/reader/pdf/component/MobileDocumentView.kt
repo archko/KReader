@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 
 /**
@@ -37,7 +38,7 @@ public fun MobileDocumentView(
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
     currentPath: String,
-    searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>> = emptyMap(),
+    searchHighlightQuads: Map<Int, List<DocQuad>> = emptyMap(),
     currentSearchPageIndex: Int? = null,
 ) {
     // 创建文档视图状态

@@ -1,27 +1,23 @@
 package com.archko.reader.viewer.component
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.archko.reader.pdf.component.SearchState
@@ -66,35 +62,30 @@ fun SearchBar(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // 搜索输入框
-            TextField(
+            BasicTextField(
                 value = searchState.query,
                 onValueChange = onQueryChange,
-                placeholder = {
-                    Text(
-                        text = stringResource(Res.string.search_hint),
-                        fontSize = 13.sp
-                    )
-                },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { onSearch() }
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = 13.sp,
+                    color = Color.White
                 ),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                cursorBrush = SolidColor(Color.White),
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 8.dp, end = 8.dp)
+                    .padding(horizontal = 8.dp),
+                decorationBox = { innerTextField ->
+                    if (searchState.query.isEmpty()) {
+                        Text(
+                            text = stringResource(Res.string.search_hint),
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                    innerTextField()
+                }
             )
-            
+
             // 搜索按钮
             IconButton(
                 onClick = onSearch,

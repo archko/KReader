@@ -28,12 +28,19 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.Bookmark
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.pdf.util.ReadingTimeTracker
+import com.archko.reader.pdf.viewmodel.AIViewModel
+import com.archko.reader.pdf.viewmodel.BookmarkViewModel
+import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.component.DrawingToolbar
+import com.archko.reader.viewer.component.SearchBar
 import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
@@ -337,9 +344,9 @@ fun CustomView(
     scrollOri: Long = 0,
     reflow: Long = 0,
     crop: Boolean? = null,
-    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
-    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
-    aiViewModel: com.archko.reader.pdf.viewmodel.AIViewModel,
+    bookmarkViewModel: BookmarkViewModel,
+    readingStatsViewModel: ReadingStatsViewModel,
+    aiViewModel: AIViewModel,
 ) {
     var vZoom by remember { mutableDoubleStateOf(initialZoom) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
@@ -360,10 +367,7 @@ fun CustomView(
 
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
-    var editingBookmark by remember { mutableStateOf<com.archko.reader.pdf.entity.Bookmark?>(null) }
-
-    // 阅读时长追踪
-    val readingTimeTracker = remember { com.archko.reader.pdf.util.ReadingTimeTracker() }
+    var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
 
     // 用于保存当前页码的引用
     var currentPageRef = remember { mutableIntStateOf(progressPage ?: 0) }
@@ -375,7 +379,7 @@ fun CustomView(
     // 构建搜索高亮映射（按页面分组）
     // 当前结果的quads放在最前面，这样Page.kt绘制时第一个quad会被特殊高亮
     val searchHighlightQuads = remember(searchState.results, searchState.currentIndex) {
-        val highlightMap = mutableMapOf<Int, MutableList<com.archko.reader.pdf.entity.MuPdfQuad>>()
+        val highlightMap = mutableMapOf<Int, MutableList<DocQuad>>()
 
         // 先添加当前结果的quads
         val currentResult = searchState.currentResult
@@ -405,17 +409,6 @@ fun CustomView(
         // 加载书签
         if (paths.size == 1 && FileTypeUtils.isDocumentFile(paths[0])) {
             bookmarkViewModel.loadBookmarks(paths[0])
-        }
-    }
-
-    // 阅读时长追踪 - 启动
-    LaunchedEffect(currentPath) {
-        if (FileTypeUtils.isDocumentFile(currentPath)) {
-            readingTimeTracker.startSession()
-            // 初始化统计数据
-            decoder?.let { dec ->
-                readingStatsViewModel.startSession(currentPath, dec.originalPageSizes.size)
-            }
         }
     }
 
@@ -613,6 +606,9 @@ fun CustomView(
 
             var showQueueDialog by remember { mutableStateOf(false) }
 
+            // 阅读时长追踪
+            val readingTimeTracker = remember { ReadingTimeTracker() }
+
             // 对于单图片文件，根据尺寸自动调整滚动方向
             LaunchedEffect(decoder) {
                 decoder?.let { dec ->
@@ -631,6 +627,17 @@ fun CustomView(
                                 isVertical = false
                             }
                         }
+                    }
+                }
+            }
+
+            // 阅读时长追踪 - 启动
+            LaunchedEffect(currentPath) {
+                if (FileTypeUtils.isDocumentFile(currentPath)) {
+                    readingTimeTracker.startSession()
+                    // 初始化统计数据
+                    decoder?.let { dec ->
+                        readingStatsViewModel.startSession(currentPath, dec.originalPageSizes.size)
                     }
                 }
             }
@@ -699,13 +706,13 @@ fun CustomView(
             }
 
             // 搜索功能函数
-            fun performSearch(query: String) {
+            fun performSearch(state: SearchState) {
+                val query: String = state.query
                 if (query.isBlank()) {
-                    searchState = SearchState()
                     return
                 }
 
-                searchState = searchState.copy(isSearching = true)
+                searchState = state.copy(isSearching = true)
 
                 scope.launch(Dispatchers.IO) {
                     try {
@@ -805,15 +812,13 @@ fun CustomView(
                         val sessionDuration = readingTimeTracker.pauseSession()
                         val annotationCount = annotationManager.annotations.values.sumOf { it.size }
                         val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
-                        scope.launch {
-                            readingStatsViewModel.endSession(
-                                path = currentPath,
-                                sessionDuration = sessionDuration,
-                                currentPage = currentPageRef.intValue,
-                                annotationCount = annotationCount,
-                                bookmarkCount = bookmarkCount
-                            )
-                        }
+                        readingStatsViewModel.endSession(
+                            path = currentPath,
+                            sessionDuration = sessionDuration,
+                            currentPage = currentPageRef.intValue,
+                            annotationCount = annotationCount,
+                            bookmarkCount = bookmarkCount
+                        )
                     }
                 }
             }
@@ -981,7 +986,7 @@ fun CustomView(
                                 searchState = searchState.copy(query = query)
                             },
                             onSearch = {
-                                performSearch(searchState.query)
+                                performSearch(searchState)
                             },
                             onPrevious = {
                                 goToPreviousResult()

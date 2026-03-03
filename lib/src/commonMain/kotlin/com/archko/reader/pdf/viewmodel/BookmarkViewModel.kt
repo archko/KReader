@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
 import com.archko.reader.pdf.entity.Bookmark
+import com.archko.reader.pdf.util.getFileName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -26,9 +27,10 @@ public class BookmarkViewModel : ViewModel() {
      */
     public fun loadBookmarks(path: String) {
         viewModelScope.launch {
-            val bookmarks = database?.bookmarkDao()?.getBookmarksByPath(path) ?: emptyList()
+            val name = path.getFileName()
+            val bookmarks = database?.bookmarkDao()?.getBookmarksByPath(name) ?: emptyList()
             _currentPathBookmarks.value = bookmarks
-            println("BookmarkViewModel.loadBookmarks: path=$path, count=${bookmarks.size}")
+            println("BookmarkViewModel.loadBookmarks: name=$name, count=${bookmarks.size}")
         }
     }
 
@@ -44,8 +46,9 @@ public class BookmarkViewModel : ViewModel() {
         scrollY: Long? = null
     ) {
         viewModelScope.launch {
+            val name = path.getFileName()
             val bookmark = Bookmark(
-                path = path,
+                path = name,
                 pageIndex = pageIndex,
                 title = title,
                 note = note,
@@ -56,7 +59,7 @@ public class BookmarkViewModel : ViewModel() {
             println("BookmarkViewModel.addBookmark: $bookmark")
             
             // 重新加载当前文档的书签
-            loadBookmarks(path)
+            loadBookmarks(name)
         }
     }
 
@@ -91,14 +94,16 @@ public class BookmarkViewModel : ViewModel() {
      * 检查指定页面是否有书签
      */
     public suspend fun hasBookmarkAtPage(path: String, pageIndex: Int): Boolean {
-        return database?.bookmarkDao()?.getBookmarkByPageAndPath(path, pageIndex) != null
+        val name = path.getFileName()
+        return database?.bookmarkDao()?.getBookmarkByPageAndPath(name, pageIndex) != null
     }
 
     /**
      * 获取指定页面的书签
      */
     public suspend fun getBookmarkAtPage(path: String, pageIndex: Int): Bookmark? {
-        return database?.bookmarkDao()?.getBookmarkByPageAndPath(path, pageIndex)
+        val name = path.getFileName()
+        return database?.bookmarkDao()?.getBookmarkByPageAndPath(name, pageIndex)
     }
 
     /**

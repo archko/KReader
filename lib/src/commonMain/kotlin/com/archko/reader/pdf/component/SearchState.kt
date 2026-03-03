@@ -1,7 +1,6 @@
 package com.archko.reader.pdf.component
 
-import androidx.compose.ui.geometry.Offset
-import com.archko.reader.pdf.entity.MuPdfQuad
+import com.archko.reader.pdf.entity.DocQuad
 
 /**
  * 搜索状态
@@ -24,7 +23,7 @@ public data class SearchState(
 public data class SearchResult(
     val pageIndex: Int,
     val text: String,
-    val quads: List<MuPdfQuad>,
+    val quads: List<DocQuad>,
     val context: String  // 上下文预览
 )
 

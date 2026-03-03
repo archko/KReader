@@ -19,7 +19,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,7 +54,7 @@ fun AISettingDialog(
 ) {
     val providers by viewModel.providers.collectAsState()
     val defaultProvider by viewModel.defaultProvider.collectAsState()
-    
+
     var showEditDialog by remember { mutableStateOf(false) }
     var editingProvider by remember { mutableStateOf<AIProvider?>(null) }
 
@@ -143,9 +142,9 @@ private fun AIProviderItem(
                 selected = isDefault,
                 onClick = onSetDefault
             )
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             // 提供商信息
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -165,7 +164,7 @@ private fun AIProviderItem(
                     )
                 }
             }
-            
+
             // 编辑按钮
             IconButton(onClick = onEdit) {
                 Icon(
@@ -190,7 +189,7 @@ private fun AIProviderEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(Res.string.ai_edit_provider, provider.name)) },
+        title = { Text(text = stringResource(Res.string.ai_edit_provider).format(provider.name)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -204,7 +203,7 @@ private fun AIProviderEditDialog(
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true
                 )
-                
+
                 OutlinedTextField(
                     value = baseUrl,
                     onValueChange = { baseUrl = it },
@@ -212,7 +211,7 @@ private fun AIProviderEditDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                
+
                 OutlinedTextField(
                     value = model,
                     onValueChange = { model = it },

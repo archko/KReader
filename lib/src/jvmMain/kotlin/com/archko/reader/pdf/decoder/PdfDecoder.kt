@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.decoder
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -8,9 +9,11 @@ import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.DecodeTask
+import com.archko.reader.pdf.component.SearchResult
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.PageSizeBean
@@ -753,7 +756,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
-    ): ImageBitmap{
+    ): ImageBitmap {
         return ImageBitmap(
             task.width,
             task.height,
@@ -889,21 +892,24 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     /**
      * 在文档中搜索文本
      */
-    override fun search(query: String, caseSensitive: Boolean): List<com.archko.reader.pdf.component.SearchResult> {
+    override fun search(
+        query: String,
+        caseSensitive: Boolean
+    ): List<SearchResult> {
         if (query.isBlank() || document == null) {
             return emptyList()
         }
 
-        val results = mutableListOf<com.archko.reader.pdf.component.SearchResult>()
-        
+        val results = mutableListOf<SearchResult>()
+
         try {
             for (pageIndex in 0 until pageCount) {
                 val page = getPage(pageIndex) ?: continue
-                
+
                 // 使用MuPDF的search功能 - 返回 Quad[][]
                 val searchQuery = if (caseSensitive) query else query.lowercase()
                 val quadArrays = page.search(searchQuery)
-                
+
                 if (quadArrays.isNotEmpty()) {
                     // 获取页面文本用于上下文
                     val result = page.textAsText("preserve-whitespace,inhibit-spaces")
@@ -912,7 +918,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                     } else {
                         ""
                     }
-                    
+
                     // 为每个匹配创建结果 - quadArrays是二维数组，每个匹配可能有多个quad
                     quadArrays.forEach { quadArray ->
                         if (quadArray.isNotEmpty()) {
@@ -924,27 +930,28 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                             } else {
                                 -1
                             }
-                            
+
                             val contextStart = (matchIndex - 30).coerceAtLeast(0)
-                            val contextEnd = (matchIndex + query.length + 30).coerceAtMost(pageText.length)
+                            val contextEnd =
+                                (matchIndex + query.length + 30).coerceAtMost(pageText.length)
                             val context = if (matchIndex >= 0 && pageText.isNotEmpty()) {
                                 pageText.substring(contextStart, contextEnd).trim()
                             } else {
                                 query
                             }
-                            
+
                             // 转换所有quad到我们的MuPdfQuad格式
                             val convertedQuads = quadArray.map { quad ->
-                                com.archko.reader.pdf.entity.MuPdfQuad(
-                                    ul = androidx.compose.ui.geometry.Offset(quad.ul_x, quad.ul_y),
-                                    ur = androidx.compose.ui.geometry.Offset(quad.ur_x, quad.ur_y),
-                                    ll = androidx.compose.ui.geometry.Offset(quad.ll_x, quad.ll_y),
-                                    lr = androidx.compose.ui.geometry.Offset(quad.lr_x, quad.lr_y)
+                                DocQuad(
+                                    ul = Offset(quad.ul_x, quad.ul_y),
+                                    ur = Offset(quad.ur_x, quad.ur_y),
+                                    ll = Offset(quad.ll_x, quad.ll_y),
+                                    lr = Offset(quad.lr_x, quad.lr_y)
                                 )
                             }
-                            
+
                             results.add(
-                                com.archko.reader.pdf.component.SearchResult(
+                                SearchResult(
                                     pageIndex = pageIndex,
                                     text = query,
                                     quads = convertedQuads,
@@ -959,7 +966,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
             println("PdfDecoder.search error: ${e.message}")
             e.printStackTrace()
         }
-        
+
         println("PdfDecoder.search: query='$query', found ${results.size} results")
         return results
     }

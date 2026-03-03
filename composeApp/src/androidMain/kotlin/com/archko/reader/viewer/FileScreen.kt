@@ -14,14 +14,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,12 +68,16 @@ import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.inferName
+import com.archko.reader.pdf.viewmodel.AIViewModel
+import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.book_info
 import kreader.composeapp.generated.resources.browse_directory_message
 import kreader.composeapp.generated.resources.browse_directory_title
 import kreader.composeapp.generated.resources.cancel
@@ -88,7 +90,6 @@ import kreader.composeapp.generated.resources.delete_cache
 import kreader.composeapp.generated.resources.delete_history
 import kreader.composeapp.generated.resources.load_more
 import kreader.composeapp.generated.resources.select_pdf
-import kreader.composeapp.generated.resources.book_info
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -99,9 +100,9 @@ data class OpenDocRequest(val paths: List<String>, val page: Int?)
 fun FileScreen(
     viewModel: PdfViewModel,
     fontViewModel: FontViewModel,
-    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
-    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
-    aiViewModel: com.archko.reader.pdf.viewmodel.AIViewModel,
+    bookmarkViewModel: BookmarkViewModel,
+    readingStatsViewModel: ReadingStatsViewModel,
+    aiViewModel: AIViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,

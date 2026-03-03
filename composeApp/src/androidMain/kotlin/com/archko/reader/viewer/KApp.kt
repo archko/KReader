@@ -33,7 +33,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
+import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
+import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.navigation.MainDestinations
 import com.archko.reader.viewer.navigation.rememberKNavController
 import com.archko.reader.viewer.viewmodel.FontViewModel
@@ -52,14 +54,12 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun KApp(
-    screenWidthInPixels: Int,
-    screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
     aiViewModel: AIViewModel,
     fontViewModel: FontViewModel,
-    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
-    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
+    bookmarkViewModel: BookmarkViewModel,
+    readingStatsViewModel: ReadingStatsViewModel,
     externalPath: String? = null
 ) {
     // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
@@ -87,8 +87,6 @@ fun KApp(
                         route = MainDestinations.HOME_SCREEN
                     ) { backStackEntry ->
                         MainContainer(
-                            screenWidthInPixels,
-                            screenHeightInPixels,
                             viewModel,
                             backupViewModel,
                             aiViewModel,
@@ -111,14 +109,12 @@ fun KApp(
 
 @Composable
 fun MainContainer(
-    screenWidthInPixels: Int,
-    screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
     aiViewModel: AIViewModel,
     fontViewModel: FontViewModel,
-    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
-    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
+    bookmarkViewModel: BookmarkViewModel,
+    readingStatsViewModel: ReadingStatsViewModel,
     modifier: Modifier = Modifier,
     externalPath: String? = null,
     onExternalPathConsumed: () -> Unit = {}
@@ -145,8 +141,6 @@ fun MainContainer(
             startDestination = HomeSections.FILE.route
         ) {
             addHomeGraph(
-                screenWidthInPixels,
-                screenHeightInPixels,
                 viewModel,
                 backupViewModel,
                 aiViewModel,
@@ -163,14 +157,12 @@ fun MainContainer(
 }
 
 fun NavGraphBuilder.addHomeGraph(
-    screenWidthInPixels: Int,
-    screenHeightInPixels: Int,
     viewModel: PdfViewModel,
     backupViewModel: BackupViewModel,
     aiViewModel: AIViewModel,
     fontViewModel: FontViewModel,
-    bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel,
-    readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel,
+    bookmarkViewModel: BookmarkViewModel,
+    readingStatsViewModel: ReadingStatsViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
     externalPath: String? = null,

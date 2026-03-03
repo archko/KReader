@@ -20,11 +20,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
@@ -127,12 +124,6 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 }
             }
 
-            val configuration = LocalConfiguration.current
-            val density = LocalDensity.current
-            val screenWidthInPixels = with(density) { configuration.screenWidthDp.dp.toPx() }
-            val screenHeightInPixels = with(density) { configuration.screenHeightDp.dp.toPx() }
-            println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
-
             val driverFactory = DriverFactory(LocalContext.current)
             val database = driverFactory.createRoomDatabase()
             val viewModelStoreOwner = remember { ComposeViewModelStoreOwner() }
@@ -141,8 +132,10 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 val fontViewModel: FontViewModel = viewModel()
                 val backupViewModel: BackupViewModel = viewModel()
                 val aiViewModel: AIViewModel = viewModel()
-                val bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel = viewModel()
-                val readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel = viewModel()
+                val bookmarkViewModel: com.archko.reader.pdf.viewmodel.BookmarkViewModel =
+                    viewModel()
+                val readingStatsViewModel: com.archko.reader.pdf.viewmodel.ReadingStatsViewModel =
+                    viewModel()
                 viewModel.database = database
                 backupViewModel.database = database
                 aiViewModel.database = database
@@ -150,8 +143,6 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                 readingStatsViewModel.database = database
 
                 KApp(
-                    screenWidthInPixels.toInt(),
-                    screenHeightInPixels.toInt(),
                     viewModel,
                     backupViewModel,
                     aiViewModel,

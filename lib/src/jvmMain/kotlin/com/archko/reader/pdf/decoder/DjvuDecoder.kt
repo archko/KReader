@@ -719,7 +719,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                         val width = searchResult.width.toFloat()
                         val height = searchResult.height.toFloat()
                         
-                        val quad = com.archko.reader.pdf.entity.MuPdfQuad(
+                        val quad = com.archko.reader.pdf.entity.DocQuad(
                             ul = androidx.compose.ui.geometry.Offset(x, y),
                             ur = androidx.compose.ui.geometry.Offset(x + width, y),
                             ll = androidx.compose.ui.geometry.Offset(x, y + height),

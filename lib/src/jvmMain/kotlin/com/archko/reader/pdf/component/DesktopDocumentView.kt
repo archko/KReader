@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 import kotlin.math.max
 import kotlin.math.min
@@ -62,7 +63,7 @@ public fun DesktopDocumentView(
     pathConfig: PathConfig,
     annotationManager: AnnotationManager,
     currentPath: String,
-    searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>> = emptyMap(),
+    searchHighlightQuads: Map<Int, List<DocQuad>> = emptyMap(),
     currentSearchPageIndex: Int? = null,
 ) {
     // 平台判断
@@ -135,8 +136,8 @@ public fun DesktopDocumentView(
             stateHolder.orientation.value
         )
         stateHolder.pageViewState.updateVisiblePages(
-            stateHolder.offset.value, 
-            stateHolder.viewSize.value, 
+            stateHolder.offset.value,
+            stateHolder.viewSize.value,
             stateHolder.vZoom.value
         )
     }

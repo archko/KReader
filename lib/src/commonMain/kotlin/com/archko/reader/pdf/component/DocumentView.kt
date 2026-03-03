@@ -37,8 +37,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
+import com.archko.reader.pdf.util.ReadingTimeTracker
 import com.archko.reader.pdf.util.ViewUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -185,7 +187,7 @@ internal fun DocumentViewEffects(
     crop: Boolean,
     speakingPageIndex: Int?,
     columnCount: Int,
-    searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.MuPdfQuad>>,
+    searchHighlightQuads: Map<Int, List<DocQuad>>,
     currentSearchPageIndex: Int?,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)?,
     onCloseDocument: (() -> Unit)?,
@@ -198,6 +200,9 @@ internal fun DocumentViewEffects(
     val orientation = state.orientation
     val isJumping = state.isJumping
     val flingJob = state.flingJob
+
+    // 阅读时长追踪
+    val readingTimeTracker = remember { ReadingTimeTracker() }
 
     LaunchedEffect(columnCount) {
         pageViewState.updateColumnCount(columnCount)
@@ -335,7 +340,7 @@ internal fun DocumentViewEffects(
                             } else {
                                 page.bounds.top
                             }
-                            
+
                             val clampedTargetY = targetY.coerceIn(
                                 0f,
                                 (pageViewState.totalHeight - viewSize.value.height).coerceAtLeast(0f)
