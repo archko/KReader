@@ -161,7 +161,7 @@ public class AnnotationManager(public val path: String) {
                                                 }
                                             })
                                             put("config", buildJsonObject {
-                                                put("c", path.config.color.value.toString(16))
+                                                put("c", (path.config.color.value and 0xFFFFFFFFL).toString(16))
                                                 put("s", path.config.strokeWidth)
                                                 put("d", path.config.drawType.name)
                                             })
@@ -254,7 +254,13 @@ public class AnnotationManager(public val path: String) {
 
                                 val colorStr = configObj["c"]?.jsonPrimitive?.content
                                 val colorValue = colorStr?.toULongOrNull(16)
-                                val color = colorValue?.let { Color(it) } ?: Color(0xFFff0000)
+                                // 兼容旧格式：如果颜色字符串长度超过8位，说明是旧的错误格式，需要截取后8位
+                                val normalizedColorValue = if (colorValue != null && colorStr?.length ?: 0 > 8) {
+                                    colorValue and 0xFFFFFFFFL
+                                } else {
+                                    colorValue ?: 0xFFff0000UL
+                                }
+                                val color = Color(normalizedColorValue)
                                 val strokeWidth =
                                     configObj["s"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 4f
                                 val drawTypeStr = configObj["d"]?.jsonPrimitive?.content ?: "CURVE"
