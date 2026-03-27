@@ -53,11 +53,6 @@ public class PageNode(
         this.aPage = newAPage
     }
 
-    // 逻辑rect转实际像素
-    // pageWidth/pageHeight: Page的缩放后尺寸（currentWidth/currentHeight）
-    // xOffset/yOffset: Page在文档中的缩放后偏移（currentBounds.left/top）
-    // bounds: Node在Page中的逻辑坐标[0,1]
-    // 返回: Node在文档中的绝对像素坐标
     public fun toPixelRect(
         pageWidth: Float,
         pageHeight: Float,
@@ -203,12 +198,12 @@ public class PageNode(
         }
 
         // 4. 无论是否绘制，都尝试解码（预加载区域内）
-        if (bitmapState == null) {
-            decode(pageWidth, pageHeight)
-        }
+        //if (bitmapState == null) {
+        //    decode(pageWidth, pageHeight)
+        //}
     }
 
-    private fun decode(pageWidth: Float, pageHeight: Float) {
+    public fun decode(pageWidth: Float, pageHeight: Float) {
         val currentKey = cacheKey
 
         if (activeDecodeKey == currentKey || isDecoding) return

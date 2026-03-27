@@ -36,6 +36,7 @@ public class Page(
     public var xOffset: Float = 0f
 ) {
     public var totalScale: Float = 1f
+
     // 可见的 nodes 映射：(x, y) -> PageNode，按需创建
     private val visibleNodes: MutableMap<Pair<Int, Int>, PageNode> = mutableMapOf()
     private var currentTileConfig: TileConfig? = null
@@ -308,7 +309,9 @@ public class Page(
 
                     override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
                         // 优化：使用快速查找方法
-                        return !pageViewState.isShutdown() && pageViewState.isPageInVisibleList(pageNumber)
+                        return !pageViewState.isShutdown() && pageViewState.isPageInVisibleList(
+                            pageNumber
+                        )
                     }
 
                     override fun onFinish(pageNumber: Int) {
@@ -387,13 +390,8 @@ public class Page(
             return
         }
 
-        // 分块模式：按行列顺序绘制可见的 nodes
-        val sortedNodes = visibleNodes.entries
-            .sortedBy { it.key.second * config.xBlocks + it.key.first }
-            .map { it.value }
-
-        for (node in sortedNodes) {
-            node.draw(
+        for (node in visibleNodes) {
+            node.value.draw(
                 drawScope,
                 currentWidth,
                 currentHeight,
@@ -596,10 +594,10 @@ public class Page(
     private fun drawSearchHighlight(drawScope: DrawScope, currentBounds: Rect) {
         val highlightQuads = pageViewState.searchHighlightQuads[aPage.index] ?: return
         val isCurrentPage = pageViewState.currentSearchPageIndex == aPage.index
-        
+
         // 所有结果用黄色半透明
         val normalHighlightColor = Color(0x55FFFF00)
-        
+
         highlightQuads.forEach { quad ->
             // 将Page坐标的Quad转换为屏幕坐标
             val screenQuad = quadToScreenQuad(quad, currentBounds)
@@ -616,12 +614,12 @@ public class Page(
                 size = Size(right - left, bottom - top)
             )
         }
-        
+
         // 如果是当前页面，在第一个结果上再绘制一层橙色高亮
         if (isCurrentPage && highlightQuads.isNotEmpty()) {
             val currentQuad = highlightQuads[0]
             val screenQuad = quadToScreenQuad(currentQuad, currentBounds)
-            
+
             val left = minOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
             val top = minOf(screenQuad.ul.y, screenQuad.ll.y, screenQuad.ur.y, screenQuad.lr.y)
             val right = maxOf(screenQuad.ul.x, screenQuad.ll.x, screenQuad.ur.x, screenQuad.lr.x)
@@ -638,7 +636,10 @@ public class Page(
     /**
      * 将Page坐标的Quad转换为屏幕坐标的Quad
      */
-    private fun quadToScreenQuad(quad: com.archko.reader.pdf.entity.DocQuad, currentBounds: Rect): com.archko.reader.pdf.entity.DocQuad {
+    private fun quadToScreenQuad(
+        quad: com.archko.reader.pdf.entity.DocQuad,
+        currentBounds: Rect
+    ): com.archko.reader.pdf.entity.DocQuad {
         return com.archko.reader.pdf.entity.DocQuad(
             ul = pagePointToScreenPoint(quad.ul.x, quad.ul.y, currentBounds),
             ur = pagePointToScreenPoint(quad.ur.x, quad.ur.y, currentBounds),
@@ -818,19 +819,16 @@ public class Page(
             bounds.bottom * scaleRatio
         )
 
+        val currentWidth = width * scaleRatio
+        val currentHeight = height * scaleRatio
+
         // 单块模式：只有一个 node
         if (config.isSingleBlock) {
+            visibleNodes.values.forEach { pageViewState.nodePool.release(it) }
+            val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
             val key = Pair(0, 0)
-            if (!visibleNodes.containsKey(key)) {
-                val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
-                visibleNodes[key] = node
-            }
-
-            // 清理其他可能的
-            val keysToRemove = visibleNodes.keys.filter { it != key }
-            keysToRemove.forEach { removeKey ->
-                visibleNodes.remove(removeKey)?.let { pageViewState.nodePool.release(it) }
-            }
+            visibleNodes[key] = node
+            node.decode(currentWidth, currentHeight)
             return
         }
 
@@ -841,10 +839,14 @@ public class Page(
         val pageVisibleBottom = (visibleRect.bottom - currentBounds.top) / (height * scaleRatio)
 
         // 计算需要可见的 block x/y indices 范围
-        val minBlockX = floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
-        val maxBlockX = ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
-        val minBlockY = floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
-        val maxBlockY = ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+        val minBlockX =
+            floor(pageVisibleLeft * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val maxBlockX =
+            ceil(pageVisibleRight * config.xBlocks).toInt().coerceIn(0, config.xBlocks - 1)
+        val minBlockY =
+            floor(pageVisibleTop * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
+        val maxBlockY =
+            ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
 
         // 新的可见 nodes 集合
         val newVisibleKeys = mutableSetOf<Pair<Int, Int>>()
@@ -867,15 +869,16 @@ public class Page(
                 }
             }
         }
-        //println("updateVisibleNodes:${visibleNodes.size}")
+        //println("Page.updateVisibleNodes.config:$config, x:$minBlockX-$maxBlockX, y:$minBlockY-$maxBlockY, visible:${oldVisibleNodes.size}, key:$newVisibleKeys")
 
-        // 清理不再可见的 nodes
         val iterator = visibleNodes.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (entry.key !in newVisibleKeys) {
                 pageViewState.nodePool.release(entry.value)
                 iterator.remove()
+            } else {
+                entry.value.decode(currentWidth, currentHeight)
             }
         }
     }
