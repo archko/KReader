@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.cache
 
 import androidx.compose.ui.graphics.ImageBitmap
+import java.util.concurrent.atomic.AtomicInteger
 
 private const val CANDIDATE_TIMEOUT = 60_000L
 private var MAX_MEMORY_BYTES = 256 * 1024 * 1024L
@@ -12,35 +13,46 @@ private var PAGE_CANDIDATE_MEMORY_BYTES = PAGE_CACHE_MEMORY_BYTES / 4
 /**
  * Bitmap状态管理器，解决并发访问和生命周期问题
  * 使用引用计数确保正在使用的bitmap不会被回收
+ *
+ * 用一个 AtomicInteger 合并编码 refCount（低31位）和 recycled 标志（第32位），
+ * 通过 CAS 循环实现所有方法完全无锁。
  */
 public class BitmapState(
     public val bitmap: ImageBitmap,
     public val key: String,
     public val byteSize: Long // 缓存尺寸，避免重复计算
 ) {
-    private var referenceCount = 0
-    private var isRecycled = false
+    private val state = AtomicInteger(0)
 
-    public fun acquire(): Boolean = synchronized(this) {
-        if (isRecycled) return false
-        referenceCount++
-        return true
-    }
-
-    public fun release(): Unit = synchronized(this) {
-        if (referenceCount > 0) referenceCount--
-    }
-
-    public fun markRecycled(): Boolean = synchronized(this) {
-        if (referenceCount == 0 && !isRecycled) {
-            isRecycled = true
-            return true
+    public fun acquire(): Boolean {
+        while (true) {
+            val current = state.get()
+            if (current < 0) return false
+            if (state.compareAndSet(current, current + 1)) return true
         }
-        return false
     }
 
-    public fun canRecycle(): Boolean = synchronized(this) { referenceCount == 0 }
-    public fun isRecycled(): Boolean = synchronized(this) { isRecycled }
+    public fun release(): Unit {
+        while (true) {
+            val current = state.get()
+            val refCount = current and Int.MAX_VALUE
+            if (refCount == 0) break
+            if (state.compareAndSet(current, current - 1)) break
+        }
+    }
+
+    public fun markRecycled(): Boolean {
+        while (true) {
+            val current = state.get()
+            if (current < 0) return false
+            val refCount = current and Int.MAX_VALUE
+            if (refCount != 0) return false
+            if (state.compareAndSet(current, current or Int.MIN_VALUE)) return true
+        }
+    }
+
+    public fun canRecycle(): Boolean = (state.get() and Int.MAX_VALUE) == 0
+    public fun isRecycled(): Boolean = state.get() < 0
 }
 
 /**
@@ -99,21 +111,21 @@ private class InnerImageCache(
         state.release()
     }
 
-    public fun put(key: String, bitmap: ImageBitmap): BitmapState = synchronized(this) {
+    public fun put(key: String, bitmap: ImageBitmap): BitmapState {
         val imageSize = calculateImageSize(bitmap)
-
-        // 如果已存在旧的，先移入候选池
-        cache.remove(key)?.let { oldState ->
-            currentMemoryBytes -= oldState.byteSize
-            addToCandidatePool(key, oldState)
-        }
-
         val state = BitmapState(bitmap, key, imageSize)
-        cache[indexLast(key)] = state // LinkedHashMap 记录新插入项
-        cache[key] = state
-        currentMemoryBytes += imageSize
 
-        trimToSize()
+        synchronized(this) {
+            val oldState = cache.put(key, state)
+            if (oldState != null) {
+                currentMemoryBytes -= oldState.byteSize
+                addToCandidatePool(key, oldState)
+            }
+            currentMemoryBytes += imageSize
+        }
+        // ← 锁在这里释放了，主线程的 acquireNode() 不会被阻塞
+
+        synchronized(this) { trimToSize() } // 第二次拿锁做 eviction
         return state
     }
 

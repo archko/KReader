@@ -31,8 +31,7 @@ public class PageNode(
     private var activeDecodeKey: String? = null
 
     //不能用bounds.toString(),切边切换,key变化
-    public val cacheKey: String
-        get() = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pageViewState.vZoom}-${pageViewState.orientation}-${pageViewState.isCropEnabled()}"
+    public var cacheKey: String = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pageViewState.vZoom}-${pageViewState.orientation}-${pageViewState.isCropEnabled()}"
 
     private var bitmapState by mutableStateOf<BitmapState?>(null)
     private var isDecoding = false
@@ -48,9 +47,16 @@ public class PageNode(
     // 缓存TileSpec计算结果
     private var cachedTileSpec: TileSpec? = null
 
+    public fun updateKey() {
+        // 只有在 orientation 或 crop 改变时才重新生成字符串
+        // 或者使用更快的位运算生成 Long 型 ID
+        cacheKey = "${aPage.index}-${bounds.left}-${bounds.top}-${bounds.right}-${bounds.bottom}-${pageViewState.vZoom}-${pageViewState.orientation}-${pageViewState.isCropEnabled()}"
+    }
+
     public fun update(newBounds: Rect, newAPage: APage) {
         this.bounds = newBounds
         this.aPage = newAPage
+        updateKey()
     }
 
     public fun toPixelRect(
