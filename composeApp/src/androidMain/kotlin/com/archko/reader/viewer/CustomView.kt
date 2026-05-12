@@ -32,7 +32,6 @@ import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.MobileDocumentView
 import com.archko.reader.pdf.component.PathConfig
-import com.archko.reader.pdf.component.SearchState
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -40,7 +39,6 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.entity.Bookmark
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
@@ -318,7 +316,7 @@ private fun TtsControlBarContent(
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ttsServiceBinder?.let { binder ->
+            ttsServiceBinder?.let { _ ->
                 IconButton(
                     onClick = { onPauseResume() },
                     enabled = true
@@ -444,7 +442,6 @@ fun CustomView(
 
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
-    var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
 
     // 阅读时长追踪
     val readingTimeTracker = remember { ReadingTimeTracker() }
@@ -539,7 +536,7 @@ fun CustomView(
 
                 bookmarkViewModel.resetAll()
                 val activity = context as? ComponentActivity
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
 
@@ -1316,7 +1313,6 @@ fun CustomView(
                         showToolbar = false
                     },
                     onEditBookmark = { bookmark ->
-                        editingBookmark = bookmark
                         showAddBookmarkDialog = true
                     },
                     onAIConversationClick = { pageIndex ->
@@ -1373,7 +1369,7 @@ fun CustomView(
             if (showAddBookmarkDialog) {
                 AddBookmarkDialog(
                     pageIndex = currentPage,
-                    bookmarks = bookmarkViewModel.currentPathBookmarks.value,
+                    bookmarks = bookmarkViewModel.currentPathBookmarks.collectAsState().value,
                     onSave = { existingBookmark, title, note, color ->
                         if (existingBookmark != null) {
                             // 更新现有书签

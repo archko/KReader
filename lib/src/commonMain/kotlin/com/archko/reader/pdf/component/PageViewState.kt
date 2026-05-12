@@ -71,13 +71,6 @@ public class PageViewState(
     public var decodeService: DecodeService? = null
         private set
 
-    // 渲染触发Flow
-    private val _renderFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
-    public val renderFlow: SharedFlow<Unit> = _renderFlow.asSharedFlow()
-
-    // throttle机制（34ms内最多触发一次）
-    private var lastRenderTime = 0L
-
     // 解码完成回调
     public var onDecodeCompleted: (() -> Unit)? = null
 
@@ -102,18 +95,7 @@ public class PageViewState(
         initDecodeService()
     }
 
-    // 触发渲染更新（带throttle）
-    private fun triggerRenderUpdate() {
-        val currentTime = System.currentTimeMillis()
-        //println("triggerRenderUpdate:${currentTime - lastRenderTime}")
-        if (currentTime - lastRenderTime >= 34) {
-            _renderFlow.tryEmit(Unit)
-            lastRenderTime = currentTime
-        }
-    }
-
     public fun notifyDecodeCompleted() {
-        triggerRenderUpdate()
     }
 
     /**

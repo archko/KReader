@@ -76,20 +76,8 @@ import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.launch
-import kreader.composeapp.generated.resources.Res
-import kreader.composeapp.generated.resources.book_info
-import kreader.composeapp.generated.resources.browse_directory_message
-import kreader.composeapp.generated.resources.browse_directory_title
-import kreader.composeapp.generated.resources.cancel
-import kreader.composeapp.generated.resources.clear_history
-import kreader.composeapp.generated.resources.components_thumbnail_corner
-import kreader.composeapp.generated.resources.components_thumbnail_left
-import kreader.composeapp.generated.resources.components_thumbnail_top
-import kreader.composeapp.generated.resources.confirm
-import kreader.composeapp.generated.resources.delete_cache
-import kreader.composeapp.generated.resources.delete_history
-import kreader.composeapp.generated.resources.load_more
-import kreader.composeapp.generated.resources.select_pdf
+import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -359,8 +347,15 @@ fun FileScreen(
                             val firstDocumentPath = tifFiles.first().absolutePath
                             val paths = listOf(firstDocumentPath)
                             openDocRequest = OpenDocRequest(paths, 0)
+                        } else {
+                            paths.firstOrNull()?.let { path ->
+                                Toast.makeText(
+                                    PdfApp.app,
+                                    getString(Res.string.unsupported_document, path),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
                         }
-                        // 如果都没有，什么都不做
                     }
                 }
             }

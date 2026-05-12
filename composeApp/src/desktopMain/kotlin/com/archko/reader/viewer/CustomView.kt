@@ -20,7 +20,6 @@ import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.PathConfig
-import com.archko.reader.pdf.component.SearchState
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -28,7 +27,6 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
-import com.archko.reader.pdf.entity.Bookmark
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
@@ -367,7 +365,6 @@ fun CustomView(
 
     // 书签相关状态
     var showAddBookmarkDialog by remember { mutableStateOf(false) }
-    var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
 
     // 用于保存当前页码的引用
     var currentPageRef = remember { mutableIntStateOf(progressPage ?: 0) }
@@ -999,7 +996,6 @@ fun CustomView(
                                 showOutlineDialog = false
                             },
                             onEditBookmark = { bookmark ->
-                                editingBookmark = bookmark
                                 showAddBookmarkDialog = true
                             },
                             onAIConversationClick = { pageIndex ->

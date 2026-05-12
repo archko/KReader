@@ -42,6 +42,7 @@
     <string name="password">Password</string>
     <string name="incorrect_password">Incorrect password. Please try again.</string>
     <string name="ok">OK</string>
+    <string name="unsupported_document">Unsupported document: %s</string>
 
     <string name="select_result">Selection: </string>
     <string name="select_copy">Copy</string>

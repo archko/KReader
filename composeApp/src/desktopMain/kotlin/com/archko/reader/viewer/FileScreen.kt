@@ -73,6 +73,7 @@ import com.mohamedrejeb.calf.picker.FilePickerSelectionMode
 import com.mohamedrejeb.calf.picker.rememberFilePickerLauncher
 import kotlinx.coroutines.launch
 import kreader.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -213,7 +214,6 @@ fun FileScreen(
                             || FileTypeUtils.isDocumentFile(path)
                             || FileTypeUtils.isTiffFile(path))
                 ) {
-
                     println("FileScreen: 文件类型支持，准备打开")
                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                     viewModel.getRecent(path)
@@ -223,6 +223,10 @@ fun FileScreen(
                     println("FileScreen: 已设置打开文档请求")
                 } else {
                     println("FileScreen: 文件不存在或类型不支持")
+                    toaster.show(
+                        message = getString(Res.string.unsupported_document, path),
+                        type = ToastType.Error,
+                    )
                 }
             }
         }
@@ -252,6 +256,10 @@ fun FileScreen(
                                     && !FileTypeUtils.isDocumentFile(path)
                                     && !FileTypeUtils.isTiffFile(path)
                                 ) {
+                                    toaster.show(
+                                        message = getString(Res.string.unsupported_document, path),
+                                        type = ToastType.Error,
+                                    )
                                     return@launch
                                 }
 

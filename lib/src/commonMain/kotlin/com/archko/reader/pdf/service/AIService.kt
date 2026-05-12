@@ -12,8 +12,6 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -199,7 +197,7 @@ public class AIService {
                     content = userPrompt
                 )
             ),
-            max_tokens = provider.maxTokens,
+            maxTokens = provider.maxTokens,
             temperature = provider.temperature
         )
 
@@ -216,9 +214,9 @@ public class AIService {
             Result.success(
                 AIResponse(
                     answer = answer,
-                    promptTokens = response.usage?.prompt_tokens ?: 0,
-                    completionTokens = response.usage?.completion_tokens ?: 0,
-                    totalTokens = response.usage?.total_tokens ?: 0
+                    promptTokens = response.usage?.promptTokens ?: 0,
+                    completionTokens = response.usage?.completionTokens ?: 0,
+                    totalTokens = response.usage?.totalTokens ?: 0
                 )
             )
         } catch (e: Exception) {
@@ -237,7 +235,7 @@ public class AIService {
 private data class OpenAIRequest(
     val model: String,
     val messages: List<Message>,
-    val max_tokens: Int,
+    val maxTokens: Int,
     val temperature: Float
 )
 
@@ -260,7 +258,7 @@ private data class Choice(
 
 @Serializable
 private data class Usage(
-    val prompt_tokens: Int = 0,
-    val completion_tokens: Int = 0,
-    val total_tokens: Int = 0
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    val totalTokens: Int = 0
 )

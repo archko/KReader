@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * 阅读统计ViewModel,根据书名,不是路径取数据
@@ -147,6 +148,7 @@ public class ReadingStatsViewModel : ViewModel() {
     private fun getCurrentDate(): String {
         val calendar = Calendar.getInstance()
         return String.format(
+            locale = Locale.getDefault(),
             "%04d-%02d-%02d",
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH) + 1,
@@ -171,7 +173,7 @@ public class ReadingStatsViewModel : ViewModel() {
 
             val diffMillis = cal2.timeInMillis - cal1.timeInMillis
             return (diffMillis / (1000 * 60 * 60 * 24)).toInt()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return 0
         }
     }
