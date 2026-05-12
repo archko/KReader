@@ -10,15 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/**
- * AI 功能 ViewModel
- * @author: archko 2026/3/1
- */
 public class AIViewModel : ViewModel() {
 
     public var database: AppDatabase? = null
 
-    private val aiService = AIService()
+    public var aiService: AIService = AIService()
 
     private val _providers = MutableStateFlow<List<AIProvider>>(emptyList())
     public val providers: StateFlow<List<AIProvider>> = _providers
@@ -26,61 +22,120 @@ public class AIViewModel : ViewModel() {
     private val _defaultProvider = MutableStateFlow<AIProvider?>(null)
     public val defaultProvider: StateFlow<AIProvider?> = _defaultProvider
 
-    // AI页面对话相关状态
     private val _conversations = MutableStateFlow<List<AIPageConversation>>(emptyList())
     public val conversations: StateFlow<List<AIPageConversation>> = _conversations
 
     private val _isLoading = MutableStateFlow(false)
     public val isLoading: StateFlow<Boolean> = _isLoading
 
-    /**
-     * 初始化默认提供商
-     */
+    init {
+        initializeDefaultProviders()
+        initializeAIService()
+    }
+
+    public fun getAIPromptConfig(): AIService.AIPromptConfig {
+        return AIService.AIPromptConfig(
+            systemPrompt = "你是一个专业的文档阅读助手。用户会提供文档页面的内容，并基于这些内容提问。请根据页面内容准确回答问题。",
+            userPromptFormat = "页面内容：\n%s\n\n问题：%s",
+            unsupportedProvider = "不支持的 AI 提供商: %s",
+            apiRequestFailed = "API 请求失败: %d %s",
+            apiEmptyResponse = "API 返回空响应体",
+            emptyResponse = "AI 返回空响应",
+            apiCallFailed = "API 调用失败: %s"
+        )
+    }
+
+    private fun initializeAIService() {
+        try {
+            val config = getAIPromptConfig()
+            aiService.setPromptConfig(config)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     public fun initializeDefaultProviders() {
         viewModelScope.launch {
             val existing = database?.aiProviderDao()?.getAllProviders() ?: emptyList()
-            if (existing.isEmpty()) {
-                val defaults = listOf(
-                    AIProvider(
-                        id = "deepseek",
-                        name = "DeepSeek",
-                        apiKey = "",
-                        baseUrl = "https://api.deepseek.com",
-                        model = "deepseek-chat",
-                        maxTokens = 2000,
-                        temperature = 0.7f,
-                        isDefault = true
-                    ),
-                    AIProvider(
-                        id = "qwen",
-                        name = "通义千问",
-                        apiKey = "",
-                        baseUrl = "https://dashscope.aliyuncs.com",
-                        model = "qwen-turbo",
-                        maxTokens = 2000,
-                        temperature = 0.7f,
-                        isDefault = false
-                    ),
-                    AIProvider(
-                        id = "glm",
-                        name = "智谱清言",
-                        apiKey = "",
-                        baseUrl = "https://open.bigmodel.cn",
-                        model = "glm-4-flash",
-                        maxTokens = 2000,
-                        temperature = 0.7f,
-                        isDefault = false
-                    )
+            val existingIds = existing.map { it.id }.toSet()
+
+            val allDefaults = listOf(
+                AIProvider(
+                    id = "deepseek",
+                    name = "DeepSeek",
+                    apiKey = "",
+                    baseUrl = "https://api.deepseek.com",
+                    model = "deepseek-v4-flash",
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = false
+                ),
+                AIProvider(
+                    id = "qwen",
+                    name = "通义千问",
+                    apiKey = "",
+                    baseUrl = "https://dashscope.aliyuncs.com",
+                    model = "qwen-turbo",
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = false
+                ),
+                AIProvider(
+                    id = "glm",
+                    name = "智谱清言",
+                    apiKey = "",
+                    baseUrl = "https://open.bigmodel.cn",
+                    model = "glm-4-flash",
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = false
+                ),
+                AIProvider(
+                    id = "openai",
+                    name = "OpenAI GPT",
+                    apiKey = "",
+                    baseUrl = "https://api.openai.com",
+                    model = "gpt-4o-mini",
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = false
+                ),
+                AIProvider(
+                    id = "gemini",
+                    name = "Google Gemini",
+                    apiKey = "",
+                    baseUrl = "https://generativelanguage.googleapis.com",
+                    model = "gemini-2.0-flash",
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = false
                 )
-                database?.aiProviderDao()?.insertAllProviders(defaults)
+            )
+
+            val toInsert = allDefaults.filter { it.id !in existingIds }
+            if (toInsert.isNotEmpty()) {
+                database?.aiProviderDao()?.insertAllProviders(toInsert)
             }
+
+            existing.forEach { provider ->
+                val defaultProvider = allDefaults.find { it.id == provider.id }
+                if (defaultProvider != null) {
+                    val updated = provider.apply {
+                        name = defaultProvider.name
+                        baseUrl = defaultProvider.baseUrl
+                        model = defaultProvider.model
+                        maxTokens = defaultProvider.maxTokens
+                        temperature = defaultProvider.temperature
+                        updatedAt = System.currentTimeMillis()
+                    }
+                    database?.aiProviderDao()?.updateProvider(updated)
+                }
+            }
+
             loadProviders()
         }
     }
 
-    /**
-     * 加载所有提供商
-     */
     public fun loadProviders() {
         viewModelScope.launch {
             val providers = database?.aiProviderDao()?.getAllProviders() ?: emptyList()
@@ -89,9 +144,6 @@ public class AIViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 更新提供商
-     */
     public fun updateProvider(provider: AIProvider) {
         viewModelScope.launch {
             provider.updatedAt = System.currentTimeMillis()
@@ -100,9 +152,6 @@ public class AIViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 设置默认提供商
-     */
     public fun setDefaultProvider(id: String) {
         viewModelScope.launch {
             database?.aiProviderDao()?.clearAllDefaults()
@@ -111,30 +160,18 @@ public class AIViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 获取当前可用的提供商
-     */
     public suspend fun getCurrentProvider(): AIProvider? {
         return database?.aiProviderDao()?.getDefaultProvider()
     }
 
-    // ========== AI页面对话功能 ==========
-
-    /**
-     * 加载指定页面的对话历史
-     */
     public fun loadConversations(path: String, pageIndex: Int) {
         viewModelScope.launch {
             val list = database?.aiPageConversationDao()?.getConversationsByPage(path, pageIndex)
                 ?: emptyList()
             _conversations.value = list
-            println("AIViewModel.loadConversations: path=$path, page=$pageIndex, count=${list.size}")
         }
     }
 
-    /**
-     * 保存对话
-     */
     public fun saveConversation(
         documentPath: String,
         documentName: String,
@@ -153,36 +190,21 @@ public class AIViewModel : ViewModel() {
                 pageContent = pageContent
             )
             database?.aiPageConversationDao()?.insertConversation(conversation)
-            println("AIViewModel.saveConversation: $conversation")
-
-            // 重新加载对话列表
             loadConversations(documentPath, pageIndex)
         }
     }
 
-    /**
-     * 删除对话
-     */
     public fun deleteConversation(conversation: AIPageConversation) {
         viewModelScope.launch {
             database?.aiPageConversationDao()?.deleteConversation(conversation)
-            println("AIViewModel.deleteConversation: $conversation")
-
-            // 重新加载对话列表
             loadConversations(conversation.documentPath, conversation.pageIndex)
         }
     }
 
-    /**
-     * 设置加载状态
-     */
     public fun setLoading(loading: Boolean) {
         _isLoading.value = loading
     }
 
-    /**
-     * 发送问题到 AI 并保存对话
-     */
     public fun askQuestion(
         documentPath: String,
         documentName: String,
@@ -196,7 +218,6 @@ public class AIViewModel : ViewModel() {
             _isLoading.value = true
 
             try {
-                // 获取当前默认的 AI 提供商
                 val provider = getCurrentProvider()
                 if (provider == null) {
                     onError("请先配置 AI 提供商")
@@ -210,12 +231,10 @@ public class AIViewModel : ViewModel() {
                     return@launch
                 }
 
-                // 调用 AI 服务
                 val result = aiService.chat(provider, question, pageContent)
 
                 result.fold(
                     onSuccess = { aiResponse ->
-                        // 保存对话
                         saveConversation(
                             documentPath = documentPath,
                             documentName = documentName,
@@ -243,9 +262,6 @@ public class AIViewModel : ViewModel() {
         }
     }
 
-    /**
-     * 获取所有文档的对话记录（按页面分组）
-     */
     public fun loadAllConversations(documentPath: String) {
         viewModelScope.launch {
             val allConversations = database?.aiPageConversationDao()
@@ -256,6 +272,5 @@ public class AIViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        aiService.close()
     }
 }
