@@ -37,8 +37,8 @@ public class Page(
 ) {
     public var totalScale: Float = 1f
 
-    // 可见的 nodes 映射：(x, y) -> PageNode，按需创建
-    private val visibleNodes: MutableMap<Pair<Int, Int>, PageNode> = mutableMapOf()
+    // 可见的 nodes 映射：Int key = (x shl 16) or y，按需创建，零Pair分配
+    private val visibleNodes: MutableMap<Int, PageNode> = mutableMapOf()
     private var currentTileConfig: TileConfig? = null
 
     //page bound, should be caculate after view measured
@@ -379,8 +379,8 @@ public class Page(
         }
 
         if (config.isSingleBlock) {
-            // 单块模式：只绘制 (0, 0) 节点
-            visibleNodes[Pair(0, 0)]?.draw(
+            // 单块模式：只绘制 (0, 0) 节点，key=0
+            visibleNodes[0]?.draw(
                 drawScope,
                 currentWidth,
                 currentHeight,
@@ -412,16 +412,17 @@ public class Page(
             bounds.bottom * scaleRatio
         )
 
-        // 获取画布的可视区域
-        val visibleRect = Rect(
-            -offset.x,
-            -offset.y,
-            drawScope.size.width - offset.x,
-            drawScope.size.height - offset.y
-        )
+        // 直接计算可见区域边界，避免创建 visibleRect 对象
+        val vrLeft = -offset.x
+        val vrTop = -offset.y
+        val vrRight = drawScope.size.width - offset.x
+        val vrBottom = drawScope.size.height - offset.y
 
-        // 检查页面是否真正可见（用于绘制判断）
-        val isActuallyVisible = isPageVisible(visibleRect, currentBounds)
+        // 检查页面是否真正可见：内联 overlaps 检查
+        val isActuallyVisible = currentBounds.left < vrRight
+                && currentBounds.right > vrLeft
+                && currentBounds.top < vrBottom
+                && currentBounds.bottom > vrTop
 
         // 如果页面不在可见区域且不在预加载列表中，直接返回
         if (!isActuallyVisible && !pageViewState.isPageInVisibleList(aPage.index)) {
@@ -802,22 +803,23 @@ public class Page(
 
     /**
      * 根据可见区域按需创建/释放 nodes
-     * @param visibleRect 可见区域（屏幕坐标）
+     * @param visLeft/visTop/visRight/visBottom 可见区域边界（屏幕坐标），避免Rect分配
      * @param scaleRatio 缩放比例
      */
-    public fun updateVisibleNodes(visibleRect: Rect, scaleRatio: Float) {
+    public fun updateVisibleNodes(
+        visLeft: Float, visTop: Float, visRight: Float, visBottom: Float,
+        scaleRatio: Float
+    ) {
         val config = currentTileConfig ?: run {
             invalidateNodes()
             currentTileConfig!!
         }
 
-        // 计算当前缩放下的页面边界
-        val currentBounds = Rect(
-            bounds.left * scaleRatio,
-            bounds.top * scaleRatio,
-            bounds.right * scaleRatio,
-            bounds.bottom * scaleRatio
-        )
+        // 内联 currentBounds 计算，避免 Rect 分配
+        val cbLeft = bounds.left * scaleRatio
+        val cbTop = bounds.top * scaleRatio
+        val cbRight = bounds.right * scaleRatio
+        val cbBottom = bounds.bottom * scaleRatio
 
         val currentWidth = width * scaleRatio
         val currentHeight = height * scaleRatio
@@ -825,18 +827,18 @@ public class Page(
         // 单块模式：只有一个 node
         if (config.isSingleBlock) {
             visibleNodes.values.forEach { pageViewState.nodePool.release(it) }
+            visibleNodes.clear()
             val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
-            val key = Pair(0, 0)
-            visibleNodes[key] = node
+            visibleNodes[0] = node  // key=0 表示 (0,0)
             node.decode(currentWidth, currentHeight)
             return
         }
 
         // 分块模式：计算可见区域在页面中的相对位置 [0, 1]
-        val pageVisibleLeft = (visibleRect.left - currentBounds.left) / (width * scaleRatio)
-        val pageVisibleRight = (visibleRect.right - currentBounds.left) / (width * scaleRatio)
-        val pageVisibleTop = (visibleRect.top - currentBounds.top) / (height * scaleRatio)
-        val pageVisibleBottom = (visibleRect.bottom - currentBounds.top) / (height * scaleRatio)
+        val pageVisibleLeft = (visLeft - cbLeft) / currentWidth
+        val pageVisibleRight = (visRight - cbLeft) / currentWidth
+        val pageVisibleTop = (visTop - cbTop) / currentHeight
+        val pageVisibleBottom = (visBottom - cbTop) / currentHeight
 
         // 计算需要可见的 block x/y indices 范围
         val minBlockX =
@@ -848,20 +850,19 @@ public class Page(
         val maxBlockY =
             ceil(pageVisibleBottom * config.yBlocks).toInt().coerceIn(0, config.yBlocks - 1)
 
-        // 新的可见 nodes 集合
-        val newVisibleKeys = mutableSetOf<Pair<Int, Int>>()
-
+        // 创建/更新可见的 nodes（不创建临时Set）
+        val xBlockCount = config.xBlocks.toFloat()
+        val yBlockCount = config.yBlocks.toFloat()
         for (y in minBlockY..maxBlockY) {
             for (x in minBlockX..maxBlockX) {
-                val key = Pair(x, y)
-                newVisibleKeys.add(key)
+                val key = (x shl 16) or y  // Int 编码代替 Pair，零分配
 
                 // 按需创建 node
                 if (!visibleNodes.containsKey(key)) {
-                    val left = x / config.xBlocks.toFloat()
-                    val top = y / config.yBlocks.toFloat()
-                    val right = (x + 1) / config.xBlocks.toFloat()
-                    val bottom = (y + 1) / config.yBlocks.toFloat()
+                    val left = x / xBlockCount
+                    val top = y / yBlockCount
+                    val right = (x + 1) / xBlockCount
+                    val bottom = (y + 1) / yBlockCount
                     val rect = Rect(left, top, right, bottom)
 
                     val node = pageViewState.nodePool.acquire(pageViewState, rect, aPage)
@@ -869,12 +870,15 @@ public class Page(
                 }
             }
         }
-        //println("Page.updateVisibleNodes.config:$config, x:$minBlockX-$maxBlockX, y:$minBlockY-$maxBlockY, visible:${oldVisibleNodes.size}, key:$newVisibleKeys")
 
+        // 移除不在范围内的 nodes，同时触发保留节点的解码
         val iterator = visibleNodes.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            if (entry.key !in newVisibleKeys) {
+            val key = entry.key
+            val x = key ushr 16
+            val y = key and 0xFFFF
+            if (x !in minBlockX..maxBlockX || y !in minBlockY..maxBlockY) {
                 pageViewState.nodePool.release(entry.value)
                 iterator.remove()
             } else {
@@ -922,36 +926,36 @@ public class Page(
     }
 
     public companion object {
-        // 如果块太大,在图片放大的时候,它会接近最大块,这对于gpu上传一个大块图片,有时卡一下
-        public const val MIN_BLOCK: Float = 384f
-        public const val MAX_BLOCK: Float = 256f * 3f // 768
+        // 核心约束：仅保留最小块、最大块，取消基础块
+        public const val MIN_BLOCK: Float = 256f
+        public const val MAX_BLOCK: Float = 512f
 
-        // 单轴块数计算：优先1块，仅超出maxBlock才分块
-        private fun calcAxisBlocks(length: Float, maxBlock: Float, minBlock: Float): Int {
+        // 单轴块数计算：优先1块，仅超出MAX_BLOCK才分块（延迟重建核心）
+        private fun calcAxisBlocks(length: Float): Int {
             if (length <= 0) return 1
-                if (length <= maxBlock) {
-                    return 1
-                }
-    
-                var blocks = ceil(length / maxBlock).toInt()
-                val actualBlockSize = length / blocks
-    
-                if (actualBlockSize < minBlock) {
-                    blocks = ceil(length / minBlock).toInt()
-                }
-                return blocks
+
+            // 核心规则：只要长度 ≤ 最大块1536，就用1块（不管最小块512）
+            if (length <= MAX_BLOCK) {
+                return 1
+            }
+
+            // 长度 > 最大块1536 → 按1536分块，保证实际块大小 ≥ 512
+            var blocks = ceil(length / MAX_BLOCK).toInt()
+            val actualBlockSize = length / blocks
+
+            // 兜底：如果分块后实际块大小 < 512，按最小块重新分
+            if (actualBlockSize < MIN_BLOCK) {
+                blocks = ceil(length / MIN_BLOCK).toInt()
+            }
+            return blocks
         }
 
         private fun calculateTileConfig(
             width: Float,
             height: Float,
         ): TileConfig {
-            val isWideImage = width > height * 2
-            val maxBlock = if (isWideImage) 512f else MAX_BLOCK
-            val minBlock = if (isWideImage) 256f else MIN_BLOCK
-
-            val xBlocks = calcAxisBlocks(width, maxBlock, minBlock)
-            val yBlocks = calcAxisBlocks(height, maxBlock, minBlock)
+            val xBlocks = calcAxisBlocks(width)
+            val yBlocks = calcAxisBlocks(height)
             return TileConfig(xBlocks, yBlocks)
         }
 

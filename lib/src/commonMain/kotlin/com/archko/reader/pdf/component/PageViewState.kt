@@ -174,55 +174,69 @@ public class PageViewState(
         currentSearchResultIndex = -1
     }
 
+    /**
+     * Tile可见性检查（基于TileSpec）- decode回调路径使用
+     */
     public fun isTileVisible(spec: TileSpec, strictMode: Boolean = false): Boolean {
         val page = pages.getOrNull(spec.page) ?: return false
+        val scaleRatio = spec.pageWidth / page.width
 
-        // spec.pageWidth/pageHeight 是缩放后的Page尺寸
-        // page.bounds 包含了Page在文档中的位置（基于pageViewState.vZoom）
-        // 需要计算当前缩放比例下的Page偏移
-        val scaleRatio = spec.pageWidth / page.width  // 当前缩放比例 / 基准缩放比例
-
-        // 计算tile在文档中的绝对坐标
-        val pixelRect = Rect(
-            left = spec.bounds.left * spec.pageWidth + page.bounds.left * scaleRatio,
-            top = spec.bounds.top * spec.pageHeight + page.bounds.top * scaleRatio,
-            right = spec.bounds.right * spec.pageWidth + page.bounds.left * scaleRatio,
-            bottom = spec.bounds.bottom * spec.pageHeight + page.bounds.top * scaleRatio
-        )
+        // 直接计算4个坐标，避免创建Rect对象
+        val tileLeft = spec.bounds.left * spec.pageWidth + page.bounds.left * scaleRatio
+        val tileTop = spec.bounds.top * spec.pageHeight + page.bounds.top * scaleRatio
+        val tileRight = spec.bounds.right * spec.pageWidth + page.bounds.left * scaleRatio
+        val tileBottom = spec.bounds.bottom * spec.pageHeight + page.bounds.top * scaleRatio
 
         return if (strictMode) {
-            isVisible(viewSize, viewOffset, pixelRect, spec.page)
+            isVisibleInline(tileLeft, tileTop, tileRight, tileBottom)
         } else {
-            isVisibleWithPreload(viewSize, viewOffset, pixelRect)
+            isVisibleWithPreloadInline(tileLeft, tileTop, tileRight, tileBottom)
         }
     }
 
-    private fun isVisibleWithPreload(
-        viewSize: IntSize,
-        offset: Offset,
-        bounds: Rect,
+    /**
+     * Tile可见性检查（直接传坐标）- PageNode.draw()热路径使用
+     * 复用getCachedPixelRect()已计算好的坐标，避免重复计算+对象分配
+     */
+    public fun isTileVisible(
+        tileLeft: Float, tileTop: Float, tileRight: Float, tileBottom: Float,
+        strictMode: Boolean = false
     ): Boolean {
-        // 获取包含预加载区域的可视区域
-        val preloadRect = if (orientation == Vertical) {
-            Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = viewSize.width - offset.x,
-                bottom = viewSize.height - offset.y + viewSize.height * preloadScreens  // 向下扩展
-            )
+        return if (strictMode) {
+            isVisibleInline(tileLeft, tileTop, tileRight, tileBottom)
         } else {
-            Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = viewSize.width - offset.x + viewSize.width * preloadScreens,   // 向右扩展
-                bottom = viewSize.height - offset.y
-            )
+            isVisibleWithPreloadInline(tileLeft, tileTop, tileRight, tileBottom)
         }
+    }
 
-        // 检查页面是否与预加载区域相交
-        val visible = bounds.overlaps(preloadRect)
-        //println("page.draw.isVisibleWithPreload:$visible, offset:$offset, bounds:$bounds, preloadRect:$preloadRect, $page")
-        return visible
+    // 严格可见：必须与屏幕区域相交
+    private fun isVisibleInline(
+        left: Float, top: Float, right: Float, bottom: Float
+    ): Boolean {
+        val visLeft = -viewOffset.x
+        val visTop = -viewOffset.y
+        val visRight = viewSize.width - viewOffset.x
+        val visBottom = viewSize.height - viewOffset.y
+        return left < visRight && right > visLeft && top < visBottom && bottom > visTop
+    }
+
+    // 预加载可见：与屏幕+预加载区域相交
+    private fun isVisibleWithPreloadInline(
+        left: Float, top: Float, right: Float, bottom: Float
+    ): Boolean {
+        val visLeft = -viewOffset.x
+        val visTop = -viewOffset.y
+        val visRight = if (orientation == Vertical) {
+            viewSize.width - viewOffset.x
+        } else {
+            viewSize.width - viewOffset.x + viewSize.width * preloadScreens
+        }
+        val visBottom = if (orientation == Vertical) {
+            viewSize.height - viewOffset.y + viewSize.height * preloadScreens
+        } else {
+            viewSize.height - viewOffset.y
+        }
+        return left < visRight && right > visLeft && top < visBottom && bottom > visTop
     }
 
     /**
@@ -545,17 +559,16 @@ public class PageViewState(
             return
         }
 
-        // 计算当前可见区域（包含预加载范围）
-        val visibleRect = Rect(
-            left = -offset.x,
-            top = -offset.y,
-            right = viewSize.width - offset.x,
-            bottom = viewSize.height - offset.y
-        )
-
         val scaleRatio = currentVZoom / this.vZoom
 
         if (columnCount > 1) {
+            // 计算当前可见区域（包含预加载范围）
+            val visibleRect = Rect(
+                left = -offset.x,
+                top = -offset.y,
+                right = viewSize.width - offset.x,
+                bottom = viewSize.height - offset.y
+            )
             // 多列布局：需要同时考虑水平和垂直方向的可见性
             val tilesToRenderCopy = pages.filter { page ->
                 val scaledBounds = Rect(
@@ -583,7 +596,7 @@ public class PageViewState(
 
             // 更新每个可见页面的可见 nodes
             tilesToRenderCopy.forEach { page ->
-                page.updateVisibleNodes(visibleRect, scaleRatio)
+                page.updateVisibleNodes(visibleRect.left, visibleRect.top, visibleRect.right, visibleRect.bottom, scaleRatio)
             }
             println("updateVisiblePages.multiColumn: visible=${tilesToRenderCopy.map { it.aPage.index }}")
         } else if (orientation == Vertical) {
@@ -591,12 +604,8 @@ public class PageViewState(
             val visibleBottom = viewSize.height - offset.y
             // 预加载区域：向下扩展一屏
             val preloadBottom = visibleBottom + viewSize.height * preloadScreens
-            val preloadRect = Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = viewSize.width - offset.x,
-                bottom = preloadBottom
-            )
+            val preloadLeft = -offset.x
+            val preloadRight = viewSize.width - offset.x
 
             val first = findVerticalFirstVisible(visibleTop, currentVZoom)
             val last = findVerticalLastVisible(preloadBottom, currentVZoom)
@@ -622,21 +631,18 @@ public class PageViewState(
                 pageToRender = tilesToRenderCopy
             }
 
-            // 更新每个可见页面的可见 nodes
+            // 更新每个可见页面的可见 nodes（直传坐标，避免Rect分配）
             tilesToRenderCopy.forEach { page ->
-                page.updateVisibleNodes(preloadRect, scaleRatio)
+                page.updateVisibleNodes(preloadLeft, visibleTop, preloadRight, preloadBottom, scaleRatio)
             }
         } else {
             val visibleLeft = -offset.x
             val visibleRight = viewSize.width - offset.x
-            // 预加载区域：向右扩展一屏
+            // 预加载区域：向右扩展一屏（直传坐标，避免Rect分配）
+            val vTop = -offset.y
+            val vBottom = viewSize.height - offset.y
+            val preloadLeft = -offset.x
             val preloadRight = visibleRight + viewSize.width * preloadScreens
-            val preloadRect = Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = preloadRight,
-                bottom = viewSize.height - offset.y
-            )
 
             val first = findHorizontalFirstVisible(visibleLeft, currentVZoom)
             val last = findHorizontalLastVisible(preloadRight, currentVZoom)
@@ -662,9 +668,9 @@ public class PageViewState(
                 pageToRender = tilesToRenderCopy
             }
 
-            // 更新每个可见页面的可见 nodes
+            // 更新每个可见页面的可见 nodes（直传坐标，避免Rect分配）
             tilesToRenderCopy.forEach { page ->
-                page.updateVisibleNodes(preloadRect, scaleRatio)
+                page.updateVisibleNodes(preloadLeft, vTop, preloadRight, vBottom, scaleRatio)
             }
         }
     }

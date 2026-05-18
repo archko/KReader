@@ -42,9 +42,6 @@ public class PageNode(
     private var cachedXOffset: Float = 0f
     private var cachedYOffset: Float = 0f
 
-    // 缓存TileSpec计算结果
-    private var cachedTileSpec: TileSpec? = null
-
     public fun updateKey() {
         // 只有在 orientation 或 crop 改变时才重新生成字符串
         // 或者使用更快的位运算生成 Long 型 ID
@@ -99,31 +96,6 @@ public class PageNode(
         return cachedPixelRect!!
     }
 
-    // 获取缓存的TileSpec，如果参数变化则重新计算
-    private fun getCachedTileSpec(
-        pageWidth: Float,
-        pageHeight: Float,
-        scale: Float
-    ): TileSpec {
-        if (cachedTileSpec == null ||
-            cachedPageWidth != pageWidth ||
-            cachedPageHeight != pageHeight
-        ) {
-            cachedTileSpec = TileSpec(
-                aPage.index,
-                scale,
-                bounds,
-                pageWidth.toInt(),
-                pageHeight.toInt(),
-                pageViewState.viewSize,
-                cacheKey,
-                null
-            )
-        }
-
-        return cachedTileSpec!!
-    }
-
     public fun recycle() {
         activeDecodeKey = null
         bitmapState?.let { ImageCache.releaseNode(it) }
@@ -138,8 +110,6 @@ public class PageNode(
         cachedPageHeight = 0f
         cachedXOffset = 0f
         cachedYOffset = 0f
-
-        cachedTileSpec = null
     }
 
     /**
@@ -162,21 +132,21 @@ public class PageNode(
         }
         val pixelRect = getCachedPixelRect(pageWidth, pageHeight, xOffset, yOffset)
 
-        val width = aPage.getWidth(pageViewState.isCropEnabled())
-        //val height = aPage.getHeight(pageViewState.isCropEnabled())
-        val scale = pageWidth / width
-        val tileSpec = getCachedTileSpec(pageWidth, pageHeight, scale)
-
-        // 1. 首先检查是否在预加载区域内
-        val isInPreloadArea = pageViewState.isTileVisible(tileSpec, strictMode = false)
-        //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, isInPreloadArea:$isInPreloadArea, isDecoding=$isDecoding, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=$bitmapState")
+        // 1. 首先检查是否在预加载区域内（复用pixelRect坐标，零额外对象分配）
+        val isInPreloadArea = pageViewState.isTileVisible(
+            pixelRect.left, pixelRect.top, pixelRect.right, pixelRect.bottom,
+            strictMode = false
+        )
         if (!isInPreloadArea) {
             recycle()  // 完全超出预加载区域，回收
             return
         }
 
         // 2. 检查是否在严格可见区域内
-        val isStrictlyVisible = pageViewState.isTileVisible(tileSpec, strictMode = true)
+        val isStrictlyVisible = pageViewState.isTileVisible(
+            pixelRect.left, pixelRect.top, pixelRect.right, pixelRect.bottom,
+            strictMode = true
+        )
 
         if (null != bitmapState && bitmapState!!.isRecycled()) {
             bitmapState = null
@@ -210,7 +180,7 @@ public class PageNode(
     public fun decode(pageWidth: Float, pageHeight: Float) {
         val currentKey = cacheKey
 
-        if (activeDecodeKey == currentKey || isDecoding) return
+        if (activeDecodeKey == currentKey || isDecoding || (null != bitmapState && bitmapState!!.isRecycled())) return
 
         val cachedState = ImageCache.acquireNode(currentKey)
         if (cachedState != null) {
