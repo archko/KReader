@@ -249,15 +249,16 @@ public class PageViewState(
             isCropEnabled = { cropEnabled }
         )
         decodeService = DecodeService(decoder)
+        println("PageViewState.initDecodeService")
 
         // 如果启用切边，生成切边任务
         if (cropEnabled) {
-            decodeService!!.submit {
+            Thread {
                 val cropTasks = decoder.generateCropTasks()
                 if (cropTasks.isNotEmpty()) {
                     decodeService?.submitCropTasks(cropTasks)
                 }
-            }
+            }.start()
         }
     }
 

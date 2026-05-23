@@ -46,7 +46,6 @@ public class Page(
 
     private var thumbBitmapState by mutableStateOf<BitmapState?>(null)
     private var thumbDecoding = false
-    private var thumbJob: Future<*>? = null
     private var aspectRatio = 0f
 
     // 缓存的cacheKey，只在viewSize有值时计算一次
@@ -74,8 +73,6 @@ public class Page(
         thumbBitmapState?.let { ImageCache.releasePage(it) }
         thumbBitmapState = null
         thumbDecoding = false
-        thumbJob?.cancel(true)
-        thumbJob = null
     }
 
     /**
@@ -263,11 +260,10 @@ public class Page(
 
     private fun startThumbnailDecoding(cacheKey: String) {
         thumbDecoding = true
-        thumbJob?.cancel(true)
-        thumbJob = pageViewState.decodeService!!.submit {
+
             if (!isScopeActive()) {
                 thumbDecoding = false
-                return@submit
+                return
             }
 
             val decodeTask = DecodeTask(
@@ -322,7 +318,7 @@ public class Page(
 
             // 提交任务到DecodeService
             pageViewState.decodeService?.submitTask(decodeTask)
-        }
+
     }
 
     private fun isScopeActive(): Boolean {
@@ -830,7 +826,7 @@ public class Page(
             visibleNodes.clear()
             val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
             visibleNodes[0] = node  // key=0 表示 (0,0)
-            node.decode(currentWidth, currentHeight)
+            node.decode(currentWidth, currentHeight, pageViewState.vZoom)
             return
         }
 
@@ -882,7 +878,7 @@ public class Page(
                 pageViewState.nodePool.release(entry.value)
                 iterator.remove()
             } else {
-                entry.value.decode(currentWidth, currentHeight)
+                entry.value.decode(currentWidth, currentHeight, pageViewState.vZoom)
             }
         }
     }
@@ -928,7 +924,7 @@ public class Page(
     public companion object {
         // 核心约束：仅保留最小块、最大块，取消基础块
         public const val MIN_BLOCK: Float = 256f
-        public const val MAX_BLOCK: Float = 512f
+        public const val MAX_BLOCK: Float = 256f * 2f
 
         // 单轴块数计算：优先1块，仅超出MAX_BLOCK才分块（延迟重建核心）
         private fun calcAxisBlocks(length: Float): Int {
