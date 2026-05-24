@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -745,7 +746,7 @@ internal fun DocumentViewCanvas(
     val selectionStartPos = state.selectionStartPos
     val selectionEndPos = state.selectionEndPos
 
-    Canvas(
+    Box(
         modifier = modifier.fillMaxSize()
             .graphicsLayer {
                 translationX = state.offset.value.x
@@ -753,34 +754,25 @@ internal fun DocumentViewCanvas(
                 clip = false
                 renderEffect = null
             }
-    ) {
-        //val centerOffsetX =
-        //    if (orientation.value == Horizontal && pageViewState.totalWidth < viewSize.width) {
-        //        (viewSize.width - pageViewState.totalWidth) / 2
-        //    } else 0f
-        //val centerOffsetY =
-        //    if (orientation.value == Vertical && pageViewState.totalHeight < viewSize.height) {
-        //        (viewSize.height - pageViewState.totalHeight) / 2
-        //    } else 0f
-        //translate(left = offset.value.x + centerOffsetX, top = offset.value.y + centerOffsetY) {
-        pageViewState.drawVisiblePages(this, state.offset.value, state.vZoom.value)
+            .drawWithContent {
+                pageViewState.drawVisiblePages(this, state.offset.value, state.vZoom.value)
 
-        if (isTextSelecting.value && selectionStartPos.value != null && selectionEndPos.value != null) {
-            val start = selectionStartPos.value!!
-            val end = selectionEndPos.value!!
-            val left = minOf(start.x, end.x) - state.offset.value.x
-            val top = minOf(start.y, end.y) - state.offset.value.y
-            val right = maxOf(start.x, end.x) - state.offset.value.x
-            val bottom = maxOf(start.y, end.y) - state.offset.value.y
+                if (isTextSelecting.value && selectionStartPos.value != null && selectionEndPos.value != null) {
+                    val start = selectionStartPos.value!!
+                    val end = selectionEndPos.value!!
+                    val left = minOf(start.x, end.x) - state.offset.value.x
+                    val top = minOf(start.y, end.y) - state.offset.value.y
+                    val right = maxOf(start.x, end.x) - state.offset.value.x
+                    val bottom = maxOf(start.y, end.y) - state.offset.value.y
 
-            drawRect(
-                color = Color.Blue.copy(alpha = 0.3f),
-                topLeft = Offset(left, top),
-                size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
-            )
-        }
-        //}
-    }
+                    drawRect(
+                        color = Color.Blue.copy(alpha = 0.3f),
+                        topLeft = Offset(left, top),
+                        size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
+                    )
+                }
+            }
+    )
 }
 
 /**
