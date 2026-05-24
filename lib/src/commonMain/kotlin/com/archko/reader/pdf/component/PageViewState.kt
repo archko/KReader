@@ -187,11 +187,13 @@ public class PageViewState(
         val tileRight = spec.bounds.right * spec.pageWidth + page.bounds.left * scaleRatio
         val tileBottom = spec.bounds.bottom * spec.pageHeight + page.bounds.top * scaleRatio
 
-        return if (strictMode) {
+        var result = if (strictMode) {
             isVisibleInline(tileLeft, tileTop, tileRight, tileBottom)
         } else {
             isVisibleWithPreloadInline(tileLeft, tileTop, tileRight, tileBottom)
         }
+        //println("[PageNode.isTileVisible] page=${page.aPage.index}, result=$result, $tileLeft-$tileTop-$tileRight-$tileBottom")
+        return result
     }
 
     /**

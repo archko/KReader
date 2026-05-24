@@ -149,7 +149,7 @@ public class PageNode(
             bitmapState = null
         }
 
-        //println("[PageNode.draw] page=${aPage.index}, isStrictlyVisible:$isStrictlyVisible")
+        //println("[PageNode.draw] page=${aPage.index}, isStrictlyVisible:$isStrictlyVisible, isDecoding:$isDecoding $bitmapState")
         // 3. 只有严格可见才绘制
         if (isStrictlyVisible) {
             bitmapState?.let { state ->
@@ -170,22 +170,22 @@ public class PageNode(
         }
 
         // 4. 无论是否绘制，都尝试解码（预加载区域内）
-        //if (bitmapState == null) {
-        //    decode(pageWidth, pageHeight)
+        //if (bitmapState == null && !isDecoding) {
+        //    decode(pageWidth, pageHeight, pageViewState.vZoom)
         //}
     }
 
     public fun decode(pageWidth: Float, pageHeight: Float, vZoom: Float) {
         val currentKey = cacheKey
 
-        //println("[PageNode.decode] page=${aPage.index}, isDecoding:$isDecoding, $activeDecodeKey->$currentKey, $bitmapState")
-        if (activeDecodeKey == currentKey || isDecoding || (null != bitmapState && bitmapState!!.isRecycled())) {
+        //println("[PageNode.decode] page=${aPage.index}, isDecoding:$isDecoding, $activeDecodeKey->$currentKey, bitmapState:$bitmapState")
+        if (activeDecodeKey == currentKey || isDecoding || (null != bitmapState && !bitmapState!!.isRecycled())) {
             return
         }
 
         val cachedState = ImageCache.acquireNode(currentKey)
         if (cachedState != null) {
-            //println("[PageNode.decode] page=${aPage.index}, cachedState:$isDecoding, $currentKey")
+            //println("[PageNode.decode] page=${aPage.index}, cachedState:$cachedState, $currentKey")
             bitmapState?.let { ImageCache.releaseNode(it) }
             bitmapState = cachedState
             activeDecodeKey = currentKey
@@ -193,7 +193,10 @@ public class PageNode(
         }
         isDecoding = true
 
-        if (!isScopeActive()) return
+        if (!isScopeActive()) {
+            println("[PageNode.decode] page=${aPage.index}, isScopeActive")
+            return
+        }
 
         activeDecodeKey = currentKey
 
@@ -223,13 +226,13 @@ public class PageNode(
                 right = bounds.right * pageWidth + left,
                 bottom = bounds.bottom * pageHeight + top
         )
-        //println("[PageNode].decode:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
+        //println("[PageNode.decode].w-h:$pageWidth-$pageHeight, left:$left, $scale, width:$width, $srcRect, $aPage")
         val outWidth = ((srcRect.right - srcRect.left)).toInt()
         val outHeight = ((srcRect.bottom - srcRect.top)).toInt()
 
         //外面的计算如果出问题了,会在这里拦截,避免崩溃.目前是正常的
         if (outWidth > MAX_BLOCK * 2 || outHeight > MAX_BLOCK * 2) {
-            println("[PageNode].decode:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
+            println("[PageNode.decode]:scaled.w-h:$pageWidth-$pageHeight, page.w-h:$width-$height, out.w-h:$outWidth-$outHeight")
             isDecoding = false
             return
         }
@@ -296,9 +299,9 @@ public class PageNode(
                 }
 
                 override fun onFinish(pageNumber: Int) {
-                        if (activeDecodeKey == currentKey) {
-                            isDecoding = false
-                        }
+                    if (activeDecodeKey == currentKey) {
+                        isDecoding = false
+                    }
                 }
             }
         )

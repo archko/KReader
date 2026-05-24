@@ -261,27 +261,27 @@ public class Page(
     private fun startThumbnailDecoding(cacheKey: String) {
         thumbDecoding = true
 
-            if (!isScopeActive()) {
-                thumbDecoding = false
-                return
-            }
+        if (!isScopeActive()) {
+            thumbDecoding = false
+            return
+        }
 
-            val decodeTask = DecodeTask(
-                type = TaskType.PAGE,
-                pageIndex = aPage.index,
-                key = cacheKey,
-                aPage = aPage,
-                zoom = 1f,
-                bounds,
-                width.toInt(),
-                height.toInt(),
-                crop = pageViewState.isCropEnabled(),
-                callback = object : DecodeCallback {
-                    override fun onDecodeComplete(
-                        bitmap: ImageBitmap?,
-                        isThumb: Boolean,
-                        error: Throwable?
-                    ) {
+        val decodeTask = DecodeTask(
+            type = TaskType.PAGE,
+            pageIndex = aPage.index,
+            key = cacheKey,
+            aPage = aPage,
+            zoom = 1f,
+            bounds,
+            width.toInt(),
+            height.toInt(),
+            crop = pageViewState.isCropEnabled(),
+            callback = object : DecodeCallback {
+                override fun onDecodeComplete(
+                    bitmap: ImageBitmap?,
+                    isThumb: Boolean,
+                    error: Throwable?
+                ) {
                         if (bitmap != null && !pageViewState.isShutdown()) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
                             CoroutineScope(Dispatchers.Main).launch {
@@ -301,23 +301,22 @@ public class Page(
                             }
                         }
                         thumbDecoding = false
-                    }
-
-                    override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                        // 优化：使用快速查找方法
-                        return !pageViewState.isShutdown() && pageViewState.isPageInVisibleList(
-                            pageNumber
-                        )
-                    }
-
-                    override fun onFinish(pageNumber: Int) {
-                        thumbDecoding = false
-                    }
                 }
-            )
 
-            // 提交任务到DecodeService
-            pageViewState.decodeService?.submitTask(decodeTask)
+                override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                    // 优化：使用快速查找方法
+                    return !pageViewState.isShutdown() && pageViewState.isPageInVisibleList(
+                        pageNumber
+                    )
+                }
+
+                override fun onFinish(pageNumber: Int) {
+                    thumbDecoding = false
+                }
+            }
+        )
+
+        pageViewState.decodeService?.submitTask(decodeTask)
 
     }
 

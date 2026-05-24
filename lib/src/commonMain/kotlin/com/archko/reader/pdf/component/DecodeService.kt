@@ -70,6 +70,7 @@ public class DecodeService(
         }
 
         if (task.callback?.shouldRender(task.pageIndex, task.type == TaskType.PAGE) != true) {
+            println("[DecodeService.shouldRender] page=${task.pageIndex}, $task")
             task.callback?.onFinish(task.pageIndex)
             return
         }
