@@ -170,9 +170,9 @@ public class PageNode(
         }
 
         // 4. 无论是否绘制，都尝试解码（预加载区域内）
-        //if (bitmapState == null && !isDecoding) {
-        //    decode(pageWidth, pageHeight, pageViewState.vZoom)
-        //}
+        if (bitmapState == null && !isDecoding) {
+            decode(pageWidth, pageHeight, pageViewState.vZoom)
+        }
     }
 
     public fun decode(pageWidth: Float, pageHeight: Float, vZoom: Float) {

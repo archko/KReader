@@ -825,7 +825,7 @@ public class Page(
             visibleNodes.clear()
             val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
             visibleNodes[0] = node  // key=0 表示 (0,0)
-            node.decode(currentWidth, currentHeight, pageViewState.vZoom)
+            //node.decode(currentWidth, currentHeight, pageViewState.vZoom)
             return
         }
 
@@ -867,7 +867,7 @@ public class Page(
         }
 
         // 移除不在范围内的 nodes，同时触发保留节点的解码
-        val iterator = visibleNodes.iterator()
+        /*val iterator = visibleNodes.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
             val key = entry.key
@@ -879,7 +879,7 @@ public class Page(
             } else {
                 entry.value.decode(currentWidth, currentHeight, pageViewState.vZoom)
             }
-        }
+        }*/
     }
 
     /**
@@ -923,7 +923,7 @@ public class Page(
     public companion object {
         // 核心约束：仅保留最小块、最大块，取消基础块
         public const val MIN_BLOCK: Float = 256f
-        public const val MAX_BLOCK: Float = 256f * 2f
+        public const val MAX_BLOCK: Float = 256f * 3f
 
         // 单轴块数计算：优先1块，仅超出MAX_BLOCK才分块（延迟重建核心）
         private fun calcAxisBlocks(length: Float): Int {
