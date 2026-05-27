@@ -34,7 +34,7 @@ android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
 
-versionCode = "15"
+versionCode = "18"
 versionName = "1.2.3"
 
 [libraries]
