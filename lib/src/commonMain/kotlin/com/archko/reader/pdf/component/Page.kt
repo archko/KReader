@@ -929,12 +929,12 @@ public class Page(
         private fun calcAxisBlocks(length: Float): Int {
             if (length <= 0) return 1
 
-            // 核心规则：只要长度 ≤ 最大块1536，就用1块（不管最小块512）
+            // 核心规则：只要长度 ≤ 最大块，就用1块（不管最小块）
             if (length <= MAX_BLOCK) {
                 return 1
             }
 
-            // 长度 > 最大块1536 → 按1536分块，保证实际块大小 ≥ 512
+            // 长度 > 最大块 → 按最大块分块，保证实际块大小 ≥ 最小块
             var blocks = ceil(length / MAX_BLOCK).toInt()
             val actualBlockSize = length / blocks
 
