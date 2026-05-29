@@ -67,6 +67,7 @@ public class AIService {
                 "glm" -> chatWithGLM(provider, question, pageContent, config)
                 "openai" -> chatWithOpenAI(provider, question, pageContent, config)
                 "gemini" -> chatWithGemini(provider, question, pageContent, config)
+                "free" -> chatWithOpenAI(provider, question, pageContent, config)
                 else -> Result.failure(
                     Exception((config?.unsupportedProvider ?: "不支持的 AI 提供商: %s").format(provider.id))
                 )

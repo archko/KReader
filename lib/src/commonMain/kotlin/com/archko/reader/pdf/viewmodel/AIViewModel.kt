@@ -109,6 +109,16 @@ public class AIViewModel : ViewModel() {
                     maxTokens = 100000,
                     temperature = 0.7f,
                     isDefault = false
+                ),
+                AIProvider(
+                    id = "free",
+                    name = "免费AI",
+                    apiKey = "",
+                    baseUrl = "https://openrouter.ai/api/v1",
+                    model = "openrouter/free",
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = false
                 )
             )
 

@@ -1,18 +1,26 @@
 package com.archko.reader.viewer.dialog
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.archko.reader.pdf.entity.AIProvider
@@ -58,6 +67,8 @@ fun AISettingDialog(
     var showEditDialog by remember { mutableStateOf(false) }
     var editingProvider by remember { mutableStateOf<AIProvider?>(null) }
 
+    var showFreeModelDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.initializeDefaultProviders()
     }
@@ -73,26 +84,63 @@ fun AISettingDialog(
         )
     }
 
+    if (showFreeModelDialog) {
+        val freeProvider = providers.find { it.id == "free" }
+        if (freeProvider != null) {
+            FreeModelBrowserDialog(
+                apiKey = freeProvider.apiKey,
+                baseUrl = freeProvider.baseUrl,
+                currentModel = freeProvider.model,
+                onDismiss = { showFreeModelDialog = false },
+                onModelSelected = { modelId ->
+                    val updated = freeProvider.apply {
+                        model = modelId
+                    }
+                    viewModel.updateProvider(updated)
+                    showFreeModelDialog = false
+                }
+            )
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(Res.string.ai_setting_title)) },
         text = {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                items(providers) { provider ->
-                    AIProviderItem(
-                        provider = provider,
-                        isDefault = provider.id == defaultProvider?.id,
-                        onSetDefault = {
-                            viewModel.setDefaultProvider(provider.id)
-                        },
-                        onEdit = {
-                            editingProvider = provider
-                            showEditDialog = true
-                        }
-                    )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(providers) { provider ->
+                        AIProviderItem(
+                            provider = provider,
+                            isDefault = provider.id == defaultProvider?.id,
+                            onSetDefault = {
+                                viewModel.setDefaultProvider(provider.id)
+                            },
+                            onEdit = {
+                                editingProvider = provider
+                                showEditDialog = true
+                            }
+                        )
+                    }
+
+                    // 免费AI入口
+                    item {
+                        FreeProviderCard(
+                            provider = providers.find { it.id == "free" },
+                            isDefault = defaultProvider?.id == "free",
+                            onEnableFree = {
+                                viewModel.setDefaultProvider("free")
+                            },
+                            onBrowseModels = {
+                                showFreeModelDialog = true
+                            }
+                        )
+                    }
                 }
             }
         },
@@ -112,6 +160,85 @@ fun AISettingDialog(
     )
 }
 
+@Composable
+private fun FreeProviderCard(
+    provider: AIProvider?,
+    isDefault: Boolean,
+    onEnableFree: () -> Unit,
+    onBrowseModels: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDefault) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onEnableFree() }
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = isDefault,
+                onClick = onEnableFree
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "免费AI",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "免费",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+                Text(
+                    text = provider?.baseUrl ?: "https://api.siliconflow.cn",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "模型: ${provider?.model ?: "未选择"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Button(
+                onClick = onBrowseModels,
+                enabled = provider?.apiKey?.isNotEmpty() == true,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text("浏览模型", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
 
 @Composable
 private fun AIProviderItem(
@@ -137,7 +264,6 @@ private fun AIProviderItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 默认选择
             RadioButton(
                 selected = isDefault,
                 onClick = onSetDefault
@@ -145,7 +271,6 @@ private fun AIProviderItem(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 提供商信息
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = provider.name,
@@ -165,7 +290,6 @@ private fun AIProviderItem(
                 }
             }
 
-            // 编辑按钮
             IconButton(onClick = onEdit) {
                 Icon(
                     painter = painterResource(Res.drawable.ic_edit),

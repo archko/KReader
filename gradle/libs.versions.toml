@@ -14,6 +14,7 @@ ktor = "3.4.3"
 kotlinx-coroutines = "1.11.0"
 kotlinx-immutableCollections = "0.4.0"
 ksp = "2.3.8"
+openai-client = "4.1.0"
 
 calf = "0.12.0"
 mupdfFitz = "1.25.1"
@@ -86,6 +87,8 @@ reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reo
 
 sonner = { module = "io.github.dokar3:sonner", version.ref = "sonner" }
 crashreport = { module = "com.tencent.bugly:crashreport", version.ref = "crashreport" }
+
+openai-client = { module = "com.aallam.openai:openai-client", version.ref = "openai-client" }
 
 [plugins]
 #kotlin-native-cocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }

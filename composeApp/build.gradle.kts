@@ -49,6 +49,7 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.openai.client)
         }
         desktopMain.dependencies {
             implementation(libs.jetbrains.lifecycle.viewmodel.compose)
