@@ -285,4 +285,15 @@
     <string name="ai_api_empty_response">API 返回空响应体</string>
     <string name="ai_empty_response">AI 返回空响应</string>
     <string name="ai_api_call_failed">API 调用失败: %s</string>
+
+    <!-- 免费 AI 提供商 -->
+    <string name="ai_free_title">免费AI</string>
+    <string name="ai_free_badge">免费</string>
+    <string name="ai_free_model">模型: %s</string>
+    <string name="ai_free_model_not_selected">未选择</string>
+    <string name="ai_free_browse_models">浏览模型</string>
+    <string name="ai_free_select_model_title">选择免费模型</string>
+    <string name="ai_free_total_models">共 %d 个模型，请选择一个</string>
+    <string name="ai_free_confirm_selection">确认选择</string>
+    <string name="ai_free_fetch_failed">获取模型列表失败: %s</string>
 </resources>

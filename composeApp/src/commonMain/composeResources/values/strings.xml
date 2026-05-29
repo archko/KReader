@@ -284,4 +284,15 @@
     <string name="ai_api_empty_response">API returned empty response body</string>
     <string name="ai_empty_response">AI returned empty response</string>
     <string name="ai_api_call_failed">API call failed: %s</string>
+
+    <!-- Free AI Provider -->
+    <string name="ai_free_title">Free AI</string>
+    <string name="ai_free_badge">Free</string>
+    <string name="ai_free_model">Model: %s</string>
+    <string name="ai_free_model_not_selected">Not selected</string>
+    <string name="ai_free_browse_models">Browse Models</string>
+    <string name="ai_free_select_model_title">Select Free Model</string>
+    <string name="ai_free_total_models">Total %d models, please select one</string>
+    <string name="ai_free_confirm_selection">Confirm Selection</string>
+    <string name="ai_free_fetch_failed">Failed to fetch model list: %s</string>
 </resources>

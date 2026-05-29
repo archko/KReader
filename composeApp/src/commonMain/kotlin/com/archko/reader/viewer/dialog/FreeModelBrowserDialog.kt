@@ -32,7 +32,12 @@ import com.aallam.openai.client.OpenAI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ai_free_confirm_selection
+import kreader.composeapp.generated.resources.ai_free_fetch_failed
+import kreader.composeapp.generated.resources.ai_free_select_model_title
+import kreader.composeapp.generated.resources.ai_free_total_models
 import kreader.composeapp.generated.resources.cancel
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -60,7 +65,7 @@ fun FreeModelBrowserDialog(
                 openAI.models().map { it.id }.sorted()
             }
         } catch (e: Exception) {
-            errorMsg = "获取模型列表失败: ${e.message}"
+            errorMsg = getString(Res.string.ai_free_fetch_failed).format(e.message ?: "")
         } finally {
             isLoading = false
         }
@@ -68,7 +73,7 @@ fun FreeModelBrowserDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择免费模型") },
+        title = { Text(stringResource(Res.string.ai_free_select_model_title)) },
         text = {
             Column {
                 if (isLoading) {
@@ -86,7 +91,7 @@ fun FreeModelBrowserDialog(
                     )
                 } else {
                     Text(
-                        text = "共 ${models.size} 个模型，请选择一个",
+                        text = stringResource(Res.string.ai_free_total_models).format(models.size),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -137,7 +142,7 @@ fun FreeModelBrowserDialog(
                 onClick = { onModelSelected(selectedModel) },
                 enabled = selectedModel.isNotEmpty() && !isLoading && errorMsg == null
             ) {
-                Text("确认选择")
+                Text(stringResource(Res.string.ai_free_confirm_selection))
             }
         },
         dismissButton = {

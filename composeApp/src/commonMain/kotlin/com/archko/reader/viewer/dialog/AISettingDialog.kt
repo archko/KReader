@@ -47,6 +47,11 @@ import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.ai_api_key_label
 import kreader.composeapp.generated.resources.ai_api_url_label
 import kreader.composeapp.generated.resources.ai_edit_provider
+import kreader.composeapp.generated.resources.ai_free_badge
+import kreader.composeapp.generated.resources.ai_free_browse_models
+import kreader.composeapp.generated.resources.ai_free_model
+import kreader.composeapp.generated.resources.ai_free_model_not_selected
+import kreader.composeapp.generated.resources.ai_free_title
 import kreader.composeapp.generated.resources.ai_model_name_label
 import kreader.composeapp.generated.resources.ai_setting_title
 import kreader.composeapp.generated.resources.cancel
@@ -195,7 +200,7 @@ private fun FreeProviderCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "免费AI",
+                        text = stringResource(Res.string.ai_free_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -209,7 +214,7 @@ private fun FreeProviderCard(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "免费",
+                            text = stringResource(Res.string.ai_free_badge),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
@@ -221,7 +226,9 @@ private fun FreeProviderCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "模型: ${provider?.model ?: "未选择"}",
+                    text = stringResource(Res.string.ai_free_model).format(
+                        provider?.model ?: stringResource(Res.string.ai_free_model_not_selected)
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -234,7 +241,7 @@ private fun FreeProviderCard(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )
             ) {
-                Text("浏览模型", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(Res.string.ai_free_browse_models), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
