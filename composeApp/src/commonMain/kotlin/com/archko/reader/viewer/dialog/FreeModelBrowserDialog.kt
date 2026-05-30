@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aallam.openai.client.OpenAI
+import com.aallam.openai.client.OpenAIHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.Res
@@ -60,11 +61,12 @@ fun FreeModelBrowserDialog(
             models = withContext(Dispatchers.Default) {
                 val openAI = OpenAI(
                     token = apiKey,
-                    host = baseUrl.trimEnd('/')
+                    host = OpenAIHost(normalizedUrl)
                 )
-                openAI.models().map { it.id }.sorted()
+                openAI.models().map { it.id.toString() }.sorted()
             }
         } catch (e: Exception) {
+            println("OpenAI:$e.message")
             errorMsg = getString(Res.string.ai_free_fetch_failed).format(e.message ?: "")
         } finally {
             isLoading = false
