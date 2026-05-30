@@ -401,7 +401,10 @@ fun main(args: Array<String>) {
                             || part.endsWith(".epub")
                             || part.endsWith(".mobi")
                             || part.endsWith(".txt")
-                            || part.endsWith(".djvu"))
+                            || part.endsWith(".djvu")
+                            || part.endsWith(".html"))
+                            || part.endsWith(".xhtml"))
+                            || part.endsWith(".md"))
                 ) {
                     val cleanPath = part.trim('"', '\'').replace("\\", "/")
                     println("方法4 - Java命令解析: $part -> $cleanPath")

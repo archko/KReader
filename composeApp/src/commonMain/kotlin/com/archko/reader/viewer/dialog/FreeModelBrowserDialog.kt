@@ -61,7 +61,7 @@ fun FreeModelBrowserDialog(
             models = withContext(Dispatchers.Default) {
                 val openAI = OpenAI(
                     token = apiKey,
-                    host = OpenAIHost(normalizedUrl)
+                    host = OpenAIHost(baseUrl)
                 )
                 openAI.models().map { it.id.toString() }.sorted()
             }

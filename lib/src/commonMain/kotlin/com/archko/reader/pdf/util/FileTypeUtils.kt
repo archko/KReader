@@ -56,6 +56,8 @@ public object FileTypeUtils {
                     filePath.endsWith(".fb") || filePath.endsWith(".fb2") ||
                     filePath.endsWith(".pptx") || filePath.endsWith(".docx") ||
                     filePath.endsWith(".djvu") || filePath.endsWith(".djv") ||
+                    filePath.endsWith(".txt") || filePath.endsWith(".md") ||
+                    filePath.endsWith(".html") || filePath.endsWith(".xhtml") ||
                     filePath.endsWith(".svg")
         }
     }
@@ -109,6 +111,10 @@ public object FileTypeUtils {
                 || path.endsWith(".pptx", true)
                 || path.endsWith(".docx", true)
                 || path.endsWith(".xlsx", true)
+                || path.endsWith(".html", true)
+                || path.endsWith(".xhtml", true)
+                || path.endsWith(".txt", true)
+                || path.endsWith(".md", true)
     }
 
     public fun isSupportedImageForCreater(path: String): Boolean {
