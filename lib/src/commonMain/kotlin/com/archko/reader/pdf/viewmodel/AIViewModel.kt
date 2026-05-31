@@ -55,123 +55,100 @@ public class AIViewModel : ViewModel() {
     }
 
     public fun initializeDefaultProviders() {
-        viewModelScope.launch {
-            val existing = database?.aiProviderDao()?.getAllProviders() ?: emptyList()
-            val existingIds = existing.map { it.id }.toSet()
-
-            val allDefaults = listOf(
-                AIProvider(
-                    id = "deepseek",
-                    name = "DeepSeek",
-                    apiKey = "",
-                    baseUrl = "https://api.deepseek.com",
-                    model = "deepseek-v4-flash",
-                    maxTokens = 100000,
-                    temperature = 0.7f,
-                    isDefault = false
-                ),
-                AIProvider(
-                    id = "qwen",
-                    name = "通义千问",
-                    apiKey = "",
-                    baseUrl = "https://dashscope.aliyuncs.com",
-                    model = "qwen-turbo",
-                    maxTokens = 100000,
-                    temperature = 0.7f,
-                    isDefault = false
-                ),
-                AIProvider(
-                    id = "glm",
-                    name = "智谱清言",
-                    apiKey = "",
-                    baseUrl = "https://open.bigmodel.cn",
-                    model = "glm-4-flash",
-                    maxTokens = 100000,
-                    temperature = 0.7f,
-                    isDefault = false
-                ),
-                AIProvider(
-                    id = "openai",
-                    name = "OpenAI GPT",
-                    apiKey = "",
-                    baseUrl = "https://api.openai.com",
-                    model = "gpt-4o-mini",
-                    maxTokens = 100000,
-                    temperature = 0.7f,
-                    isDefault = false
-                ),
-                AIProvider(
-                    id = "gemini",
-                    name = "Google Gemini",
-                    apiKey = "",
-                    baseUrl = "https://generativelanguage.googleapis.com",
-                    model = "gemini-2.0-flash",
-                    maxTokens = 100000,
-                    temperature = 0.7f,
-                    isDefault = false
-                ),
-                AIProvider(
-                    id = "free",
-                    name = "免费AI",
-                    apiKey = "",
-                    baseUrl = "https://openrouter.ai/api/v1",
-                    model = "openrouter/free",
-                    maxTokens = 100000,
-                    temperature = 0.7f,
-                    isDefault = false
-                )
+        val allDefaults = listOf(
+            AIProvider(
+                id = "deepseek",
+                name = "DeepSeek",
+                apiKey = "",
+                baseUrl = "https://api.deepseek.com",
+                model = "deepseek-v4-flash",
+                maxTokens = 100000,
+                temperature = 0.7f,
+                isDefault = false
+            ),
+            AIProvider(
+                id = "qwen",
+                name = "通义千问",
+                apiKey = "",
+                baseUrl = "https://dashscope.aliyuncs.com",
+                model = "qwen-turbo",
+                maxTokens = 100000,
+                temperature = 0.7f,
+                isDefault = false
+            ),
+            AIProvider(
+                id = "glm",
+                name = "智谱清言",
+                apiKey = "",
+                baseUrl = "https://open.bigmodel.cn",
+                model = "glm-4-flash",
+                maxTokens = 100000,
+                temperature = 0.7f,
+                isDefault = false
+            ),
+            AIProvider(
+                id = "openai",
+                name = "OpenAI GPT",
+                apiKey = "",
+                baseUrl = "https://api.openai.com",
+                model = "gpt-4o-mini",
+                maxTokens = 100000,
+                temperature = 0.7f,
+                isDefault = false
+            ),
+            AIProvider(
+                id = "gemini",
+                name = "Google Gemini",
+                apiKey = "",
+                baseUrl = "https://generativelanguage.googleapis.com",
+                model = "gemini-2.0-flash",
+                maxTokens = 100000,
+                temperature = 0.7f,
+                isDefault = false
             )
-
-            val toInsert = allDefaults.filter { it.id !in existingIds }
-            if (toInsert.isNotEmpty()) {
-                database?.aiProviderDao()?.insertAllProviders(toInsert)
-            }
-
-            existing.forEach { provider ->
-                val defaultProvider = allDefaults.find { it.id == provider.id }
-                if (defaultProvider != null) {
-                    val updated = provider.apply {
-                        name = defaultProvider.name
-                        baseUrl = defaultProvider.baseUrl
-                        model = defaultProvider.model
-                        maxTokens = defaultProvider.maxTokens
-                        temperature = defaultProvider.temperature
-                        updatedAt = System.currentTimeMillis()
-                    }
-                    database?.aiProviderDao()?.updateProvider(updated)
-                }
-            }
-
-            loadProviders()
-        }
+        )
+        _providers.value = allDefaults
+        _defaultProvider.value = allDefaults.find { it.isDefault }
     }
 
     public fun loadProviders() {
-        viewModelScope.launch {
-            val providers = database?.aiProviderDao()?.getAllProviders() ?: emptyList()
-            _providers.value = providers
-            _defaultProvider.value = providers.find { it.isDefault }
-        }
+        val default = _defaultProvider.value
+        _providers.value = _providers.value.toList()
+        _defaultProvider.value = default
     }
 
     public fun updateProvider(provider: AIProvider) {
         viewModelScope.launch {
+            val currentProviders = _providers.value.toMutableList()
+            val index = currentProviders.indexOfFirst { it.id == provider.id }
             provider.updatedAt = System.currentTimeMillis()
+            if (index >= 0) {
+                currentProviders[index] = provider
+            } else {
+                currentProviders.add(provider)
+            }
+            _providers.value = currentProviders
+            if (provider.isDefault) {
+                _defaultProvider.value = provider
+            }
             database?.aiProviderDao()?.updateProvider(provider)
-            loadProviders()
         }
     }
 
     public fun setDefaultProvider(id: String) {
         viewModelScope.launch {
+            val currentProviders = _providers.value.map {
+                it.apply { isDefault = it.id == id }
+            }
+            _providers.value = currentProviders
+            _defaultProvider.value = currentProviders.find { it.isDefault }
             database?.aiProviderDao()?.clearAllDefaults()
             database?.aiProviderDao()?.setDefault(id)
-            loadProviders()
         }
     }
 
     public suspend fun getCurrentProvider(): AIProvider? {
-        return database?.aiProviderDao()?.getDefaultProvider()
+        return _defaultProvider.value
     }
 
     public fun loadConversations(path: String, pageIndex: Int) {

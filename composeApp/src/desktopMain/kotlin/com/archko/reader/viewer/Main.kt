@@ -402,8 +402,8 @@ fun main(args: Array<String>) {
                             || part.endsWith(".mobi")
                             || part.endsWith(".txt")
                             || part.endsWith(".djvu")
-                            || part.endsWith(".html"))
-                            || part.endsWith(".xhtml"))
+                            || part.endsWith(".html")
+                            || part.endsWith(".xhtml")
                             || part.endsWith(".md"))
                 ) {
                     val cleanPath = part.trim('"', '\'').replace("\\", "/")

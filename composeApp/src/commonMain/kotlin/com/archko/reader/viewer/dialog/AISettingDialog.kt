@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,7 +27,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +46,6 @@ import kreader.composeapp.generated.resources.ai_edit_provider
 import kreader.composeapp.generated.resources.ai_free_badge
 import kreader.composeapp.generated.resources.ai_free_browse_models
 import kreader.composeapp.generated.resources.ai_free_model
-import kreader.composeapp.generated.resources.ai_free_model_not_selected
 import kreader.composeapp.generated.resources.ai_free_title
 import kreader.composeapp.generated.resources.ai_model_name_label
 import kreader.composeapp.generated.resources.ai_setting_title
@@ -74,9 +69,9 @@ fun AISettingDialog(
 
     var showFreeModelDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        viewModel.initializeDefaultProviders()
-    }
+    val freeProvider = providers.find { it.id == "free" }
+    val freeBaseUrl = "https://openrouter.ai/api"
+    val freeDefaultModel = "openrouter/free"
 
     if (showEditDialog && editingProvider != null) {
         AIProviderEditDialog(
@@ -90,22 +85,26 @@ fun AISettingDialog(
     }
 
     if (showFreeModelDialog) {
-        val freeProvider = providers.find { it.id == "free" }
-        if (freeProvider != null) {
-            FreeModelBrowserDialog(
-                apiKey = freeProvider.apiKey,
-                baseUrl = freeProvider.baseUrl,
-                currentModel = freeProvider.model,
-                onDismiss = { showFreeModelDialog = false },
-                onModelSelected = { modelId ->
-                    val updated = freeProvider.apply {
-                        model = modelId
-                    }
-                    viewModel.updateProvider(updated)
-                    showFreeModelDialog = false
-                }
-            )
-        }
+        FreeModelBrowserDialog(
+            baseUrl = "https://openrouter.ai/api/v1/",
+            currentModel = freeProvider?.model ?: freeDefaultModel,
+            onDismiss = { showFreeModelDialog = false },
+            onModelSelected = { apiKey, modelId ->
+                val updated = AIProvider(
+                    id = "free",
+                    name = "免费AI",
+                    apiKey = apiKey,
+                    baseUrl = freeBaseUrl,
+                    model = modelId,
+                    maxTokens = 100000,
+                    temperature = 0.7f,
+                    isDefault = true
+                )
+                viewModel.updateProvider(updated)
+                viewModel.setDefaultProvider("free")
+                showFreeModelDialog = false
+            }
+        )
     }
 
     AlertDialog(
@@ -136,7 +135,8 @@ fun AISettingDialog(
                     // 免费AI入口
                     item {
                         FreeProviderCard(
-                            provider = providers.find { it.id == "free" },
+                            baseUrl = freeProvider?.baseUrl ?: freeBaseUrl,
+                            model = freeProvider?.model ?: freeDefaultModel,
                             isDefault = defaultProvider?.id == "free",
                             onEnableFree = {
                                 viewModel.setDefaultProvider("free")
@@ -167,7 +167,8 @@ fun AISettingDialog(
 
 @Composable
 private fun FreeProviderCard(
-    provider: AIProvider?,
+    baseUrl: String,
+    model: String,
     isDefault: Boolean,
     onEnableFree: () -> Unit,
     onBrowseModels: () -> Unit
@@ -221,14 +222,12 @@ private fun FreeProviderCard(
                     }
                 }
                 Text(
-                    text = provider?.baseUrl ?: "https://api.siliconflow.cn",
+                    text = baseUrl,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = stringResource(Res.string.ai_free_model).format(
-                        provider?.model ?: stringResource(Res.string.ai_free_model_not_selected)
-                    ),
+                    text = stringResource(Res.string.ai_free_model).format(model),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -236,7 +235,7 @@ private fun FreeProviderCard(
 
             Button(
                 onClick = onBrowseModels,
-                enabled = provider?.apiKey?.isNotEmpty() == true,
+                enabled = true,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )

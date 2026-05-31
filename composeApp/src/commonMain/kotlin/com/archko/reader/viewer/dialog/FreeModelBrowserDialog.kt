@@ -16,6 +16,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,12 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aallam.openai.client.OpenAI
 import com.aallam.openai.client.OpenAIHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.Res
+import kreader.composeapp.generated.resources.ai_api_key_label
 import kreader.composeapp.generated.resources.ai_free_confirm_selection
 import kreader.composeapp.generated.resources.ai_free_fetch_failed
 import kreader.composeapp.generated.resources.ai_free_select_model_title
@@ -43,27 +46,33 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun FreeModelBrowserDialog(
-    apiKey: String,
     baseUrl: String,
     currentModel: String,
     onDismiss: () -> Unit,
-    onModelSelected: (String) -> Unit
+    onModelSelected: (apiKey: String, model: String) -> Unit
 ) {
+    var apiKey by remember { mutableStateOf("") }
     var models by remember { mutableStateOf<List<String>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var selectedModel by remember { mutableStateOf(currentModel) }
+    var hasFetched by remember { mutableStateOf(false) }
 
     LaunchedEffect(apiKey, baseUrl) {
+        if (apiKey.isBlank()) return@LaunchedEffect
         isLoading = true
         errorMsg = null
+        hasFetched = true
         try {
             models = withContext(Dispatchers.Default) {
                 val openAI = OpenAI(
                     token = apiKey,
                     host = OpenAIHost(baseUrl)
                 )
-                openAI.models().map { it.id.toString() }.sorted()
+                openAI.models()
+                    .map { it.id.id }
+                    .filter { it.contains("free", ignoreCase = true) }
+                    .sorted()
             }
         } catch (e: Exception) {
             println("OpenAI:$e.message")
@@ -78,7 +87,24 @@ fun FreeModelBrowserDialog(
         title = { Text(stringResource(Res.string.ai_free_select_model_title)) },
         text = {
             Column {
-                if (isLoading) {
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text(stringResource(Res.string.ai_api_key_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (apiKey.isBlank() && !hasFetched) {
+                    Text(
+                        text = "请输入 API Key 以浏览模型",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (isLoading) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
@@ -91,7 +117,7 @@ fun FreeModelBrowserDialog(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium
                     )
-                } else {
+                } else if (models.isNotEmpty()) {
                     Text(
                         text = stringResource(Res.string.ai_free_total_models).format(models.size),
                         style = MaterialTheme.typography.bodySmall,
@@ -141,8 +167,8 @@ fun FreeModelBrowserDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onModelSelected(selectedModel) },
-                enabled = selectedModel.isNotEmpty() && !isLoading && errorMsg == null
+                onClick = { onModelSelected(apiKey, selectedModel) },
+                enabled = selectedModel.isNotEmpty() && !isLoading && errorMsg == null && models.isNotEmpty()
             ) {
                 Text(stringResource(Res.string.ai_free_confirm_selection))
             }
