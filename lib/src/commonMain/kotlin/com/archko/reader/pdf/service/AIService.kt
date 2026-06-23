@@ -67,7 +67,7 @@ public class AIService {
                 "glm" -> chatWithGLM(provider, question, pageContent, config)
                 "openai" -> chatWithOpenAI(provider, question, pageContent, config)
                 "gemini" -> chatWithGemini(provider, question, pageContent, config)
-                "free" -> chatWithOpenAI(provider, question, pageContent, config)
+                "free" -> chatWithOpenRouter(provider, question, pageContent, config)
                 else -> Result.failure(
                     Exception((config?.unsupportedProvider ?: "不支持的 AI 提供商: %s").format(provider.id))
                 )
@@ -165,6 +165,62 @@ public class AIService {
                     promptTokens = 0,
                     completionTokens = 0,
                     totalTokens = 0
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(
+                Exception((config?.apiCallFailed ?: "API 调用失败: %s").format(e.message), e)
+            )
+        }
+    }
+
+    private suspend fun chatWithOpenRouter(
+        provider: AIProvider,
+        question: String,
+        pageContent: String,
+        config: AIPromptConfig?
+    ): Result<AIResponse> {
+        val systemPrompt = config?.systemPrompt
+            ?: "你是一个专业的文档阅读助手。用户会提供文档页面的内容，并基于这些内容提问。请根据页面内容准确回答问题。"
+        val userPrompt = config?.userPromptFormat?.format(pageContent, question)
+            ?: "页面内容：\n$pageContent\n\n问题：$question"
+
+        val url = "${provider.baseUrl}/v1/chat/completions"
+
+        val requestBody = OpenAIRequest(
+            model = provider.model,
+            messages = listOf(
+                Message(
+                    role = "system",
+                    content = systemPrompt
+                ),
+                Message(
+                    role = "user",
+                    content = userPrompt
+                )
+            ),
+            maxTokens = provider.maxTokens,
+            temperature = provider.temperature
+        )
+
+        return try {
+            val response: OpenAIResponse = client.post(url) {
+                header("Authorization", "Bearer ${provider.apiKey}")
+                header("HTTP-Referer", "https://www.bing.com")
+                header("X-Title", "KReader")
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }.body()
+
+            val answer = response.choices.firstOrNull()?.message?.content
+                ?: return Result.failure(Exception(config?.emptyResponse ?: "AI 返回空响应"))
+
+            Result.success(
+                AIResponse(
+                    answer = answer,
+                    promptTokens = response.usage?.promptTokens ?: 0,
+                    completionTokens = response.usage?.completionTokens ?: 0,
+                    totalTokens = response.usage?.totalTokens ?: 0
                 )
             )
         } catch (e: Exception) {
