@@ -1,8 +1,11 @@
 package com.archko.reader.pdf.decoder
 
+import android.content.ContentResolver
+import android.net.Uri
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
@@ -11,6 +14,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
@@ -20,7 +24,10 @@ import java.io.File
 /**
  * @author: archko 2025/8/9 :6:26
  */
-public class TiffDecoder(public val file: File) : ImageDecoder {
+public class TiffDecoder(
+    public val documentInfo: DocumentInfo,
+    private val contentResolver: ContentResolver? = null
+) : ImageDecoder {
 
     public override var pageCount: Int = 1
 
@@ -35,23 +42,44 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     public override var imageSize: IntSize = IntSize.Zero
 
     public var viewSize: IntSize = IntSize.Zero
-    public override val aPageList: MutableList<APage> = ArrayList()
+    public override val aPageList: MutableList<APage>? = ArrayList()
     private var tiffLoader: TiffLoader? = null
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     init {
-        if (!file.exists()) {
-            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
-        }
-
-        if (!file.canRead()) {
-            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
-        }
-
+        val docPath = documentInfo.path
         tiffLoader = TiffLoader()
 
+        if (contentResolver != null && documentInfo.hasUri()) {
+            try {
+                val uri = Uri.parse(documentInfo.uri)
+                val pfd = contentResolver.openFileDescriptor(uri, "r")
+                if (pfd != null) {
+                    val fd = pfd.detachFd()
+                    tiffLoader!!.openTiffFd(fd)
+                    pfd.close()
+                } else {
+                    throw RuntimeException("无法打开URI: ${documentInfo.uri}")
+                }
+            } catch (e: Exception) {
+                throw RuntimeException("无法打开文档: $docPath, 错误: ${e.message}", e)
+            }
+        } else if (docPath != null) {
+            val file = File(docPath)
+            if (!file.exists()) {
+                throw IllegalArgumentException("文档文件不存在: $docPath")
+            }
+            if (!file.canRead()) {
+                throw SecurityException("无法读取文档文件: $docPath")
+            }
+            tiffLoader!!.openTiff(docPath)
+        } else {
+            throw IllegalArgumentException("文档信息不完整: 无路径和URI")
+        }
+
         originalPageSizes = prepareSizes()
+
+        cacheCoverIfNeeded()
     }
 
     override fun size(viewportSize: IntSize): IntSize {
@@ -107,7 +135,6 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     private fun prepareSizes(): List<Size> {
         val list = mutableListOf<Size>()
 
-        tiffLoader!!.openTiff(file.absolutePath)
         val tiffInfo = tiffLoader!!.tiffInfo
         val width = tiffInfo!!.width
         val height = tiffInfo.height
@@ -147,7 +174,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
 
             bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${file.absolutePath}: $e")
+            println("renderPageRegion error: ${documentInfo ?: ""}, $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -204,6 +231,9 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
         tiffLoader?.close()
 
         ImageCache.clear()
+    }
+
+    private fun cacheCoverIfNeeded() {
     }
 
     override fun getStructuredText(index: Int): Any? {

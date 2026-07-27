@@ -1,7 +1,21 @@
 package com.archko.reader.pdf.util
 
-import com.archko.reader.pdf.util.FileTypeUtils.MAX_SIZE_MB
 import java.io.File
+
+private val IMAGE_EXTENSIONS = setOf(
+    "jpg", "jpeg", "png", "gif", "bmp", "webp",
+    "heif", "heic",
+    "dng", "arw", "nef", "cr2", "cr3", "raf", "orf",
+    "sr2", "srw", "x3f", "pef", "3fr", "rw2", "nrw", "crw"
+)
+
+private val DOCUMENT_EXTENSIONS = setOf(
+    "pdf", "epub", "mobi", "xps", "fb", "fb2",
+    "pptx", "docx", "djvu", "djv", "txt", "md",
+    "html", "xhtml", "svg"
+)
+
+private val TIFF_EXTENSIONS = setOf("jfif", "tiff", "tif")
 
 /**
  * 文件类型判断工具类
@@ -10,6 +24,46 @@ import java.io.File
 public object FileTypeUtils {
 
     private const val MAX_SIZE_MB = 120 * 1024 * 1024L
+
+    public fun isImageExtension(ext: String): Boolean {
+        return ext.lowercase() in IMAGE_EXTENSIONS
+    }
+
+    public fun isDocumentExtension(ext: String): Boolean {
+        return ext.lowercase() in DOCUMENT_EXTENSIONS
+    }
+
+    public fun isTiffExtension(ext: String): Boolean {
+        return ext.lowercase() in TIFF_EXTENSIONS
+    }
+
+    public fun isImageMimeType(mimeType: String): Boolean {
+        val mt = mimeType.lowercase()
+        return (mt.startsWith("image/") && mt != "image/tiff" && mt != "image/jfif" && mt != "image/svg+xml" && mt != "image/vnd.djvu")
+                || mt.startsWith("raw/")
+    }
+
+    public fun isDocumentMimeType(mimeType: String): Boolean {
+        val mt = mimeType.lowercase()
+        return when {
+            mt in setOf(
+                "application/pdf", "application/epub+zip", "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/plain", "text/html", "text/markdown", "image/svg+xml",
+                "application/x-mobipocket-ebook", "application/vnd.ms-xpsdocument",
+                "application/x-fictionbook+xml", "image/vnd.djvu",
+                "application/vnd.comicbook+zip", "application/x-cbz"
+            ) -> true
+            mt.startsWith("text/") -> true
+            else -> false
+        }
+    }
+
+    public fun isTiffMimeType(mimeType: String): Boolean {
+        val mt = mimeType.lowercase()
+        return mt in setOf("image/tiff", "image/jfif")
+    }
 
     /**
      * 判断是否为图片文件
@@ -50,29 +104,18 @@ public object FileTypeUtils {
      * 判断是否为文档文件
      */
     public fun isDocumentFile(path: String): Boolean {
-        return path.lowercase().let { filePath ->
-            filePath.endsWith(".pdf") || filePath.endsWith(".epub") ||
-                    filePath.endsWith(".mobi") || filePath.endsWith(".xps") ||
-                    filePath.endsWith(".fb") || filePath.endsWith(".fb2") ||
-                    filePath.endsWith(".pptx") || filePath.endsWith(".docx") ||
-                    filePath.endsWith(".djvu") || filePath.endsWith(".djv") ||
-                    filePath.endsWith(".txt") || filePath.endsWith(".md") ||
-                    filePath.endsWith(".html") || filePath.endsWith(".xhtml") ||
-                    filePath.endsWith(".svg")
-        }
+        val ext = path.substringAfterLast('.', "").lowercase()
+        return isDocumentExtension(ext)
     }
 
     public fun isTiffFile(path: String): Boolean {
-        return path.lowercase().let { filePath ->
-            filePath.endsWith(".jfif") || filePath.endsWith(".tiff")
-                    || filePath.endsWith(".tif")
-        }
+        val ext = path.substringAfterLast('.', "").lowercase()
+        return isTiffExtension(ext)
     }
 
     public fun isDjvuFile(path: String): Boolean {
-        return path.lowercase().let { filePath ->
-            filePath.endsWith(".djvu") || filePath.endsWith(".djv")
-        }
+        val ext = path.substringAfterLast('.', "").lowercase()
+        return ext == "djvu" || ext == "djv"
     }
 
     /**
@@ -105,22 +148,13 @@ public object FileTypeUtils {
     }
 
     public fun isReflowable(path: String): Boolean {
-        return path.endsWith(".cbz", true)
-                || path.endsWith(".epub", true)
-                || path.endsWith(".mobi", true)
-                || path.endsWith(".pptx", true)
-                || path.endsWith(".docx", true)
-                || path.endsWith(".xlsx", true)
-                || path.endsWith(".html", true)
-                || path.endsWith(".xhtml", true)
-                || path.endsWith(".txt", true)
-                || path.endsWith(".md", true)
+        val ext = path.substringAfterLast('.', "").lowercase()
+        return ext in setOf("cbz", "epub", "mobi", "pptx", "docx", "xlsx", "html", "xhtml", "txt", "md")
     }
 
     public fun isSupportedImageForCreater(path: String): Boolean {
-        return path.endsWith(".jpg", true)
-                || path.endsWith(".jpeg", true)
-                || path.endsWith(".gif", true)
+        val ext = path.substringAfterLast('.', "").lowercase()
+        return ext in setOf("jpg", "jpeg", "gif")
     }
 }
 

@@ -55,6 +55,7 @@ import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.entity.CustomImageData
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.getAbsolutePath
@@ -78,7 +79,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
-data class OpenDocRequest(val paths: List<String>, val page: Int?)
+data class OpenDocRequest(val documents: List<DocumentInfo>, val page: Int?)
 
 @Composable
 fun FileScreen(
@@ -143,12 +144,12 @@ fun FileScreen(
                                             // 按修改日期倒序排列，最新修改的在最前面
                                             allImageFiles.sortByDescending { it.lastModified() }
 
-                                            val paths = allImageFiles.map { it.absolutePath }
-                                            openDocRequest = OpenDocRequest(paths, 0)
+                                            val docs = allImageFiles.map { DocumentInfo(path = it.absolutePath, fileSize = it.length()) }
+                                            openDocRequest = OpenDocRequest(docs, 0)
                                         }
                                     } else {
                                         // 如果父目录不存在，只打开当前图片
-                                        openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                                        openDocRequest = OpenDocRequest(listOf(DocumentInfo(path = imagePath, fileSize = File(imagePath).length())), 0)
                                     }
                                 }
                             }
@@ -187,13 +188,14 @@ fun FileScreen(
                     val file = File(path)
                     if (file.exists()) {
                         scope.launch {
-                            val paths = listOf(file.absolutePath)
-                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                            val docInfo = DocumentInfo(path = file.absolutePath, fileSize = file.length())
+                            val docs = listOf(docInfo)
+                            if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
                                 viewModel.getRecent(bookRecent.path!!)
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(paths, startPage)
+                                openDocRequest = OpenDocRequest(docs, startPage)
                             } else {
-                                openDocRequest = OpenDocRequest(paths, 0)
+                                openDocRequest = OpenDocRequest(docs, 0)
                             }
                         }
                     }
@@ -219,7 +221,7 @@ fun FileScreen(
                     viewModel.getRecent(path)
                     val startPage = viewModel.recent?.page?.toInt() ?: 0
                     println("FileScreen: 开始页码: $startPage")
-                    openDocRequest = OpenDocRequest(listOf(path), startPage)
+                    openDocRequest = OpenDocRequest(listOf(DocumentInfo(path = path, fileSize = file.length())), startPage)
                     println("FileScreen: 已设置打开文档请求")
                 } else {
                     println("FileScreen: 文件不存在或类型不支持")
@@ -269,13 +271,14 @@ fun FileScreen(
                                     showDirectoryDialog = true
                                 } else {
                                     // 如果是文档文件，直接打开
-                                    val paths = listOf(path)
-                                    if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                    val docInfo = DocumentInfo(path = path, fileSize = fileObj.length())
+                                    val docs = listOf(docInfo)
+                                    if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
                                         viewModel.getRecent(path)
                                         val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                        openDocRequest = OpenDocRequest(paths, startPage)
+                                        openDocRequest = OpenDocRequest(docs, startPage)
                                     } else {
-                                        openDocRequest = OpenDocRequest(paths, 0)
+                                        openDocRequest = OpenDocRequest(docs, 0)
                                     }
                                 }
                             }
@@ -360,15 +363,16 @@ fun FileScreen(
                                         val file = File(path)
                                         if (file.exists()) {
                                             scope.launch {
-                                                val paths = listOf(file.absolutePath)
-                                                if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                                val docInfo = DocumentInfo(path = file.absolutePath, fileSize = file.length())
+                                                val docs = listOf(docInfo)
+                                                if (FileTypeUtils.shouldSaveProgress(docs.map { d -> d.path ?: "" })) {
                                                     viewModel.getRecent(it.path!!)
                                                     val startPage =
                                                         viewModel.recent?.page?.toInt() ?: 0
                                                     openDocRequest =
-                                                        OpenDocRequest(paths, startPage)
+                                                        OpenDocRequest(docs, startPage)
                                                 } else {
-                                                    openDocRequest = OpenDocRequest(paths, 0)
+                                                    openDocRequest = OpenDocRequest(docs, 0)
                                                 }
                                             }
                                         } else {

@@ -2,6 +2,8 @@ package com.archko.reader.viewer
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -28,7 +30,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -37,7 +38,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -63,11 +63,14 @@ import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.entity.CustomImageData
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.getAbsolutePath
+import com.archko.reader.pdf.util.getExtension
 import com.archko.reader.pdf.util.inferName
+import com.archko.reader.pdf.util.normalizePath
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
@@ -82,7 +85,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
-data class OpenDocRequest(val paths: List<String>, val page: Int?)
+data class OpenDocRequest(val documents: List<DocumentInfo>, val page: Int?)
 
 @Composable
 fun FileScreen(
@@ -93,9 +96,10 @@ fun FileScreen(
     aiViewModel: AIViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
-    externalPath: String? = null,
+    externalDocument: DocumentInfo? = null,
     onExternalPathConsumed: () -> Unit = {},
-    onCloseDocument: () -> Unit = {}
+    onCloseDocument: () -> Unit = {},
+    hasStoragePermission: Boolean = false
 ) {
     Theme {
         val context = LocalContext.current
@@ -104,9 +108,7 @@ fun FileScreen(
         val hasMoreData by viewModel.hasMoreData.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
-        var showDirectoryDialog by remember { mutableStateOf(false) }
-        var pendingImagePath by remember { mutableStateOf<String?>(null) }
-        var pendingFiles by remember { mutableStateOf<List<File>?>(null) }
+
         var showBookInfoDialog by remember { mutableStateOf<Recent?>(null) }
 
         val isDarkTheme = isSystemInDarkTheme()
@@ -135,31 +137,50 @@ fun FileScreen(
             }
         }
 
-        // 处理外部路径 - 只处理一次，处理后立即清除
-        LaunchedEffect(externalPath) {
-            if (externalPath != null) {
+        LaunchedEffect(externalDocument) {
+            if (externalDocument != null) {
                 scope.launch {
-                    val file = File(externalPath)
-                    if (file.exists()) {
-                        if (FileTypeUtils.isImageFile(externalPath)) {
-                            openDocRequest = OpenDocRequest(listOf(externalPath), 0)
-                        } else if (FileTypeUtils.isDocumentFile(externalPath)) {
-                            // 如果是支持的文档文件，直接打开
-                            val paths = listOf(file.absolutePath)
-                            if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                viewModel.getRecent(file.absolutePath)
+                    var mimeType: String? = null
+                    var ext: String? = null
+                    var fileSize = externalDocument.fileSize
+
+                    if (externalDocument.hasUri()) {
+                        val uri = Uri.parse(externalDocument.uri)
+                        val (queriedExt, queriedSize) = queryContentResolver(context, uri)
+                        ext = queriedExt
+                        if (queriedSize > 0) fileSize = queriedSize
+                        mimeType = context.contentResolver.getType(uri)
+                    }
+
+                    val path = externalDocument.path
+                    if (ext == null && path != null) {
+                        val normalizedPath = normalizePath(path)
+                        val recent = viewModel.database?.recentDao()?.getRecent(normalizedPath)
+                        ext = recent?.ext ?: path.getExtension()
+                    }
+                    ext = ext ?: ""
+
+                    when {
+                        mimeType != null && FileTypeUtils.isImageMimeType(mimeType) ||
+                                ext.isNotEmpty() && FileTypeUtils.isImageExtension(ext) -> {
+                            openDocRequest = OpenDocRequest(listOf(externalDocument), 0)
+                        }
+                        mimeType != null && FileTypeUtils.isDocumentMimeType(mimeType) ||
+                                ext.isNotEmpty() && FileTypeUtils.isDocumentExtension(ext) -> {
+                            val docs = listOf(externalDocument)
+                            if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
+                                viewModel.getRecent(path ?: externalDocument.uri ?: "")
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(paths, startPage)
+                                openDocRequest = OpenDocRequest(docs, startPage)
                             } else {
-                                openDocRequest = OpenDocRequest(paths, 0)
+                                openDocRequest = OpenDocRequest(docs, 0)
                             }
-                        } else if (FileTypeUtils.isTiffFile(externalPath)) {
-                            // 如果是tiff
-                            val paths = listOf(file.absolutePath)
-                            openDocRequest = OpenDocRequest(paths, 0)
+                        }
+                        mimeType != null && FileTypeUtils.isTiffMimeType(mimeType) ||
+                                ext.isNotEmpty() && FileTypeUtils.isTiffExtension(ext) -> {
+                            openDocRequest = OpenDocRequest(listOf(externalDocument), 0)
                         }
                     }
-                    // 处理完外部路径后立即清除，防止重复打开
                     onExternalPathConsumed()
                 }
             }
@@ -181,75 +202,6 @@ fun FileScreen(
             }
         }
 
-        // 确认对话框
-        if (showDirectoryDialog) {
-            AlertDialog(
-                onDismissRequest = {
-                    showDirectoryDialog = false
-                    pendingImagePath = null
-                    pendingFiles = null
-                },
-                title = { Text(stringResource(Res.string.browse_directory_title)) },
-                text = { Text(stringResource(Res.string.browse_directory_message)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDirectoryDialog = false
-                            pendingImagePath?.let { imagePath ->
-                                scope.launch {
-                                    // 扫描整个目录
-                                    val imageFile = File(imagePath)
-                                    val parentDir = imageFile.parentFile
-                                    if (parentDir != null && parentDir.exists()) {
-                                        val allImageFiles = mutableListOf<File>()
-
-                                        // 只扫描当前目录层级，不递归子目录
-                                        parentDir.listFiles()?.forEach { file ->
-                                            if (FileTypeUtils.isValidImageFile(file)) {
-                                                allImageFiles.add(file)
-                                            }
-                                        }
-
-                                        if (allImageFiles.isNotEmpty()) {
-                                            // 按修改日期倒序排列，最新修改的在最前面
-                                            allImageFiles.sortByDescending { it.lastModified() }
-
-                                            val paths = allImageFiles.map { it.absolutePath }
-                                            openDocRequest = OpenDocRequest(paths, 0)
-                                        }
-                                    } else {
-                                        // 如果父目录不存在，只打开当前图片
-                                        openDocRequest = OpenDocRequest(listOf(imagePath), 0)
-                                    }
-                                }
-                            }
-                            pendingImagePath = null
-                            pendingFiles = null
-                        }
-                    ) {
-                        Text(stringResource(Res.string.confirm))
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            showDirectoryDialog = false
-                            pendingFiles?.let { images ->
-                                if (images.isNotEmpty()) {
-                                    val paths = images.map { it.absolutePath }
-                                    openDocRequest = OpenDocRequest(paths, 0)
-                                }
-                            }
-                            pendingImagePath = null
-                            pendingFiles = null
-                        }
-                    ) {
-                        Text(stringResource(Res.string.cancel))
-                    }
-                }
-            )
-        }
-
         // 书本信息对话框
         showBookInfoDialog?.let { recent ->
             BookInfoDialog(
@@ -261,14 +213,16 @@ fun FileScreen(
                     val path = getAbsolutePath(bookRecent.path)
                     val file = File(path)
                     if (file.exists()) {
+                        val fileSize = bookRecent.size ?: file.length()
                         scope.launch {
-                            val paths = listOf(file.absolutePath)
-                            if (FileTypeUtils.shouldSaveProgress(paths)) {
+                            val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
+                            val docs = listOf(docInfo)
+                            if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
                                 viewModel.getRecent(bookRecent.path!!)
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(paths, startPage)
+                                openDocRequest = OpenDocRequest(docs, startPage)
                             } else {
-                                openDocRequest = OpenDocRequest(paths, 0)
+                                openDocRequest = OpenDocRequest(docs, 0)
                             }
                         }
                     } else {
@@ -287,21 +241,18 @@ fun FileScreen(
             contract = ActivityResultContracts.StartActivityForResult()
         ) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                val paths = mutableListOf<String>()
+                val uriPathPairs = mutableListOf<Pair<Uri, String?>>()
                 try {
                     val oneUri = result.data?.data
                     if (oneUri != null) {
                         val path = IntentFile.getPath(PdfApp.app!!, oneUri)
-                            ?: oneUri.toString()
-                        paths.add(path)
+                        uriPathPairs.add(oneUri to path)
                     } else {
-                        // 多选
                         for (index in 0 until (result.data?.clipData?.itemCount ?: 0)) {
                             val uri = result.data?.clipData?.getItemAt(index)?.uri
                             if (uri != null) {
                                 val path = IntentFile.getPath(PdfApp.app!!, uri)
-                                    ?: uri.toString()
-                                paths.add(path)
+                                uriPathPairs.add(uri to path)
                             }
                         }
                     }
@@ -310,52 +261,98 @@ fun FileScreen(
                 }
 
                 scope.launch {
-                    if (paths.isNotEmpty()) {
-                        // 先判断所有文件，得到图片列表和文档列表
-                        val imageFiles = mutableListOf<File>()
-                        val documentFiles = mutableListOf<File>()
-                        val tifFiles = mutableListOf<File>()
+                    if (uriPathPairs.isNotEmpty()) {
+                        val imageDocs = mutableListOf<DocumentInfo>()
+                        val documentDocs = mutableListOf<DocumentInfo>()
+                        val tiffDocs = mutableListOf<DocumentInfo>()
 
-                        paths.forEach { path ->
-                            val fileObj = File(path)
-                            if (FileTypeUtils.isAccetableImageFile(fileObj)) {
-                                imageFiles.add(fileObj)
-                            } else if (FileTypeUtils.isDocumentFile(path)) {
-                                documentFiles.add(fileObj)
-                            } else if (FileTypeUtils.isTiffFile(path)) {
-                                tifFiles.add(fileObj)
+                        for ((uri, path) in uriPathPairs) {
+                            val (resolvedExt, resolvedSize) = queryContentResolver(context, uri)
+                            val mimeType = context.contentResolver.getType(uri)
+
+                            var ext = resolvedExt
+                            var fileSize = resolvedSize
+                            if (ext == null && path != null) {
+                                val recent = viewModel.database?.recentDao()?.getRecent(path)
+                                ext = recent?.ext ?: path.getExtension()
+                                if (fileSize <= 0) fileSize = recent?.size ?: 0L
+                            }
+
+                            val doc = DocumentInfo(
+                                uri = uri.toString(),
+                                path = path,
+                                fileSize = fileSize,
+                                mimeType = mimeType,
+                                ext = ext
+                            )
+                            val extStr = ext ?: ""
+
+                            when {
+                                mimeType != null && FileTypeUtils.isImageMimeType(mimeType) ||
+                                        extStr.isNotEmpty() && FileTypeUtils.isImageExtension(extStr) -> {
+                                    imageDocs.add(doc)
+                                }
+                                mimeType != null && FileTypeUtils.isDocumentMimeType(mimeType) ||
+                                        extStr.isNotEmpty() && FileTypeUtils.isDocumentExtension(extStr) ||
+                                        path == null -> {
+                                    documentDocs.add(doc)
+                                }
+                                mimeType != null && FileTypeUtils.isTiffMimeType(mimeType) ||
+                                        extStr.isNotEmpty() && FileTypeUtils.isTiffExtension(extStr) -> {
+                                    tiffDocs.add(doc)
+                                }
+                                path != null && FileTypeUtils.isAccetableImageFile(File(path)) -> {
+                                    imageDocs.add(doc)
+                                }
+                                path != null && FileTypeUtils.isDocumentFile(path) -> {
+                                    documentDocs.add(doc)
+                                }
+                                path != null && FileTypeUtils.isTiffFile(path) -> {
+                                    tiffDocs.add(doc)
+                                }
                             }
                         }
 
-                        if (imageFiles.isNotEmpty()) {
-                            // 有图片，弹出对话框选择
-                            val firstImagePath = imageFiles.first().absolutePath
-                            pendingImagePath = firstImagePath
-                            pendingFiles = imageFiles // 直接设置为图片列表
-                            showDirectoryDialog = true
-                        } else if (documentFiles.isNotEmpty()) {
-                            // 没有图片但有文档，直接打开第一个文档
-                            val firstDocumentPath = documentFiles.first().absolutePath
-                            val paths = listOf(firstDocumentPath)
-                            if (FileTypeUtils.shouldSaveProgress(paths)) {
-                                viewModel.getRecent(paths.first())
+                        if (imageDocs.isNotEmpty()) {
+                            openDocRequest = OpenDocRequest(listOf(imageDocs.first()), 0)
+                        } else if (documentDocs.isNotEmpty()) {
+                            val firstDoc = documentDocs.first()
+                            val docs = listOf(firstDoc)
+                            val docPaths = docs.mapNotNull { it.path }
+                            if (FileTypeUtils.shouldSaveProgress(docPaths)) {
+                                viewModel.getRecent(docPaths.first())
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(paths, startPage)
+                                openDocRequest = OpenDocRequest(docs, startPage)
+                            } else {
+                                openDocRequest = OpenDocRequest(docs, 0)
                             }
-                        } else if (tifFiles.isNotEmpty()) {
-                            // tiff
-                            val firstDocumentPath = tifFiles.first().absolutePath
-                            val paths = listOf(firstDocumentPath)
-                            openDocRequest = OpenDocRequest(paths, 0)
+                        } else if (tiffDocs.isNotEmpty()) {
+                            openDocRequest = OpenDocRequest(listOf(tiffDocs.first()), 0)
                         } else {
-                            paths.firstOrNull()?.let { path ->
+                            uriPathPairs.firstOrNull()?.let { (uri, path) ->
+                                val displayPath = path ?: uri.toString()
                                 Toast.makeText(
                                     PdfApp.app,
-                                    getString(Res.string.unsupported_document, path),
+                                    getString(Res.string.unsupported_document, displayPath),
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        val directoryPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree()
+        ) { treeUri ->
+            if (treeUri != null) {
+                val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(treeUri, takeFlags)
+                scope.launch {
+                    val docs = scanDirectoryImages(context, treeUri)
+                    if (docs.isNotEmpty()) {
+                        openDocRequest = OpenDocRequest(docs, 0)
                     }
                 }
             }
@@ -410,6 +407,25 @@ fun FileScreen(
                         ) {
                             Text(stringResource(Res.string.select_pdf))
                         }
+                        Button(
+                            onClick = { directoryPickerLauncher.launch(null) },
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Text(stringResource(Res.string.album))
+                        }
+                    }
+
+                    if (!hasStoragePermission) {
+                        Text(
+                            text = stringResource(Res.string.no_storage_permission),
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
 
                     if (recentList.isNotEmpty()) {
@@ -450,16 +466,18 @@ fun FileScreen(
                                         val path = getAbsolutePath(it.path)
                                         val file = File(path)
                                         if (file.exists()) {
+                                            val fileSize = it.size ?: file.length()
                                             scope.launch {
-                                                val paths = listOf(file.absolutePath)
-                                                if (FileTypeUtils.shouldSaveProgress(paths)) {
+                                                val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
+                                                val docs = listOf(docInfo)
+                                                if (FileTypeUtils.shouldSaveProgress(docs.map { d -> d.path ?: "" })) {
                                                     viewModel.getRecent(it.path!!)
                                                     val startPage =
                                                         viewModel.recent?.page?.toInt() ?: 0
                                                     openDocRequest =
-                                                        OpenDocRequest(paths, startPage)
+                                                        OpenDocRequest(docs, startPage)
                                                 } else {
-                                                    openDocRequest = OpenDocRequest(paths, 0)
+                                                    openDocRequest = OpenDocRequest(docs, 0)
                                                 }
                                             }
                                         } else {
@@ -527,7 +545,7 @@ fun FileScreen(
             } else {
                 onShowBottomBarChanged(false)
                 CustomView(
-                    paths = openDocRequest!!.paths,
+                    documents = openDocRequest!!.documents,
                     progressPage = openDocRequest!!.page,
                     onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
                         viewModel.updateRecent(
@@ -559,6 +577,69 @@ fun FileScreen(
             }
         }
     }
+}
+
+private fun queryContentResolver(context: android.content.Context, uri: Uri): Pair<String?, Long> {
+    var ext: String? = null
+    var fileSize = 0L
+    try {
+        val cursor = context.contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val nameIdx = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                val sizeIdx = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (nameIdx >= 0) {
+                    val name = it.getString(nameIdx)
+                    ext = name?.substringAfterLast('.', "")?.lowercase()
+                }
+                if (sizeIdx >= 0 && !it.isNull(sizeIdx)) {
+                    fileSize = it.getLong(sizeIdx)
+                }
+            }
+        }
+    } catch (_: Exception) {
+    }
+    return ext to fileSize
+}
+
+private fun scanDirectoryImages(context: android.content.Context, treeUri: Uri): List<DocumentInfo> {
+    val docs = mutableListOf<DocumentInfo>()
+    val documentId = DocumentsContract.getTreeDocumentId(treeUri)
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
+    val projection = arrayOf(
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+        DocumentsContract.Document.COLUMN_SIZE
+    )
+    val cursor = context.contentResolver.query(childrenUri, projection, null, null, null)
+    cursor?.use {
+        val mimeTypeIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+        val docIdIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+        val nameIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+        val sizeIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+        while (it.moveToNext()) {
+            if (mimeTypeIdx < 0 || docIdIdx < 0) continue
+            val mimeType = it.getString(mimeTypeIdx)
+            if (mimeType != null && mimeType.startsWith("image/")) {
+                val docId = it.getString(docIdIdx)
+                val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                val displayName = if (nameIdx >= 0) it.getString(nameIdx) ?: "" else ""
+                val size = if (sizeIdx >= 0) it.getLong(sizeIdx) else 0L
+                val ext = displayName.substringAfterLast('.', "").lowercase()
+                if (FileTypeUtils.isImageExtension(ext) || FileTypeUtils.isTiffExtension(ext)) {
+                    docs.add(DocumentInfo(
+                        uri = docUri.toString(),
+                        path = displayName,
+                        fileSize = size,
+                        mimeType = mimeType,
+                        ext = ext
+                    ))
+                }
+            }
+        }
+    }
+    return docs
 }
 
 @Composable

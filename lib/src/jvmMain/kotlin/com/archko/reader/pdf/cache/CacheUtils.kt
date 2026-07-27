@@ -11,11 +11,12 @@ public actual fun getStoragePath(): String {
     return userHome
 }
 
-public actual fun getPageCacheFile(file: File): File {
+public actual fun getPageCacheFile(path: String): File {
+    val name = path.substringAfterLast("/").substringBeforeLast(".")
     val saveFile = File(
         getCacheDirectory("page").absolutePath
                 + File.separator
-                + file.nameWithoutExtension + ".json"
+                + name + ".json"
     )
     return saveFile
 }

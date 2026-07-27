@@ -15,11 +15,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.app.ActivityCompat
@@ -31,6 +35,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.archko.reader.pdf.cache.DriverFactory
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
@@ -41,22 +46,50 @@ class ComposeViewModelStoreOwner : ViewModelStoreOwner {
     override val viewModelStore: ViewModelStore = ViewModelStore()
 }
 
-open class MainActivity : ComponentActivity(), OnPermissionGranted {
+open class MainActivity : ComponentActivity() {
 
-    private val permissionCallbacks = arrayOfNulls<OnPermissionGranted>(PERMISSION_LENGTH)
     private var permissionDialog: Dialog? = null
-    private var externalPath: String? = null
+    private var externalDocument: DocumentInfo? = null
+    private var hasStoragePermission by mutableStateOf(false)
+
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            hasStoragePermission = true
+        } else {
+            Toast.makeText(this, getString(R.string.grant_failed), Toast.LENGTH_SHORT).show()
+            requestStoragePermission(false)
+        }
+    }
+
+    private val allFilesAccessLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
+            hasStoragePermission = true
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        refreshPermissionState()
+        loadView()
         checkForExternalPermission()
+    }
+
+    private fun refreshPermissionState() {
+        hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            checkStoragePermission()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // 处理新的intent
         processExternalIntent(intent)
         setIntent(null)
     }
@@ -64,33 +97,28 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
     private fun processExternalIntent(intent: Intent?) {
         if (intent == null) return
 
-        externalPath = when (intent.action) {
+        externalDocument = when (intent.action) {
             Intent.ACTION_VIEW -> {
-                // 处理ACTION_VIEW，从intent.data获取文件路径
                 val uri = intent.data
                 if (uri != null) {
                     val path = IntentFile.getPath(this, uri)
-                    if (!TextUtils.isEmpty(path)) {
-                        path
-                    } else {
-                        uri.toString()
-                    }
+                    DocumentInfo(uri = uri.toString(), path = path)
                 } else {
                     null
                 }
             }
 
             else -> {
-                // 处理自定义路径参数
-                intent.getStringExtra("path")?.takeIf { !TextUtils.isEmpty(it) }
+                intent.getStringExtra("path")?.takeIf { !TextUtils.isEmpty(it) }?.let { path ->
+                    DocumentInfo(path = path)
+                }
             }
         }
 
-        Log.d(TAG, "处理外部intent，路径: $externalPath")
+        Log.d(TAG, "处理外部intent，路径: ${externalDocument?.getDisplayPath()}")
     }
 
     fun loadView() {
-        // 处理外部intent
         processExternalIntent(intent)
         val activity = this as? ComponentActivity
 
@@ -149,7 +177,8 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                     fontViewModel,
                     bookmarkViewModel,
                     readingStatsViewModel,
-                    externalPath
+                    externalDocument,
+                    hasStoragePermission = hasStoragePermission
                 )
             }
         }
@@ -158,17 +187,12 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
 
     private fun checkForExternalPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11 (API 30) 及以上版本，只需要申请"管理所有文件访问权限"
             if (!Environment.isExternalStorageManager()) {
-                requestAllFilesAccess(this)
-            } else {
-                loadView()
+                requestAllFilesAccess()
             }
-        } else { // Android 6.0 (API 23) 到 Android 10 (API 29)，需要申请 WRITE_EXTERNAL_STORAGE 权限
+        } else {
             if (!checkStoragePermission()) {
-                requestStoragePermission(this, true)
-            } else {
-                loadView()
+                requestStoragePermission(true)
             }
         }
     }
@@ -180,11 +204,8 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         ) == PackageManager.PERMISSION_GRANTED)
     }
 
-    open fun requestStoragePermission(
-        onPermissionGranted: OnPermissionGranted, isInitialStart: Boolean
-    ) {
+    open fun requestStoragePermission(isInitialStart: Boolean) {
         val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
-        permissionCallbacks[STORAGE_PERMISSION] = onPermissionGranted
         if (ActivityCompat.shouldShowRequestPermissionRationale(
                 this,
                 permission
@@ -197,9 +218,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
                     finish()
                 }
                 .setNegativeButton(getString(R.string.grant_ok)) { _, _ ->
-                    ActivityCompat.requestPermissions(
-                        this, arrayOf(permission), STORAGE_PERMISSION
-                    )
+                    storagePermissionLauncher.launch(permission)
                     permissionDialog?.run {
                         permissionDialog!!.dismiss()
                     }
@@ -207,30 +226,25 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
             builder.setCancelable(false)
             builder.create().show()
         } else if (isInitialStart) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(permission),
-                STORAGE_PERMISSION
-            )
+            storagePermissionLauncher.launch(permission)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-    open fun requestAllFilesAccess(onPermissionGranted: OnPermissionGranted) {
+    open fun requestAllFilesAccess() {
         // 调用此方法时已经确认是 Android 11 及以上版本且没有管理权限
         val builder: AlertDialog.Builder = AlertDialog.Builder(this)
         builder.setTitle(getString(R.string.grant_all_files_permission))
             .setMessage(getString(R.string.grant_all_files_permission))
             .setPositiveButton(getString(R.string.grant_cancel)) { _, _ ->
-                finish()
+                //finish()
             }
             .setNegativeButton(getString(R.string.grant_ok)) { _, _ ->
-                permissionCallbacks[ALL_FILES_PERMISSION] = onPermissionGranted
                 try {
                     val intent =
                         Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                             .setData("package:$packageName".toUri())
-                    startActivity(intent)
+                    allFilesAccessLauncher.launch(intent)
                 } catch (e: Exception) {
                     Log.e(
                         TAG,
@@ -249,54 +263,7 @@ open class MainActivity : ComponentActivity(), OnPermissionGranted {
         builder.create().show()
     }
 
-    private fun isGranted(grantResults: IntArray): Boolean {
-        return grantResults.size == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == STORAGE_PERMISSION) {
-            if (isGranted(grantResults)) {
-                permissionCallbacks[STORAGE_PERMISSION]!!.onPermissionGranted()
-                permissionCallbacks[STORAGE_PERMISSION] = null
-            } else {
-                Toast.makeText(
-                    this,
-                    getString(R.string.grant_failed),
-                    Toast.LENGTH_SHORT
-                ).show()
-                permissionCallbacks[STORAGE_PERMISSION]?.let {
-                    requestStoragePermission(it, false)
-                }
-            }
-        }
-    }
-
-    override fun onPermissionGranted() {
-        loadView()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // 检查用户是否从设置页面返回并授予了权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Environment.isExternalStorageManager() && permissionCallbacks[ALL_FILES_PERMISSION] != null) {
-                permissionCallbacks[ALL_FILES_PERMISSION]!!.onPermissionGranted()
-                permissionCallbacks[ALL_FILES_PERMISSION] = null
-            }
-        }
-    }
-
     companion object {
-
         private val TAG = "ChooseFile"
-
-        const val PERMISSION_LENGTH = 2
-        var STORAGE_PERMISSION = 0
-        const val ALL_FILES_PERMISSION = 1
     }
 }

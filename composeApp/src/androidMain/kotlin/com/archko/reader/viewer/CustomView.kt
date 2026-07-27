@@ -40,6 +40,7 @@ import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.TtsProgressListener
@@ -73,6 +74,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * @author: archko 2025/7/23 :09:09
@@ -359,7 +361,7 @@ private fun TtsControlBarContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
-    paths: List<String>,
+    documents: List<DocumentInfo>,
     progressPage: Int? = null,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -402,8 +404,9 @@ fun CustomView(
         println("ImageCache: 设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)")
 
         // 加载书签
-        if (paths.size == 1 && FileTypeUtils.isDocumentFile(paths[0])) {
-            bookmarkViewModel.loadBookmarks(paths[0])
+        val firstPath = documents.getOrNull(0)?.path
+        if (documents.size == 1 && firstPath != null && FileTypeUtils.isDocumentFile(firstPath)) {
+            bookmarkViewModel.loadBookmarks(firstPath)
         }
     }
 
@@ -450,11 +453,16 @@ fun CustomView(
     var currentPageRef = remember { mutableIntStateOf(progressPage ?: 0) }
 
     // 多文件支持
-    val currentPath = paths.getOrNull(0) ?: paths.first()
+    val currentDoc = documents.getOrNull(0) ?: documents.first()
+    val currentPath = currentDoc.path ?: currentDoc.uri ?: ""
 
     // TTS服务绑定器 - 只有文档文件才初始化
     var ttsServiceBinder by remember { mutableStateOf<TtsServiceBinder?>(null) }
     var pathConfig by remember { mutableStateOf(PathConfig()) }
+    val contentResolver = context.contentResolver
+
+    // 兼容性：从documents中提取路径列表供旧代码使用
+    val paths = documents.map { it.path ?: it.uri ?: "" }
 
     Box(
         modifier = Modifier
@@ -463,11 +471,12 @@ fun CustomView(
     ) {
         LaunchedEffect(currentPath) {
             withContext(Dispatchers.IO) {
-                delay(20)
+                delay(20.milliseconds)
                 println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
                 if (!FileTypeUtils.isDocumentFile(currentPath)
                     && !FileTypeUtils.isImageFile(currentPath)
                     && !FileTypeUtils.isTiffFile(currentPath)
+                    && !currentDoc.hasUri()
                 ) {
                     loadingError = "document_open_failed"
                     decoder = null
@@ -477,23 +486,24 @@ fun CustomView(
                     val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                         null
                     } else {
-                        if (paths.size > 1) {
+                        if (documents.size > 1) {
                             isCrop = false
-                            // 多文件模式：创建ImagesDecoder
-                            val files = paths.map { File(it) }
-                            ImagesDecoder(files)
+                            ImagesDecoder(documents, contentResolver)
                         } else {
                             if (FileTypeUtils.isDjvuFile(currentPath)) {
                                 ttsServiceBinder = TtsServiceBinder(context, currentPath)
                                 ttsServiceBinder?.bindService()
 
-                                val djvuDecoder = DjvuDecoder(File(currentPath))
+                                val djvuDecoder = DjvuDecoder(currentDoc, contentResolver)
                                 djvuDecoder
-                            } else if (FileTypeUtils.isDocumentFile(currentPath)) {
+                            } else if (FileTypeUtils.isImageFile(currentPath)) {
+                                isCrop = false
+                                ImagesDecoder(documents, contentResolver)
+                            } else if (FileTypeUtils.isDocumentFile(currentPath) || currentDoc.hasUri()) {
                                 ttsServiceBinder = TtsServiceBinder(context, currentPath)
                                 ttsServiceBinder?.bindService()
 
-                                val pdfDecoder = PdfDecoder(File(currentPath))
+                                val pdfDecoder = PdfDecoder(currentDoc, contentResolver)
 
                                 if (pdfDecoder.needsPassword) {
                                     showPasswordDialog = true
@@ -506,11 +516,11 @@ fun CustomView(
                                 pdfDecoder
                             } else if (FileTypeUtils.isTiffFile(currentPath)) {
                                 isCrop = false
-                                val tiffDecoder = TiffDecoder(File(currentPath))
+                                val tiffDecoder = TiffDecoder(currentDoc, contentResolver)
                                 tiffDecoder
                             } else {
                                 isCrop = false
-                                ImagesDecoder(listOf(File(currentPath)))
+                                ImagesDecoder(documents, contentResolver)
                             }
                         }
                     }
@@ -965,7 +975,7 @@ fun CustomView(
                     onStartSpeaking = { page, dec, binder ->
                         scope.launch {
                             speakingPageIndex = page
-                            speakFromCurrentPage(page, dec, binder)
+                            speakFromCurrentPage(page, dec, binder, currentPath)
                         }
                     },
                     isReflow = isReflow,
@@ -1417,7 +1427,8 @@ fun CustomView(
 suspend fun speakFromCurrentPage(
     startPage: Int,
     imageDecoder: ImageDecoder,
-    speechService: TtsServiceBinder
+    speechService: TtsServiceBinder,
+    docPath: String = ""
 ) {
     if (speechService.isSpeaking()) {
         println("TTS: 正在朗读，停止当前朗读")
@@ -1434,7 +1445,7 @@ suspend fun speakFromCurrentPage(
             if (cacheBean == null) {
                 cacheBean = ReflowCacheLoader.loadReflowFromFile(
                     totalPages,
-                    imageDecoder.filePath
+                    docPath
                 )
             }
 
@@ -1476,7 +1487,7 @@ suspend fun speakFromCurrentPage(
 
                     cacheBean = ReflowCacheLoader.saveReflowToFile(
                         totalPages,
-                        imageDecoder.filePath,
+                        docPath,
                         allTexts
                     )
                     imageDecoder.cacheBean = cacheBean

@@ -14,6 +14,7 @@ import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.PageSizeBean
@@ -32,7 +33,7 @@ import java.io.File
 /**
  * @author: archko 2025/4/11 :11:26
  */
-public class PdfDecoder(public val file: File) : ImageDecoder {
+public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     private var document: Document? = null
     public override var pageCount: Int = 0
@@ -61,7 +62,6 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     // 链接缓存，避免重复解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
@@ -201,32 +201,30 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     }
 
     init {
-        // 检查文件是否存在
+        val docPath = documentInfo.path
+            ?: throw IllegalArgumentException("文档信息不完整: 无路径")
+        val file = File(docPath)
         if (!file.exists()) {
-            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
+            throw IllegalArgumentException("文档文件不存在: $docPath")
         }
-
-        // 检查文件是否可读
         if (!file.canRead()) {
-            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
+            throw SecurityException("无法读取文档文件: $docPath")
         }
 
         try {
-            filePath = file.absolutePath
-            if (FileTypeUtils.isReflowable(file.absolutePath)) {
-                val css = FontCSSGenerator.generateFontCSS(null, "10px")
+            if (FileTypeUtils.isReflowable(docPath)) {
+                val css = FontCSSGenerator.generateCSS(null, "10px")
                 println("应用自定义CSS: $css")
                 com.artifex.mupdf.fitz.Context.setUserCSS(css)
             }
-            document = Document.openDocument(file.absolutePath)
-            // 检查是否需要密码
+            document = Document.openDocument(docPath)
             needsPassword = document?.needsPassword() == true
             if (!needsPassword) {
-                isAuthenticated = true // 不需要密码的文档直接设置为已认证
+                isAuthenticated = true
                 initializeDocument()
             }
         } catch (e: Exception) {
-            throw RuntimeException("无法打开文档: ${file.absolutePath}, 错误: ${e.message}", e)
+            throw RuntimeException("无法打开文档: $docPath, 错误: ${e.message}", e)
         }
     }
 
@@ -255,7 +253,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      */
     private fun initializeDocument() {
         document?.let { doc ->
-            if (FileTypeUtils.isReflowable(file.absolutePath)) {
+            if (FileTypeUtils.isReflowable(documentInfo.path ?: "")) {
                 val fontSize = FontCSSGenerator.getDefFontSize()
                 val fs = fontSize.toInt().toFloat()
                 val w = 1280f
@@ -266,7 +264,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
                     h,
                     fontSize,
                     fs,
-                    file.absolutePath
+                    documentInfo.path ?: ""
                 )
                 doc.layout(w, h, fontSize)
             }
@@ -288,7 +286,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     private fun initPageSizeBean() {
         try {
             val count: Int = pageCount
-            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: "", documentInfo.fileSize)
             println("PdfDecoder.initPageSizeBean:$psb")
 
             if (null != psb && psb.list != null && psb.list!!.size == count) {
@@ -328,7 +326,7 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        val path = file.absolutePath
+        val path = documentInfo.path ?: ""
         try {
             if (null != ImageCache.acquirePage(path)) {
                 return
@@ -395,7 +393,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
     override fun close() {
         if (cachePage && !aPageList.isNullOrEmpty()) {
             println("PdfDecoder.close:${aPageList.size}")
-            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+            try {
+                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+            } catch (e: Exception) {
+                println("PdfDecoder.close: 保存缓存失败: ${e.message}")
+            }
         }
 
         // 清理页面缓存
@@ -444,7 +446,11 @@ public class PdfDecoder(public val file: File) : ImageDecoder {
 
             // 保存到缓存
             if (cachePage && aPageList!!.isNotEmpty()) {
-                APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+                try {
+                    APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                } catch (e: Exception) {
+                    println("PdfDecoder: 缓存页面尺寸失败: ${e.message}")
+                }
             }
         }
         println("PdfDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")

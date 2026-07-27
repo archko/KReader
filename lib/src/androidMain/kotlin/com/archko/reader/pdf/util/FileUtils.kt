@@ -7,76 +7,18 @@ import android.text.TextUtils
 import com.archko.reader.pdf.PdfApp
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.text.SimpleDateFormat
-import java.util.Objects
-import kotlin.math.max
-import kotlin.math.min
+import java.util.Locale
 
 public class FileUtils private constructor() {
-    /**
-     * 文件MD5值
-     *
-     * @param filepath
-     */
-    public fun md5File(filepath: String): String? {
-        try {
-            val file = File(filepath)
-            val fis = FileInputStream(file)
-            val md = MessageDigest.getInstance("MD5")
-            val buffer = ByteArray(1024)
-            var length = -1
-            while (fis.read(buffer, 0, 1024) != -1) {
-                length = fis.read(buffer, 0, 1024)
-                md.update(buffer, 0, length)
-            }
-            val bigInt = BigInteger(1, md.digest())
-            return bigInt.toString(16)
-        } catch (e: FileNotFoundException) {
-            e.printStackTrace()
-        } catch (e: NoSuchAlgorithmException) {
-            e.printStackTrace()
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-
-        return null
-    }
 
     public companion object {
-        private val mounts = ArrayList<String?>()
-        private val mountsPR = ArrayList<String>()
-        private val aliases = ArrayList<String?>()
-        private val aliasesPR = ArrayList<String>()
-
-        init {
-            val files = Environment.getRootDirectory().listFiles()
-            if (null != files) {
-                for (f in files) {
-                    if (f.isDirectory()) {
-                        try {
-                            val cp = f.getCanonicalPath()
-                            val ap = f.getAbsolutePath()
-                            if (cp != ap) {
-                                aliases.add(ap)
-                                aliasesPR.add(ap + "/")
-                                mounts.add(cp)
-                                mountsPR.add("/")
-                            }
-                        } catch (ex: IOException) {
-                            System.err.println(ex.message)
-                        }
-                    }
-                }
-            }
-        }
 
         public fun getRealPath(absolutePath: String): String {
             val sdcard = Environment.getExternalStorageDirectory().getPath()
@@ -95,7 +37,6 @@ public class FileUtils private constructor() {
         }
 
         public fun getStorageDir(dir: String?): File {
-            //String path = Environment.getExternalStorageDirectory().getPath() + "/" + dir;
             val sdcardRoot: String = getStorageDirPath()
             val file = File("$sdcardRoot/$dir")
             if (!file.exists()) {
@@ -105,18 +46,13 @@ public class FileUtils private constructor() {
         }
 
         public fun getStorageDirPath(): String {
-            var externalFileRootDir: File? = PdfApp.app!!.getExternalFilesDir(null)
-            do {
-                externalFileRootDir =
-                    Objects.requireNonNull<File?>(externalFileRootDir).parentFile
-            } while (Objects.requireNonNull<File?>(externalFileRootDir).absolutePath
-                    .contains("/Android")
-            )
-            var sdcardRoot: String? = null
-            if (null != externalFileRootDir) {
-                sdcardRoot = externalFileRootDir.getPath()
+            if (Environment.MEDIA_MOUNTED == Environment.getExternalStorageState()) {
+                val externalFileRootDir: File? = PdfApp.app!!.getExternalFilesDir(null)
+                if (externalFileRootDir != null) {
+                    return externalFileRootDir.absolutePath
+                }
             }
-            return sdcardRoot!!
+            return PdfApp.app!!.filesDir.absolutePath
         }
 
         public fun getDir(file: File?): String {
@@ -124,7 +60,7 @@ public class FileUtils private constructor() {
                 return ""
             }
             val name = file.getName()
-            return file.getAbsolutePath().substring(0, file.getAbsolutePath().length - name.length)
+            return file.absolutePath.substring(0, file.absolutePath.length - name.length)
         }
 
         public fun getDir(absPath: String?): String {
@@ -145,62 +81,18 @@ public class FileUtils private constructor() {
 
         public fun getFileSize(size: Long): String {
             if (size > 1073741824) {
-                return String.format("%.2f", size / 1073741824.0) + " GB"
+                return String.format(Locale.getDefault(), "%.2f", size / 1073741824.0) + " GB"
             } else if (size > 1048576) {
-                return String.format("%.2f", size / 1048576.0) + " MB"
+                return String.format(Locale.getDefault(), "%.2f", size / 1048576.0) + " MB"
             } else if (size > 1024) {
-                return String.format("%.2f", size / 1024.0) + " KB"
+                return String.format(Locale.getDefault(), "%.2f", size / 1024.0) + " KB"
             } else {
-                return size.toString() + " B"
+                return "$size B"
             }
         }
 
         public fun getFileDate(time: Long): String? {
-            return SimpleDateFormat("dd MMM yyyy").format(time)
-        }
-
-        public fun getAbsolutePath(file: File?): String? {
-            return if (file != null) file.getAbsolutePath() else null
-        }
-
-        public fun getCanonicalPath(file: File?): String? {
-            try {
-                return if (file != null) file.getCanonicalPath() else null
-            } catch (ex: IOException) {
-                return null
-            }
-        }
-
-        public fun invertMountPrefix(fileName: String): String? {
-            run {
-                var i = 0
-                val n: Int = min(aliases.size, mounts.size)
-                while (i < n) {
-                    val alias: String? = aliases.get(i)
-                    val mount: String? = mounts.get(i)
-                    if (fileName == alias) {
-                        return mount
-                    }
-                    if (fileName == mount) {
-                        return alias
-                    }
-                    i++
-                }
-            }
-            var i = 0
-            val n: Int = min(aliasesPR.size, mountsPR.size)
-            while (i < n) {
-                val alias: String = aliasesPR.get(i)
-                val mount: String = mountsPR.get(i)
-                if (fileName.startsWith(alias)) {
-                    return mount + fileName.substring(alias.length)
-                }
-                if (fileName.startsWith(mount)) {
-                    return alias + fileName.substring(mount.length)
-                }
-                i++
-            }
-            return null
+            return SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(time)
         }
 
         public fun getName(absPath: String?): String {
@@ -255,12 +147,11 @@ public class FileUtils private constructor() {
         public fun move(sourceDir: File?, targetDir: File?, fileNames: Array<String>): Int {
             var count = 0
             var processed = 0
-            val updates = max(1, fileNames.size / 20)
 
             var renamed = true
 
             val buf = ByteArray(128 * 1024)
-            var length = 0
+            var length: Int
             for (file in fileNames) {
                 val source = File(sourceDir, file)
                 val target = File(targetDir, file)
@@ -287,13 +178,13 @@ public class FileUtils private constructor() {
                         if (outs != null) {
                             try {
                                 outs.close()
-                            } catch (ignored: IOException) {
+                            } catch (_: IOException) {
                             }
                         }
                         if (ins != null) {
                             try {
                                 ins.close()
-                            } catch (ignored: IOException) {
+                            } catch (_: IOException) {
                             }
                         }
                     }
@@ -316,33 +207,14 @@ public class FileUtils private constructor() {
             }
         }
 
-        public fun getDiskCacheDir(context: Context, uniqueName: String?): File {
-            val cachePath = if (Environment.MEDIA_MOUNTED == Environment
-                    .getExternalStorageState()
-            ) {
-                getExternalCacheDir(context).path
-            } else {
-                context.cacheDir.path
-            }
-
-            return File(cachePath + File.separator + uniqueName)
-        }
-
-        /**
-         * Get the external app cache directory
-         *
-         * @param context The [Context] to use
-         * @return The external cache directory
-         */
         public fun getExternalCacheDir(context: Context): File {
-            val mCacheDir = context.getExternalCacheDir()
+            val mCacheDir = context.externalCacheDir
             if (mCacheDir != null) {
                 return mCacheDir
             }
 
-            /* Before Froyo we need to construct the external cache dir ourselves */
-            val dir = "/Android/data/" + context.getPackageName() + "/cache/"
-            return File(Environment.getExternalStorageDirectory().getPath() + dir)
+            val dir = "/Android/data/" + context.packageName + "/cache/"
+            return File(Environment.getExternalStorageDirectory().path + dir)
         }
 
         public fun cleanDir(dir: File) {
@@ -396,14 +268,14 @@ public class FileUtils private constructor() {
                 val md = MessageDigest.getInstance("MD5")
                 val bytes = md.digest(data.toByteArray())
                 return bytesToHexString(bytes)
-            } catch (e: NoSuchAlgorithmException) {
+            } catch (_: NoSuchAlgorithmException) {
             }
             return data
         }
 
         private fun bytesToHexString(src: ByteArray?): String? {
             val stringBuilder = StringBuilder("")
-            if (src == null || src.size <= 0) {
+            if (src == null || src.isEmpty()) {
                 return null
             }
             for (i in src.indices) {

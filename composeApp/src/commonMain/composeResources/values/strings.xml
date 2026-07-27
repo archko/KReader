@@ -34,6 +34,7 @@
     <string name="page_number">Page %d</string>
     <string name="current_page">%d/%d</string>
     <string name="document_open_failed">Failed to open document</string>
+    <string name="document_open_permission">Check permission</string>
     <string name="close">Close</string>
     <string name="browse_directory_title">Browse Directory</string>
     <string name="browse_directory_message">Do you want to browse the entire directory?</string>
@@ -43,6 +44,10 @@
     <string name="incorrect_password">Incorrect password. Please try again.</string>
     <string name="ok">OK</string>
     <string name="unsupported_document">Unsupported document: %s</string>
+
+    <string name="no_storage_permission">Files can only be opened temporarily without storage permission.</string>
+
+    <string name="album">Album</string>
 
     <string name="select_result">Selection: </string>
     <string name="select_copy">Copy</string>

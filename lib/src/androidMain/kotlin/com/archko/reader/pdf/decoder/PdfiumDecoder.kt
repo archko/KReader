@@ -1,7 +1,9 @@
 package com.archko.reader.pdf.decoder
 
+import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
+import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
@@ -17,6 +19,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.PageSizeBean
@@ -30,7 +33,10 @@ import java.io.File
  * @author: archko 2026/2/13 :22:18
  * PdfiumDecoder使用Android SDK内置的PdfRenderer进行PDF渲染
  */
-public class PdfiumDecoder(public val file: File) : ImageDecoder {
+public class PdfiumDecoder(
+    public val documentInfo: DocumentInfo,
+    private val contentResolver: ContentResolver? = null
+) : ImageDecoder {
 
     private var pdfRenderer: PdfRenderer? = null
     private var parcelFileDescriptor: ParcelFileDescriptor? = null
@@ -61,7 +67,6 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     // 链接缓存 - Android PdfRenderer不支持链接解析
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
@@ -136,35 +141,41 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
     }
 
     init {
-        // 检查文件是否存在
-        if (!file.exists()) {
-            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
-        }
-
-        // 检查文件是否可读
-        if (!file.canRead()) {
-            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
-        }
+        val docPath = documentInfo.path
 
         try {
-            filePath = file.absolutePath
-            // Android PdfRenderer不支持reflow功能
-            if (FileTypeUtils.isReflowable(file.absolutePath)) {
+            if (contentResolver != null && documentInfo.hasUri()) {
+                val uri = Uri.parse(documentInfo.uri)
+                parcelFileDescriptor = contentResolver.openFileDescriptor(uri, "r")
+                if (parcelFileDescriptor == null) {
+                    throw RuntimeException("无法打开URI: ${documentInfo.uri}")
+                }
+            } else if (docPath != null) {
+                val file = File(docPath)
+                if (!file.exists()) {
+                    throw IllegalArgumentException("文档文件不存在: $docPath")
+                }
+                if (!file.canRead()) {
+                    throw SecurityException("无法读取文档文件: $docPath")
+                }
+                parcelFileDescriptor =
+                    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            } else {
+                throw IllegalArgumentException("文档信息不完整: 无路径和URI")
+            }
+
+            if (FileTypeUtils.isReflowable(docPath ?: "")) {
                 println("PdfiumDecoder: Android PdfRenderer不支持reflow功能，将使用普通模式")
             }
 
-            // 打开ParcelFileDescriptor
-            parcelFileDescriptor =
-                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
             pdfRenderer = PdfRenderer(parcelFileDescriptor!!)
 
-            // Android PdfRenderer不支持密码保护
             needsPassword = false
             isAuthenticated = true
 
             initializeDocument()
         } catch (e: Exception) {
-            throw RuntimeException("无法打开文档: ${file.absolutePath}, 错误: ${e.message}", e)
+            throw RuntimeException("无法打开文档: ${docPath ?: ""}, 错误: ${e.message}", e)
         }
     }
 
@@ -202,7 +213,7 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
     private fun initPageSizeBean() {
         try {
             val count: Int = pageCount
-            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize)
             println("PdfiumDecoder.initPageSizeBean:$psb")
 
             if (null != psb && psb.list != null && psb.list!!.size == count) {
@@ -242,7 +253,7 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        val path = file.absolutePath
+        val path = documentInfo.path ?: documentInfo.uri ?: return
         try {
             if (null != ImageCache.acquirePage(path)) {
                 return
@@ -310,7 +321,11 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
     override fun close() {
         if (cachePage && !aPageList.isNullOrEmpty()) {
             println("PdfiumDecoder.close:${aPageList.size}")
-            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+            try {
+                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize, aPageList)
+            } catch (e: Exception) {
+                println("PdfiumDecoder.close: 保存缓存失败: ${e.message}")
+            }
         }
 
         // 清理页面缓存
@@ -362,7 +377,11 @@ public class PdfiumDecoder(public val file: File) : ImageDecoder {
 
             // 保存到缓存
             if (cachePage && aPageList!!.isNotEmpty()) {
-                APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+                try {
+                    APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize, aPageList)
+                } catch (e: Exception) {
+                    println("PdfiumDecoder: 缓存页面尺寸失败: ${e.message}")
+                }
             }
         }
         println("PdfiumDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")

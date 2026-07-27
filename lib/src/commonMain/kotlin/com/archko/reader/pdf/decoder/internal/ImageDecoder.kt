@@ -22,7 +22,6 @@ public interface ImageDecoder {
     public var outlineItems: List<Item>?
     public val aPageList: MutableList<APage>?
     public var cacheBean: ReflowCacheBean?
-    public var filePath: String?
 
     /** Size of the full image, without any scaling applied. */
     public var imageSize: IntSize

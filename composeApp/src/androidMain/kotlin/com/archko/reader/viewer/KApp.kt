@@ -31,6 +31,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BackupViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
@@ -60,15 +61,14 @@ fun KApp(
     fontViewModel: FontViewModel,
     bookmarkViewModel: BookmarkViewModel,
     readingStatsViewModel: ReadingStatsViewModel,
-    externalPath: String? = null
+    externalDocument: DocumentInfo? = null,
+    hasStoragePermission: Boolean = false
 ) {
-    // 在顶层管理 externalPath 状态，确保关闭后不会重新打开
-    var currentExternalPath by remember { mutableStateOf(externalPath) }
+    var currentExternalDocument by remember { mutableStateOf(externalDocument) }
 
-    // 只在首次接收到 externalPath 时设置
-    LaunchedEffect(externalPath) {
-        if (externalPath != null && currentExternalPath == null) {
-            currentExternalPath = externalPath
+    LaunchedEffect(externalDocument) {
+        if (externalDocument != null && currentExternalDocument == null) {
+            currentExternalDocument = externalDocument
         }
     }
 
@@ -94,11 +94,11 @@ fun KApp(
                             bookmarkViewModel,
                             readingStatsViewModel,
                             modifier = Modifier,
-                            externalPath = currentExternalPath,
+                            externalDocument = currentExternalDocument,
                             onExternalPathConsumed = {
-                                // 当外部路径被处理后，清除它以防止重复打开
-                                currentExternalPath = null
-                            }
+                                currentExternalDocument = null
+                            },
+                            hasStoragePermission = hasStoragePermission
                         )
                     }
                 }
@@ -116,8 +116,9 @@ fun MainContainer(
     bookmarkViewModel: BookmarkViewModel,
     readingStatsViewModel: ReadingStatsViewModel,
     modifier: Modifier = Modifier,
-    externalPath: String? = null,
-    onExternalPathConsumed: () -> Unit = {}
+    externalDocument: DocumentInfo? = null,
+    onExternalPathConsumed: () -> Unit = {},
+    hasStoragePermission: Boolean = false
 ) {
     val nestedNavController = rememberKNavController()
     val navBackStackEntry by nestedNavController.navController.currentBackStackEntryAsState()
@@ -149,8 +150,9 @@ fun MainContainer(
                 readingStatsViewModel,
                 modifier = Modifier.consumeWindowInsets(padding),
                 onShowBottomBarChanged = { showBottomBar = it },
-                externalPath = externalPath,
-                onExternalPathConsumed = onExternalPathConsumed
+                externalDocument = externalDocument,
+                onExternalPathConsumed = onExternalPathConsumed,
+                hasStoragePermission = hasStoragePermission
             )
         }
     }
@@ -165,8 +167,9 @@ fun NavGraphBuilder.addHomeGraph(
     readingStatsViewModel: ReadingStatsViewModel,
     modifier: Modifier = Modifier,
     onShowBottomBarChanged: (Boolean) -> Unit = {},
-    externalPath: String? = null,
-    onExternalPathConsumed: () -> Unit = {}
+    externalDocument: DocumentInfo? = null,
+    onExternalPathConsumed: () -> Unit = {},
+    hasStoragePermission: Boolean = false
 ) {
     composable(HomeSections.FILE.route) { from ->
         FileScreen(
@@ -177,8 +180,9 @@ fun NavGraphBuilder.addHomeGraph(
             aiViewModel,
             modifier = modifier,
             onShowBottomBarChanged = onShowBottomBarChanged,
-            externalPath = externalPath,
-            onExternalPathConsumed = onExternalPathConsumed
+            externalDocument = externalDocument,
+            onExternalPathConsumed = onExternalPathConsumed,
+            hasStoragePermission = hasStoragePermission
         )
     }
     composable(HomeSections.SETTING.route) { from ->

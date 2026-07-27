@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import kreader.composeapp.generated.resources.Res
 import kreader.composeapp.generated.resources.close
 import kreader.composeapp.generated.resources.document_open_failed
+import kreader.composeapp.generated.resources.document_open_permission
 import kreader.composeapp.generated.resources.loading
 import kreader.composeapp.generated.resources.support_format
 import org.jetbrains.compose.resources.stringResource
@@ -63,6 +64,13 @@ fun ErrorContent(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(Res.string.document_open_permission),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(

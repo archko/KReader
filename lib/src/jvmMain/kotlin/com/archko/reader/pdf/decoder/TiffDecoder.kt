@@ -12,6 +12,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
@@ -21,7 +22,7 @@ import java.io.File
 /**
  * @author: archko 2025/8/9 :6:26
  */
-public class TiffDecoder(public val file: File) : ImageDecoder {
+public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     public override var pageCount: Int = 1
 
@@ -39,15 +40,16 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var tiffLoader: TiffLoader? = null
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     init {
+        val docPath = documentInfo.path
+            ?: throw IllegalArgumentException("文档信息不完整: 无路径")
+        val file = File(docPath)
         if (!file.exists()) {
-            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
+            throw IllegalArgumentException("文档文件不存在: $docPath")
         }
-
         if (!file.canRead()) {
-            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
+            throw SecurityException("无法读取文档文件: $docPath")
         }
 
         tiffLoader = TiffLoader()
@@ -62,12 +64,12 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
      */
     private fun cacheCoverIfNeeded() {
         try {
-            if (null != ImageCache.acquirePage(file.absolutePath)) {
+            if (null != ImageCache.acquirePage(documentInfo.path ?: "")) {
                 return
             }
             val bitmap = renderCoverPage()
 
-            CustomImageFetcher.cacheBitmap(bitmap, file.absolutePath)
+            CustomImageFetcher.cacheBitmap(bitmap, documentInfo.path ?: "")
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
         }
@@ -154,7 +156,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
     private fun prepareSizes(): List<Size> {
         val list = mutableListOf<Size>()
 
-        tiffLoader!!.openTiff(file.absolutePath)
+        tiffLoader!!.openTiff(documentInfo.path ?: "")
         val tiffInfo = tiffLoader!!.tiffInfo
         tiffInfo?.run {
             val width = tiffInfo.width
@@ -200,7 +202,7 @@ public class TiffDecoder(public val file: File) : ImageDecoder {
                 return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${file.absolutePath}: $e")
+            println("renderPageRegion error for file ${documentInfo.path ?: ""}: $e")
             CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }

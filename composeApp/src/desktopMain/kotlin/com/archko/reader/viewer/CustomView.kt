@@ -28,6 +28,7 @@ import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.SpeechService
@@ -59,6 +60,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * @author: archko 2025/7/23 :09:09
@@ -332,7 +334,7 @@ private fun ToolbarContent(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomView(
-    paths: List<String>,
+    documents: List<DocumentInfo>,
     progressPage: Int? = null,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
@@ -399,14 +401,18 @@ fun CustomView(
     val currentSearchPageIndex = searchState.currentResult?.pageIndex
 
     // 多文件支持
-    val currentPath = paths.getOrNull(0) ?: paths.first()
+    val currentDoc = documents.getOrNull(0) ?: documents.first()
+    val currentPath = currentDoc.path ?: currentDoc.uri ?: ""
+    // 兼容性：从documents中提取路径列表供旧代码使用
+    val paths = documents.map { it.path ?: it.uri ?: "" }
 
     val speechService: SpeechService = remember { TtsQueueService() }
 
     LaunchedEffect(Unit) {
         // 加载书签
-        if (paths.size == 1 && FileTypeUtils.isDocumentFile(paths[0])) {
-            bookmarkViewModel.loadBookmarks(paths[0])
+        val firstPath = documents.getOrNull(0)?.path
+        if (documents.size == 1 && firstPath != null && FileTypeUtils.isDocumentFile(firstPath)) {
+            bookmarkViewModel.loadBookmarks(firstPath)
         }
     }
 
@@ -417,7 +423,7 @@ fun CustomView(
     ) {
         LaunchedEffect(currentPath) {
             withContext(Dispatchers.IO) {
-                delay(20)
+                delay(20.milliseconds)
                 println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
                 if (!FileTypeUtils.isDocumentFile(currentPath)
                     && !FileTypeUtils.isImageFile(currentPath)
@@ -431,17 +437,15 @@ fun CustomView(
                     val newDecoder: ImageDecoder? = if (viewportSize == IntSize.Zero) {
                         null
                     } else {
-                        if (paths.size > 1) {
+                        if (documents.size > 1) {
                             isCrop = false
-                            // 多文件模式：创建ImagesDecoder
-                            val files = paths.map { File(it) }
-                            ImagesDecoder(files)
+                            ImagesDecoder(documents)
                         } else {
                             if (FileTypeUtils.isDjvuFile(currentPath)) {
-                                val djvuDecoder = DjvuDecoder(File(currentPath))
+                                val djvuDecoder = DjvuDecoder(currentDoc)
                                 djvuDecoder
                             } else if (FileTypeUtils.isDocumentFile(currentPath)) {
-                                val pdfDecoder = PdfDecoder(File(currentPath))
+                                val pdfDecoder = PdfDecoder(currentDoc)
 
                                 if (pdfDecoder.needsPassword) {
                                     showPasswordDialog = true
@@ -454,11 +458,11 @@ fun CustomView(
                                 pdfDecoder
                             } else if (FileTypeUtils.isTiffFile(currentPath)) {
                                 isCrop = false
-                                val tiffDecoder = TiffDecoder(File(currentPath))
+                                val tiffDecoder = TiffDecoder(currentDoc)
                                 tiffDecoder
                             } else {
                                 isCrop = false
-                                ImagesDecoder(listOf(File(currentPath)))
+                                ImagesDecoder(documents)
                             }
                         }
                     }
@@ -803,7 +807,7 @@ fun CustomView(
                     onStartSpeaking = { page, dec, binder ->
                         scope.launch {
                             speakingPageIndex = page
-                            speakFromCurrentPage(page, decoder!!, speechService)
+                            speakFromCurrentPage(page, decoder!!, speechService, currentPath)
                             if (!speechService.isSpeaking()) {
                                 showQueueDialog = false
                                 speakingPageIndex = null
@@ -1169,7 +1173,8 @@ fun CustomView(
 suspend fun speakFromCurrentPage(
     startPage: Int,
     imageDecoder: ImageDecoder,
-    speechService: SpeechService
+    speechService: SpeechService,
+    docPath: String = ""
 ) {
     if (speechService.isSpeaking()) {
         println("TTS: 正在朗读，停止当前朗读")
@@ -1186,7 +1191,7 @@ suspend fun speakFromCurrentPage(
             if (cacheBean == null) {
                 cacheBean = ReflowCacheLoader.loadReflowFromFile(
                     totalPages,
-                    imageDecoder.filePath
+                    docPath
                 )
             }
 
@@ -1228,7 +1233,7 @@ suspend fun speakFromCurrentPage(
 
                     cacheBean = ReflowCacheLoader.saveReflowToFile(
                         totalPages,
-                        imageDecoder.filePath,
+                        docPath,
                         allTexts
                     )
                     imageDecoder.cacheBean = cacheBean

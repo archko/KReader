@@ -12,6 +12,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
@@ -24,9 +25,9 @@ import java.io.File
  * 图片文件解码器，支持多个图片文件
  * @author: archko 2025/1/20
  */
-public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
+public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDecoder {
 
-    public override var pageCount: Int = files.size
+    public override var pageCount: Int = documents.size
 
     // 私有变量存储原始页面尺寸
     public override var originalPageSizes: List<Size> = listOf()
@@ -45,7 +46,6 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     private val regionDecoders = mutableMapOf<Int, Document>()
     private val maxRegionDecoders = 10
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     // 缓存HeifLoader，避免重复创建，限制数量为10个
     private val heifLoaders = mutableMapOf<Int, HeifLoader>()
@@ -54,24 +54,22 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     private val isHeifFile = mutableListOf<Boolean>()
 
     init {
-        if (files.isEmpty()) {
+        if (documents.isEmpty()) {
             throw IllegalArgumentException("图片文件列表不能为空")
         }
 
         // 检查所有文件是否存在且可读
-        files.forEach { file ->
-            if (!file.exists()) {
-                throw IllegalArgumentException("图片文件不存在: ${file.absolutePath}")
+        documents.forEach { doc ->
+            val path = doc.path
+            if (path != null) {
+                val file = File(path)
+                if (!file.exists()) {
+                    throw IllegalArgumentException("图片文件不存在: $path")
+                }
+                if (!file.canRead()) {
+                    throw SecurityException("无法读取图片文件: $path")
+                }
             }
-            if (!file.canRead()) {
-                throw SecurityException("无法读取图片文件: ${file.absolutePath}")
-            }
-        }
-
-        // 检测文件类型
-        files.forEach { file ->
-            val isHeif = FileTypeUtils.isHeifFormat(file)
-            isHeifFile.add(isHeif)
         }
 
         // 初始化原始页面尺寸
@@ -83,10 +81,10 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        if (files.size > 1) {
+        if (documents.size > 1) {
             return
         }
-        val path = files[0].absolutePath
+        val path = documents[0].path ?: documents[0].uri ?: ""
         try {
             if (null != ImageCache.acquirePage(path)) {
                 return
@@ -103,7 +101,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
      * 渲染封面页面，根据高宽比进行特殊处理
      */
     private fun renderCoverPage(index: Int): ImageBitmap {
-        if (index >= files.size) {
+        if (index >= documents.size) {
             return ImageBitmap(160, 200, ImageBitmapConfig.Rgb565)
         }
 
@@ -195,7 +193,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 }
             }
         } catch (e: Exception) {
-            println("renderImageAtScale error for file ${files[index].absolutePath}: $e")
+            println("renderImageAtScale error for file ${documents[index].absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -253,12 +251,12 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         val list = mutableListOf<Size>()
         var totalHeight = 0
 
-        for (i in files.indices) {
-            val file = files[i]
+        for (i in documents.indices) {
+            val doc = documents[i]
             val size = if (isHeifFile[i]) {
                 // 使用HeifLoader获取尺寸
                 val heifLoader = HeifLoader()
-                heifLoader.openHeif(file.absolutePath)
+                heifLoader.openHeif((documents[i].path ?: documents[i].uri ?: ""))
                 val heifInfo = heifLoader.heifInfo
                 heifLoader.close()
 
@@ -276,7 +274,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 }
             } else {
                 // 使用MuPDF获取尺寸
-                val doc = Document.openDocument(file.absolutePath)
+                val doc = Document.openDocument((documents[i].path ?: documents[i].uri ?: ""))
                 val page = doc.loadPage(0) // 图片文件只有一页，索引为0
                 val bounds = page.bounds
                 val pageSize = Size(
@@ -305,7 +303,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
-        if (index >= files.size) {
+        if (index >= documents.size) {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
 
@@ -385,7 +383,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                 }
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${files[index].absolutePath}: $e")
+            println("renderPageRegion error for file ${documents[index].absolutePath}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -491,7 +489,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
      * 获取或创建MuPDF Document，限制缓存数量为10个
      */
     private fun getRegionDecoder(index: Int): Document? {
-        if (index >= files.size) return null
+        if (index >= documents.size) return null
 
         // 如果缓存已满且当前索引不在缓存中，移除最旧的项
         if (regionDecoders.size >= maxRegionDecoders && !regionDecoders.containsKey(index)) {
@@ -502,8 +500,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         }
 
         return regionDecoders.getOrPut(index) {
-            val file = files[index]
-            return Document.openDocument(file.absolutePath)
+            val file = documents[index]
+            return Document.openDocument((documents[i].path ?: documents[i].uri ?: ""))
         }
     }
 
@@ -511,7 +509,7 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
      * 获取或创建HeifLoader，限制缓存数量为10个
      */
     private fun getHeifLoader(index: Int): HeifLoader? {
-        if (index >= files.size) return null
+        if (index >= documents.size) return null
 
         // 如果缓存已满且当前索引不在缓存中，移除最旧的项
         if (heifLoaders.size >= maxRegionDecoders && !heifLoaders.containsKey(index)) {
@@ -522,9 +520,9 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         }
 
         return heifLoaders.getOrPut(index) {
-            val file = files[index]
+            val file = documents[index]
             val loader = HeifLoader()
-            loader.openHeif(file.absolutePath)
+            loader.openHeif((documents[i].path ?: documents[i].uri ?: ""))
             return loader
         }
     }

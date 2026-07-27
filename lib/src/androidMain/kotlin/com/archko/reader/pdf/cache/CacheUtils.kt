@@ -11,10 +11,11 @@ public actual fun getStoragePath(): String {
     return FileUtils.getStoragePath("")
 }
 
-public actual fun getPageCacheFile(file: File): File {
+public actual fun getPageCacheFile(path: String): File {
+    val name = path.substringAfterLast("/").substringBeforeLast(".")
     val saveFile = File(
         FileUtils.getStorageDirPath() + "/amupdf"
-                + File.separator + "page" + File.separator + file.nameWithoutExtension + ".json"
+                + File.separator + "page" + File.separator + name + ".json"
     )
     return saveFile
 }

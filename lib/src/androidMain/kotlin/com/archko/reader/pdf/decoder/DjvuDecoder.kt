@@ -1,6 +1,9 @@
 package com.archko.reader.pdf.decoder
 
+import android.content.ContentResolver
 import android.graphics.Bitmap
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -15,6 +18,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.PageSizeBean
@@ -27,7 +31,10 @@ import java.io.File
 /**
  * @author: archko 2025/11/9 :6:26
  */
-public class DjvuDecoder(public val file: File) : ImageDecoder {
+public class DjvuDecoder(
+    public val documentInfo: DocumentInfo,
+    private val contentResolver: ContentResolver? = null
+) : ImageDecoder {
 
     public override var pageCount: Int = 0
 
@@ -47,7 +54,6 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
@@ -95,28 +101,43 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     init {
-        if (!file.exists()) {
-            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
-        }
-
-        if (!file.canRead()) {
-            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
-        }
-
-        filePath = file.absolutePath
+        val docPath = documentInfo.path
         djvuLoader = DjvuLoader()
 
-        // 先打开文件获取页面数
-        djvuLoader!!.openDjvu(file.absolutePath)
+        if (contentResolver != null && documentInfo.hasUri()) {
+            try {
+                val uri = Uri.parse(documentInfo.uri)
+                val pfd = contentResolver.openFileDescriptor(uri, "r")
+                if (pfd != null) {
+                    val fd = pfd.detachFd()
+                    djvuLoader!!.openDjvuFd(fd)
+                    pfd.close()
+                } else {
+                    throw RuntimeException("无法打开URI: ${documentInfo.uri}")
+                }
+            } catch (e: Exception) {
+                throw RuntimeException("无法打开文档: $docPath, 错误: ${e.message}", e)
+            }
+        } else if (docPath != null) {
+            val file = File(docPath)
+            if (!file.exists()) {
+                throw IllegalArgumentException("文档文件不存在: $docPath")
+            }
+            if (!file.canRead()) {
+                throw SecurityException("无法读取文档文件: $docPath")
+            }
+            djvuLoader!!.openDjvu(docPath)
+        } else {
+            throw IllegalArgumentException("文档信息不完整: 无路径和URI")
+        }
+
         val djvuInfo = djvuLoader!!.djvuInfo
         if (djvuInfo != null) {
             pageCount = djvuInfo.pages
         }
 
-        // 先尝试从缓存加载页面尺寸和切边数据
         initPageSizeBean()
 
-        // 如果缓存不存在或不完整，从文档加载页面尺寸
         if (originalPageSizes.isEmpty()) {
             originalPageSizes = prepareSizes()
         }
@@ -128,7 +149,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     private fun initPageSizeBean() {
         try {
             val count: Int = pageCount
-            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize)
             println("DjvuDecoder.initPageSizeBean:$psb")
 
             if (null != psb && psb.list != null && psb.list!!.size == count) {
@@ -168,7 +189,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        val path = file.absolutePath
+        val path = documentInfo.path ?: documentInfo.uri ?: return
         try {
             if (null == djvuLoader || null != ImageCache.acquirePage(path)) {
                 return
@@ -232,7 +253,11 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         djvuLoader?.close()
         if (cachePage && aPageList.isNotEmpty()) {
             println("DjvuDecoder.close:${aPageList.size}")
-            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+            try {
+                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize, aPageList)
+            } catch (e: Exception) {
+                println("DjvuDecoder.close: 保存缓存失败: ${e.message}")
+            }
         }
 
         linksCache.clear()
@@ -250,7 +275,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         var totalHeight = 0
         println("DjVu document has $pageCount pages")
 
-        for (i in 0..pageCount) {
+        for (i in 0 until pageCount) {
             val pageInfo = djvuLoader!!.getPageInfo(i)
             if (pageInfo != null) {
                 val width = pageInfo.width
@@ -273,7 +298,11 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
         // 保存到缓存
         if (cachePage && aPageList.isNotEmpty()) {
-            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+            try {
+                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize, aPageList)
+            } catch (e: Exception) {
+                println("DjvuDecoder: 缓存页面尺寸失败: ${e.message}")
+            }
         }
 
         println("DjvuDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")
@@ -389,7 +418,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
             bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${file.absolutePath}: $e")
+            println("renderPageRegion error: ${documentInfo.path ?: documentInfo.uri ?: ""}, $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }

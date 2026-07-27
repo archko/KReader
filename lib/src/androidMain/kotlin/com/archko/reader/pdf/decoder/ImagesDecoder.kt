@@ -1,10 +1,14 @@
 package com.archko.reader.pdf.decoder
 
+import android.content.ContentResolver
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
+import android.net.Uri
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
@@ -12,10 +16,12 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
+import android.os.ParcelFileDescriptor
 import java.io.File
 import java.io.FileInputStream
 
@@ -23,9 +29,12 @@ import java.io.FileInputStream
  * 图片文件解码器，支持多个图片文件
  * @author: archko 2025/1/20
  */
-public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
+public class ImagesDecoder(
+    private val documents: List<DocumentInfo>,
+    private val contentResolver: ContentResolver? = null
+) : ImageDecoder {
 
-    public override var pageCount: Int = files.size
+    public override var pageCount: Int = documents.size
 
     // 私有变量存储原始页面尺寸
     public override var originalPageSizes: List<Size> = listOf()
@@ -44,20 +53,25 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
     private val regionDecoders = mutableMapOf<Int, BitmapRegionDecoder>()
     private val maxRegionDecoders = 10
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     init {
-        if (files.isEmpty()) {
+        if (documents.isEmpty()) {
             throw IllegalArgumentException("图片文件列表不能为空")
         }
 
-        // 检查所有文件是否存在且可读
-        files.forEach { file ->
-            if (!file.exists()) {
-                throw IllegalArgumentException("图片文件不存在: ${file.absolutePath}")
-            }
-            if (!file.canRead()) {
-                throw SecurityException("无法读取图片文件: ${file.absolutePath}")
+        // 检查所有文件（仅路径模式下）
+        if (contentResolver == null) {
+            documents.forEach { doc ->
+                val path = doc.path
+                if (path != null) {
+                    val file = File(path)
+                    if (!file.exists()) {
+                        throw IllegalArgumentException("图片文件不存在: $path")
+                    }
+                    if (!file.canRead()) {
+                        throw SecurityException("无法读取图片文件: $path")
+                    }
+                }
             }
         }
 
@@ -114,21 +128,32 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         return originalPageSizes[index]
     }
 
+    private fun getImageBounds(index: Int): Pair<Int, Int> {
+        val doc = documents[index]
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        if (contentResolver != null && doc.hasUri()) {
+            try {
+                val uri = Uri.parse(doc.uri)
+                contentResolver.openInputStream(uri)?.use { inputStream ->
+                    BitmapFactory.decodeStream(inputStream, null, options)
+                }
+            } catch (e: Exception) {
+                println("Failed to decode bounds for ${doc.uri}: $e")
+            }
+        } else if (doc.path != null) {
+            BitmapFactory.decodeFile(doc.path, options)
+        }
+        return Pair(options.outWidth, options.outHeight)
+    }
+
     private fun prepareSizes(): List<Size> {
         val list = mutableListOf<Size>()
         var totalHeight = 0
 
-        for (i in files.indices) {
-            val file = files[i]
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-
-            BitmapFactory.decodeFile(file.absolutePath, options)
-
-            val width = options.outWidth
-            val height = options.outHeight
-
+        for (i in documents.indices) {
+            val (width, height) = getImageBounds(i)
             val size = Size(
                 width,
                 height,
@@ -150,21 +175,17 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
-        if (index >= files.size) {
+        if (index >= documents.size) {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
-
-        val file = files[index]
 
         return try {
             // 部分区域：使用BitmapRegionDecoder
             val regionDecoder = getRegionDecoder(index)
             if (regionDecoder != null) {
-                // 计算偏移量（基于缩放后尺寸）
                 val patchX = region.left.toInt()
                 val patchY = region.top.toInt()
 
-                // 计算原始图片中的区域（需要转换为原始坐标）
                 val originalSize = originalPageSizes[index]
                 val scaledRegion = android.graphics.Rect(
                     (patchX / scale).toInt().coerceIn(0, originalSize.width),
@@ -173,26 +194,22 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
                     ((patchY + outHeight) / scale).toInt().coerceIn(0, originalSize.height)
                 )
 
-                // 确保区域有效
                 if (scaledRegion.width() > 0 && scaledRegion.height() > 0) {
-                    // 解码区域
                     val options = BitmapFactory.Options().apply {
                         inSampleSize =
                             calculateInSampleSizeForRegion(scaledRegion, outWidth, outHeight)
                     }
 
                     val regionBitmap = regionDecoder.decodeRegion(scaledRegion, options)
-                    //println("ImagesDecoder.renderPageRegion:原始=${originalSize.width}x${originalSize.height}, 偏移=($patchX,$patchY), 区域=${scaledRegion.width()}x${scaledRegion.height()}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 采样=${options.inSampleSize}, 结果=${regionBitmap.width}x${regionBitmap.height}")
                     regionBitmap.asImageBitmap()
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 }
             } else {
-                // 如果无法创建region decoder，返回默认图片
                 ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${file.absolutePath}: $e")
+            println("renderPageRegion error for index $index: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -215,7 +232,6 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
         outHeight: Int,
         crop: Boolean
     ): ImageBitmap {
-        // 整张图片：使用传入的scale参数，就像PdfDecoder一样
         val originalSize = originalPageSizes[aPage.index]
         val scale = if (aPage.width > 0) {
             outWidth.toFloat() / aPage.getWidth(crop)
@@ -223,19 +239,17 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
             1f
         }
 
-        // 使用传入的scale参数计算目标尺寸
         val targetWidth = (originalSize.width * scale).toInt()
         val targetHeight = (originalSize.height * scale).toInt()
 
         val options = BitmapFactory.Options().apply {
-            inSampleSize = calculateInSampleSize(files[aPage.index], targetWidth, targetHeight)
+            inSampleSize = calculateInSampleSize(targetWidth, targetHeight)
         }
 
         println("ImagesDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 目标=$targetWidth-$targetHeight")
 
-        val bitmap = BitmapFactory.decodeFile(files[aPage.index].absolutePath, options)
+        val bitmap = decodeImage(aPage.index, options)
         if (bitmap != null) {
-            //println("ImagesDecoder.renderPage:原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale, 目标=${targetWidth}x${targetHeight}, 采样=${options.inSampleSize}, 结果=${bitmap.width}x${bitmap.height}")
             return bitmap.asImageBitmap()
         } else {
             return ImageBitmap(targetWidth, targetHeight, ImageBitmapConfig.Rgb565)
@@ -246,9 +260,8 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
      * 获取或创建BitmapRegionDecoder，限制缓存数量为10个
      */
     private fun getRegionDecoder(index: Int): BitmapRegionDecoder? {
-        if (index >= files.size) return null
+        if (index >= documents.size) return null
 
-        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
         if (regionDecoders.size >= maxRegionDecoders && !regionDecoders.containsKey(index)) {
             val oldestIndex = regionDecoders.keys.first()
             val oldestDecoder = regionDecoders.remove(oldestIndex)
@@ -258,39 +271,55 @@ public class ImagesDecoder(private val files: List<File>) : ImageDecoder {
 
         return regionDecoders.getOrPut(index) {
             try {
-                val file = files[index]
-                val inputStream = FileInputStream(file)
-                BitmapRegionDecoder.newInstance(inputStream, false)
+                val doc = documents[index]
+                if (contentResolver != null && doc.hasUri()) {
+                    val uri = Uri.parse(doc.uri)
+                    val pfd = contentResolver.openFileDescriptor(uri, "r")
+                    if (pfd != null) {
+                        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { inputStream ->
+                            BitmapRegionDecoder.newInstance(inputStream, false)
+                        }
+                    } else {
+                        null
+                    }
+                } else if (doc.path != null) {
+                    val inputStream = FileInputStream(File(doc.path))
+                    BitmapRegionDecoder.newInstance(inputStream, false)
+                } else {
+                    null
+                }
             } catch (e: Exception) {
-                println("Failed to create BitmapRegionDecoder for file ${files[index].absolutePath}: $e")
+                println("Failed to create BitmapRegionDecoder for index $index: $e")
                 null
             } ?: throw RuntimeException("Cannot create BitmapRegionDecoder")
+        }
+    }
+
+    private fun decodeImage(index: Int, options: BitmapFactory.Options): Bitmap? {
+        val doc = documents[index]
+        return if (contentResolver != null && doc.hasUri()) {
+            try {
+                val uri = Uri.parse(doc.uri)
+                contentResolver.openInputStream(uri)?.use { inputStream ->
+                    BitmapFactory.decodeStream(inputStream, null, options)
+                }
+            } catch (e: Exception) {
+                println("Failed to decode image from URI ${doc.uri}: $e")
+                null
+            }
+        } else if (doc.path != null) {
+            BitmapFactory.decodeFile(doc.path, options)
+        } else {
+            null
         }
     }
 
     /**
      * 计算采样大小以优化内存使用
      */
-    private fun calculateInSampleSize(file: File, reqWidth: Int, reqHeight: Int): Int {
-        val options = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-
-        BitmapFactory.decodeFile(file.absolutePath, options)
-
-        val height = options.outHeight
-        val width = options.outWidth
+    private fun calculateInSampleSize(reqWidth: Int, reqHeight: Int): Int {
         var inSampleSize = 1
-
-        if (height > reqHeight || width > reqWidth) {
-            val halfHeight = height / 2
-            val halfWidth = width / 2
-
-            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                inSampleSize *= 2
-            }
-        }
-
+        if (reqHeight <= 0 || reqWidth <= 0) return inSampleSize
         return inSampleSize
     }
 

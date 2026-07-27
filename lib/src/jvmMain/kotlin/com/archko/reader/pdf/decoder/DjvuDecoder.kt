@@ -13,6 +13,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.PageSizeBean
@@ -26,7 +27,7 @@ import java.io.File
 /**
  * @author: archko 2025/11/9 :6:26
  */
-public class DjvuDecoder(public val file: File) : ImageDecoder {
+public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     public override var pageCount: Int = 0
 
@@ -46,7 +47,6 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     private var pageSizeBean: PageSizeBean? = null
     private var cachePage = true
     public override var cacheBean: ReflowCacheBean? = null
-    public override var filePath: String? = null
 
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
@@ -94,19 +94,20 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     }
 
     init {
+        val docPath = documentInfo.path
+            ?: throw IllegalArgumentException("文档信息不完整: 无路径")
+        val file = File(docPath)
         if (!file.exists()) {
-            throw IllegalArgumentException("文档文件不存在: ${file.absolutePath}")
+            throw IllegalArgumentException("文档文件不存在: $docPath")
         }
-
         if (!file.canRead()) {
-            throw SecurityException("无法读取文档文件: ${file.absolutePath}")
+            throw SecurityException("无法读取文档文件: $docPath")
         }
 
-        filePath = file.absolutePath
         djvuLoader = DjvuLoader()
-        
+
         // 先打开文件获取页面数
-        djvuLoader!!.openDjvu(file.absolutePath)
+        djvuLoader!!.openDjvu(docPath)
         val djvuInfo = djvuLoader!!.djvuInfo
         if (djvuInfo != null) {
             pageCount = djvuInfo.pages
@@ -127,7 +128,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
     private fun initPageSizeBean() {
         try {
             val count: Int = pageCount
-            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, file.absolutePath)
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: "", documentInfo.fileSize)
             println("DjvuDecoder.initPageSizeBean:$psb")
             
             if (null != psb && psb.list != null && psb.list!!.size == count) {
@@ -167,7 +168,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
      * 检查并缓存封面图片
      */
     private fun cacheCoverIfNeeded() {
-        val path = file.absolutePath
+        val path = documentInfo.path ?: ""
         try {
             if (null == djvuLoader || null != ImageCache.acquirePage(path)) {
                 return
@@ -229,9 +230,13 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
 
     override fun close() {
         djvuLoader?.close()
-        if (cachePage && !aPageList.isNullOrEmpty()) {
-            println("PdfDecoder.close:${aPageList.size}")
-            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+        if (cachePage && aPageList.isNotEmpty()) {
+            println("DjvuDecoder.close:${aPageList.size}")
+            try {
+                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+            } catch (e: Exception) {
+                println("DjvuDecoder.close: 保存缓存失败: ${e.message}")
+            }
         }
 
         linksCache.clear()
@@ -249,7 +254,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         var totalHeight = 0
         println("DjVu document has $pageCount pages")
 
-        for (i in 0..pageCount) {
+        for (i in 0 until pageCount) {
             val pageInfo = djvuLoader!!.getPageInfo(i)
             if (pageInfo != null) {
                 val width = pageInfo.width
@@ -272,7 +277,11 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
         
         // 保存到缓存
         if (cachePage && aPageList.isNotEmpty()) {
-            APageSizeLoader.savePageSizeToFile(false, file.absolutePath, aPageList)
+            try {
+                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+            } catch (e: Exception) {
+                println("DjvuDecoder: 缓存页面尺寸失败: ${e.message}")
+            }
         }
         
         println("DjvuDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")
@@ -392,7 +401,7 @@ public class DjvuDecoder(public val file: File) : ImageDecoder {
                 ImageBitmapConfig.Rgb565
             )
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${file.absolutePath}: $e")
+            println("renderPageRegion error for file ${documentInfo.path ?: ""}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
