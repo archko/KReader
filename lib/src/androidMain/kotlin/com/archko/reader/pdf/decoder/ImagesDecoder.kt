@@ -217,7 +217,7 @@ public class ImagesDecoder(
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
-    ): ImageBitmap{
+    ): ImageBitmap {
         return ImageBitmap(
             task.width,
             task.height,
@@ -242,11 +242,12 @@ public class ImagesDecoder(
         val targetWidth = (originalSize.width * scale).toInt()
         val targetHeight = (originalSize.height * scale).toInt()
 
+        // 关键更改：计算 Sampling 时结合图片的原始尺寸与 View 请求的 targetWidth/targetHeight
         val options = BitmapFactory.Options().apply {
-            inSampleSize = calculateInSampleSize(targetWidth, targetHeight)
+            inSampleSize = calculateInSampleSize(originalSize.width, originalSize.height, targetWidth, targetHeight)
         }
 
-        println("ImagesDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 目标=$targetWidth-$targetHeight")
+        println("ImagesDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 目标=$targetWidth-$targetHeight, inSampleSize=${options.inSampleSize}")
 
         val bitmap = decodeImage(aPage.index, options)
         if (bitmap != null) {
@@ -317,9 +318,24 @@ public class ImagesDecoder(
     /**
      * 计算采样大小以优化内存使用
      */
-    private fun calculateInSampleSize(reqWidth: Int, reqHeight: Int): Int {
+    private fun calculateInSampleSize(
+        srcWidth: Int,
+        srcHeight: Int,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Int {
         var inSampleSize = 1
-        if (reqHeight <= 0 || reqWidth <= 0) return inSampleSize
+        if (reqHeight <= 0 || reqWidth <= 0 || srcWidth <= 0 || srcHeight <= 0) return inSampleSize
+
+        if (srcHeight > reqHeight || srcWidth > reqWidth) {
+            val halfHeight = srcHeight / 2
+            val halfWidth = srcWidth / 2
+
+            // 选择能保证采样后的尺寸仍然大于等于目标尺寸的最大的 2 的幂次方
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
         return inSampleSize
     }
 
@@ -334,6 +350,8 @@ public class ImagesDecoder(
         val regionWidth = region.width()
         val regionHeight = region.height()
         var inSampleSize = 1
+
+        if (reqHeight <= 0 || reqWidth <= 0 || regionWidth <= 0 || regionHeight <= 0) return inSampleSize
 
         if (regionHeight > reqHeight || regionWidth > reqWidth) {
             val halfHeight = regionHeight / 2
@@ -372,4 +390,4 @@ public class ImagesDecoder(
     override fun decodeReflowAllPages(): List<ReflowBean> {
         return emptyList()
     }
-} 
+}
