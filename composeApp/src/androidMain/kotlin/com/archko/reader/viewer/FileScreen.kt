@@ -602,22 +602,28 @@ private fun queryContentResolver(context: android.content.Context, uri: Uri): Pa
 }
 
 private fun scanDirectoryImages(context: android.content.Context, treeUri: Uri): List<DocumentInfo> {
-    val docs = mutableListOf<DocumentInfo>()
+    val docs = mutableListOf<DocumentInfoWithDate>() // 临时包装结构用于排序
     val documentId = DocumentsContract.getTreeDocumentId(treeUri)
     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
+    
+    // 1. 将 COLUMN_LAST_MODIFIED 加入 projection
     val projection = arrayOf(
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
         DocumentsContract.Document.COLUMN_MIME_TYPE,
-        DocumentsContract.Document.COLUMN_SIZE
+        DocumentsContract.Document.COLUMN_SIZE,
+        DocumentsContract.Document.COLUMN_LAST_MODIFIED
     )
-    val sortOrder = "${DocumentsContract.Document.COLUMN_LAST_MODIFIED} DESC"
-    val cursor = context.contentResolver.query(childrenUri, projection, null, null, sortOrder)
+    
+    // 注意：sortOrder 传 null，靠后续内存排序
+    val cursor = context.contentResolver.query(childrenUri, projection, null, null, null)
     cursor?.use {
         val mimeTypeIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
         val docIdIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
         val nameIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
         val sizeIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+        val lastModifiedIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+
         while (it.moveToNext()) {
             if (mimeTypeIdx < 0 || docIdIdx < 0) continue
             val mimeType = it.getString(mimeTypeIdx)
@@ -626,21 +632,42 @@ private fun scanDirectoryImages(context: android.content.Context, treeUri: Uri):
                 val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                 val displayName = if (nameIdx >= 0) it.getString(nameIdx) ?: "" else ""
                 val size = if (sizeIdx >= 0) it.getLong(sizeIdx) else 0L
+                
+                // 读取修改时间（如果没有记录，默认为 0L）
+                val lastModified = if (lastModifiedIdx >= 0 && !it.isNull(lastModifiedIdx)) {
+                    it.getLong(lastModifiedIdx)
+                } else {
+                    0L
+                }
+
                 val ext = displayName.substringAfterLast('.', "").lowercase()
                 if (FileTypeUtils.isImageExtension(ext) || FileTypeUtils.isTiffExtension(ext)) {
-                    docs.add(DocumentInfo(
-                        uri = docUri.toString(),
-                        path = displayName,
-                        fileSize = size,
-                        mimeType = mimeType,
-                        ext = ext
-                    ))
+                    docs.add(
+                        DocumentInfoWithDate(
+                            info = DocumentInfo(
+                                uri = docUri.toString(),
+                                path = displayName,
+                                fileSize = size,
+                                mimeType = mimeType,
+                                ext = ext
+                            ),
+                            lastModified = lastModified
+                        )
+                    )
                 }
             }
         }
     }
-    return docs
+
+    // 2. 在内存中按最后修改时间降序排序，并返回 DocumentInfo 列表
+    return docs.sortedByDescending { it.lastModified }.map { it.info }
 }
+
+// 辅助包装类
+private data class DocumentInfoWithDate(
+    val info: DocumentInfo,
+    val lastModified: Long
+)
 
 @Composable
 private fun RecentItem(
