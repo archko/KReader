@@ -168,7 +168,7 @@ fun FileScreen(
                         mimeType != null && FileTypeUtils.isDocumentMimeType(mimeType) ||
                                 ext.isNotEmpty() && FileTypeUtils.isDocumentExtension(ext) -> {
                             val docs = listOf(externalDocument)
-                            if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
+                            if (FileTypeUtils.shouldSaveProgress(docs)) {
                                 viewModel.getRecent(path ?: externalDocument.uri ?: "")
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(docs, startPage)
@@ -217,7 +217,7 @@ fun FileScreen(
                         scope.launch {
                             val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
                             val docs = listOf(docInfo)
-                            if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
+                            if (FileTypeUtils.shouldSaveProgress(docs)) {
                                 viewModel.getRecent(bookRecent.path!!)
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(docs, startPage)
@@ -318,9 +318,8 @@ fun FileScreen(
                         } else if (documentDocs.isNotEmpty()) {
                             val firstDoc = documentDocs.first()
                             val docs = listOf(firstDoc)
-                            val docPaths = docs.mapNotNull { it.path }
-                            if (FileTypeUtils.shouldSaveProgress(docPaths)) {
-                                viewModel.getRecent(docPaths.first())
+                            if (FileTypeUtils.shouldSaveProgress(docs)) {
+                                viewModel.getRecent(firstDoc.path ?: firstDoc.uri ?: "")
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(docs, startPage)
                             } else {
@@ -470,7 +469,7 @@ fun FileScreen(
                                             scope.launch {
                                                 val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
                                                 val docs = listOf(docInfo)
-                                                if (FileTypeUtils.shouldSaveProgress(docs.map { d -> d.path ?: "" })) {
+                                                if (FileTypeUtils.shouldSaveProgress(docs)) {
                                                     viewModel.getRecent(it.path!!)
                                                     val startPage =
                                                         viewModel.recent?.page?.toInt() ?: 0
@@ -612,7 +611,8 @@ private fun scanDirectoryImages(context: android.content.Context, treeUri: Uri):
         DocumentsContract.Document.COLUMN_MIME_TYPE,
         DocumentsContract.Document.COLUMN_SIZE
     )
-    val cursor = context.contentResolver.query(childrenUri, projection, null, null, null)
+    val sortOrder = "${DocumentsContract.Document.COLUMN_LAST_MODIFIED} DESC"
+    val cursor = context.contentResolver.query(childrenUri, projection, null, null, sortOrder)
     cursor?.use {
         val mimeTypeIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
         val docIdIdx = it.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)

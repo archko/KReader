@@ -1,5 +1,6 @@
 package com.archko.reader.pdf.util
 
+import com.archko.reader.pdf.entity.DocumentInfo
 import java.io.File
 
 private val IMAGE_EXTENSIONS = setOf(
@@ -122,16 +123,16 @@ public object FileTypeUtils {
      * 判断是否应该保存进度
      * 只有单文档文件才保存进度
      */
-    public fun shouldSaveProgress(paths: List<String>): Boolean {
-        return paths.size == 1 && isDocumentFile(paths.first())
+    public fun shouldSaveProgress(documents: List<DocumentInfo>): Boolean {
+        return documents.size == 1 && isDocumentFile(documents.first().path ?: documents.first().uri ?: "")
     }
 
     /**
      * 判断是否应该显示大纲功能
      * 只有单文档文件才显示大纲
      */
-    public fun shouldShowOutline(paths: List<String>): Boolean {
-        return paths.size == 1 && isDocumentFile(paths.first())
+    public fun shouldShowOutline(documents: List<DocumentInfo>): Boolean {
+        return documents.size == 1 && isDocumentFile(documents.first().path ?: documents.first().uri ?: "")
     }
 
     /**

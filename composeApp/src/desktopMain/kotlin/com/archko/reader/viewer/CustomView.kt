@@ -70,7 +70,7 @@ private fun ToolbarContent(
     isVertical: Boolean,
     onOrientationChange: () -> Unit,
     onCloseDocument: (() -> Unit)?,
-    paths: List<String>,
+    paths: List<DocumentInfo>,
     currentPath: String,
     columnCount: Int,
     speechService: SpeechService,
@@ -102,7 +102,7 @@ private fun ToolbarContent(
     ) {
         var showColumn by remember {
             mutableStateOf(
-                if (paths.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
+                if (documents.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
                     false
                 } else {
                     true
@@ -271,7 +271,7 @@ private fun ToolbarContent(
                     )
                 }
                 // 只有单文档文件才显示大纲按钮
-                if (FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                    if (FileTypeUtils.shouldShowOutline(documents)) {
                     IconButton(onClick = { onOutlineDialogShow() }) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_toc),
@@ -404,17 +404,7 @@ fun CustomView(
     val currentDoc = documents.getOrNull(0) ?: documents.first()
     val currentPath = currentDoc.path ?: currentDoc.uri ?: ""
     // 兼容性：从documents中提取路径列表供旧代码使用
-    val paths = documents.map { it.path ?: it.uri ?: "" }
-
-    val speechService: SpeechService = remember { TtsQueueService() }
-
-    LaunchedEffect(Unit) {
-        // 加载书签
-        val firstPath = documents.getOrNull(0)?.path
-        if (documents.size == 1 && firstPath != null && FileTypeUtils.isDocumentFile(firstPath)) {
-            bookmarkViewModel.loadBookmarks(firstPath)
-        }
-    }
+    val contentResolver = context.contentResolver
 
     Box(
         modifier = Modifier
@@ -614,7 +604,7 @@ fun CustomView(
             // 对于单图片文件，根据尺寸自动调整滚动方向
             LaunchedEffect(decoder) {
                 decoder?.let { dec ->
-                    if (paths.size == 1 &&
+                    if (documents.size == 1 &&
                         (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(
                             currentPath
                         ))
@@ -736,10 +726,10 @@ fun CustomView(
                 }
             }
 
-            val annotationManager = remember(paths) {
+            val annotationManager = remember(documents.map { it.path ?: it.uri ?: "" }) {
                 var absolutePath = ""
-                if (paths.size == 1) {
-                    val first = paths[0]
+                if (documents.size == 1) {
+                    val first = documents[0].path ?: documents[0].uri ?: ""
                     if (FileTypeUtils.isDocumentFile(first)) {
                         absolutePath = first
                     }
@@ -786,7 +776,7 @@ fun CustomView(
                     isVertical = isVertical,
                     onOrientationChange = { isVertical = !isVertical },
                     onCloseDocument = onCloseDocument,
-                    paths = paths,
+                    paths = documents,
                     currentPath = currentPath,
                     speechService = speechService,
                     currentPage = currentPage,
@@ -978,7 +968,7 @@ fun CustomView(
                     }
 
                     // 大纲弹窗（最上层）- 只有单文档文件才显示
-                    if (showOutlineDialog && FileTypeUtils.shouldShowOutline(listOf(currentPath))) {
+                    if (showOutlineDialog && FileTypeUtils.shouldShowOutline(documents)) {
                         val outlineList = decoder?.outlineItems ?: emptyList()
                         OutlineDialog(
                             currentPage = currentPage,

@@ -104,7 +104,7 @@ private fun ToolbarContent(
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, TtsServiceBinder) -> Unit,
     isReflow: Boolean,
-    paths: List<String>
+    documents: List<DocumentInfo>
 ) {
     Surface(
         color = Color(0xCC222222),
@@ -208,7 +208,7 @@ private fun ToolbarContent(
                         }
                     }
 
-                    if (FileTypeUtils.shouldShowOutline(paths)) {
+                    if (FileTypeUtils.shouldShowOutline(documents)) {
                         item {
                             IconButton(onClick = { onOutlineDialogShow() }) {
                                 Icon(
@@ -461,9 +461,6 @@ fun CustomView(
     var pathConfig by remember { mutableStateOf(PathConfig()) }
     val contentResolver = context.contentResolver
 
-    // 兼容性：从documents中提取路径列表供旧代码使用
-    val paths = documents.map { it.path ?: it.uri ?: "" }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -499,6 +496,10 @@ fun CustomView(
                             } else if (FileTypeUtils.isImageFile(currentPath)) {
                                 isCrop = false
                                 ImagesDecoder(documents, contentResolver)
+                            } else if (FileTypeUtils.isTiffFile(currentPath)) {
+                                isCrop = false
+                                val tiffDecoder = TiffDecoder(currentDoc, contentResolver)
+                                tiffDecoder
                             } else if (FileTypeUtils.isDocumentFile(currentPath) || currentDoc.hasUri()) {
                                 ttsServiceBinder = TtsServiceBinder(context, currentPath)
                                 ttsServiceBinder?.bindService()
@@ -514,10 +515,6 @@ fun CustomView(
                                 }
 
                                 pdfDecoder
-                            } else if (FileTypeUtils.isTiffFile(currentPath)) {
-                                isCrop = false
-                                val tiffDecoder = TiffDecoder(currentDoc, contentResolver)
-                                tiffDecoder
                             } else {
                                 isCrop = false
                                 ImagesDecoder(documents, contentResolver)
@@ -662,7 +659,7 @@ fun CustomView(
             // 对于单图片文件，根据尺寸自动调整滚动方向
             LaunchedEffect(decoder) {
                 decoder?.let { dec ->
-                    if (paths.size == 1 &&
+                    if (documents.size == 1 &&
                         (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(
                             currentPath
                         ))
@@ -708,7 +705,7 @@ fun CustomView(
             var columnCount by remember { mutableIntStateOf(1) }
             var showColumn by remember {
                 mutableStateOf(
-                    if (paths.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
+                    if (documents.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
                         false
                     } else {
                         true
@@ -716,10 +713,10 @@ fun CustomView(
                 )
             }
 
-            val annotationManager = remember(paths) {
+            val annotationManager = remember(documents) {
                 var absolutePath = ""
-                if (paths.size == 1) {
-                    val first = paths[0]
+                if (documents.size == 1) {
+                    val first = documents[0].path ?: documents[0].uri ?: ""
                     if (FileTypeUtils.isDocumentFile(first)) {
                         absolutePath = first
                     }
@@ -858,7 +855,7 @@ fun CustomView(
                 ReflowView(
                     decoder = decoder!!,
                     pageCount = pageCount,
-                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
+                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
                     onCloseDocument = {
                         println("onCloseDocument.isReflow:$isReflow")
                         if (!isReflow) {
@@ -897,7 +894,7 @@ fun CustomView(
                     jumpOffsetY = jumpIntent.offsetY,
                     initialOrientation = orientation,
                     columnCount = columnCount,
-                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(paths)) onSaveDocument else null,
+                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
                     onCloseDocument = {
                         println("onCloseDocument.isReflow:$isReflow")
                         // 保存阅读统计
@@ -979,7 +976,7 @@ fun CustomView(
                         }
                     },
                     isReflow = isReflow,
-                    paths = paths
+                    documents = documents
                 )
             }
 
@@ -1298,11 +1295,11 @@ fun CustomView(
             }
 
             // 大纲弹窗（最上层）- 只有单文档文件才显示
-            if (showOutlineDialog && FileTypeUtils.shouldShowOutline(paths)) {
+            if (showOutlineDialog && FileTypeUtils.shouldShowOutline(documents)) {
                 val outlineList = decoder?.outlineItems ?: emptyList()
                 OutlineDialog(
                     currentPage = currentPage,
-                    currentPath = paths.firstOrNull() ?: "",
+                    currentPath = documents.firstOrNull()?.path ?: documents.firstOrNull()?.uri ?: "",
                     outlineList = outlineList,
                     annotationManager = annotationManager,
                     bookmarkViewModel = bookmarkViewModel,

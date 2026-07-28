@@ -190,7 +190,7 @@ fun FileScreen(
                         scope.launch {
                             val docInfo = DocumentInfo(path = file.absolutePath, fileSize = file.length())
                             val docs = listOf(docInfo)
-                            if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
+                            if (FileTypeUtils.shouldSaveProgress(docs)) {
                                 viewModel.getRecent(bookRecent.path!!)
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(docs, startPage)
@@ -273,7 +273,7 @@ fun FileScreen(
                                     // 如果是文档文件，直接打开
                                     val docInfo = DocumentInfo(path = path, fileSize = fileObj.length())
                                     val docs = listOf(docInfo)
-                                    if (FileTypeUtils.shouldSaveProgress(docs.map { it.path ?: "" })) {
+                                    if (FileTypeUtils.shouldSaveProgress(docs)) {
                                         viewModel.getRecent(path)
                                         val startPage = viewModel.recent?.page?.toInt() ?: 0
                                         openDocRequest = OpenDocRequest(docs, startPage)
@@ -365,7 +365,7 @@ fun FileScreen(
                                             scope.launch {
                                                 val docInfo = DocumentInfo(path = file.absolutePath, fileSize = file.length())
                                                 val docs = listOf(docInfo)
-                                                if (FileTypeUtils.shouldSaveProgress(docs.map { d -> d.path ?: "" })) {
+                                                if (FileTypeUtils.shouldSaveProgress(docs)) {
                                                     viewModel.getRecent(it.path!!)
                                                     val startPage =
                                                         viewModel.recent?.page?.toInt() ?: 0
