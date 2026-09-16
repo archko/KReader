@@ -107,12 +107,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    android.applicationVariants.all {
-        val variant = this
-        outputs.all {
-            if (this is com.android.build.gradle.internal.api.ApkVariantOutputImpl) {
-                //修改apk名称
-                this.outputFileName = "KReader-${variant.versionName}.apk"
+}
+
+// 修改apk名称
+androidComponents {
+    onVariants { variant ->
+        val versionName = libs.versions.versionName.get()
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                output.outputFileName.set("KReader-${versionName}.apk")
             }
         }
     }
