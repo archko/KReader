@@ -1,38 +1,9 @@
 package com.archko.reader.pdf.component
 
-import androidx.compose.ui.geometry.Rect
-import com.archko.reader.pdf.entity.APage
-
 /**
- * PageNode 对象池，用于减少高倍缩放时频繁创建几万个对象的开销
- * 经过优化后,最多只有十几个
+ * 旧的对象池已由 PageNode 的稳定 tile id 复用取代，保留空实现避免外部引用编译失败。
  */
 public class PageNodePool {
-    private val pool = ArrayDeque<PageNode>(32) // 预留初始容量
-
-    // 获取一个 Node，如果没有则新建
-    public fun acquire(pageViewState: PageViewState, bounds: Rect, aPage: APage): PageNode {
-        val node = pool.removeLastOrNull()
-        return if (node != null) {
-            // 先重置状态再重新赋值
-            node.recycle() 
-            node.update(bounds, aPage)
-            node
-        } else {
-            PageNode(pageViewState, bounds, aPage)
-        }
-    }
-
-    // 回收 Node
-    public fun release(node: PageNode) {
-        node.recycle() // 释放位图和 Job
-        if (pool.size < 32) { // 限制池子大小，防止极端内存占用
-            pool.addLast(node)
-        }
-    }
-
     public fun clear() {
-        pool.forEach { it.recycle() }
-        pool.clear()
     }
 }

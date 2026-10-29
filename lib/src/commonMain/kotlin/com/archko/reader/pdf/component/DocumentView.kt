@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
@@ -117,7 +117,6 @@ internal fun rememberDocumentViewState(
     val lastTapTime = remember { mutableLongStateOf(0L) }
     val tapDelayJob = remember { mutableStateOf<Job?>(null) }
 
-    // 创建文本选择器 - 使用expect/actual模式
     val textSelector = remember {
         createTextSelector(currentPath) { pageIndex ->
             val structuredText = decoder.getStructuredText(pageIndex)
@@ -130,7 +129,6 @@ internal fun rememberDocumentViewState(
     }
 
     val pageViewState = remember(list) {
-        println("DocumentView: 创建新的PageViewState:$viewSize, vZoom:$vZoom，list: ${list.size}, orientation: $orientation")
         PageViewState(
             list,
             decoder,
@@ -142,14 +140,12 @@ internal fun rememberDocumentViewState(
         )
     }
 
-    // 文本选择相关状态
     val isTextSelecting = remember { mutableStateOf(false) }
     val selectedPage = remember { mutableStateOf<Page?>(null) }
     val showTextActionToolbar = remember { mutableStateOf(false) }
     val selectionStartPos = remember { mutableStateOf<Offset?>(null) }
     val selectionEndPos = remember { mutableStateOf<Offset?>(null) }
 
-    // 临时存储当前正在画的线（比例坐标）
     val drawingPoints = remember { mutableListOf<Offset>() }
     var activeDrawingPage by remember { mutableIntStateOf(-1) }
 
@@ -209,7 +205,7 @@ internal fun DocumentViewEffects(
 
     LaunchedEffect(columnCount) {
         pageViewState.updateColumnCount(columnCount)
-        pageViewState.updateVisiblePages(offset.value, viewSize.value, vZoom.value)
+        offset.value = pageViewState.viewOffset
     }
 
     LaunchedEffect(speakingPageIndex) {
@@ -217,223 +213,110 @@ internal fun DocumentViewEffects(
         pageViewState.updateSpeakingPageIndex(speakingPageIndex)
     }
 
-    // 更新搜索高亮
     LaunchedEffect(searchHighlightQuads, currentSearchPageIndex) {
         pageViewState.updateSearchHighlight(searchHighlightQuads, currentSearchPageIndex)
     }
 
-    // 设置页面跳转回调
     LaunchedEffect(pageViewState) {
         pageViewState.onPageLinkClick = { pageIndex ->
             isJumping.value = true
-            val targetPage = pageViewState.pages[pageIndex]
-            val newOffset = Offset(offset.value.x, -targetPage.bounds.top)
+            val newOffset = pageViewState.offsetForPage(pageIndex)
             offset.value = newOffset
-            pageViewState.updateOffset(offset.value)
+            pageViewState.updateOffset(newOffset)
+            offset.value = pageViewState.viewOffset
             isJumping.value = false
         }
 
         pageViewState.onUrlLinkClick = { url ->
-            println("DocumentView: URL链接点击，URL: $url")
             HyperLinkUtils.openSystemBrowser(url)
         }
+
+        pageViewState.onLayoutApplied = {
+            flingJob.value?.cancel()
+        }
     }
 
-    // 确保在 list 变化时重新计算总高度
-    LaunchedEffect(list) {
+    LaunchedEffect(pageViewState.layoutVersion) {
+        offset.value = pageViewState.viewOffset
+    }
+
+    LaunchedEffect(pageViewState, viewSize.value) {
         if (viewSize.value != IntSize.Zero) {
-            println("DocumentView: 更新ViewSize:$viewSize, vZoom:$vZoom, list: ${list.size}, orientation: $orientation")
-            pageViewState.updateViewSize(viewSize.value, vZoom.value, orientation.value)
+            pageViewState.updateViewSize(
+                viewSize.value,
+                vZoom.value,
+                orientation.value
+            )
+            offset.value = pageViewState.viewOffset
         }
     }
 
-    // 监听外部参数的变化
     LaunchedEffect(jumpToPage, jumpOffsetY, initialOrientation, pageViewState.init) {
-        if (columnCount == 1 && initialOrientation != orientation.value && pageViewState.init) {
+        if (pageViewState.init && initialOrientation != orientation.value) {
             isJumping.value = true
-            val currentPage = jumpToPage ?: 0
-            println("DocumentView: orientation改变，重置offset和zoom: $orientation->$initialOrientation, page:$currentPage")
             orientation.value = initialOrientation
-            offset.value = Offset.Zero
-            vZoom.value = 1f
-            pageViewState.updateViewSize(viewSize.value, vZoom.value, orientation.value)
-
-            val page = pageViewState.pages.getOrNull(currentPage)
-            if (page != null) {
-                if (orientation.value == Vertical) {
-                    val clampedTargetY = page.bounds.top.coerceIn(
-                        0f,
-                        (pageViewState.totalHeight - viewSize.value.height).coerceAtLeast(0f)
-                    )
-                    val clampedY = -clampedTargetY
-                    offset.value = Offset(offset.value.x, clampedY)
-                } else {
-                    val clampedTargetX = page.bounds.left.coerceIn(
-                        0f,
-                        (pageViewState.totalWidth - viewSize.value.width).coerceAtLeast(0f)
-                    )
-                    val clampedX = -clampedTargetX
-                    offset.value = Offset(clampedX, offset.value.y)
-                }
-                println("DocumentView: orientation改变，跳转: ${offset.value}, $currentPage, page:$page")
-                flingJob.value?.cancel()
-                pageViewState.updateOffset(offset.value)
-            }
+            pageViewState.updateViewSize(viewSize.value, vZoom.value, initialOrientation)
+            offset.value = pageViewState.viewOffset
             isJumping.value = false
-            return@LaunchedEffect
         }
 
-        if (null != jumpToPage && (state.toPage.value != jumpToPage || jumpOffsetY != null) && pageViewState.init) {
+        if (jumpToPage != null && pageViewState.init &&
+            (state.toPage.value != jumpToPage || jumpOffsetY != null)
+        ) {
             isJumping.value = true
             state.toPage.value = jumpToPage
 
-            when (jumpMode) {
+            val newOffset = when (jumpMode) {
                 JumpMode.PageRestore -> {
-                    val offsetX = initialScrollX.toFloat()
-                    val offsetY = initialScrollY.toFloat()
-                    val testOffset = Offset(offsetX, offsetY)
-                    val offsetPage =
-                        ViewUtils.firstPage(
-                            pageViewState,
-                            testOffset,
-                            orientation.value,
-                            viewSize.value,
-                            null
-                        )
-
-                    if (offsetPage == state.toPage.value) {
-                        offset.value = Offset(
-                            offsetX.coerceIn(
-                                -(pageViewState.totalWidth - viewSize.value.width).coerceAtLeast(
-                                    0f
-                                ), 0f
-                            ),
-                            offsetY.coerceIn(
-                                -(pageViewState.totalHeight - viewSize.value.height).coerceAtLeast(
-                                    0f
-                                ), 0f
-                            )
-                        )
+                    if (initialScrollX == 0L && initialScrollY == 0L) {
+                        pageViewState.offsetForPage(jumpToPage)
                     } else {
-                        val page = pageViewState.pages.getOrNull(state.toPage.value)
-                        if (page != null) {
-                            val clampedTargetY = page.bounds.top.coerceIn(
-                                0f,
-                                (pageViewState.totalHeight - viewSize.value.height).coerceAtLeast(0f)
-                            )
-                            val clampedY = -clampedTargetY
-                            val clampedTargetX = page.bounds.left.coerceIn(
-                                0f,
-                                (pageViewState.totalWidth - viewSize.value.width).coerceAtLeast(0f)
-                            )
-                            val clampedX = -clampedTargetX
-                            offset.value = Offset(clampedX, clampedY)
-                        }
+                        pageViewState.offsetForDoc(
+                            Offset(initialScrollX.toFloat(), initialScrollY.toFloat())
+                        )
                     }
-                    println("DocumentView: PageRestore跳转 toPage=${state.toPage.value}, offsetPage=$offsetPage, useOffset=${offsetPage == state.toPage.value}, offset:$testOffset")
                 }
 
                 JumpMode.PageNavigation -> {
-                    val page = pageViewState.pages.getOrNull(state.toPage.value)
-                    if (page != null) {
-                        if (orientation.value == Vertical) {
-                            // 如果有精确的offsetY，使用它；否则跳转到页面顶部
-                            val targetY = if (jumpOffsetY != null) {
-                                page.bounds.top + jumpOffsetY
-                            } else {
-                                page.bounds.top
-                            }
-
-                            val clampedTargetY = targetY.coerceIn(
-                                0f,
-                                (pageViewState.totalHeight - viewSize.value.height).coerceAtLeast(0f)
-                            )
-                            val clampedY = -clampedTargetY
-                            offset.value = Offset(offset.value.x, clampedY)
-                        } else {
-                            val clampedTargetX = page.bounds.left.coerceIn(
-                                0f,
-                                (pageViewState.totalWidth - viewSize.value.width).coerceAtLeast(0f)
-                            )
-                            val clampedX = -clampedTargetX
-                            offset.value = Offset(clampedX, offset.value.y)
-                        }
-                        println("DocumentView: PageNavigation跳转到:${offset.value}, top:${page.bounds.top}, offsetY:$jumpOffsetY, toPage:${state.toPage.value}")
-                    } else {
-                        println("DocumentView: PageNavigation找不到页面:${state.toPage.value}")
-                    }
+                    pageViewState.offsetForPage(jumpToPage, jumpOffsetY)
                 }
             }
 
             flingJob.value?.cancel()
-            pageViewState.updateOffset(offset.value)
+            offset.value = newOffset
+            pageViewState.updateOffset(newOffset)
+            offset.value = pageViewState.viewOffset
             isJumping.value = false
         }
     }
 
     LaunchedEffect(crop) {
-        val old = pageViewState.isCropEnabled()
-        if (old != crop) {
-            println("DocumentView: 切边变化:$crop")
-            pageViewState.setCropEnabled(crop)
-            pageViewState.pages.forEach { page ->
-                page.recycle()
-            }
-            ImageCache.clear()
-            pageViewState.invalidatePageSizes()
-            pageViewState.updateOffset(offset.value)
-        }
+        pageViewState.setCropEnabled(crop)
+        offset.value = pageViewState.viewOffset
     }
 
-    // 监听页面变化并回调
     LaunchedEffect(offset.value) {
         if (!isJumping.value) {
-            ViewUtils.firstPage(
-                pageViewState,
-                offset.value,
-                orientation.value,
-                viewSize.value,
-                onPageChanged
-            )
+            ViewUtils.firstPage(pageViewState, onPageChanged)
         }
     }
 
-    // 获取生命周期所有者
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // 保存文档状态的公共方法
     fun saveDocumentState() {
-        val pages = pageViewState.pages
-        var currentPage = 0
-        if (pages.isNotEmpty()) {
-            val offsetY = offset.value.y
-            val offsetX = offset.value.x
-            val firstVisible = pages.indexOfFirst { page ->
-                if (orientation.value == Vertical) {
-                    val top = -offsetY
-                    val bottom = top + viewSize.value.height
-                    page.bounds.bottom > top && page.bounds.top < bottom
-                } else {
-                    val left = -offsetX
-                    val right = left + viewSize.value.width
-                    page.bounds.right > left && page.bounds.left < right
-                }
-            }
-            if (firstVisible != -1) {
-                currentPage = firstVisible
-            }
-        }
         val pageCount = list.size
         val zoom = vZoom.value.toDouble()
-        println("DocumentView: 保存记录:page:$currentPage, pc:$pageCount, ${viewSize.value}, vZoom:$vZoom, list: ${list.size}, orientation: $orientation, crop: $crop,${pageViewState.isCropEnabled()}")
+        val currentPage = pageViewState.firstVisiblePageIndex()
+        val docX = -offset.value.x / vZoom.value
+        val docY = -offset.value.y / vZoom.value
 
         if (!list.isEmpty()) {
             onSaveDocument?.invoke(
                 currentPage,
                 pageCount,
                 zoom,
-                offset.value.x.toLong(),
-                offset.value.y.toLong(),
+                docX.toLong(),
+                docY.toLong(),
                 orientation.value.toLong(),
                 reflow,
                 if (pageViewState.isCropEnabled()) 0L else 1L
@@ -441,7 +324,6 @@ internal fun DocumentViewEffects(
         }
     }
 
-    // 监听生命周期事件，在onPause时保存记录
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
@@ -479,7 +361,6 @@ internal fun CommonGestureHandler(
     val pageViewState = state.pageViewState
     val offset = state.offset
     val vZoom = state.vZoom
-    val orientation = state.orientation
     val scope = state.scope
     val flingJob = state.flingJob
     val isTextSelecting = state.isTextSelecting
@@ -506,27 +387,19 @@ internal fun CommonGestureHandler(
                                 selectionStartPos.value = pos
                                 showTextActionToolbar.value = false
 
-                                val clickedPageIndex = ViewUtils.calculateClickedPage(
-                                    pos,
-                                    offset.value,
-                                    orientation.value,
-                                    pageViewState
-                                )
+                                val doc = pageViewState.viewport.toDoc(pos)
+                                val clickedPageIndex =
+                                    ViewUtils.calculateClickedPage(doc, pageViewState)
                                 pageViewState.pages.getOrNull(clickedPageIndex)?.let {
-                                    it.startTextSelection(
-                                        pos.x - offset.value.x,
-                                        pos.y - offset.value.y
-                                    )
+                                    it.startTextSelection(doc.x, doc.y)
                                     selectedPage.value = it
                                 }
                             },
-                            onDrag = { change, dragAmount ->
+                            onDrag = { change, _ ->
                                 change.consume()
                                 selectionEndPos.value = change.position
-                                selectedPage.value?.updateTextSelection(
-                                    change.position.x - offset.value.x,
-                                    change.position.y - offset.value.y
-                                )
+                                val doc = pageViewState.viewport.toDoc(change.position)
+                                selectedPage.value?.updateTextSelection(doc.x, doc.y)
                             },
                             onDragEnd = {
                                 val selection = selectedPage.value?.endTextSelection()
@@ -542,54 +415,50 @@ internal fun CommonGestureHandler(
                         detectDragGestures(
                             onDragStart = { startOffset ->
                                 drawingPoints.clear()
-                                val targetPage = pageViewState.pageToRender.find {
-                                    it.bounds.contains(startOffset - offset.value)
-                                }
-                                activeDrawingPage.value = targetPage?.aPage?.index ?: -1
+                                val doc = pageViewState.viewport.toDoc(startOffset)
+                                val targetPage =
+                                    pageViewState.pageToRender.find { it.baseRect.contains(doc) }
+                                activeDrawingPage.value = targetPage?.index ?: -1
 
-                                if (activeDrawingPage.value != -1) {
-                                    val targetPage =
-                                        pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage.value }!!
-                                    val localX = startOffset.x - offset.value.x - targetPage.xOffset
-                                    val localY = startOffset.y - offset.value.y - targetPage.yOffset
+                                if (targetPage != null) {
                                     val startRel = Offset(
-                                        localX / targetPage.width,
-                                        localY / targetPage.height
+                                        (doc.x - targetPage.baseRect.left) / targetPage.baseRect.width,
+                                        (doc.y - targetPage.baseRect.top) / targetPage.baseRect.height
                                     )
                                     drawingPoints.add(startRel)
                                 }
                             },
-                            onDrag = { change, dragAmount ->
+                            onDrag = { change, _ ->
                                 if (activeDrawingPage.value != -1) {
-                                    val targetPage =
-                                        pageViewState.pageToRender.find { it.aPage.index == activeDrawingPage.value }!!
-                                    val localX =
-                                        change.position.x - offset.value.x - targetPage.xOffset
-                                    val localY =
-                                        change.position.y - offset.value.y - targetPage.yOffset
-                                    val currentRel = Offset(
-                                        localX / targetPage.width,
-                                        localY / targetPage.height
-                                    )
-
-                                    if (pathConfig.drawType == DrawType.LINE) {
-                                        val startRel = drawingPoints.first()
-                                        val linePoints =
-                                            ViewUtils.calculateLinePoints(startRel, currentRel)
-                                        pageViewState.updateDrawing(
-                                            activeDrawingPage.value,
-                                            linePoints,
-                                            pathConfig
-                                        )
-                                    } else {
-                                        drawingPoints.add(currentRel)
-                                        pageViewState.updateDrawing(
-                                            activeDrawingPage.value,
-                                            drawingPoints.toList(),
-                                            pathConfig
-                                        )
+                                    val targetPage = pageViewState.pageToRender.find {
+                                        it.index == activeDrawingPage.value
                                     }
-                                    change.consume()
+                                    if (targetPage != null) {
+                                        val doc = pageViewState.viewport.toDoc(change.position)
+                                        val currentRel = Offset(
+                                            (doc.x - targetPage.baseRect.left) / targetPage.baseRect.width,
+                                            (doc.y - targetPage.baseRect.top) / targetPage.baseRect.height
+                                        )
+
+                                        if (pathConfig.drawType == DrawType.LINE) {
+                                            val startRel = drawingPoints.first()
+                                            val linePoints =
+                                                ViewUtils.calculateLinePoints(startRel, currentRel)
+                                            pageViewState.updateDrawing(
+                                                activeDrawingPage.value,
+                                                linePoints,
+                                                pathConfig
+                                            )
+                                        } else {
+                                            drawingPoints.add(currentRel)
+                                            pageViewState.updateDrawing(
+                                                activeDrawingPage.value,
+                                                drawingPoints.toList(),
+                                                pathConfig
+                                            )
+                                        }
+                                        change.consume()
+                                    }
                                 }
                             },
                             onDragEnd = {
@@ -642,70 +511,51 @@ internal fun CommonGestureHandler(
                                         if (centroid.isSpecified && zoomChange != 1f) {
                                             val newZoom =
                                                 (vZoom.value * zoomChange).coerceIn(1f, max_zoom)
-                                            val zoomFactor = newZoom / vZoom.value
-
-                                            // 计算居中偏移
-                                            val centerOffsetX =
-                                                if (orientation.value == Horizontal && pageViewState.totalWidth < viewSize.width) {
-                                                    (viewSize.width - pageViewState.totalWidth) / 2
-                                                } else 0f
-                                            val centerOffsetY =
-                                                if (orientation.value == Vertical && pageViewState.totalHeight < viewSize.height) {
-                                                    (viewSize.height - pageViewState.totalHeight) / 2
-                                                } else 0f
-
-                                            // 计算缩放中心点：手势中心相对于内容的位置（考虑居中偏移）
-                                            val contentCenterX =
-                                                centroid.x - offset.value.x - centerOffsetX
-                                            val contentCenterY =
-                                                centroid.y - offset.value.y - centerOffsetY
-
-                                            // 计算新的偏移量，保持内容中心点不变
-                                            val newOffsetX =
-                                                centroid.x - contentCenterX * zoomFactor - centerOffsetX
-                                            val newOffsetY =
-                                                centroid.y - contentCenterY * zoomFactor - centerOffsetY
-
-                                            vZoom.value = newZoom
-                                            val targetOffset = Offset(newOffsetX, newOffsetY)
-                                            if (targetOffset.isSpecified) {
-                                                offset.value = calculateBounds(
-                                                    targetOffset,
-                                                    vZoom.value,
-                                                    viewSize,
-                                                    pageViewState,
-                                                    orientation.value
+                                            if (newZoom != vZoom.value) {
+                                                val content =
+                                                    pageViewState.viewport.toDoc(centroid)
+                                                val newOffset = Offset(
+                                                    centroid.x - content.x * newZoom,
+                                                    centroid.y - content.y * newZoom
                                                 )
+                                                vZoom.value = newZoom
+                                                offset.value = newOffset
+                                                pageViewState.updateViewport(
+                                                    newZoom,
+                                                    newOffset,
+                                                    false
+                                                )
+                                                offset.value = pageViewState.viewOffset
                                             }
                                         }
                                     } else {
-                                        // 累加位移，超过 TouchSlop 后才判定为拖拽，避免点击时轻微抖动触发漂移
                                         totalPan += panChange
                                         val delta = when {
                                             !isDragging && totalPan.getDistance() > touchSlop -> {
                                                 isDragging = true
                                                 totalPan
                                             }
+
                                             isDragging -> panChange
                                             else -> Offset.Zero
                                         }
                                         if (delta != Offset.Zero) {
                                             offset.value += delta
-                                            offset.value = calculateBounds(
-                                                offset.value,
+                                            pageViewState.updateViewport(
                                                 vZoom.value,
-                                                viewSize,
-                                                pageViewState,
-                                                orientation.value
+                                                offset.value,
+                                                true
                                             )
-                                            pageViewState.updateOffset(offset.value)
+                                            offset.value = pageViewState.viewOffset
                                             velocityTracker.addPosition(
                                                 lastChange?.uptimeMillis ?: 0,
                                                 lastChange?.position ?: Offset(0f, 0f)
                                             )
                                         }
                                     }
-                                    event.changes.fastForEach { if (it.positionChanged()) it.consume() }
+                                    event.changes.fastForEach {
+                                        if (it.positionChanged()) it.consume()
+                                    }
                                 }
                             } while (event.changes.fastAny { it.pressed })
 
@@ -717,17 +567,14 @@ internal fun CommonGestureHandler(
                                 if (!isDragging && dragDistance < touchSlop) {
                                     handleTapGestureInternal(
                                         finalChange.position,
-                                        viewSize,
                                         offset,
                                         state.lastTapTime,
                                         state.tapDelayJob,
                                         scope,
                                         pageViewState,
-                                        orientation.value,
                                         tapPageKeepPx,
                                         onDoubleTapToolbar,
                                         onTapNonPageArea,
-                                        onPageChanged,
                                     )
                                 }
 
@@ -735,24 +582,17 @@ internal fun CommonGestureHandler(
                                     val velocity = velocityTracker.calculateVelocity()
                                     performFling(
                                         velocity,
-                                        viewSize,
                                         pageViewState,
                                         offset,
                                         vZoom.value,
-                                        orientation.value,
                                         scope,
                                         flingJob,
                                     )
                                 }
-                            } else {
-                                pageViewState.updateOffset(offset.value)
-                                pageViewState.updateViewSize(
-                                    viewSize,
-                                    vZoom.value,
-                                    orientation.value
-                                )
                             }
-                            pageViewState.updateVisiblePages(offset.value, viewSize, vZoom.value)
+
+                            pageViewState.updateViewport(vZoom.value, offset.value, true)
+                            offset.value = pageViewState.viewOffset
                         }
                     }
                 }
@@ -761,7 +601,7 @@ internal fun CommonGestureHandler(
 }
 
 /**
- * 文档视图绘制器
+ * 文档视图绘制器：内容层做 GPU 变换，覆盖层在屏幕坐标绘制。
  */
 @Composable
 internal fun DocumentViewCanvas(
@@ -770,37 +610,34 @@ internal fun DocumentViewCanvas(
     modifier: Modifier = Modifier,
 ) {
     val pageViewState = state.pageViewState
-    val isTextSelecting = state.isTextSelecting
-    val selectionStartPos = state.selectionStartPos
-    val selectionEndPos = state.selectionEndPos
 
-    Box(
-        modifier = modifier.fillMaxSize()
-            .graphicsLayer {
-                translationX = state.offset.value.x
-                translationY = state.offset.value.y
-                clip = false
-                renderEffect = null
-            }
-            .drawWithContent {
-                pageViewState.drawVisiblePages(this, state.offset.value, state.vZoom.value)
-
-                if (isTextSelecting.value && selectionStartPos.value != null && selectionEndPos.value != null) {
-                    val start = selectionStartPos.value!!
-                    val end = selectionEndPos.value!!
-                    val left = minOf(start.x, end.x) - state.offset.value.x
-                    val top = minOf(start.y, end.y) - state.offset.value.y
-                    val right = maxOf(start.x, end.x) - state.offset.value.x
-                    val bottom = maxOf(start.y, end.y) - state.offset.value.y
-
-                    drawRect(
-                        color = Color.Blue.copy(alpha = 0.3f),
-                        topLeft = Offset(left, top),
-                        size = androidx.compose.ui.geometry.Size(right - left, bottom - top)
-                    )
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationX = state.offset.value.x
+                    translationY = state.offset.value.y
+                    scaleX = state.vZoom.value
+                    scaleY = state.vZoom.value
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    clip = false
+                    renderEffect = null
                 }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                pageViewState.revision
+                pageViewState.drawVisiblePages(this, state.offset.value, state.vZoom.value)
             }
-    )
+        }
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            state.offset.value
+            state.vZoom.value
+            pageViewState.revision
+            pageViewState.drawOverlay(this)
+        }
+    }
 }
 
 /**
@@ -808,25 +645,22 @@ internal fun DocumentViewCanvas(
  */
 internal fun handleTapGestureInternal(
     tapPos: Offset,
-    viewSize: IntSize,
     offset: MutableState<Offset>,
     lastTapTime: MutableState<Long>,
     tapDelayJob: MutableState<Job?>,
     scope: CoroutineScope,
     pageViewState: PageViewState,
-    orientation: Int,
     tapPageKeepPx: Float,
     onDoubleTapToolbar: () -> Unit,
     onTapNonPageArea: (pageIndex: Int) -> Unit,
-    onPageChanged: (page: Int) -> Unit,
 ) {
     val currentTime = System.currentTimeMillis()
     val isDoubleTap = currentTime - lastTapTime.value < 300
 
     if (isDoubleTap) {
         tapDelayJob.value?.cancel()
-
-        if (tapPos.y in (viewSize.height / 4f)..(viewSize.height * 3 / 4f)) {
+        val height = pageViewState.viewSize.height
+        if (tapPos.y in (height / 4f)..(height * 3 / 4f)) {
             onDoubleTapToolbar()
         }
         lastTapTime.value = 0L
@@ -837,32 +671,22 @@ internal fun handleTapGestureInternal(
         tapDelayJob.value = scope.launch {
             delay(300)
 
-            val linkHandled = pageViewState.handleClick(
-                tapPos.x - offset.value.x,
-                tapPos.y - offset.value.y
-            )
+            val doc = pageViewState.viewport.toDoc(tapPos)
+            val linkHandled = pageViewState.handleClick(doc.x, doc.y)
 
             if (!linkHandled) {
-                // 翻页时保留约一行文字的上下文，避免翻页后失去位置感
                 val isPageTurned = ViewUtils.handleTapGesture(
                     tapPos,
-                    viewSize,
-                    offset.value,
-                    orientation,
                     pageViewState,
                     tapPageKeepPx
                 ) { newOffset ->
                     offset.value = newOffset
-                    pageViewState.updateOffset(offset.value)
+                    pageViewState.updateOffset(newOffset)
+                    offset.value = pageViewState.viewOffset
                 }
 
                 if (!isPageTurned) {
-                    val clickedPage = ViewUtils.calculateClickedPage(
-                        tapPos,
-                        offset.value,
-                        orientation,
-                        pageViewState
-                    )
+                    val clickedPage = ViewUtils.calculateClickedPage(doc, pageViewState)
                     onTapNonPageArea(clickedPage)
                 }
             }
@@ -875,11 +699,9 @@ internal fun handleTapGestureInternal(
  */
 internal fun performFling(
     velocity: Velocity,
-    viewSize: IntSize,
     pageViewState: PageViewState,
     offset: MutableState<Offset>,
     vZoom: Float,
-    orientation: Int,
     scope: CoroutineScope,
     flingJob: MutableState<Job?>,
 ) {
@@ -888,51 +710,22 @@ internal fun performFling(
         absVelocityThreshold = 0.50f,
     )
 
-    val velocity = Offset(velocity.x * 1.1f, velocity.y * 1.1f)
+    val scaledVelocity = Offset(velocity.x * 1.1f, velocity.y * 1.1f)
     val job = scope.launch {
         val animatable = Animatable(
             initialValue = offset.value,
             typeConverter = OffsetToVector
         )
 
-        animatable.animateDecay(velocity, decay) {
-            val boundOffset = calculateBounds(
-                value,
-                vZoom,
-                viewSize,
-                pageViewState,
-                orientation
-            )
-            offset.value = boundOffset
-            pageViewState.updateOffset(offset.value)
+        animatable.animateDecay(scaledVelocity, decay) {
+            val bounded = pageViewState.viewport.clampOffset(value)
+            offset.value = bounded
+            pageViewState.updateViewport(vZoom, bounded, true)
         }
+        pageViewState.updateViewport(vZoom, offset.value, true)
+        offset.value = pageViewState.viewOffset
     }
     flingJob.value = job
-}
-
-/**
- * 边界计算逻辑
- */
-internal fun calculateBounds(
-    targetOffset: Offset,
-    currentZoom: Float,
-    size: IntSize,
-    pageViewState: PageViewState,
-    ori: Int
-): Offset {
-    val scaleRatio = currentZoom / pageViewState.vZoom
-    val contentWidth =
-        if (ori == Vertical) size.width * currentZoom else pageViewState.totalWidth * scaleRatio
-    val contentHeight =
-        if (ori == Vertical) pageViewState.totalHeight * scaleRatio else size.height * currentZoom
-
-    val minX = if (contentWidth > size.width) size.width - contentWidth else 0f
-    val minY = if (contentHeight > size.height) size.height - contentHeight else 0f
-
-    return Offset(
-        targetOffset.x.coerceIn(minX, 0f),
-        targetOffset.y.coerceIn(minY, 0f)
-    )
 }
 
 private val OffsetToVector: TwoWayConverter<Offset, AnimationVector2D> = TwoWayConverter(
@@ -960,7 +753,6 @@ internal fun TextActionToolbarWrapper(
                 selectedPage = selectedPage,
                 textSelector = textSelector,
                 onCopy = { text ->
-                    println("复制文本: $text")
                     onCopy(text)
                 },
                 onDismiss = onDismiss
@@ -968,5 +760,3 @@ internal fun TextActionToolbarWrapper(
         }
     }
 }
-
-

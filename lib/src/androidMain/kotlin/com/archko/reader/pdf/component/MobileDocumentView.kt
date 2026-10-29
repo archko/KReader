@@ -104,6 +104,7 @@ public fun MobileDocumentView(
                     stateHolder.vZoom.value,
                     stateHolder.orientation.value
                 )
+                stateHolder.offset.value = stateHolder.pageViewState.viewOffset
             },
         contentAlignment = androidx.compose.ui.Alignment.TopStart
     ) {

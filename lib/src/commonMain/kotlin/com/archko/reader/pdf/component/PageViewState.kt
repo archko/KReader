@@ -2,23 +2,33 @@ package com.archko.reader.pdf.component
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size as GeomSize
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.state.AnnotationManager
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.max
+import kotlin.math.min
 
 /**
- * @author: archko 2025/7/24 :08:21
+ * 文档视图状态：基础布局（文档空间）+ 视口 + 页内 LOD tile。
+ * 缩放只影响 ViewportState，不触发重新布局。
  */
 public class PageViewState(
     public val list: List<APage>,
@@ -29,134 +39,142 @@ public class PageViewState(
     public var columnCount: Int = 1,
     public val textSelector: TextSelector? = null
 ) {
+    internal val viewport = ViewportState()
+
+    private var cropEnabled: Boolean = crop
+    private val pendingCropPages = LinkedHashSet<Int>()
+    private var cropRelayoutScheduled: Boolean = false
+
     public var viewOffset: Offset = Offset.Zero
     public var init: Boolean by mutableStateOf(false)
     public var totalHeight: Float by mutableFloatStateOf(0f)
     public var totalWidth: Float by mutableFloatStateOf(0f)
-
     public var viewSize: IntSize by mutableStateOf(IntSize.Zero)
+
     internal var pageToRender: List<Page> by mutableStateOf(listOf())
     public var pages: List<Page> by mutableStateOf(createPages())
     public var vZoom: Float by mutableFloatStateOf(1f)
-    public var nodePool: PageNodePool = PageNodePool()
+    public var revision: Int by mutableIntStateOf(0)
+    public var layoutVersion: Int by mutableIntStateOf(0)
+
+    private var docWidth: Float = 0f
+    private var docHeight: Float = 0f
 
     // 正在朗读的页面索引，null 表示没有朗读
     public var speakingPageIndex: Int? by mutableStateOf(null)
         private set
 
     // 搜索高亮状态
-    public var searchHighlightQuads: Map<Int, List<com.archko.reader.pdf.entity.DocQuad>> by mutableStateOf(emptyMap())
+    public var searchHighlightQuads: Map<Int, List<DocQuad>> by mutableStateOf(emptyMap())
         private set
     public var currentSearchPageIndex: Int? by mutableStateOf(null)
         private set
     public var currentSearchResultIndex: Int by mutableStateOf(-1)
         private set
 
-    // 预加载配置
-    private var preloadScreens: Float = 0.8f // 预加载1屏的距离
+    private var preloadScreens: Float = 0.8f
 
-    private var lastPageKeys: Set<Int> = emptySet()
-
-    // 添加关闭标志
     private var isShutdown = false
 
-    // 链接处理回调
     public var onPageLinkClick: ((pageIndex: Int) -> Unit)? = null
     public var onUrlLinkClick: ((url: String) -> Unit)? = null
+    public var onDecodeCompleted: (() -> Unit)? = null
+    public var onLayoutApplied: (() -> Unit)? = null
 
-    // 切边控制
-    private var cropEnabled: Boolean = crop
-
-    // 解码服务
     public var decodeService: DecodeService? = null
         private set
 
-    // 解码完成回调
-    public var onDecodeCompleted: (() -> Unit)? = null
-
     public var activeDrawingAnno: Pair<Int, AnnotationPath>? by mutableStateOf(null)
 
-    public fun updateDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
-        val anno = AnnotationPath(
-            points,
-            config = pathConfig
-        )
-
-        activeDrawingAnno = pageIndex to anno
-    }
-
-    public fun finalizeDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
-        val path = AnnotationPath(points, config = pathConfig)
-        annotationManager.addPath(pageIndex, path)
-        activeDrawingAnno = null
-    }
+    private data class Anchor(
+        val index: Int,
+        val fx: Float,
+        val fy: Float,
+        val screen: Offset
+    )
 
     init {
         initDecodeService()
     }
 
+    private fun createPages(): List<Page> {
+        return list.map { aPage ->
+            Page(
+                this,
+                aPage,
+                PageGeometry(
+                    aPage.width.toFloat(),
+                    aPage.height.toFloat(),
+                    aPage.cropBounds,
+                    cropEnabled
+                ),
+                Rect(0f, 0f, 1f, 1f)
+            )
+        }
+    }
+
+    private fun initDecodeService() {
+        val decoder = DecoderAdapter(
+            imageDecoder = state,
+            viewSize = viewSize,
+            isCropEnabled = { cropEnabled }
+        )
+        decodeService = DecodeService(decoder)
+    }
+
     public fun notifyDecodeCompleted() {
     }
 
-    /**
-     * 设置切边参数
-     * @param enabled 是否启用切边
-     */
-    public fun setCropEnabled(enabled: Boolean) {
-        if (cropEnabled != enabled) {
-            cropEnabled = enabled
-        }
+    public fun updateDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
+        activeDrawingAnno = pageIndex to AnnotationPath(points, config = pathConfig)
     }
 
-    /**
-     * 获取当前切边状态
-     * @return 是否启用切边
-     */
+    public fun finalizeDrawing(pageIndex: Int, points: List<Offset>, pathConfig: PathConfig) {
+        annotationManager.addPath(pageIndex, AnnotationPath(points, config = pathConfig))
+        activeDrawingAnno = null
+    }
+
+    public fun setCropEnabled(enabled: Boolean) {
+        if (cropEnabled == enabled) {
+            return
+        }
+        cropEnabled = enabled
+        pendingCropPages.clear()
+        pages.forEach {
+            it.cropProbeRequested = false
+            it.updateGeometry(
+                PageGeometry(
+                    it.aPage.width.toFloat(),
+                    it.aPage.height.toFloat(),
+                    it.aPage.cropBounds,
+                    enabled
+                )
+            )
+        }
+        relayout()
+    }
+
     public fun isCropEnabled(): Boolean = cropEnabled
 
     public fun updateColumnCount(columnCount: Int) {
-        val columnCountChanged = this.columnCount != columnCount
-        if (columnCountChanged) {
+        if (this.columnCount != columnCount) {
             this.columnCount = columnCount
-        }
-
-        if (columnCountChanged) {
-            println("PageViewState.updateColumnCount: 重新计算页面布局columnCount: $columnCount")
-            invalidatePageSizes()
-            ImageCache.clearNodes()
+            relayout()
         }
     }
 
-    /**
-     * 设置预加载距离
-     * @param screens 预加载的屏幕数量，默认1.0表示预加载一屏的距离
-     */
     public fun setPreloadScreens(screens: Float) {
         preloadScreens = screens.coerceAtLeast(0f)
     }
 
-    /**
-     * 获取当前预加载距离
-     * @return 预加载的屏幕数量
-     */
     public fun getPreloadScreens(): Float = preloadScreens
 
-    /**
-     * 更新正在朗读的页面索引
-     * @param pageIndex 页面索引，null 表示没有朗读
-     */
     public fun updateSpeakingPageIndex(pageIndex: Int?) {
-        println("PageViewState: updateSpeakingPageIndex from $speakingPageIndex to $pageIndex")
         speakingPageIndex = pageIndex
     }
 
-    /**
-     * 更新搜索高亮状态
-     * @param highlightQuads 每个页面的高亮区域映射
-     * @param currentPageIndex 当前搜索结果所在的页面索引
-     */
     public fun updateSearchHighlight(
-        highlightQuads: Map<Int, List<com.archko.reader.pdf.entity.DocQuad>>,
+        highlightQuads: Map<Int, List<DocQuad>>,
         currentPageIndex: Int?,
         currentResultIndex: Int = -1
     ) {
@@ -165,532 +183,330 @@ public class PageViewState(
         currentSearchResultIndex = currentResultIndex
     }
 
-    /**
-     * 清除搜索高亮
-     */
     public fun clearSearchHighlight() {
         searchHighlightQuads = emptyMap()
         currentSearchPageIndex = null
         currentSearchResultIndex = -1
     }
 
-    /**
-     * Tile可见性检查（基于TileSpec）- decode回调路径使用
-     */
-    public fun isTileVisible(spec: TileSpec, strictMode: Boolean = false): Boolean {
-        val page = pages.getOrNull(spec.page) ?: return false
-        val scaleRatio = spec.pageWidth / page.width
-
-        // 直接计算4个坐标，避免创建Rect对象
-        val tileLeft = spec.bounds.left * spec.pageWidth + page.bounds.left * scaleRatio
-        val tileTop = spec.bounds.top * spec.pageHeight + page.bounds.top * scaleRatio
-        val tileRight = spec.bounds.right * spec.pageWidth + page.bounds.left * scaleRatio
-        val tileBottom = spec.bounds.bottom * spec.pageHeight + page.bounds.top * scaleRatio
-
-        var result = if (strictMode) {
-            isVisibleInline(tileLeft, tileTop, tileRight, tileBottom)
-        } else {
-            isVisibleWithPreloadInline(tileLeft, tileTop, tileRight, tileBottom)
-        }
-        //println("[PageNode.isTileVisible] page=${page.aPage.index}, result=$result, $tileLeft-$tileTop-$tileRight-$tileBottom")
-        return result
-    }
-
-    /**
-     * Tile可见性检查（直接传坐标）- PageNode.draw()热路径使用
-     * 复用getCachedPixelRect()已计算好的坐标，避免重复计算+对象分配
-     */
-    public fun isTileVisible(
-        tileLeft: Float, tileTop: Float, tileRight: Float, tileBottom: Float,
-        strictMode: Boolean = false
-    ): Boolean {
-        return if (strictMode) {
-            isVisibleInline(tileLeft, tileTop, tileRight, tileBottom)
-        } else {
-            isVisibleWithPreloadInline(tileLeft, tileTop, tileRight, tileBottom)
-        }
-    }
-
-    // 严格可见：必须与屏幕区域相交
-    private fun isVisibleInline(
-        left: Float, top: Float, right: Float, bottom: Float
-    ): Boolean {
-        val visLeft = -viewOffset.x
-        val visTop = -viewOffset.y
-        val visRight = viewSize.width - viewOffset.x
-        val visBottom = viewSize.height - viewOffset.y
-        return left < visRight && right > visLeft && top < visBottom && bottom > visTop
-    }
-
-    // 预加载可见：与屏幕+预加载区域相交
-    private fun isVisibleWithPreloadInline(
-        left: Float, top: Float, right: Float, bottom: Float
-    ): Boolean {
-        val visLeft = -viewOffset.x
-        val visTop = -viewOffset.y
-        val visRight = if (orientation == Vertical) {
-            viewSize.width - viewOffset.x
-        } else {
-            viewSize.width - viewOffset.x + viewSize.width * preloadScreens
-        }
-        val visBottom = if (orientation == Vertical) {
-            viewSize.height - viewOffset.y + viewSize.height * preloadScreens
-        } else {
-            viewSize.height - viewOffset.y
-        }
-        return left < visRight && right > visLeft && top < visBottom && bottom > visTop
-    }
-
-    /**
-     * 初始化解码服务
-     */
-    private fun initDecodeService() {
-        val decoder = DecoderAdapter(
-            imageDecoder = state,
-            viewSize = viewSize,
-            isCropEnabled = { cropEnabled }
-        )
-        decodeService = DecodeService(decoder)
-        println("PageViewState.initDecodeService")
-
-        // 如果启用切边，生成切边任务
-        if (cropEnabled) {
-            Thread {
-                val cropTasks = decoder.generateCropTasks()
-                if (cropTasks.isNotEmpty()) {
-                    decodeService?.submitCropTasks(cropTasks)
-                }
-            }.start()
-        }
-    }
+    public fun isShutdown(): Boolean = isShutdown
 
     public fun shutdown() {
         isShutdown = true
+        pendingCropPages.clear()
         decodeService?.shutdown()
-
-        pages.forEach {
-            it.recycle()
-        }
+        pages.forEach { it.recycle() }
         pages = emptyList()
         pageToRender = emptyList()
-
         state.close()
-        nodePool.clear()
-
-        println("PageViewState.shutdown: 清理完成，调用GC")
-        // 建议GC
-        System.gc()
+        ImageCache.clear()
     }
 
-    public fun isShutdown(): Boolean = isShutdown
-
-    public fun invalidatePageSizes() {
-        init = false
-        if (viewSize.width == 0 || viewSize.height == 0 || list.isEmpty()) {
-            println("PageViewState.viewSize高宽为0,或list为空,不计算page: viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth")
-            totalHeight = viewSize.height.toFloat()
-            totalWidth = viewSize.width.toFloat()
-        } else {
-            if (columnCount > 1) {
-                var currentY = 0f
-                // 计算每一列的基础宽度
-                val scaledPageWidth = (viewSize.width * vZoom) / columnCount
-                val pageCount = list.size
-
-                var i = 0
-                while (i < pageCount) {
-                    var maxHeightInRow = 0f
-
-                    for (col in 0 until columnCount) {
-                        val currentIndex = i + col
-                        if (currentIndex >= pageCount) break
-
-                        val aPage = list[currentIndex]
-                        val pageObj = pages[currentIndex]
-
-                        // 1. 计算当前页面的缩放比例 (基于列宽)
-                        val isCropped = cropEnabled && aPage.hasCrop()
-                        val originalWidth = aPage.getWidth(isCropped)
-                        val originalHeight = aPage.getHeight(isCropped)
-
-                        val pageScale = scaledPageWidth / originalWidth
-                        val scaledPageHeight = originalHeight * pageScale
-
-                        // 2. 计算当前页面的左偏移量 (left offset)
-                        val currentX = col * scaledPageWidth
-
-                        // 3. 更新页面布局边界
-                        val bounds = Rect(
-                            left = currentX,
-                            top = currentY,
-                            right = currentX + scaledPageWidth,
-                            bottom = currentY + scaledPageHeight
-                        )
-
-                        pageObj.update(scaledPageWidth, scaledPageHeight, bounds)
-
-                        // 4. 记录这一行中最高的页面高度
-                        if (scaledPageHeight > maxHeightInRow) {
-                            maxHeightInRow = scaledPageHeight
-                        }
-                    }
-
-                    currentY += maxHeightInRow
-                    i += columnCount
-                }
-
-                totalWidth = viewSize.width * vZoom
-                totalHeight = currentY
-            } else {
-                if (orientation == Vertical) {
-                    var currentY = 0f
-                    val scaledPageWidth = viewSize.width * vZoom
-                    list.zip(pages).forEach { (aPage, page) ->
-                        // 根据是否有切边选择不同的尺寸计算方式
-                        val pageScale = if (cropEnabled && aPage.hasCrop()) {
-                            // 有切边：使用切边后的尺寸
-                            scaledPageWidth / aPage.getWidth(true)
-                        } else {
-                            // 无切边：使用原始尺寸
-                            scaledPageWidth / aPage.getWidth(false)
-                        }
-
-                        val scaledPageHeight = if (cropEnabled && aPage.hasCrop()) {
-                            aPage.getHeight(true) * pageScale
-                        } else {
-                            aPage.getHeight(false) * pageScale
-                        }
-
-                        val bounds = Rect(
-                            0f,
-                            currentY,
-                            scaledPageWidth,
-                            currentY + scaledPageHeight
-                        )
-                        // 直接用最终宽高初始化Page
-                        page.update(scaledPageWidth, scaledPageHeight, bounds)
-                        currentY += scaledPageHeight
-                        //println("PageViewState.page=${aPage.index}, pageScale:$pageScale, y:$currentY, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
-                    }
-                    totalHeight = currentY
-                    totalWidth = viewSize.width * vZoom
-                } else {
-                    var currentX = 0f
-                    val scaledPageHeight = viewSize.height * vZoom
-                    list.zip(pages).forEach { (aPage, page) ->
-                        // 根据是否有切边选择不同的尺寸计算方式
-                        val pageScale = if (cropEnabled && aPage.hasCrop()) {
-                            // 有切边：使用切边后的尺寸
-                            scaledPageHeight / aPage.getHeight(true)
-                        } else {
-                            // 无切边：使用原始尺寸
-                            scaledPageHeight / aPage.getHeight(false)
-                        }
-
-                        val scaledPageWidth = if (cropEnabled && aPage.hasCrop()) {
-                            aPage.getWidth(true) * pageScale
-                        } else {
-                            aPage.getWidth(false) * pageScale
-                        }
-
-                        val bounds = Rect(
-                            currentX,
-                            0f,
-                            currentX + scaledPageWidth,
-                            scaledPageHeight
-                        )
-                        // 直接用最终宽高初始化Page
-                        page.update(scaledPageWidth, scaledPageHeight, bounds)
-                        currentX += scaledPageWidth
-                        //println("PageViewState.pageScale:$pageScale, x:$currentX, bounds:$bounds, aPage:$aPage, hasCrop:${aPage.hasCrop()}")
-                    }
-                    totalWidth = currentX
-                    totalHeight = viewSize.height * vZoom
-                    //println("PageViewState: 横向模式 - totalWidth: $totalWidth, totalHeight: $totalHeight, 页面数: ${pages.size}")
-                }
-            }
-            init = true
-        }
-        println("PageViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth, columnCount:$columnCount, zoom:$vZoom, orientation:$orientation, crop:$cropEnabled")
-    }
-
-    private fun createPages(): List<Page> {
-        val list = list.map { aPage ->
-            // 初始化时直接用viewSize和vZoom计算的宽高
-            if (orientation == Vertical) {
-                val scaledPageWidth = viewSize.width * 1f
-                val pageScale = if (aPage.width == 0) 1f else scaledPageWidth / aPage.width
-                val scaledPageHeight = aPage.height * pageScale
-                Page(
-                    this,
-                    scaledPageWidth,
-                    scaledPageHeight,
-                    aPage,
-                    0f,
-                    0f
-                )
-            } else {
-                val scaledPageHeight = viewSize.height * 1f
-                val pageScale = if (aPage.height == 0) 1f else scaledPageHeight / aPage.height
-                val scaledPageWidth = aPage.width * pageScale
-                Page(
-                    this,
-                    scaledPageWidth,
-                    scaledPageHeight,
-                    aPage,
-                    0f,
-                    0f
-                )
-            }
-        }
-        return list
-    }
-
+    /**
+     * 兼容旧调用：viewSize/zoom/orientation 变化。
+     * 只有 viewSize 或 orientation 变化才重新布局；zoom 只更新视口。
+     */
     public fun updateViewSize(
         viewSize: IntSize,
         vZoom: Float,
         orientation: Int = this.orientation
     ) {
-        val isViewSizeChanged = this.viewSize != viewSize
-        val isZoomChanged = this.vZoom != vZoom
-        val isOrientationChanged = this.orientation != orientation
+        val sizeChanged = this.viewSize != viewSize
+        val orientationChanged = this.orientation != orientation
+        val zoomChanged = this.vZoom != vZoom
 
         this.viewSize = viewSize
         this.vZoom = vZoom
-        if (isOrientationChanged) {
-            this.orientation = orientation
-            this.vZoom = 1f
-        }
+        this.orientation = orientation
+        viewport.viewSize = viewSize
+        viewport.zoom = vZoom
 
-        if (isViewSizeChanged || isZoomChanged || isOrientationChanged) {
-            println("PageViewState.updateViewSize: 重新计算页面布局orientation: $orientation")
-            invalidatePageSizes()
-        } else {
-            println("PageViewState.viewSize未变化: vZoom:$vZoom, totalHeight:$totalHeight, totalWidth:$totalWidth, orientation: $orientation, viewSize:$viewSize")
-        }
-    }
-
-    // 二分查找第一个可见页面
-    private fun findVerticalFirstVisible(top: Float, currentVZoom: Float): Int {
-        var low = 0
-        var high = pages.size - 1
-        var result = pages.size
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val page = pages[mid]
-            // 在缩放过程中，需要考虑当前缩放比例
-            val scaleRatio = currentVZoom / this.vZoom
-            val currentBottom = page.bounds.bottom * scaleRatio
-            if (currentBottom > top) {
-                result = mid
-                high = mid - 1
-            } else {
-                low = mid + 1
-            }
-        }
-        return result
-    }
-
-    // 二分查找最后一个可见页面
-    private fun findVerticalLastVisible(bottom: Float, currentVZoom: Float): Int {
-        var low = 0
-        var high = pages.size - 1
-        var result = -1
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val page = pages[mid]
-            // 在缩放过程中，需要考虑当前缩放比例
-            val scaleRatio = currentVZoom / this.vZoom
-            val currentTop = page.bounds.top * scaleRatio
-            if (currentTop < bottom) {
-                result = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-        return result
-    }
-
-    // 二分查找第一个可见页面
-    private fun findHorizontalFirstVisible(left: Float, currentVZoom: Float): Int {
-        var low = 0
-        var high = pages.size - 1
-        var result = pages.size
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val page = pages[mid]
-            // 在缩放过程中，需要考虑当前缩放比例
-            val scaleRatio = currentVZoom / this.vZoom
-            val currentRight = page.bounds.right * scaleRatio
-            if (currentRight > left) {
-                result = mid
-                high = mid - 1
-            } else {
-                low = mid + 1
-            }
-        }
-        return result
-    }
-
-    // 二分查找最后一个可见页面
-    private fun findHorizontalLastVisible(right: Float, currentVZoom: Float): Int {
-        var low = 0
-        var high = pages.size - 1
-        var result = -1
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val page = pages[mid]
-            // 在缩放过程中，需要考虑当前缩放比例
-            val scaleRatio = currentVZoom / this.vZoom
-            val currentLeft = page.bounds.left * scaleRatio
-            if (currentLeft < right) {
-                result = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-        return result
-    }
-
-    public fun updateVisiblePages(offset: Offset, viewSize: IntSize, currentVZoom: Float = vZoom) {
-        // 优化：使用二分查找定位可见页面范围
-        if (pages.isEmpty()) {
-            pageToRender = emptyList()
-            notifyDecodeCompleted()
+        if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty()) {
+            updateTotals()
             return
         }
 
-        val scaleRatio = currentVZoom / this.vZoom
+        if (sizeChanged || orientationChanged || !init) {
+            relayout()
+        } else if (zoomChanged) {
+            viewport.setContentSize(docWidth, docHeight)
+            viewport.offset = viewport.clampOffset(viewport.offset)
+            viewOffset = viewport.offset
+            updateTotals()
+            updateVisibleNow(true)
+        }
+    }
+
+    public fun invalidatePageSizes() {
+        relayout()
+    }
+
+    private fun relayout() {
+        if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty()) {
+            updateTotals()
+            return
+        }
+        val anchor = captureAnchor()
+        computeRects()
+        if (anchor != null) {
+            applyAnchor(anchor)
+        } else {
+            viewport.offset = viewport.clampOffset(viewport.offset)
+        }
+        viewOffset = viewport.offset
+        updateTotals()
+        init = true
+        layoutVersion++
+        onLayoutApplied?.invoke()
+        updateVisibleNow(true)
+    }
+
+    private fun captureAnchor(): Anchor? {
+        if (!init || docWidth <= 0f || docHeight <= 0f || pages.isEmpty()) {
+            return null
+        }
+        val rect = viewport.docRect
+        var bestPage: Page? = null
+        var bestArea = 0f
+        for (page in pages) {
+            val area = overlapArea(page.baseRect, rect)
+            if (area > bestArea) {
+                bestArea = area
+                bestPage = page
+            }
+        }
+        val page = bestPage ?: pages.first()
+        if (page.baseRect.width <= 0f || page.baseRect.height <= 0f) {
+            return null
+        }
+        val fx = ((rect.left - page.baseRect.left) / page.baseRect.width).coerceIn(0f, 1f)
+        val fy = ((rect.top - page.baseRect.top) / page.baseRect.height).coerceIn(0f, 1f)
+        val docPoint = Offset(
+            page.baseRect.left + fx * page.baseRect.width,
+            page.baseRect.top + fy * page.baseRect.height
+        )
+        return Anchor(page.index, fx, fy, viewport.toScreen(docPoint))
+    }
+
+    private fun applyAnchor(anchor: Anchor) {
+        val page = pages.getOrNull(anchor.index) ?: return
+        if (page.baseRect.width <= 0f || page.baseRect.height <= 0f) {
+            return
+        }
+        val docX = page.baseRect.left + anchor.fx * page.baseRect.width
+        val docY = page.baseRect.top + anchor.fy * page.baseRect.height
+        viewport.offset = viewport.clampOffset(
+            Offset(
+                anchor.screen.x - docX * viewport.zoom,
+                anchor.screen.y - docY * viewport.zoom
+            )
+        )
+    }
+
+    private fun overlapArea(a: Rect, b: Rect): Float {
+        val left = max(a.left, b.left)
+        val top = max(a.top, b.top)
+        val right = min(a.right, b.right)
+        val bottom = min(a.bottom, b.bottom)
+        if (right <= left || bottom <= top) {
+            return 0f
+        }
+        return (right - left) * (bottom - top)
+    }
+
+    private fun computeRects() {
+        val viewWidth = viewSize.width.toFloat()
+        val viewHeight = viewSize.height.toFloat()
 
         if (columnCount > 1) {
-            // 计算当前可见区域（包含预加载范围）
-            val visibleRect = Rect(
-                left = -offset.x,
-                top = -offset.y,
-                right = viewSize.width - offset.x,
-                bottom = viewSize.height - offset.y
-            )
-            // 多列布局：需要同时考虑水平和垂直方向的可见性
-            val tilesToRenderCopy = pages.filter { page ->
-                val scaledBounds = Rect(
-                    left = page.bounds.left * scaleRatio,
-                    top = page.bounds.top * scaleRatio,
-                    right = page.bounds.right * scaleRatio,
-                    bottom = page.bounds.bottom * scaleRatio
-                )
-                scaledBounds.overlaps(visibleRect)
+            val columnWidth = viewWidth / columnCount
+            var currentY = 0f
+            var i = 0
+            while (i < pages.size) {
+                var rowHeight = 0f
+                for (col in 0 until columnCount) {
+                    val pageIndex = i + col
+                    if (pageIndex >= pages.size) break
+                    val page = pages[pageIndex]
+                    val pageHeight = columnWidth * page.geometry.height / page.geometry.width
+                    page.updateLayout(
+                        Rect(
+                            col * columnWidth,
+                            currentY,
+                            (col + 1) * columnWidth,
+                            currentY + pageHeight
+                        )
+                    )
+                    if (pageHeight > rowHeight) {
+                        rowHeight = pageHeight
+                    }
+                }
+                currentY += rowHeight
+                i += columnCount
             }
-
-            val newPageKeys = tilesToRenderCopy.map { page ->
-                page.aPage.index
-            }.toSet()
-            val toRemove = lastPageKeys - newPageKeys
-            toRemove.forEach { key ->
-                val page = pages.getOrNull(key) ?: return@forEach
-                page.clearVisibleNodes()
-            }
-            lastPageKeys = newPageKeys
-
-            if (tilesToRenderCopy != pageToRender) {
-                pageToRender = tilesToRenderCopy
-            }
-
-            // 更新每个可见页面的可见 nodes
-            tilesToRenderCopy.forEach { page ->
-                page.updateVisibleNodes(visibleRect.left, visibleRect.top, visibleRect.right, visibleRect.bottom, scaleRatio)
-            }
-            println("updateVisiblePages.multiColumn: visible=${tilesToRenderCopy.map { it.aPage.index }}")
+            docWidth = viewWidth
+            docHeight = currentY
         } else if (orientation == Vertical) {
-            val visibleTop = -offset.y
-            val visibleBottom = viewSize.height - offset.y
-            // 预加载区域：向下扩展一屏
-            val preloadBottom = visibleBottom + viewSize.height * preloadScreens
-            val preloadLeft = -offset.x
-            val preloadRight = viewSize.width - offset.x
+            var currentY = 0f
+            for (page in pages) {
+                val pageHeight = viewWidth * page.geometry.height / page.geometry.width
+                page.updateLayout(Rect(0f, currentY, viewWidth, currentY + pageHeight))
+                currentY += pageHeight
+            }
+            docWidth = viewWidth
+            docHeight = currentY
+        } else {
+            var currentX = 0f
+            for (page in pages) {
+                val pageWidth = viewHeight * page.geometry.width / page.geometry.height
+                page.updateLayout(Rect(currentX, 0f, currentX + pageWidth, viewHeight))
+                currentX += pageWidth
+            }
+            docWidth = currentX
+            docHeight = viewHeight
+        }
 
-            val first = findVerticalFirstVisible(visibleTop, currentVZoom)
-            val last = findVerticalLastVisible(preloadBottom, currentVZoom)
+        viewport.viewSize = viewSize
+        viewport.zoom = vZoom
+        viewport.setContentSize(docWidth, docHeight)
+    }
 
-            // pageToRender 包含可见页面 + 预加载页面
-            val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
-                pages.subList(first, last + 1)
+    private fun updateTotals() {
+        totalWidth = docWidth * vZoom
+        totalHeight = docHeight * vZoom
+    }
+
+    /**
+     * 兼容旧调用：更新视口偏移。
+     */
+    public fun updateOffset(newOffset: Offset) {
+        if (!init) {
+            viewport.offset = newOffset
+            viewOffset = newOffset
+            return
+        }
+        viewport.setContentSize(docWidth, docHeight)
+        viewport.offset = viewport.clampOffset(newOffset)
+        viewOffset = viewport.offset
+        updateTotals()
+        updateVisibleNow(true)
+    }
+
+    /**
+     * 兼容旧调用：更新视口并刷新可见 tile。
+     */
+    public fun updateVisiblePages(
+        offset: Offset,
+        viewSize: IntSize,
+        currentVZoom: Float = vZoom
+    ) {
+        if (!init) {
+            updateViewSize(viewSize, currentVZoom, orientation)
+            return
+        }
+        this.viewSize = viewSize
+        this.vZoom = currentVZoom
+        viewport.viewSize = viewSize
+        viewport.zoom = currentVZoom
+        viewport.setContentSize(docWidth, docHeight)
+        viewport.offset = viewport.clampOffset(offset)
+        viewOffset = viewport.offset
+        updateTotals()
+        updateVisibleNow(true)
+    }
+
+    internal fun updateViewport(zoom: Float, offset: Offset, request: Boolean) {
+        this.vZoom = zoom
+        viewport.viewSize = viewSize
+        viewport.zoom = zoom
+        viewport.setContentSize(docWidth, docHeight)
+        viewport.offset = viewport.clampOffset(offset)
+        viewOffset = viewport.offset
+        updateTotals()
+        if (request) {
+            updateVisibleNow(true)
+        }
+    }
+
+    private fun updateVisibleNow(request: Boolean) {
+        if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty() || !init) {
+            pageToRender = emptyList()
+            return
+        }
+        val visible = viewport.docRect
+        val vertical = orientation == Vertical || columnCount > 1
+        val preloadX = if (!vertical) viewSize.width / vZoom * preloadScreens else 0f
+        val preloadY = if (vertical) viewSize.height / vZoom * preloadScreens else 0f
+        val expanded = Rect(
+            visible.left - preloadX,
+            visible.top - preloadY,
+            visible.right + preloadX,
+            visible.bottom + preloadY
+        )
+
+        val newPages = pagesIntersecting(expanded)
+        if (newPages != pageToRender) {
+            pageToRender = newPages
+        }
+        val included = newPages.toHashSet()
+        pages.forEach { if (!included.contains(it)) it.clearVisibleTiles() }
+        newPages.forEach { it.updateVisibleTiles(expanded, vZoom, request) }
+
+        pagesIntersecting(visible).forEach {
+            it.ensureLinks()
+            requestCropProbe(it)
+        }
+        revision++
+    }
+
+    private fun pagesIntersecting(rect: Rect): List<Page> {
+        if (pages.isEmpty()) {
+            return emptyList()
+        }
+        val result = ArrayList<Page>()
+        for (page in pages) {
+            val base = page.baseRect
+            if (base.right > rect.left && base.left < rect.right &&
+                base.bottom > rect.top && base.top < rect.bottom
+            ) {
+                result.add(page)
+            }
+        }
+        return result
+    }
+
+    public fun firstVisiblePageIndex(): Int {
+        val rect = viewport.docRect
+        return pagesIntersecting(rect).firstOrNull()?.index ?: 0
+    }
+
+    public fun offsetForDoc(doc: Offset): Offset {
+        viewport.setContentSize(docWidth, docHeight)
+        return viewport.clampOffset(
+            Offset(-doc.x * viewport.zoom, -doc.y * viewport.zoom)
+        )
+    }
+
+    public fun offsetForPage(pageIndex: Int, originalY: Float? = null): Offset {
+        val page = pages.getOrNull(pageIndex) ?: return viewport.offset
+        viewport.setContentSize(docWidth, docHeight)
+        val vertical = orientation == Vertical || columnCount > 1
+        val docX: Float
+        val docY: Float
+        if (vertical) {
+            docX = if (columnCount > 1) page.baseRect.left else 0f
+            docY = if (originalY != null) {
+                page.geometry.originalToDocY(originalY, page.baseRect)
             } else {
-                emptyList()
-            }
-            // 主动移除不再可见的页面图片缓存
-            val newPageKeys = tilesToRenderCopy.map { page ->
-                page.aPage.index
-            }.toSet()
-            val toRemove = lastPageKeys - newPageKeys
-            toRemove.forEach { key ->
-                val page = pages.getOrNull(key) ?: return@forEach
-                page.clearVisibleNodes()
-            }
-            lastPageKeys = newPageKeys
-
-            if (tilesToRenderCopy != pageToRender) {
-                pageToRender = tilesToRenderCopy
-            }
-
-            // 更新每个可见页面的可见 nodes（直传坐标，避免Rect分配）
-            tilesToRenderCopy.forEach { page ->
-                page.updateVisibleNodes(preloadLeft, visibleTop, preloadRight, preloadBottom, scaleRatio)
+                page.baseRect.top
             }
         } else {
-            val visibleLeft = -offset.x
-            val visibleRight = viewSize.width - offset.x
-            // 预加载区域：向右扩展一屏（直传坐标，避免Rect分配）
-            val vTop = -offset.y
-            val vBottom = viewSize.height - offset.y
-            val preloadLeft = -offset.x
-            val preloadRight = visibleRight + viewSize.width * preloadScreens
-
-            val first = findHorizontalFirstVisible(visibleLeft, currentVZoom)
-            val last = findHorizontalLastVisible(preloadRight, currentVZoom)
-
-            // pageToRender 包含可见页面 + 预加载页面
-            val tilesToRenderCopy = if (first <= last && first < pages.size && last >= 0) {
-                pages.subList(first, last + 1)
-            } else {
-                emptyList()
-            }
-            // 主动移除不再可见的页面图片缓存
-            val newPageKeys = tilesToRenderCopy.map { page ->
-                page.aPage.index
-            }.toSet()
-            val toRemove = lastPageKeys - newPageKeys
-            toRemove.forEach { key ->
-                val page = pages.getOrNull(key) ?: return@forEach
-                page.clearVisibleNodes()
-            }
-            lastPageKeys = newPageKeys
-
-            if (tilesToRenderCopy != pageToRender) {
-                pageToRender = tilesToRenderCopy
-            }
-
-            // 更新每个可见页面的可见 nodes（直传坐标，避免Rect分配）
-            tilesToRenderCopy.forEach { page ->
-                page.updateVisibleNodes(preloadLeft, vTop, preloadRight, vBottom, scaleRatio)
-            }
+            docX = page.baseRect.left
+            docY = 0f
         }
-    }
-    
-    /**
-     * 可见,有可能是预加载
-     * 优化：O(1) 快速检查页面是否在可见列表中
-     */
-    public fun isPageInVisibleList(pageIndex: Int): Boolean {
-        return lastPageKeys.contains(pageIndex)
-    }
-
-    public fun updateOffset(newOffset: Offset) {
-        if (viewOffset != newOffset) {
-            this.viewOffset = newOffset
-            updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
-        }
+        return viewport.clampOffset(
+            Offset(-docX * viewport.zoom, -docY * viewport.zoom)
+        )
     }
 
     public fun drawVisiblePages(
@@ -698,37 +514,266 @@ public class PageViewState(
         offset: Offset,
         vZoom: Float,
     ) {
-        pageToRender.forEach { page ->
-            page.draw(drawScope, offset, vZoom)
+        val list = pageToRender
+        for (page in list) {
+            page.drawTiles(drawScope)
         }
     }
 
-    /**
-     * 处理点击事件，查找并处理链接
-     * @param x 点击的X坐标
-     * @param y 点击的Y坐标
-     * @return 如果找到链接并处理成功返回true，否则返回false
-     */
-    public fun handleClick(x: Float, y: Float): Boolean {
+    private fun requestCropProbe(page: Page) {
+        if (!cropEnabled || page.aPage.cropBounds != null || page.cropProbeRequested) {
+            return
+        }
+        val service = decodeService ?: return
+        page.cropProbeRequested = true
+        val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
+            page.aPage.width,
+            page.aPage.height,
+            200
+        )
+        val task = DecodeTask(
+            type = TaskType.CROP,
+            pageIndex = page.index,
+            key = "crop-${page.index}-${page.geometry.id}",
+            aPage = page.aPage,
+            zoom = 1f,
+            pageSliceBounds = Rect(0f, 0f, 1f, 1f),
+            width = thumbWidth,
+            height = thumbHeight,
+            crop = true,
+            callback = object : DecodeCallback {
+                override fun onDecodeComplete(
+                    bitmap: androidx.compose.ui.graphics.ImageBitmap?,
+                    isThumb: Boolean,
+                    error: Throwable?
+                ) {
+                }
+
+                override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                    return !isShutdown
+                }
+
+                override fun onFinish(pageNumber: Int) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onCropProbeFinished(page)
+                    }
+                }
+            }
+        )
+        service.submitTask(task)
+    }
+
+    private fun onCropProbeFinished(page: Page) {
+        if (isShutdown) return
+        pendingCropPages.add(page.index)
+        if (cropRelayoutScheduled) {
+            return
+        }
+        cropRelayoutScheduled = true
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(50)
+            cropRelayoutScheduled = false
+            applyPendingCropResults()
+        }
+    }
+
+    private fun applyPendingCropResults() {
+        if (isShutdown) {
+            pendingCropPages.clear()
+            return
+        }
+        var changed = false
+        for (index in pendingCropPages) {
+            val page = pages.getOrNull(index) ?: continue
+            val geometry = PageGeometry(
+                page.aPage.width.toFloat(),
+                page.aPage.height.toFloat(),
+                page.aPage.cropBounds,
+                cropEnabled
+            )
+            if (geometry != page.geometry) {
+                page.updateGeometry(geometry)
+                changed = true
+            }
+        }
+        pendingCropPages.clear()
+        if (changed) {
+            relayout()
+        }
+    }
+
+    public fun drawOverlay(drawScope: DrawScope) {
         for (page in pageToRender) {
-            val link = page.findLinkAtPoint(x, y)
+            val base = page.baseRect
+            val visible = viewport.docRect
+            if (base.right < visible.left || base.left > visible.right ||
+                base.bottom < visible.top || base.top > visible.bottom
+            ) {
+                continue
+            }
+            drawLinks(drawScope, page)
+            drawTextSelection(drawScope, page)
+            drawSearchHighlight(drawScope, page)
+            drawSpeakingIndicator(drawScope, page)
+            drawAnnotations(drawScope, page)
+            drawSeparator(drawScope, page)
+        }
+    }
+
+    private fun toScreen(page: Page, x: Float, y: Float): Offset {
+        return viewport.toScreen(page.geometry.originalToDoc(x, y, page.baseRect))
+    }
+
+    private fun drawLinks(drawScope: DrawScope, page: Page) {
+        if (page.links.isEmpty()) return
+        val geometry = page.geometry
+        for (link in page.links) {
+            val bbox = link.bbox ?: continue
+            if (bbox.right <= geometry.left || bbox.left >= geometry.left + geometry.width ||
+                bbox.bottom <= geometry.top || bbox.top >= geometry.top + geometry.height
+            ) {
+                continue
+            }
+            val rect = geometry.originalRectToDoc(bbox, page.baseRect)
+            val topLeft = viewport.toScreen(Offset(rect.left, rect.top))
+            val bottomRight = viewport.toScreen(Offset(rect.right, rect.bottom))
+            val linkColor = if (link.linkType == Hyperlink.LINKTYPE_URL) {
+                Color(0x66336EE5)
+            } else {
+                Color(0x40FFA500)
+            }
+            drawScope.drawRect(
+                color = linkColor,
+                topLeft = topLeft,
+                size = GeomSize(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y)
+            )
+        }
+    }
+
+    private fun drawTextSelection(drawScope: DrawScope, page: Page) {
+        val selection = page.currentSelection ?: return
+        val selector = textSelector ?: return
+        val color = Color(0x6633B5E5)
+        selection.quads.forEach { quad ->
+            val screenQuad = selector.quadToScreenQuad(quad) { x, y ->
+                toScreen(page, x, y)
+            }
+            val left = minOf(screenQuad.ul.x, screenQuad.ur.x, screenQuad.ll.x, screenQuad.lr.x)
+            val top = minOf(screenQuad.ul.y, screenQuad.ur.y, screenQuad.ll.y, screenQuad.lr.y)
+            val right = maxOf(screenQuad.ul.x, screenQuad.ur.x, screenQuad.ll.x, screenQuad.lr.x)
+            val bottom = maxOf(screenQuad.ul.y, screenQuad.ur.y, screenQuad.ll.y, screenQuad.lr.y)
+            drawScope.drawRect(
+                color = color,
+                topLeft = Offset(left, top),
+                size = GeomSize(right - left, bottom - top)
+            )
+        }
+    }
+
+    private fun drawSearchHighlight(drawScope: DrawScope, page: Page) {
+        val quads = searchHighlightQuads[page.index] ?: return
+        val normalColor = Color(0x55FFFF00)
+        quads.forEach { quad ->
+            drawScreenQuad(drawScope, page, quad, normalColor)
+        }
+        if (currentSearchPageIndex == page.index && quads.isNotEmpty()) {
+            drawScreenQuad(drawScope, page, quads[0], Color(0x88FFA500))
+        }
+    }
+
+    private fun drawScreenQuad(drawScope: DrawScope, page: Page, quad: DocQuad, color: Color) {
+        val ul = toScreen(page, quad.ul.x, quad.ul.y)
+        val ur = toScreen(page, quad.ur.x, quad.ur.y)
+        val ll = toScreen(page, quad.ll.x, quad.ll.y)
+        val lr = toScreen(page, quad.lr.x, quad.lr.y)
+        val left = minOf(ul.x, ur.x, ll.x, lr.x)
+        val top = minOf(ul.y, ur.y, ll.y, lr.y)
+        val right = maxOf(ul.x, ur.x, ll.x, lr.x)
+        val bottom = maxOf(ul.y, ur.y, ll.y, lr.y)
+        drawScope.drawRect(
+            color = color,
+            topLeft = Offset(left, top),
+            size = GeomSize(right - left, bottom - top)
+        )
+    }
+
+    private fun drawSpeakingIndicator(drawScope: DrawScope, page: Page) {
+        val speakingPage = speakingPageIndex
+        if (speakingPage != null && speakingPage == page.index) {
+            val topLeft = viewport.toScreen(Offset(page.baseRect.left, page.baseRect.top))
+            val bottomRight = viewport.toScreen(Offset(page.baseRect.right, page.baseRect.bottom))
+            drawScope.drawRect(
+                color = Color.Red,
+                topLeft = topLeft,
+                size = GeomSize(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y),
+                style = Stroke(width = 8f)
+            )
+        }
+    }
+
+    private fun drawAnnotations(drawScope: DrawScope, page: Page) {
+        annotationManager.annotations[page.index]?.forEach { anno ->
+            drawAnnotationPath(drawScope, page, anno)
+        }
+        activeDrawingAnno?.let { (index, anno) ->
+            if (index == page.index) {
+                drawAnnotationPath(drawScope, page, anno)
+            }
+        }
+    }
+
+    private fun drawAnnotationPath(drawScope: DrawScope, page: Page, anno: AnnotationPath) {
+        if (anno.points.size < 2) return
+        val path = Path()
+        anno.points.forEachIndexed { i, rel ->
+            val doc = Offset(
+                page.baseRect.left + rel.x * page.baseRect.width,
+                page.baseRect.top + rel.y * page.baseRect.height
+            )
+            val screen = viewport.toScreen(doc)
+            if (i == 0) path.moveTo(screen.x, screen.y) else path.lineTo(screen.x, screen.y)
+        }
+        drawScope.drawPath(path, anno.config.color, style = Stroke(width = anno.config.strokeWidth))
+    }
+
+    private fun drawSeparator(drawScope: DrawScope, page: Page) {
+        val color = Color(0xFF999999)
+        if (orientation == Vertical || columnCount > 1) {
+            val topLeft = viewport.toScreen(
+                Offset(page.baseRect.left, page.baseRect.bottom - 2f / viewport.zoom)
+            )
+            val right = viewport.toScreen(Offset(page.baseRect.left + page.baseRect.width / 4, page.baseRect.bottom))
+            drawScope.drawRect(
+                color = color,
+                topLeft = topLeft,
+                size = GeomSize(right.x - topLeft.x, 2f)
+            )
+        } else {
+            val topLeft = viewport.toScreen(
+                Offset(page.baseRect.right - 2f / viewport.zoom, page.baseRect.top)
+            )
+            val bottom = viewport.toScreen(Offset(page.baseRect.right, page.baseRect.top + page.baseRect.height / 4))
+            drawScope.drawRect(
+                color = color,
+                topLeft = topLeft,
+                size = GeomSize(2f, bottom.y - topLeft.y)
+            )
+        }
+    }
+
+    public fun handleClick(docX: Float, docY: Float): Boolean {
+        for (page in pageToRender) {
+            val link = page.findLinkAtPoint(docX, docY)
             if (link != null) {
                 return handleLink(link)
             }
         }
-
         return false
     }
 
-    /**
-     * 处理链接
-     * @param link 找到的链接
-     * @return 处理是否成功
-     */
     private fun handleLink(link: Hyperlink): Boolean {
         return when (link.linkType) {
             Hyperlink.LINKTYPE_PAGE -> {
-                // 页面链接，跳转到指定页面
                 if (link.page >= 0 && link.page < pages.size) {
                     onPageLinkClick?.invoke(link.page)
                     true
@@ -746,28 +791,19 @@ public class PageViewState(
                 }
             }
 
-            else -> {
-                println("PageViewState.handleLink: 未知链接类型: ${link.linkType}")
-                false
-            }
+            else -> false
         }
     }
 
     public companion object {
-
         public fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
-            // 获取画布的可视区域
             val visibleRect = Rect(
                 left = -offset.x,
                 top = -offset.y,
                 right = viewSize.width - offset.x,
                 bottom = viewSize.height - offset.y
             )
-
-            // 检查页面是否与可视区域相交
-            val visible = bounds.overlaps(visibleRect)
-            //println("page.draw.isStrictlyVisible:$visible, offset:$offset, bounds:$bounds, visibleRect:$visibleRect, $page")
-            return visible
+            return bounds.overlaps(visibleRect)
         }
     }
 }

@@ -131,6 +131,7 @@ public class DecoderAdapter(
                 Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
             }
 
+            aPage.cropBounds = finalCropBounds
             println("PdfDecoderAdapter.processCrop: page=${task.pageIndex}, cropBounds=$finalCropBounds")
 
             CropResult(task.pageIndex, finalCropBounds)

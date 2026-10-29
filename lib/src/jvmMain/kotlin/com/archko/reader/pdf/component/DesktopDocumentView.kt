@@ -140,6 +140,7 @@ public fun DesktopDocumentView(
             stateHolder.viewSize.value,
             stateHolder.vZoom.value
         )
+        stateHolder.offset.value = stateHolder.pageViewState.viewOffset
     }
 
     // 桌面端特有的键盘事件处理器
@@ -324,6 +325,7 @@ public fun DesktopDocumentView(
                                     stateHolder.orientation.value
                                 )
                                 stateHolder.pageViewState.updateOffset(newOffset)
+                                stateHolder.offset.value = stateHolder.pageViewState.viewOffset
                             }
                         }
                         true
@@ -356,6 +358,7 @@ public fun DesktopDocumentView(
                                     stateHolder.orientation.value
                                 )
                                 stateHolder.pageViewState.updateOffset(newOffset)
+                                stateHolder.offset.value = stateHolder.pageViewState.viewOffset
                             }
                         }
                         true
@@ -385,6 +388,7 @@ public fun DesktopDocumentView(
                                     stateHolder.orientation.value
                                 )
                                 stateHolder.pageViewState.updateOffset(newOffset)
+                                stateHolder.offset.value = stateHolder.pageViewState.viewOffset
                             }
                         }
                         true
@@ -412,6 +416,7 @@ public fun DesktopDocumentView(
                     stateHolder.vZoom.value,
                     stateHolder.orientation.value
                 )
+                stateHolder.offset.value = stateHolder.pageViewState.viewOffset
             },
         contentAlignment = Alignment.TopStart
     ) {
@@ -522,8 +527,10 @@ private fun handleZoom(
     val newOffsetX = centerX - contentX * zoomRatio
     val newOffsetY = centerY - contentY * zoomRatio
 
-    val maxX = (pageViewState.totalWidth - viewSize.width).coerceAtLeast(0f)
-    val maxY = (pageViewState.totalHeight - viewSize.height).coerceAtLeast(0f)
+    val baseWidth = if (currentZoom > 0f) pageViewState.totalWidth / currentZoom else pageViewState.totalWidth
+    val baseHeight = if (currentZoom > 0f) pageViewState.totalHeight / currentZoom else pageViewState.totalHeight
+    val maxX = (baseWidth * newZoom - viewSize.width).coerceAtLeast(0f)
+    val maxY = (baseHeight * newZoom - viewSize.height).coerceAtLeast(0f)
 
     val clampedOffsetX = newOffsetX.coerceIn(-maxX, 0f)
     val clampedOffsetY = newOffsetY.coerceIn(-maxY, 0f)
