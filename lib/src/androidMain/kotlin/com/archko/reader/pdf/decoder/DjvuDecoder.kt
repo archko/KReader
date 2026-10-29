@@ -27,6 +27,8 @@ import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import java.io.File
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * @author: archko 2025/11/9 :6:26
@@ -57,6 +59,12 @@ public class DjvuDecoder(
 
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
+
+    // 当前页整页位图缓存，避免同一页多个 tile 重复 ddjvu_page_render
+    private val maxFullPageCacheBytes = 24L * 1024 * 1024
+    private var fullPageCacheIndex = -1
+    private var fullPageCacheScale = 0f
+    private var fullPageCacheBitmap: Bitmap? = null
 
     public companion object {
         /**
@@ -250,6 +258,9 @@ public class DjvuDecoder(
     }
 
     override fun close() {
+        fullPageCacheBitmap = null
+        fullPageCacheIndex = -1
+        fullPageCacheScale = 0f
         djvuLoader?.close()
         if (cachePage && aPageList.isNotEmpty()) {
             println("DjvuDecoder.close:${aPageList.size}")
@@ -399,13 +410,46 @@ public class DjvuDecoder(
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
+        val loader = djvuLoader
+        if (loader == null || !loader.isOpened || index !in originalPageSizes.indices || scale <= 0f) {
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
+
         return try {
-            val pageWidth = (region.width / scale).toInt()
-            val pageHeight = (region.height / scale).toInt()
-            val patchX = (region.left / scale).toInt()
-            val patchY = (region.top / scale).toInt()
-            //精度的问题,jni那边不支持小数进位四舍五入,所以这里的高宽要修正一下.
-            val bitmap = djvuLoader!!.decodeRegionToBitmap(
+            val originalSize = originalPageSizes[index]
+            val pageOutWidth = ceil(originalSize.width * scale).toInt()
+            val pageOutHeight = ceil(originalSize.height * scale).toInt()
+
+            // 页面被切成多个 tile 时，先渲染整页再裁剪，避免重复渲染
+            if (pageOutWidth > outWidth + 1 || pageOutHeight > outHeight + 1) {
+                val fullBitmap = getFullPageBitmap(index, scale, pageOutWidth, pageOutHeight)
+                if (fullBitmap != null) {
+                    val left = floor(region.left).toInt().coerceIn(0, fullBitmap.width)
+                    val top = floor(region.top).toInt().coerceIn(0, fullBitmap.height)
+                    val right = ceil(region.right).toInt().coerceIn(left, fullBitmap.width)
+                    val bottom = ceil(region.bottom).toInt().coerceIn(top, fullBitmap.height)
+
+                    if (right > left && bottom > top) {
+                        return Bitmap.createBitmap(
+                            fullBitmap,
+                            left,
+                            top,
+                            right - left,
+                            bottom - top
+                        ).asImageBitmap()
+                    }
+                }
+            }
+
+            // 起点向下取整、宽高向上取整，保证相邻 tile 覆盖完整，避免接缝
+            val patchX = floor(region.left / scale).toInt()
+            val patchY = floor(region.top / scale).toInt()
+            val pageWidth =
+                (ceil(region.right / scale).toInt() - patchX).coerceAtLeast(1)
+            val pageHeight =
+                (ceil(region.bottom / scale).toInt() - patchY).coerceAtLeast(1)
+
+            val bitmap = loader.decodeRegionToBitmap(
                 index,
                 patchX,
                 patchY,
@@ -414,8 +458,6 @@ public class DjvuDecoder(
                 scale,
             )
 
-            println("DjvuDecoder.renderPageRegion:index:$index, scale:$scale, patch:$patchX-$patchY-page:$pageWidth-$pageHeight, region:$region")
-
             bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
             println("renderPageRegion error: ${documentInfo.path ?: documentInfo.uri ?: ""}, $e")
@@ -423,14 +465,51 @@ public class DjvuDecoder(
         }
     }
 
+    private fun getFullPageBitmap(
+        index: Int,
+        scale: Float,
+        pageOutWidth: Int,
+        pageOutHeight: Int
+    ): Bitmap? {
+        fullPageCacheBitmap?.let { bitmap ->
+            if (fullPageCacheIndex == index && fullPageCacheScale == scale && !bitmap.isRecycled) {
+                return bitmap
+            }
+        }
+
+        val bytes = pageOutWidth.toLong() * pageOutHeight * 4
+        if (bytes > maxFullPageCacheBytes) {
+            fullPageCacheBitmap = null
+            return null
+        }
+
+        val originalSize = originalPageSizes[index]
+        val bitmap = djvuLoader?.decodeRegionToBitmap(
+            index,
+            0,
+            0,
+            originalSize.width,
+            originalSize.height,
+            scale
+        ) ?: return null
+
+        fullPageCacheIndex = index
+        fullPageCacheScale = scale
+        fullPageCacheBitmap = bitmap
+        return bitmap
+    }
+
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
-    ): ImageBitmap{
-        return ImageBitmap(
+    ): ImageBitmap {
+        return renderPageRegion(
+            task.pageSliceBounds,
+            task.pageIndex,
+            totalScale,
+            IntSize.Zero,
             task.width,
-            task.height,
-            ImageBitmapConfig.Rgb565
+            task.height
         )
     }
 

@@ -1,9 +1,12 @@
 package com.archko.reader.pdf.decoder
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.cache.APageSizeLoader
@@ -23,6 +26,8 @@ import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import java.awt.image.BufferedImage
 import java.io.File
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * @author: archko 2025/11/9 :6:26
@@ -50,6 +55,12 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     private val linksCache = mutableMapOf<Int, List<Hyperlink>>()
     private var djvuLoader: DjvuLoader? = null
+
+    // 当前页整页位图缓存，避免同一页多个 tile 重复 ddjvu_page_render
+    private val maxFullPageCacheBytes = 24L * 1024 * 1024
+    private var fullPageCacheIndex = -1
+    private var fullPageCacheScale = 0f
+    private var fullPageCacheBitmap: BufferedImage? = null
 
     public companion object {
         /**
@@ -229,6 +240,9 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
     }
 
     override fun close() {
+        fullPageCacheBitmap = null
+        fullPageCacheIndex = -1
+        fullPageCacheScale = 0f
         djvuLoader?.close()
         if (cachePage && aPageList.isNotEmpty()) {
             println("DjvuDecoder.close:${aPageList.size}")
@@ -378,13 +392,45 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
+        val loader = djvuLoader
+        if (loader == null || !loader.isOpened || index !in originalPageSizes.indices || scale <= 0f) {
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
+
         return try {
-            val pageWidth = (region.width / scale).toInt()
-            val pageHeight = (region.height / scale).toInt()
-            val patchX = (region.left / scale).toInt()
-            val patchY = (region.top / scale).toInt()
-            //精度的问题,jni那边不支持小数进位四舍五入,所以这里的高宽要修正一下.
-            val bitmap = djvuLoader!!.decodeRegionToBitmap(
+            val originalSize = originalPageSizes[index]
+            val pageOutWidth = ceil(originalSize.width * scale).toInt()
+            val pageOutHeight = ceil(originalSize.height * scale).toInt()
+
+            // 页面被切成多个 tile 时，先渲染整页再裁剪，避免重复渲染
+            if (pageOutWidth > outWidth + 1 || pageOutHeight > outHeight + 1) {
+                val fullBitmap = getFullPageBitmap(index, scale, pageOutWidth, pageOutHeight)
+                if (fullBitmap != null) {
+                    val left = floor(region.left).toInt().coerceIn(0, fullBitmap.width)
+                    val top = floor(region.top).toInt().coerceIn(0, fullBitmap.height)
+                    val right = ceil(region.right).toInt().coerceIn(left, fullBitmap.width)
+                    val bottom = ceil(region.bottom).toInt().coerceIn(top, fullBitmap.height)
+
+                    if (right > left && bottom > top) {
+                        return fullBitmap.getSubimage(
+                            left,
+                            top,
+                            right - left,
+                            bottom - top
+                        ).toComposeImageBitmap()
+                    }
+                }
+            }
+
+            // 起点向下取整、宽高向上取整，保证相邻 tile 覆盖完整，避免接缝
+            val patchX = floor(region.left / scale).toInt()
+            val patchY = floor(region.top / scale).toInt()
+            val pageWidth =
+                (ceil(region.right / scale).toInt() - patchX).coerceAtLeast(1)
+            val pageHeight =
+                (ceil(region.bottom / scale).toInt() - patchY).coerceAtLeast(1)
+
+            val bitmap = loader.decodeRegionToBitmap(
                 index,
                 patchX,
                 patchY,
@@ -392,8 +438,6 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 pageHeight,
                 scale,
             )
-
-            println("PdfDecoder.renderPageRegion:index:$index, scale:$scale, patch:$patchX-$patchY-page:$pageWidth-$pageHeight, region:$region")
 
             bitmap?.toComposeImageBitmap() ?: ImageBitmap(
                 outWidth,
@@ -406,14 +450,51 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
     }
 
+    private fun getFullPageBitmap(
+        index: Int,
+        scale: Float,
+        pageOutWidth: Int,
+        pageOutHeight: Int
+    ): BufferedImage? {
+        fullPageCacheBitmap?.let { bitmap ->
+            if (fullPageCacheIndex == index && fullPageCacheScale == scale) {
+                return bitmap
+            }
+        }
+
+        val bytes = pageOutWidth.toLong() * pageOutHeight * 4
+        if (bytes > maxFullPageCacheBytes) {
+            fullPageCacheBitmap = null
+            return null
+        }
+
+        val originalSize = originalPageSizes[index]
+        val bitmap = djvuLoader?.decodeRegionToBitmap(
+            index,
+            0,
+            0,
+            originalSize.width,
+            originalSize.height,
+            scale
+        ) ?: return null
+
+        fullPageCacheIndex = index
+        fullPageCacheScale = scale
+        fullPageCacheBitmap = bitmap
+        return bitmap
+    }
+
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
-    ): ImageBitmap{
-        return ImageBitmap(
+    ): ImageBitmap {
+        return renderPageRegion(
+            task.pageSliceBounds,
+            task.pageIndex,
+            totalScale,
+            IntSize.Zero,
             task.width,
-            task.height,
-            ImageBitmapConfig.Rgb565
+            task.height
         )
     }
 
@@ -569,24 +650,17 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         println("DjvuDecoder.cropImageBitmap:$index, 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight)")
 
         try {
-            // 读取原始图片的像素数据
-            val originalPixels = IntArray(originalBitmap.width * originalBitmap.height)
-            originalBitmap.readPixels(originalPixels)
+            val croppedImageBitmap = ImageBitmap(safeWidth, safeHeight)
+            val canvas = Canvas(croppedImageBitmap)
+            canvas.drawImageRect(
+                image = originalBitmap,
+                srcOffset = IntOffset(safeX, safeY),
+                srcSize = IntSize(safeWidth, safeHeight),
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(safeWidth, safeHeight),
+                paint = Paint()
+            )
 
-            // 创建切边后的BufferedImage
-            val croppedImage = BufferedImage(safeWidth, safeHeight, BufferedImage.TYPE_INT_ARGB)
-
-            // 复制切边区域的像素
-            for (y in 0 until safeHeight) {
-                for (x in 0 until safeWidth) {
-                    val srcIndex = (safeY + y) * originalBitmap.width + (safeX + x)
-                    if (srcIndex < originalPixels.size) {
-                        croppedImage.setRGB(x, y, originalPixels[srcIndex])
-                    }
-                }
-            }
-
-            val croppedImageBitmap = croppedImage.toComposeImageBitmap()
             println("DjvuDecoder.cropImageBitmap: 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
 
             return croppedImageBitmap
