@@ -1,90 +1,77 @@
 package com.archko.reader.pdf.cache
 
 import android.graphics.Bitmap
-import androidx.core.util.Pools
 
 /**
  * Created by archko on 16/12/24.
  */
+
+/**
+ * 按尺寸分桶的 Bitmap 池，避免不同尺寸互相挤占导致命中率过低。
+ */
 public object BitmapPool {
-    private val simplePool = FixedSimplePool<Bitmap>(18)
+    private const val MAX_POOL_SIZE = 18
+    private const val MAX_PER_SIZE = 2
+
+    private data class PoolKey(
+        val width: Int,
+        val height: Int,
+        val config: Bitmap.Config
+    )
+
+    private val buckets = HashMap<PoolKey, ArrayDeque<Bitmap>>()
+    private var pooledCount = 0
+    private val lock = Any()
 
     public fun acquire(
         width: Int,
         height: Int,
         config: Bitmap.Config = Bitmap.Config.ARGB_8888
     ): Bitmap {
-        var bitmap = simplePool.acquire()
+        synchronized(lock) {
+            val key = PoolKey(width, height, config)
+            val bucket = buckets[key]
+            while (bucket != null && bucket.isNotEmpty()) {
+                val bitmap = bucket.removeLast()
+                pooledCount--
 
-        // 如果拿到的已经被回收，重试一次
-        if (bitmap?.isRecycled == true) {
-            bitmap = simplePool.acquire()
+                if (!bitmap.isRecycled) {
+                    bitmap.eraseColor(0)
+                    return bitmap
+                }
+            }
+            if (bucket != null && bucket.isEmpty()) {
+                buckets.remove(key)
+            }
         }
 
-        return if (bitmap != null &&
-            bitmap.width == width &&
-            bitmap.height == height &&
-            bitmap.config == config
-        ) {
-            bitmap.eraseColor(0)
-            bitmap
-        } else {
-            // 如果不匹配或为空，不放入池子，直接创建新的
-            Bitmap.createBitmap(width, height, config)
-        }
+        return Bitmap.createBitmap(width, height, config)
     }
 
     public fun release(bitmap: Bitmap?) {
         if (bitmap == null || bitmap.isRecycled) return
 
-        val isReleased = simplePool.release(bitmap)
-        if (!isReleased) {
-            bitmap.recycle()
+        synchronized(lock) {
+            val config = bitmap.config ?: Bitmap.Config.ARGB_8888
+            val key = PoolKey(bitmap.width, bitmap.height, config)
+            val bucket = buckets.getOrPut(key) { ArrayDeque() }
+
+            if (pooledCount < MAX_POOL_SIZE && bucket.size < MAX_PER_SIZE) {
+                bucket.addLast(bitmap)
+                pooledCount++
+            } else {
+                bitmap.recycle()
+            }
         }
     }
 
-    @Synchronized
     public fun clear() {
-        var bitmap: Bitmap?
-        while ((simplePool.acquire().also { bitmap = it }) != null) {
-            bitmap!!.recycle()
-        }
-    }
-
-    // 增加同步机制
-    private class FixedSimplePool<T : Any>(maxPoolSize: Int) : Pools.Pool<T> {
-        private val mPool: Array<Any?> = arrayOfNulls(maxPoolSize)
-        private var mPoolSize = 0
-        private val lock = Any() // 专用的锁对象
-
-        override fun acquire(): T? = synchronized(lock) {
-            if (mPoolSize > 0) {
-                val lastPooledIndex = mPoolSize - 1
-
-                @Suppress("UNCHECKED_CAST")
-                val instance = mPool[lastPooledIndex] as T?
-                mPool[lastPooledIndex] = null
-                mPoolSize--
-                return instance
+        synchronized(lock) {
+            buckets.values.forEach { bucket ->
+                bucket.forEach { bitmap -> bitmap.recycle() }
             }
-            return null
-        }
-
-        override fun release(instance: T): Boolean = synchronized(lock) {
-            if (isInPool(instance)) return true
-            if (mPoolSize < mPool.size) {
-                mPool[mPoolSize] = instance
-                mPoolSize++
-                return true
-            }
-            return false
-        }
-
-        private fun isInPool(instance: T): Boolean {
-            for (i in 0 until mPoolSize) {
-                if (mPool[i] === instance) return true
-            }
-            return false
+            buckets.clear()
+            pooledCount = 0
         }
     }
 }

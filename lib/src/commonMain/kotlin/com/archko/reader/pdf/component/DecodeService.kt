@@ -21,6 +21,8 @@ public class DecodeService(
     init {
         // 启动一个常驻循环来监听队列
         scope.launch {
+            setDecodeThreadPriority()
+
             while (!isShutdown.get()) {
                 val task = synchronized(lock) {
                     val next = when {

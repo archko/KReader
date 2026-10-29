@@ -41,11 +41,14 @@ import com.archko.reader.pdf.util.PFDSeekableInputStream
 import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.Utils
 import com.archko.reader.pdf.util.loadOutlineItems
+import com.artifex.mupdf.fitz.DisplayList
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.Matrix
 import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
+import java.util.Collections
+import java.util.LinkedHashMap
 
 /**
  * @author: archko 2025/4/11 :11:26
@@ -74,9 +77,43 @@ public class PdfDecoder(
     public var needsPassword: Boolean = false
     public var isAuthenticated: Boolean = false
 
-    // 页面缓存，最多缓存8页
-    private val pageCache = mutableMapOf<Int, Page>()
+    // 页面缓存，最多缓存8页，按访问顺序淘汰
     private val maxPageCache = 8
+    private val pageCache = Collections.synchronizedMap(
+        object : LinkedHashMap<Int, Page>(maxPageCache, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Page>): Boolean {
+                if (size > maxPageCache) {
+                    try {
+                        eldest.value.destroy()
+                    } catch (e: Exception) {
+                        println("Error destroying cached page: $e")
+                    }
+                    return true
+                }
+                return false
+            }
+        }
+    )
+
+    // DisplayList 缓存，避免同一页多个 tile 重复解释 content stream
+    private val maxDisplayListCache = 3
+    private val displayListCache = object : LinkedHashMap<Int, DisplayList>(
+        maxDisplayListCache,
+        0.75f,
+        true
+    ) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, DisplayList>): Boolean {
+            if (size > maxDisplayListCache) {
+                try {
+                    eldest.value.destroy()
+                } catch (e: Exception) {
+                    println("Error destroying cached display list: $e")
+                }
+                return true
+            }
+            return false
+        }
+    }
 
     public override val aPageList: MutableList<APage>? = ArrayList()
     private var pageSizeBean: PageSizeBean? = null
@@ -413,6 +450,16 @@ public class PdfDecoder(
             }
         }
 
+        // 清理 DisplayList 缓存
+        displayListCache.values.forEach { displayList ->
+            try {
+                displayList.destroy()
+            } catch (e: Exception) {
+                println("Error destroying cached display list: $e")
+            }
+        }
+        displayListCache.clear()
+
         // 清理页面缓存
         pageCache.values.forEach { page ->
             try {
@@ -558,19 +605,39 @@ public class PdfDecoder(
         bitmap: Bitmap,
         patchX: Int,
         patchY: Int,
-        decodeLink: Boolean
+        decodeLink: Boolean,
+        useDisplayList: Boolean = false
     ) {
         val ctm = Matrix(scale)
         val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, bitmap.width, bitmap.height)
 
-        val page = getPage(index)
-        page.run(dev, ctm, null)
+        try {
+            val displayList = if (useDisplayList) {
+                getDisplayList(index)
+            } else {
+                // 缩略图不主动创建 DisplayList，已有则复用
+                displayListCache[index]
+            }
+            if (displayList != null) {
+                displayList.run(dev, ctm, null)
+            } else {
+                getPage(index).run(dev, ctm, null)
+            }
 
-        // 在解码缩略图时同时解析链接
-        parseLinksIfNeeded(index, false, decodeLink)
+            // 在解码缩略图时同时解析链接
+            parseLinksIfNeeded(index, false, decodeLink)
+        } finally {
+            dev.close()
+            dev.destroy()
+        }
+    }
 
-        dev.close()
-        dev.destroy()
+    private fun getDisplayList(index: Int): DisplayList {
+        displayListCache[index]?.let { return it }
+
+        val displayList = getPage(index).toDisplayList()
+        displayListCache[index] = displayList
+        return displayList
     }
 
     public override fun renderPage(
@@ -744,7 +811,7 @@ public class PdfDecoder(
 
             val start = System.currentTimeMillis()
             val bitmap = acquireReusableBitmap(outWidth, outHeight)
-            decode(index, scale, bitmap, patchX, patchY, false)
+            decode(index, scale, bitmap, patchX, patchY, false, true)
             println("PdfDecoder.renderPageRegion:index:$index, cos:${System.currentTimeMillis() - start}, scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
             /*val file = File(
@@ -767,7 +834,7 @@ public class PdfDecoder(
     ): ImageBitmap {
         // 1. 从对象池获取 Bitmap 并清空
         val bitmap: Bitmap = BitmapPool.acquire(task.width, task.height)
-        bitmap.eraseColor(android.graphics.Color.WHITE)
+        //bitmap.eraseColor(android.graphics.Color.WHITE)
 
         decode(
             task.pageIndex,
@@ -775,7 +842,8 @@ public class PdfDecoder(
             bitmap,
             task.pageSliceBounds.left.toInt(),
             task.pageSliceBounds.top.toInt(),
-            false
+            false,
+            true
         )
 
         return bitmap.asImageBitmap()
@@ -917,14 +985,6 @@ public class PdfDecoder(
      * 获取或创建页面，支持缓存
      */
     private fun getPage(index: Int): Page {
-        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
-        if (pageCache.size >= maxPageCache && !pageCache.containsKey(index)) {
-            val oldestIndex = pageCache.keys.first()
-            val oldestPage = pageCache.remove(oldestIndex)
-            oldestPage?.destroy()
-            //println("Removed page $oldestIndex from cache to make room for page $index")
-        }
-
         return pageCache.getOrPut(index) {
             document!!.loadPage(index)
         }
