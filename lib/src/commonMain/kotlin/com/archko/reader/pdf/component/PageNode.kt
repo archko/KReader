@@ -9,6 +9,7 @@ import com.archko.reader.pdf.cache.ImageCache
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val TILE_CONTENT_PX: Float = 1024f
+internal const val TILE_LONG_CONTENT_PX: Float = 1536f
 internal const val MIN_TILE_LEVEL: Int = -6
 internal const val MAX_TILE_LEVEL: Int = 8
 

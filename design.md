@@ -190,6 +190,7 @@ tileOutputPx = ceil(C.width * 2^L / cols(L)) <= CT
 
 - 网格只依赖 `C`（`geometry.id`）与 level。列数、横竖屏、视口尺寸变化不改变 tile id。
 - 网格按"目标纹理像素 CT"直接计算，保证每个 tile 的纹理不超过 CT，同时 tile 数量最少。
+- 超长页（高 > 宽×3 或宽 > 高×3）在该轴上使用 `TILE_LONG_CONTENT_PX=1536`，减少长条页面的切块数量；普通页仍为 1024。
 - 允许负 level：大页在 fit 缩放下就需要低于 1:1 的纹理分辨率。
 - tile 的 doc 矩形 = `baseRect` × `fraction`。
 - 解码源矩形 = 内容矩形（原始页坐标）× `textureScale(L)`；`DecoderAdapter.decodeNode` 的 `scale` 即 `textureScale(L)`，解码器接口不变。
@@ -210,8 +211,9 @@ level     = clamp(ceil(log2(needed)), MIN_TILE_LEVEL, MAX_TILE_LEVEL)
 ### 3. 兜底策略
 
 1. **页面缩略图**：每页一张低分辨率整页图，**始终绘制在 tile 下方**；请求一次，缓存在 `ImageCache.pageCache`。缩略图不做切边探测，保证解码快。
-2. **当前档 tile**：覆盖在缩略图之上；尚未解码或不在可见范围的 tile 不绘制，露出缩略图。
-3. 这样放大/缩小过程中底部始终有页面图像：放大时高清 tile 盖在缩略图上，缩小时 tile 范围缩小、缩略图自然露出，不会白屏。
+2. **上一档 fallback**：level 变化时先把当前可见档的 tile 移入 `fallbackTiles`（保留位图），新档 tile 覆盖其上；新档可见 tile 全部就绪后再释放上一档。只保留一级，避免缓存膨胀。
+3. **当前档 tile**：覆盖在上一档与缩略图之上；尚未解码或不在可见范围的 tile 不绘制，由下层兜底。
+4. 这样放大/缩小过程中底部始终有页面图像：切档时旧档继续显示，新档逐块覆盖，不会白屏或闪烁。
 
 ### 4. 超长图 / 单张 TIFF / 长条漫画
 
@@ -337,6 +339,7 @@ pageIndex, scrollX(docX), scrollY(docY), zoom, orientation, reflow, crop
 
 - 捏合全过程不重排、不重绘内容、不清空；松手跨档只短暂变糊。
 - 1↔2 列、横竖屏切换 tile id 不变；切回命中缓存。
+- 放大/缩小跨档时上一档 tile 继续显示，新档就绪后覆盖，无白屏/闪烁。
 - 预切边首屏无跳动；懒切边锚点不跳、zoom 不重置、其他页不重解码。
 - 当前页上方/下方页面懒切边完成时，视口内容不移动。
 - 长条图按普通页处理：缩略图 + 可见 tile，不崩溃、不阻塞滚动（本阶段不做专项优化）。

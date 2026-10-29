@@ -44,6 +44,7 @@ public class Page internal constructor(
     private var currentLevel: Int = Int.MIN_VALUE
     private val tileNodes = HashMap<TileId, PageNode>()
     private var visibleTiles: List<PageNode> = emptyList()
+    private var fallbackTiles: List<PageNode> = emptyList()
 
     private var thumbBitmap: BitmapState? by mutableStateOf(null)
     private val thumbLoading: AtomicBoolean = AtomicBoolean(false)
@@ -71,6 +72,7 @@ public class Page internal constructor(
             return
         }
         releaseTileNodes()
+        releaseFallbackTiles()
         releaseThumbnail()
         geometry = newGeometry
         currentLevel = Int.MIN_VALUE
@@ -79,12 +81,22 @@ public class Page internal constructor(
 
     private fun colsAt(level: Int): Int {
         val scale = textureScale(level)
-        return ceil(geometry.width * scale / TILE_CONTENT_PX).toInt().coerceAtLeast(1)
+        val target = if (geometry.width > geometry.height * 3f) {
+            TILE_LONG_CONTENT_PX
+        } else {
+            TILE_CONTENT_PX
+        }
+        return ceil(geometry.width * scale / target).toInt().coerceAtLeast(1)
     }
 
     private fun rowsAt(level: Int): Int {
         val scale = textureScale(level)
-        return ceil(geometry.height * scale / TILE_CONTENT_PX).toInt().coerceAtLeast(1)
+        val target = if (geometry.height > geometry.width * 3f) {
+            TILE_LONG_CONTENT_PX
+        } else {
+            TILE_CONTENT_PX
+        }
+        return ceil(geometry.height * scale / target).toInt().coerceAtLeast(1)
     }
 
     private fun textureScale(level: Int): Float {
@@ -120,7 +132,16 @@ public class Page internal constructor(
 
         val level = levelFor(zoom)
         if (level != currentLevel) {
-            releaseTileNodes()
+            releaseFallbackTiles()
+            val oldVisible = visibleTiles
+            fallbackTiles = oldVisible
+            for (node in tileNodes.values) {
+                if (!oldVisible.contains(node)) {
+                    node.release()
+                }
+            }
+            tileNodes.clear()
+            visibleTiles = emptyList()
             currentLevel = level
         }
 
@@ -191,6 +212,11 @@ public class Page internal constructor(
                     requestDecode(node)
                 }
             }
+        }
+        if (fallbackTiles.isNotEmpty() && nodes.isNotEmpty() &&
+            nodes.all { it.bitmap != null }
+        ) {
+            releaseFallbackTiles()
         }
         return previousVisible != nodes
     }
@@ -293,9 +319,15 @@ public class Page internal constructor(
 
     internal fun clearVisibleTiles() {
         releaseTileNodes()
+        releaseFallbackTiles()
         releaseThumbnail()
         cropProbeRequested = false
         currentLevel = Int.MIN_VALUE
+    }
+
+    private fun releaseFallbackTiles() {
+        fallbackTiles.forEach { it.release() }
+        fallbackTiles = emptyList()
     }
 
     private fun releaseTileNodes() {
@@ -358,6 +390,11 @@ public class Page internal constructor(
                             ImageCache.releaseNode(newState)
                         }
                         node.queued.set(false)
+                        if (fallbackTiles.isNotEmpty() && visibleTiles.isNotEmpty() &&
+                            visibleTiles.all { it.bitmap != null }
+                        ) {
+                            releaseFallbackTiles()
+                        }
                     }
                 }
 
@@ -380,6 +417,12 @@ public class Page internal constructor(
         thumbBitmap?.let { state ->
             if (!state.isRecycled()) {
                 drawBitmap(drawScope, state, baseRect)
+            }
+        }
+        for (node in fallbackTiles) {
+            val state = node.bitmap
+            if (state != null && !state.isRecycled()) {
+                drawBitmap(drawScope, state, node.docRect(baseRect))
             }
         }
         for (node in visibleTiles) {
