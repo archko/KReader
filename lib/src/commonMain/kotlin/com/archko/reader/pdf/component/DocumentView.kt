@@ -28,9 +28,12 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.Lifecycle
@@ -48,6 +51,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val max_zoom = 30f
+
+// 点击翻页时保留的上下文高度
+private val tap_page_keep_dp = 10.dp
 
 /**
  * 文档视图状态封装
@@ -484,11 +490,14 @@ internal fun CommonGestureHandler(
     val drawingPoints = state.drawingPoints
     val activeDrawingPage = state.activeDrawingPage
 
+    val viewConfiguration = LocalViewConfiguration.current
+    val tapPageKeepPx = with(LocalDensity.current) { tap_page_keep_dp.toPx() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Transparent)
-            .pointerInput(viewSize, gestureMode, pathConfig) {
+            .pointerInput(viewSize, gestureMode, pathConfig, tapPageKeepPx) {
                 when (gestureMode) {
                     GestureMode.SELECTION -> {
                         detectDragGestures(
@@ -605,9 +614,13 @@ internal fun CommonGestureHandler(
                     }
 
                     GestureMode.VIEW -> {
+                        val touchSlop = viewConfiguration.touchSlop
+
                         awaitEachGesture {
                             val velocityTracker = VelocityTracker()
                             var isZooming = false
+                            var isDragging = false
+                            var totalPan = Offset.Zero
                             var lastChange: PointerInputChange? = null
 
                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -666,19 +679,31 @@ internal fun CommonGestureHandler(
                                             }
                                         }
                                     } else {
-                                        offset.value += panChange
-                                        offset.value = calculateBounds(
-                                            offset.value,
-                                            vZoom.value,
-                                            viewSize,
-                                            pageViewState,
-                                            orientation.value
-                                        )
-                                        pageViewState.updateOffset(offset.value)
-                                        velocityTracker.addPosition(
-                                            lastChange?.uptimeMillis ?: 0,
-                                            lastChange?.position ?: Offset(0f, 0f)
-                                        )
+                                        // 累加位移，超过 TouchSlop 后才判定为拖拽，避免点击时轻微抖动触发漂移
+                                        totalPan += panChange
+                                        val delta = when {
+                                            !isDragging && totalPan.getDistance() > touchSlop -> {
+                                                isDragging = true
+                                                totalPan
+                                            }
+                                            isDragging -> panChange
+                                            else -> Offset.Zero
+                                        }
+                                        if (delta != Offset.Zero) {
+                                            offset.value += delta
+                                            offset.value = calculateBounds(
+                                                offset.value,
+                                                vZoom.value,
+                                                viewSize,
+                                                pageViewState,
+                                                orientation.value
+                                            )
+                                            pageViewState.updateOffset(offset.value)
+                                            velocityTracker.addPosition(
+                                                lastChange?.uptimeMillis ?: 0,
+                                                lastChange?.position ?: Offset(0f, 0f)
+                                            )
+                                        }
                                     }
                                     event.changes.fastForEach { if (it.positionChanged()) it.consume() }
                                 }
@@ -689,7 +714,7 @@ internal fun CommonGestureHandler(
                             if (!isZooming) {
                                 val dragDistance =
                                     (finalChange.position - down.position).getDistance()
-                                if (dragDistance < 10f) {
+                                if (!isDragging && dragDistance < touchSlop) {
                                     handleTapGestureInternal(
                                         finalChange.position,
                                         viewSize,
@@ -699,23 +724,26 @@ internal fun CommonGestureHandler(
                                         scope,
                                         pageViewState,
                                         orientation.value,
+                                        tapPageKeepPx,
                                         onDoubleTapToolbar,
                                         onTapNonPageArea,
                                         onPageChanged,
                                     )
                                 }
 
-                                val velocity = velocityTracker.calculateVelocity()
-                                performFling(
-                                    velocity,
-                                    viewSize,
-                                    pageViewState,
-                                    offset,
-                                    vZoom.value,
-                                    orientation.value,
-                                    scope,
-                                    flingJob,
-                                )
+                                if (isDragging) {
+                                    val velocity = velocityTracker.calculateVelocity()
+                                    performFling(
+                                        velocity,
+                                        viewSize,
+                                        pageViewState,
+                                        offset,
+                                        vZoom.value,
+                                        orientation.value,
+                                        scope,
+                                        flingJob,
+                                    )
+                                }
                             } else {
                                 pageViewState.updateOffset(offset.value)
                                 pageViewState.updateViewSize(
@@ -787,6 +815,7 @@ internal fun handleTapGestureInternal(
     scope: CoroutineScope,
     pageViewState: PageViewState,
     orientation: Int,
+    tapPageKeepPx: Float,
     onDoubleTapToolbar: () -> Unit,
     onTapNonPageArea: (pageIndex: Int) -> Unit,
     onPageChanged: (page: Int) -> Unit,
@@ -814,13 +843,14 @@ internal fun handleTapGestureInternal(
             )
 
             if (!linkHandled) {
+                // 翻页时保留约一行文字的上下文，避免翻页后失去位置感
                 val isPageTurned = ViewUtils.handleTapGesture(
                     tapPos,
                     viewSize,
                     offset.value,
                     orientation,
                     pageViewState,
-                    6f // keepPx
+                    tapPageKeepPx
                 ) { newOffset ->
                     offset.value = newOffset
                     pageViewState.updateOffset(offset.value)
