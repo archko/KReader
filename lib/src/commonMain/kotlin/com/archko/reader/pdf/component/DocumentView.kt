@@ -48,6 +48,7 @@ import com.archko.reader.pdf.util.ViewUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 private const val max_zoom = 30f
@@ -230,10 +231,6 @@ internal fun DocumentViewEffects(
         pageViewState.onUrlLinkClick = { url ->
             HyperLinkUtils.openSystemBrowser(url)
         }
-
-        pageViewState.onLayoutApplied = {
-            flingJob.value?.cancel()
-        }
     }
 
     LaunchedEffect(pageViewState.layoutVersion) {
@@ -295,10 +292,12 @@ internal fun DocumentViewEffects(
         offset.value = pageViewState.viewOffset
     }
 
-    LaunchedEffect(offset.value) {
-        if (!isJumping.value) {
-            ViewUtils.firstPage(pageViewState, onPageChanged)
-        }
+    LaunchedEffect(pageViewState) {
+        snapshotFlow { pageViewState.firstVisiblePageIndex() }
+            .distinctUntilChanged()
+            .collect { page ->
+                onPageChanged?.invoke(page)
+            }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -627,7 +626,7 @@ internal fun DocumentViewCanvas(
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 pageViewState.revision
-                pageViewState.drawVisiblePages(this, state.offset.value, state.vZoom.value)
+                pageViewState.drawVisiblePages(this, Offset.Zero, 1f)
             }
         }
 

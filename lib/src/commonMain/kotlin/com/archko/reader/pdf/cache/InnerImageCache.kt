@@ -94,10 +94,6 @@ private class InnerImageCache(
         // 1. 检查主缓存（ConcurrentHashMap 无锁读）
         cache[key]?.let { state ->
             if (state.acquire()) {
-                // 更新 LRU 顺序（best-effort，不需要精确）
-                synchronized(evictionLock) {
-                    lruList[key] = state
-                }
                 return state
             }
         }
@@ -166,16 +162,16 @@ private class InnerImageCache(
         candidatePool[key] = entry
         candidateMemoryBytes.addAndGet(state.byteSize)
 
-        // 候选池超限时回收最老的
+        // 候选池超限时按迭代顺序回收，避免在解码线程上做 O(n) 扫描
         synchronized(evictionLock) {
             while (candidateMemoryBytes.get() > maxCandidateMemoryBytes) {
-                val oldest = candidatePool.entries.minByOrNull { it.value.timestamp } ?: break
-                val oldestKey = oldest.key
-                val oldestEntry = oldest.value
-                if (candidatePool.remove(oldestKey) != null) {
-                    if (oldestEntry.state.markRecycled()) {
-                        candidateMemoryBytes.addAndGet(-oldestEntry.state.byteSize)
-                        recycleImageBitmap(oldestEntry.state.bitmap)
+                val iterator = candidatePool.entries.iterator()
+                if (!iterator.hasNext()) break
+                val entry = iterator.next()
+                if (candidatePool.remove(entry.key, entry.value)) {
+                    if (entry.value.state.markRecycled()) {
+                        candidateMemoryBytes.addAndGet(-entry.value.state.byteSize)
+                        recycleImageBitmap(entry.value.state.bitmap)
                     }
                 }
             }

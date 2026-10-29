@@ -67,12 +67,18 @@ public class DecodeService(
     }
 
     private suspend fun executeTask(task: DecodeTask) {
-        synchronized(lock) {
-            if (pendingJobs[task.key] != task) return
+        val isStale = synchronized(lock) { pendingJobs[task.key] !== task }
+        if (isStale) {
+            task.callback?.onFinish(task.pageIndex)
+            return
         }
 
         if (task.callback?.shouldRender(task.pageIndex, task.type == TaskType.PAGE) != true) {
-            println("[DecodeService.shouldRender] page=${task.pageIndex}, $task")
+            synchronized(lock) {
+                if (pendingJobs[task.key] === task) {
+                    pendingJobs.remove(task.key)
+                }
+            }
             task.callback?.onFinish(task.pageIndex)
             return
         }
@@ -92,7 +98,11 @@ public class DecodeService(
         } catch (e: Exception) {
             task.callback?.onDecodeComplete(null, false, e)
         } finally {
-            synchronized(lock) { pendingJobs.remove(task.key) }
+            synchronized(lock) {
+                if (pendingJobs[task.key] === task) {
+                    pendingJobs.remove(task.key)
+                }
+            }
             task.callback?.onFinish(task.pageIndex)
         }
     }

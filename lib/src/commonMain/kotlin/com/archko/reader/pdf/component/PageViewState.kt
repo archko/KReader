@@ -19,6 +19,7 @@ import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.state.AnnotationManager
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -72,9 +73,13 @@ public class PageViewState(
     public var currentSearchResultIndex: Int by mutableStateOf(-1)
         private set
 
-    private var preloadScreens: Float = 0.8f
+    private var preloadScreens: Float = 0.0f
+    private val scanScratch = ArrayList<Page>(16)
 
     private var isShutdown = false
+    private var lastInteractionAt: Long = 0L
+
+    private val wantedPagesRef = AtomicReference<Set<Int>>(emptySet())
 
     public var onPageLinkClick: ((pageIndex: Int) -> Unit)? = null
     public var onUrlLinkClick: ((url: String) -> Unit)? = null
@@ -259,6 +264,7 @@ public class PageViewState(
         layoutVersion++
         onLayoutApplied?.invoke()
         updateVisibleNow(true)
+        revision++
     }
 
     private fun captureAnchor(): Anchor? {
@@ -423,61 +429,147 @@ public class PageViewState(
         viewport.offset = viewport.clampOffset(offset)
         viewOffset = viewport.offset
         updateTotals()
-        if (request) {
-            updateVisibleNow(true)
-        }
+        updateVisibleNow(request)
+        lastInteractionAt = System.currentTimeMillis()
     }
 
     private fun updateVisibleNow(request: Boolean) {
         if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty() || !init) {
             pageToRender = emptyList()
+            wantedPagesRef.set(emptySet())
             return
         }
         val visible = viewport.docRect
-        val vertical = orientation == Vertical || columnCount > 1
-        val preloadX = if (!vertical) viewSize.width / vZoom * preloadScreens else 0f
-        val preloadY = if (vertical) viewSize.height / vZoom * preloadScreens else 0f
-        val expanded = Rect(
-            visible.left - preloadX,
-            visible.top - preloadY,
-            visible.right + preloadX,
-            visible.bottom + preloadY
-        )
+        scanPages(visible, scanScratch)
+        val previous = pageToRender
+        var changed = !samePages(scanScratch, previous)
 
-        val newPages = pagesIntersecting(expanded)
-        if (newPages != pageToRender) {
-            pageToRender = newPages
+        // 捏合过程中页集合没变：只靠图层变换，不做额外工作
+        if (!changed && !request) {
+            return
         }
-        val included = newPages.toHashSet()
-        pages.forEach { if (!included.contains(it)) it.clearVisibleTiles() }
-        newPages.forEach { it.updateVisibleTiles(expanded, vZoom, request) }
 
-        pagesIntersecting(visible).forEach {
-            it.ensureLinks()
-            requestCropProbe(it)
+        if (changed) {
+            pageToRender = ArrayList(scanScratch)
+            val included = scanScratch.toHashSet()
+            previous.forEach {
+                if (!included.contains(it)) {
+                    it.clearVisibleTiles()
+                }
+            }
+            val wanted = HashSet<Int>(scanScratch.size)
+            for (page in scanScratch) {
+                wanted.add(page.index)
+            }
+            wantedPagesRef.set(wanted)
         }
-        revision++
+
+        for (page in scanScratch) {
+            if (request) {
+                if (page.updateVisibleTiles(visible, vZoom, true)) {
+                    changed = true
+                }
+                requestCropProbe(page)
+            }
+            page.requestThumbnail()
+        }
+        if (changed) {
+            revision++
+        }
     }
 
-    private fun pagesIntersecting(rect: Rect): List<Page> {
-        if (pages.isEmpty()) {
-            return emptyList()
+    private fun samePages(scanned: List<Page>, current: List<Page>): Boolean {
+        if (scanned.size != current.size) {
+            return false
         }
-        val result = ArrayList<Page>()
-        for (page in pages) {
-            val base = page.baseRect
-            if (base.right > rect.left && base.left < rect.right &&
-                base.bottom > rect.top && base.top < rect.bottom
-            ) {
-                result.add(page)
+        for (i in scanned.indices) {
+            if (scanned[i].index != current[i].index) {
+                return false
             }
         }
-        return result
+        return true
+    }
+
+    internal fun isPageWanted(pageIndex: Int): Boolean {
+        return wantedPagesRef.get().contains(pageIndex)
+    }
+
+    private fun scanPages(rect: Rect, out: MutableList<Page>) {
+        out.clear()
+        if (pages.isEmpty()) {
+            return
+        }
+        if (columnCount > 1) {
+            for (page in pages) {
+                val base = page.baseRect
+                if (base.right > rect.left && base.left < rect.right &&
+                    base.bottom > rect.top && base.top < rect.bottom
+                ) {
+                    out.add(page)
+                }
+            }
+            return
+        }
+        val vertical = orientation == Vertical
+        var low = 0
+        var high = pages.size - 1
+        var first = pages.size
+        if (vertical) {
+            while (low <= high) {
+                val mid = (low + high) ushr 1
+                if (pages[mid].baseRect.top >= rect.top) {
+                    first = mid
+                    high = mid - 1
+                } else {
+                    low = mid + 1
+                }
+            }
+            if (first >= pages.size) {
+                first = pages.size - 1
+            }
+            var i = first
+            while (i > 0 && pages[i - 1].baseRect.bottom > rect.top) {
+                i--
+            }
+            while (i < pages.size && pages[i].baseRect.top < rect.bottom) {
+                val page = pages[i]
+                val base = page.baseRect
+                if (base.bottom > rect.top && base.right > rect.left && base.left < rect.right) {
+                    out.add(page)
+                }
+                i++
+            }
+            return
+        }
+
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            if (pages[mid].baseRect.left >= rect.left) {
+                first = mid
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+        if (first >= pages.size) {
+            first = pages.size - 1
+        }
+        var i = first
+        while (i > 0 && pages[i - 1].baseRect.right > rect.left) {
+            i--
+        }
+        while (i < pages.size && pages[i].baseRect.left < rect.right) {
+            val page = pages[i]
+            val base = page.baseRect
+            if (base.right > rect.left && base.bottom > rect.top && base.top < rect.bottom) {
+                out.add(page)
+            }
+            i++
+        }
     }
 
     public fun firstVisiblePageIndex(): Int {
-        val rect = viewport.docRect
-        return pagesIntersecting(rect).firstOrNull()?.index ?: 0
+        return pageToRender.firstOrNull()?.index ?: 0
     }
 
     public fun offsetForDoc(doc: Offset): Offset {
@@ -550,12 +642,12 @@ public class PageViewState(
                 }
 
                 override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                    return !isShutdown
+                    return !isShutdown && isPageWanted(pageNumber)
                 }
 
                 override fun onFinish(pageNumber: Int) {
                     CoroutineScope(Dispatchers.Main).launch {
-                        onCropProbeFinished(page)
+                        onPageGeometryDetected(page)
                     }
                 }
             }
@@ -563,8 +655,17 @@ public class PageViewState(
         service.submitTask(task)
     }
 
-    private fun onCropProbeFinished(page: Page) {
+    private fun onPageGeometryDetected(page: Page) {
         if (isShutdown) return
+        val newGeometry = PageGeometry(
+            page.aPage.width.toFloat(),
+            page.aPage.height.toFloat(),
+            page.aPage.cropBounds,
+            cropEnabled
+        )
+        if (newGeometry == page.geometry) {
+            return
+        }
         pendingCropPages.add(page.index)
         if (cropRelayoutScheduled) {
             return
@@ -580,6 +681,17 @@ public class PageViewState(
     private fun applyPendingCropResults() {
         if (isShutdown) {
             pendingCropPages.clear()
+            return
+        }
+        if (System.currentTimeMillis() - lastInteractionAt < 300L) {
+            if (!cropRelayoutScheduled) {
+                cropRelayoutScheduled = true
+                CoroutineScope(Dispatchers.Main).launch {
+                    delay(120)
+                    cropRelayoutScheduled = false
+                    applyPendingCropResults()
+                }
+            }
             return
         }
         var changed = false
@@ -762,11 +874,14 @@ public class PageViewState(
     }
 
     public fun handleClick(docX: Float, docY: Float): Boolean {
+        val point = Offset(docX, docY)
         for (page in pageToRender) {
-            val link = page.findLinkAtPoint(docX, docY)
-            if (link != null) {
-                return handleLink(link)
+            if (!page.baseRect.contains(point)) {
+                continue
             }
+            page.ensureLinks()
+            val link = page.findLinkAtPoint(docX, docY)
+            return if (link != null) handleLink(link) else false
         }
         return false
     }

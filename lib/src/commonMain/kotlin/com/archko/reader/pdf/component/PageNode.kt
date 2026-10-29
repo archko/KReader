@@ -6,8 +6,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
+import java.util.concurrent.atomic.AtomicBoolean
 
-internal const val TILE_CONTENT_PX: Float = 512f
+internal const val TILE_CONTENT_PX: Float = 1024f
 internal const val MIN_TILE_LEVEL: Int = -6
 internal const val MAX_TILE_LEVEL: Int = 8
 
@@ -40,8 +41,9 @@ public class PageNode internal constructor(
     internal val crop: Boolean
 ) {
     internal var bitmap: BitmapState? by mutableStateOf(null)
-    internal var queued: Boolean = false
-    internal var removed: Boolean = false
+    internal val queued: AtomicBoolean = AtomicBoolean(false)
+    internal val removed: AtomicBoolean = AtomicBoolean(false)
+    internal var requestAt: Long = 0L
 
     internal fun docRect(base: Rect): Rect {
         return Rect(
@@ -53,9 +55,9 @@ public class PageNode internal constructor(
     }
 
     internal fun release() {
-        removed = true
+        removed.set(true)
         bitmap?.let { ImageCache.releaseNode(it) }
         bitmap = null
-        queued = false
+        queued.set(false)
     }
 }

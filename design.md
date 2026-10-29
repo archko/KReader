@@ -74,9 +74,9 @@ Box(fillMaxSize)
 职责：
 - `updateViewSize(size, zoom, orientation)`：视口尺寸/方向变化 → 重排；zoom 变化 → 只更新视口。
 - `updateColumnCount / setCropEnabled`：重排（保留锚点）。
-- `updateViewport(zoom, offset, request)`：手势路径；`request=false` 时只更新视口，不刷新 tile（捏合中）。
+- `updateViewport(zoom, offset, request)`：手势路径；拖动/惯性中 `request=true` 持续请求新出现的 tile；捏合中 `request=false`，松手后刷新当前档。
 - `updateOffset / updateVisiblePages`：兼容旧调用，更新视口并刷新 tile。
-- `updateVisibleNow`：计算预加载文档区域、可见页、每页可见 tile；请求解码；加载链接；触发懒切边探测。
+- `updateVisibleNow`：计算可见页与每页可见 tile；请求 tile、页面缩略图、低优先级切边探测。只处理可见页，不扫描/清理全部页。
 - `drawVisiblePages / drawOverlay`。
 - `handleClick`、`offsetForPage`、`offsetForDoc`、`firstVisiblePageIndex`。
 
@@ -108,7 +108,6 @@ class Page {
     var baseRect: Rect                    // 文档空间
     var geometry: PageGeometry
     val visibleTiles: List<PageNode>      // 当前档
-    // fallbackTiles / coarseNodes 内部维护
 
     var currentSelection: TextSelection?
     var links: List<Hyperlink>
@@ -122,7 +121,7 @@ class Page {
 ```
 
 - 页内网格由内容尺寸决定，不依赖布局尺寸。
-- 维护当前档 tile、**上一档 fallback tile**、粗档 tile，逐块替换。
+- 底层只画页面缩略图；当前档 tile 覆盖其上，缺失时自然露出缩略图，不做多级 fallback。
 - 链接/文本选择命中测试走 `geometry.docToOriginal`。
 
 ### 6. `PageNode` / `TileId`
@@ -172,7 +171,7 @@ Horizontal:
 
 - `docWidth / docHeight` 为文档总尺寸，不含 zoom。
 - 滚动边界：`contentSize = docSize * zoom`，`min = min(0, viewport - content)`。
-- 可见页：线性/区间扫描（页数规模下开销可忽略），用于预加载。
+- 可见页：线性/区间扫描；取可见列表首项作为当前页。
 - 多列只用于垂直方向。
 
 ## 五、LOD 金字塔
@@ -180,19 +179,17 @@ Horizontal:
 ### 1. 网格在 content 空间
 
 ```
-CT         = 512                          // level 0 每 tile 对应的内容像素
-baseCols   = max(1, ceil(C.width  / CT))
-baseRows   = max(1, ceil(C.height / CT))
+CT = 1024                                // 每个 tile 的目标纹理像素
+textureScale(L) = 2^L                    // 内容像素 -> 纹理像素
 
-cols(L) = max(1, baseCols shl L)     // L >= 0
-        = max(1, baseCols shr -L)    // L < 0
-rows(L) 同理
+cols(L) = max(1, ceil(C.width  * 2^L / CT))
+rows(L) = max(1, ceil(C.height * 2^L / CT))
 
-textureScale(L) = 2^L
-tileOutputPx    = tileContentSize * textureScale(L) <= CT
+tileOutputPx = ceil(C.width * 2^L / cols(L)) <= CT
 ```
 
-- 网格只依赖 `C`（`geometry.id`）。列数、横竖屏、视口尺寸变化不改变 tile id。
+- 网格只依赖 `C`（`geometry.id`）与 level。列数、横竖屏、视口尺寸变化不改变 tile id。
+- 网格按"目标纹理像素 CT"直接计算，保证每个 tile 的纹理不超过 CT，同时 tile 数量最少。
 - 允许负 level：大页在 fit 缩放下就需要低于 1:1 的纹理分辨率。
 - tile 的 doc 矩形 = `baseRect` × `fraction`。
 - 解码源矩形 = 内容矩形（原始页坐标）× `textureScale(L)`；`DecoderAdapter.decodeNode` 的 `scale` 即 `textureScale(L)`，解码器接口不变。
@@ -208,20 +205,19 @@ level     = clamp(ceil(log2(needed)), MIN_TILE_LEVEL, MAX_TILE_LEVEL)
 
 - `textureScale >= needed`，纹理分辨率在屏幕需求的 1~2 倍之间。
 - 档位只决定取哪一层 tile，不影响布局与 tile 索引。
-- 切换档位时当前档 tile 移入 fallback，不释放位图（引用交给缓存），新档逐块到位后覆盖。
+- 切换档位时释放当前档 tile 节点，缩略图继续显示；新档逐块到位后覆盖缩略图。
 
 ### 3. 兜底策略
 
-1. **上一档 fallback**：档位切换时保留上一档可见 tile，按其 doc 矩形绘制；新档到位后覆盖，下次切档/离开页面时释放。
-2. **祖先兜底**：当前 tile 无位图时，从 `level-1` 向上查找缓存中的祖先 tile，在祖先的 doc 矩形绘制。
-3. **粗档优先（冷启动/跳页/LongStrip）**：请求当前档时同时为可见区域请求 `level-2` 粗档，先入队先解码；粗档到位即先出图，再逐块替换为当前档。粗档 tile 固定尺寸，不会产生整页巨型纹理。
+1. **页面缩略图**：每页一张低分辨率整页图，**始终绘制在 tile 下方**；请求一次，缓存在 `ImageCache.pageCache`。缩略图不做切边探测，保证解码快。
+2. **当前档 tile**：覆盖在缩略图之上；尚未解码或不在可见范围的 tile 不绘制，露出缩略图。
+3. 这样放大/缩小过程中底部始终有页面图像：放大时高清 tile 盖在缩略图上，缩小时 tile 范围缩小、缩略图自然露出，不会白屏。
 
 ### 4. 超长图 / 单张 TIFF / 长条漫画
 
-- 不做整页 thumbnail，不做整页 `renderPage`；用可见区域的粗档 tile 兜底。
+- 当前阶段不做长条专项优化，按普通页处理：可见 tile + 页面缩略图。tile 尺寸取 1024，减少单线程解码的 tile 数量。
 - `baseRows` 可能很大，但只是索引空间，`visibleTiles` 始终只有几十个。
 - TIFF 走 `decodeRegionToBitmap`，图片走 `BitmapRegionDecoder`，PDF/Djvu 走区域渲染。
-- 需要时可由高一档 tile 下采样生成粗档并缓存。
 - 纹理尺寸上限 4096；超长文档的 floating origin 作为后续硬化项（见第十三节）。
 
 ## 六、动态切边
@@ -257,7 +253,8 @@ clampOffset + updateVisible
 
 - 内容层：`graphicsLayer` 应用 `translation + scale`；缩放/平移只更新图层属性，沿用已有纹理，由 GPU 重采样。
 - 内容绘制在文档坐标；`drawTiles` 不读 zoom/offset。
-- 绘制失效来源：`revision`（可见集合/档位变化）、`PageNode.bitmap`（tile 到位）。
+- 绘制失效来源：`revision`（可见页或可见 tile 集合变化）、`PageNode.bitmap`（tile 到位）。单纯平移/缩放且页与 tile 集合不变时不重新录制内容，只更新图层矩阵；缩小时缩略图随内容一起缩放，不会白屏。
+- 页面缩略图只在“可见 tile 未全部就绪”时绘制；全部就绪后不再画整页大图。
 - 覆盖层在屏幕坐标绘制：链接框、搜索高亮、文本选择、标注路径、朗读边框、页面分隔线；只画可见页；描边宽度按屏幕像素。
 - 视口外页面/瓦片不进入绘制集合，控制 overdraw。
 - `clip = false` 允许内容越出视口节点绘制；手势与绘制节点分离，避免变换影响命中测试。
@@ -265,12 +262,19 @@ clampOffset + updateVisible
 ## 八、解码与缓存
 
 - 单解码线程，使用现有 `DecodeService`；不改变线程模型。
-- 解码请求只在 `updateVisibleTiles` 中发出；**不在 draw 阶段发请求**。
-- 捏合中 `request=false`：只改视口，不刷新 tile；松手后一次性刷新。
-- 平移/惯性中 `request=true`：新出现的页/瓦片即时请求；key 去重避免重复。
+- 解码请求只在视口/可见集合更新时发出；**不在 draw 阶段发请求**。
+- 拖动/惯性中 `request=true`：新出现的页/瓦片即时请求，保证滚动过程中内容能持续变清晰（接受一定的解码 CPU 开销）。
+- 捏合中 `request=false`：只更新视口与可见页/缩略图，松手后刷新当前档 tile。
+- 懒切边结果的重排延迟到交互结束后应用，避免运动过程中改布局；但 tile 请求不延迟。
 - 缓存 key：`tile/page/geometryId/level/row/col`；同一档来回缩放可命中。
+- `putNode/putPage` 返回的 `BitmapState` 引用计数为 0；挂到 `PageNode`/缩略图前必须 `acquire()`，否则可能在主线程赋值前被缓存回收，导致 tile 永久空白。
+- 可见 tile 3 秒仍未拿到位图会重置排队状态并重新请求，避免异常情况下永久缺块。
 - `ImageCache.pageCache` 继续供缩略图对话框、封面、文本工具栏使用；viewer 的 tile 缓存使用独立 key 空间，不合并。
-- 页面离开可见/预加载区域时释放 `PageNode` 对位图的引用；缓存由 LRU 决定淘汰。
+- 页面离开可见区域时释放 `PageNode`/缩略图引用；缓存由 LRU 决定淘汰。
+- 同一页内已解码的离屏 tile 最多保留 `MAX_RETAINED_TILES=16`；未解码的离屏 tile 立即取消（`PageNode.removed` 让解码线程跳过）。
+- 解码回调只接受当前可见页的请求（`wantedPages` 集合），滚动后不再解过期页。
+- 跳过的任务必须从 `pendingJobs` 移除，且只移除同一任务实例，避免滚动/缩放时队列与 pending 泄漏。
+- 缓存 `acquire` 在 UI 线程保持无锁；候选池回收不做 O(n) 扫描，减少解码线程持锁时间。
 
 ## 九、交互与功能等价
 
@@ -319,7 +323,7 @@ pageIndex, scrollX(docX), scrollY(docY), zoom, orientation, reflow, crop
 | `ViewportState.kt`（新增） | 视口变换、可见文档矩形、边界 clamp |
 | `PageGeometry.kt`（新增） | 内容矩形、geometry id、原图↔文档坐标 |
 | `PageViewState.kt` | 文档编排：布局、可见页、tile 调度、切边探测、overlay 绘制 |
-| `Page.kt` | 文档空间布局 + 页内 LOD + 上一档/粗档 fallback |
+| `Page.kt` | 文档空间布局 + 页内 LOD + 页面缩略图兜底 |
 | `PageNode.kt` | tile 精灵：`TileId`、fraction、srcRect、bitmap |
 | `PageNodePool.kt` | 旧对象池废弃，保留空实现 |
 | `DocumentView.kt` | 手势、effects、存档、双层 Canvas |
@@ -332,10 +336,10 @@ pageIndex, scrollX(docX), scrollY(docY), zoom, orientation, reflow, crop
 验证：
 
 - 捏合全过程不重排、不重绘内容、不清空；松手跨档只短暂变糊。
-- 1↔2 列、横竖屏切换 tile id 不变；旧档 fallback；切回命中缓存。
+- 1↔2 列、横竖屏切换 tile id 不变；切回命中缓存。
 - 预切边首屏无跳动；懒切边锚点不跳、zoom 不重置、其他页不重解码。
 - 当前页上方/下方页面懒切边完成时，视口内容不移动。
-- 长条 TIFF 无整页纹理请求；跳页中部先出粗档；30x 平移不抖。
+- 长条图按普通页处理：缩略图 + 可见 tile，不崩溃、不阻塞滚动（本阶段不做专项优化）。
 - 双页两页都解码；翻页后预取下一 spread。
 - 划线/选择/高亮在切边、缩放、双页下位置正确。
 - 缩略图对话框、封面、文本工具栏不受 viewer 缓存改动影响。
@@ -343,5 +347,5 @@ pageIndex, scrollX(docX), scrollY(docY), zoom, orientation, reflow, crop
 后续硬化（不改变上述结构）：
 
 - floating origin：超长文档以锚点页/视口为原点，offset 保持有界，绝对位置用 Double。
-- 解码队列优先级与 epoch 取消：在不增加线程的前提下，按"当前档可见 > 粗档 > 相邻页"排序并丢弃过期请求。
+- 解码队列优先级与 epoch 取消：在不增加线程的前提下，按"当前页可见 tile > 页面缩略图"排序并丢弃过期请求。
 - 标注坐标改为原始页坐标，切边开关时位置稳定。

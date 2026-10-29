@@ -12,18 +12,18 @@ import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log2
-import kotlin.math.max
 import kotlin.math.pow
 
 /**
  * 页面：基础布局矩形（文档空间，不含 zoom）+ 内容几何 + 页内 LOD tile。
- * 页面内容永远以 baseRect 映射到文档空间；tile 身份是页内局部的。
+ * 页缩略图始终作为底层，当前档 tile 覆盖其上。
  */
 public class Page internal constructor(
     private val pageViewState: PageViewState,
@@ -41,14 +41,15 @@ public class Page internal constructor(
     public val xOffset: Float get() = baseRect.left
     public val yOffset: Float get() = baseRect.top
 
-    private var baseCols: Int = 1
-    private var baseRows: Int = 1
     private var currentLevel: Int = Int.MIN_VALUE
     private val tileNodes = HashMap<TileId, PageNode>()
     private var visibleTiles: List<PageNode> = emptyList()
-    private var fallbackTiles: List<PageNode> = emptyList()
-    private val coarseNodes = HashMap<TileId, PageNode>()
-    private var coarseLevel: Int = Int.MIN_VALUE
+
+    private var thumbBitmap: BitmapState? by mutableStateOf(null)
+    private val thumbLoading: AtomicBoolean = AtomicBoolean(false)
+    private var thumbKey: String? = null
+
+    internal var cropProbeRequested: Boolean = false
 
     // 页面链接
     public var links: List<Hyperlink> = emptyList()
@@ -61,12 +62,6 @@ public class Page internal constructor(
     private var isSelecting = false
     private var selectionStartPoint: Offset? = null
 
-    internal var cropProbeRequested: Boolean = false
-
-    init {
-        refreshGrid()
-    }
-
     internal fun updateLayout(rect: Rect) {
         baseRect = rect
     }
@@ -75,32 +70,21 @@ public class Page internal constructor(
         if (newGeometry == geometry) {
             return
         }
-        clearVisibleTiles()
+        releaseTileNodes()
+        releaseThumbnail()
         geometry = newGeometry
         currentLevel = Int.MIN_VALUE
-        refreshGrid()
         currentSelection = null
     }
 
-    private fun refreshGrid() {
-        baseCols = max(1, ceil(geometry.width / TILE_CONTENT_PX).toInt())
-        baseRows = max(1, ceil(geometry.height / TILE_CONTENT_PX).toInt())
-    }
-
     private fun colsAt(level: Int): Int {
-        return if (level >= 0) {
-            max(1, baseCols shl level)
-        } else {
-            max(1, baseCols shr (-level))
-        }
+        val scale = textureScale(level)
+        return ceil(geometry.width * scale / TILE_CONTENT_PX).toInt().coerceAtLeast(1)
     }
 
     private fun rowsAt(level: Int): Int {
-        return if (level >= 0) {
-            max(1, baseRows shl level)
-        } else {
-            max(1, baseRows shr (-level))
-        }
+        val scale = textureScale(level)
+        return ceil(geometry.height * scale / TILE_CONTENT_PX).toInt().coerceAtLeast(1)
     }
 
     private fun textureScale(level: Int): Float {
@@ -123,21 +107,20 @@ public class Page internal constructor(
         return level.coerceIn(MIN_TILE_LEVEL, MAX_TILE_LEVEL)
     }
 
-    internal fun updateVisibleTiles(visibleDoc: Rect, zoom: Float, request: Boolean) {
+    internal fun updateVisibleTiles(visibleDoc: Rect, zoom: Float, request: Boolean): Boolean {
         if (baseRect.width <= 0f || baseRect.height <= 0f ||
             visibleDoc.left >= baseRect.right || visibleDoc.right <= baseRect.left ||
             visibleDoc.top >= baseRect.bottom || visibleDoc.bottom <= baseRect.top
         ) {
+            val hadTiles = visibleTiles.isNotEmpty()
             clearVisibleTiles()
-            return
+            return hadTiles
         }
+        val previousVisible = visibleTiles
 
         val level = levelFor(zoom)
         if (level != currentLevel) {
-            releaseFallbackTiles()
-            fallbackTiles = tileNodes.values.toList()
-            tileNodes.clear()
-            visibleTiles = emptyList()
+            releaseTileNodes()
             currentLevel = level
         }
 
@@ -175,25 +158,41 @@ public class Page internal constructor(
             }
         }
 
+        // 未解码的离屏 tile 立刻取消；已解码的保留少量作为回滚缓冲。
+        var retainedOffscreen = tileNodes.size - ids.size
         val iterator = tileNodes.entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (!ids.contains(entry.key)) {
-                entry.value.release()
-                iterator.remove()
+                val node = entry.value
+                if (node.bitmap == null || retainedOffscreen > MAX_RETAINED_TILES) {
+                    node.release()
+                    iterator.remove()
+                    retainedOffscreen--
+                }
             }
         }
 
         visibleTiles = nodes
 
         if (request) {
-            requestCoarseTiles(localLeft, localRight, localTop, localBottom, level)
             for (node in nodes) {
-                if (node.bitmap == null && !node.queued) {
+                val current = node.bitmap
+                if (current != null && current.isRecycled()) {
+                    node.bitmap = null
+                    node.queued.set(false)
+                }
+                if (node.bitmap == null && node.queued.get() &&
+                    System.currentTimeMillis() - node.requestAt > 3000L
+                ) {
+                    node.queued.set(false)
+                }
+                if (node.bitmap == null && !node.queued.get()) {
                     requestDecode(node)
                 }
             }
         }
+        return previousVisible != nodes
     }
 
     private fun createNode(id: TileId, fraction: Rect, scale: Float): PageNode? {
@@ -219,82 +218,97 @@ public class Page internal constructor(
         )
     }
 
-    private fun requestCoarseTiles(
-        localLeft: Float,
-        localRight: Float,
-        localTop: Float,
-        localBottom: Float,
-        level: Int
-    ) {
-        val coarse = (level - 2).coerceAtLeast(MIN_TILE_LEVEL)
-        if (coarse >= level) {
-            releaseCoarseTiles()
+    internal fun requestThumbnail() {
+        if (thumbBitmap?.isRecycled() == true) {
+            releaseThumbnail()
+        }
+        if (thumbBitmap != null || thumbLoading.get()) {
             return
         }
-        if (coarse != coarseLevel) {
-            releaseCoarseTiles()
-            coarseLevel = coarse
+        val service = pageViewState.decodeService ?: return
+        val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
+            aPage.width,
+            aPage.height
+        )
+        val geometryId = geometry.id
+        val key = "thumb-${index}-${thumbWidth}x${thumbHeight}-$geometryId"
+        val cached = ImageCache.acquirePage(key)
+        if (cached != null) {
+            thumbBitmap = cached
+            thumbKey = key
+            return
         }
-        val cols = colsAt(coarse)
-        val rows = rowsAt(coarse)
-        val colStart = floor(localLeft * cols).toInt().coerceIn(0, cols - 1)
-        val colEnd = ceil(localRight * cols).toInt().coerceIn(0, cols - 1)
-        val rowStart = floor(localTop * rows).toInt().coerceIn(0, rows - 1)
-        val rowEnd = ceil(localBottom * rows).toInt().coerceIn(0, rows - 1)
-        val scale = textureScale(coarse)
-        val ids = HashSet<TileId>()
-        for (row in rowStart..rowEnd) {
-            for (col in colStart..colEnd) {
-                val id = TileId(index, geometry.id, coarse, row, col)
-                ids.add(id)
-                val node = coarseNodes[id] ?: createNode(
-                    id,
-                    Rect(
-                        col.toFloat() / cols,
-                        row.toFloat() / rows,
-                        (col + 1).toFloat() / cols,
-                        (row + 1).toFloat() / rows
-                    ),
-                    scale
-                )?.also { coarseNodes[id] = it } ?: continue
-                if (node.bitmap == null && !node.queued) {
-                    requestDecode(node)
+        thumbKey = key
+        thumbLoading.set(true)
+        val task = DecodeTask(
+            type = TaskType.PAGE,
+            pageIndex = index,
+            key = key,
+            aPage = aPage,
+            zoom = 1f,
+            pageSliceBounds = Rect(0f, 0f, 1f, 1f),
+            width = thumbWidth,
+            height = thumbHeight,
+            crop = pageViewState.isCropEnabled() && aPage.cropBounds != null,
+            callback = object : DecodeCallback {
+                override fun onDecodeComplete(
+                    bitmap: androidx.compose.ui.graphics.ImageBitmap?,
+                    isThumb: Boolean,
+                    error: Throwable?
+                ) {
+                    if (bitmap == null || pageViewState.isShutdown()) {
+                        thumbLoading.set(false)
+                        return
+                    }
+                    val newState = ImageCache.putPage(key, bitmap)
+                    val acquired = newState.acquire()
+                    CoroutineScope(Dispatchers.Main).launch {
+                        thumbLoading.set(false)
+                        if (acquired &&
+                            !pageViewState.isShutdown() &&
+                            thumbKey == key &&
+                            geometry.id == geometryId &&
+                            thumbBitmap == null
+                        ) {
+                            thumbBitmap = newState
+                        } else if (acquired) {
+                            ImageCache.releasePage(newState)
+                        }
+                    }
+                }
+
+                override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                    return thumbKey == key &&
+                            !pageViewState.isShutdown() &&
+                            pageViewState.isPageWanted(pageNumber)
+                }
+
+                override fun onFinish(pageNumber: Int) {
+                    thumbLoading.set(false)
                 }
             }
-        }
-        val iterator = coarseNodes.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (!ids.contains(entry.key)) {
-                entry.value.release()
-                iterator.remove()
-            }
-        }
-    }
-
-    private fun releaseCoarseTiles() {
-        coarseNodes.values.forEach { it.release() }
-        coarseNodes.clear()
-        coarseLevel = Int.MIN_VALUE
+        )
+        service.submitTask(task)
     }
 
     internal fun clearVisibleTiles() {
-        releaseAllTiles()
-        visibleTiles = emptyList()
+        releaseTileNodes()
+        releaseThumbnail()
+        cropProbeRequested = false
         currentLevel = Int.MIN_VALUE
     }
 
-    private fun releaseAllTiles() {
+    private fun releaseTileNodes() {
         tileNodes.values.forEach { it.release() }
         tileNodes.clear()
         visibleTiles = emptyList()
-        releaseFallbackTiles()
-        releaseCoarseTiles()
     }
 
-    private fun releaseFallbackTiles() {
-        fallbackTiles.forEach { it.release() }
-        fallbackTiles = emptyList()
+    private fun releaseThumbnail() {
+        thumbBitmap?.let { ImageCache.releasePage(it) }
+        thumbBitmap = null
+        thumbLoading.set(false)
+        thumbKey = null
     }
 
     private fun requestDecode(node: PageNode) {
@@ -302,7 +316,8 @@ public class Page internal constructor(
             return
         }
         val service = pageViewState.decodeService ?: return
-        node.queued = true
+        node.queued.set(true)
+        node.requestAt = System.currentTimeMillis()
         val cached = ImageCache.acquireNode(node.id.key)
         if (cached != null) {
             if (!cached.isRecycled()) {
@@ -310,7 +325,7 @@ public class Page internal constructor(
             } else {
                 ImageCache.releaseNode(cached)
             }
-            node.queued = false
+            node.queued.set(false)
             return
         }
         val task = DecodeTask(
@@ -330,26 +345,28 @@ public class Page internal constructor(
                     error: Throwable?
                 ) {
                     if (bitmap == null || pageViewState.isShutdown()) {
-                        node.queued = false
+                        node.queued.set(false)
                         return
                     }
                     val newState = ImageCache.putNode(node.id.key, bitmap)
+                    val acquired = newState.acquire()
                     CoroutineScope(Dispatchers.Main).launch {
-                        if (!node.removed && !pageViewState.isShutdown()) {
+                        if (acquired && !node.removed.get() && !pageViewState.isShutdown()) {
                             node.bitmap?.let { ImageCache.releaseNode(it) }
                             node.bitmap = newState
-                        } else {
+                        } else if (acquired) {
                             ImageCache.releaseNode(newState)
                         }
-                        node.queued = false
+                        node.queued.set(false)
                     }
                 }
 
                 override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                    return !pageViewState.isShutdown()
+                    return !node.removed.get() && !pageViewState.isShutdown() && pageViewState.isPageWanted(pageNumber)
                 }
 
                 override fun onFinish(pageNumber: Int) {
+                    node.queued.set(false)
                 }
             }
         )
@@ -360,58 +377,16 @@ public class Page internal constructor(
         if (baseRect.width <= 0f || baseRect.height <= 0f) {
             return
         }
-        val drawnAncestors = HashSet<String>()
-        for (node in coarseNodes.values) {
-            val state = node.bitmap
-            if (state != null && !state.isRecycled()) {
-                drawBitmap(drawScope, state, node.docRect(baseRect))
-            }
-        }
-        for (node in fallbackTiles) {
-            val state = node.bitmap
-            if (state != null && !state.isRecycled()) {
-                drawBitmap(drawScope, state, node.docRect(baseRect))
+        thumbBitmap?.let { state ->
+            if (!state.isRecycled()) {
+                drawBitmap(drawScope, state, baseRect)
             }
         }
         for (node in visibleTiles) {
             val state = node.bitmap
             if (state != null && !state.isRecycled()) {
                 drawBitmap(drawScope, state, node.docRect(baseRect))
-            } else {
-                drawFallback(drawScope, node, drawnAncestors)
             }
-        }
-    }
-
-    private fun drawFallback(
-        drawScope: DrawScope,
-        node: PageNode,
-        drawnAncestors: HashSet<String>
-    ) {
-        var level = node.id.level - 1
-        while (level >= MIN_TILE_LEVEL) {
-            val cols = colsAt(level)
-            val rows = rowsAt(level)
-            val col = (node.fraction.left * cols).toInt().coerceIn(0, cols - 1)
-            val row = (node.fraction.top * rows).toInt().coerceIn(0, rows - 1)
-            val key = TileId(index, geometry.id, level, row, col).key
-            val state = ImageCache.acquireNode(key)
-            if (state != null) {
-                if (!state.isRecycled() && drawnAncestors.add(key)) {
-                    val left = col.toFloat() / cols
-                    val top = row.toFloat() / rows
-                    val rect = Rect(
-                        baseRect.left + left * baseRect.width,
-                        baseRect.top + top * baseRect.height,
-                        baseRect.left + (col + 1).toFloat() / cols * baseRect.width,
-                        baseRect.top + (row + 1).toFloat() / rows * baseRect.height
-                    )
-                    drawBitmap(drawScope, state, rect)
-                }
-                ImageCache.releaseNode(state)
-                return
-            }
-            level--
         }
     }
 
@@ -511,7 +486,7 @@ public class Page internal constructor(
     }
 
     internal fun recycle() {
-        releaseAllTiles()
+        clearVisibleTiles()
         clearTextSelection()
         links = emptyList()
         linksLoaded = false
@@ -529,5 +504,9 @@ public class Page internal constructor(
 
     override fun toString(): String {
         return "Page(page=$index, base=$baseRect, geometry=$geometry)"
+    }
+
+    private companion object {
+        const val MAX_RETAINED_TILES = 16
     }
 }
