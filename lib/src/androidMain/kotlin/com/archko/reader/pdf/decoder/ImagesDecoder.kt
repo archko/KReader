@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -21,9 +22,12 @@ import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
-import android.os.ParcelFileDescriptor
 import java.io.File
 import java.io.FileInputStream
+import java.util.Collections
+import java.util.LinkedHashMap
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * 图片文件解码器，支持多个图片文件
@@ -49,9 +53,25 @@ public class ImagesDecoder(
     public var viewSize: IntSize = IntSize.Zero
     public override val aPageList: MutableList<APage> = ArrayList()
 
-    // 缓存BitmapRegionDecoder，避免重复创建，限制数量为10个
-    private val regionDecoders = mutableMapOf<Int, BitmapRegionDecoder>()
-    private val maxRegionDecoders = 10
+    // 缓存BitmapRegionDecoder，避免重复创建，按访问顺序淘汰
+    private val maxRegionDecoders = 5
+    private val regionDecoders = Collections.synchronizedMap(
+        object : LinkedHashMap<Int, BitmapRegionDecoder>(maxRegionDecoders, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<Int, BitmapRegionDecoder>
+            ): Boolean {
+                if (size > maxRegionDecoders) {
+                    try {
+                        eldest.value.recycle()
+                    } catch (e: Exception) {
+                        println("Error closing BitmapRegionDecoder: $e")
+                    }
+                    return true
+                }
+                return false
+            }
+        }
+    )
     public override var cacheBean: ReflowCacheBean? = null
 
     init {
@@ -175,7 +195,7 @@ public class ImagesDecoder(
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
-        if (index >= documents.size) {
+        if (index >= documents.size || scale <= 0f) {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
 
@@ -183,15 +203,13 @@ public class ImagesDecoder(
             // 部分区域：使用BitmapRegionDecoder
             val regionDecoder = getRegionDecoder(index)
             if (regionDecoder != null) {
-                val patchX = region.left.toInt()
-                val patchY = region.top.toInt()
-
                 val originalSize = originalPageSizes[index]
+                // 起点向下取整、终点向上取整，保证相邻 tile 覆盖完整，避免接缝
                 val scaledRegion = android.graphics.Rect(
-                    (patchX / scale).toInt().coerceIn(0, originalSize.width),
-                    (patchY / scale).toInt().coerceIn(0, originalSize.height),
-                    ((patchX + outWidth) / scale).toInt().coerceIn(0, originalSize.width),
-                    ((patchY + outHeight) / scale).toInt().coerceIn(0, originalSize.height)
+                    floor(region.left / scale).toInt().coerceIn(0, originalSize.width),
+                    floor(region.top / scale).toInt().coerceIn(0, originalSize.height),
+                    ceil(region.right / scale).toInt().coerceIn(0, originalSize.width),
+                    ceil(region.bottom / scale).toInt().coerceIn(0, originalSize.height)
                 )
 
                 if (scaledRegion.width() > 0 && scaledRegion.height() > 0) {
@@ -201,7 +219,8 @@ public class ImagesDecoder(
                     }
 
                     val regionBitmap = regionDecoder.decodeRegion(scaledRegion, options)
-                    regionBitmap.asImageBitmap()
+                    regionBitmap?.asImageBitmap()
+                        ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 }
@@ -218,10 +237,13 @@ public class ImagesDecoder(
         task: DecodeTask,
         totalScale: Float
     ): ImageBitmap {
-        return ImageBitmap(
+        return renderPageRegion(
+            task.pageSliceBounds,
+            task.pageIndex,
+            totalScale,
+            IntSize.Zero,
             task.width,
-            task.height,
-            ImageBitmapConfig.Rgb565
+            task.height
         )
     }
 
@@ -258,17 +280,10 @@ public class ImagesDecoder(
     }
 
     /**
-     * 获取或创建BitmapRegionDecoder，限制缓存数量为10个
+     * 获取或创建BitmapRegionDecoder，按访问顺序淘汰，最多缓存5个
      */
     private fun getRegionDecoder(index: Int): BitmapRegionDecoder? {
         if (index >= documents.size) return null
-
-        if (regionDecoders.size >= maxRegionDecoders && !regionDecoders.containsKey(index)) {
-            val oldestIndex = regionDecoders.keys.first()
-            val oldestDecoder = regionDecoders.remove(oldestIndex)
-            oldestDecoder?.recycle()
-            println("Removed region decoder for index $oldestIndex to make room for index $index")
-        }
 
         return regionDecoders.getOrPut(index) {
             try {
@@ -284,8 +299,9 @@ public class ImagesDecoder(
                         null
                     }
                 } else if (doc.path != null) {
-                    val inputStream = FileInputStream(File(doc.path))
-                    BitmapRegionDecoder.newInstance(inputStream, false)
+                    FileInputStream(File(doc.path)).use { inputStream ->
+                        BitmapRegionDecoder.newInstance(inputStream, false)
+                    }
                 } else {
                     null
                 }

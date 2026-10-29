@@ -20,6 +20,10 @@ import com.archko.reader.pdf.entity.ReflowCacheBean
 import com.archko.reader.pdf.util.FileTypeUtils
 import com.artifex.mupdf.fitz.Document
 import java.io.File
+import java.util.Collections
+import java.util.LinkedHashMap
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * 图片文件解码器，支持多个图片文件
@@ -42,13 +46,45 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
     public var viewSize: IntSize = IntSize.Zero
     public override val aPageList: MutableList<APage> = ArrayList()
 
-    // 缓存MuPDF Document，避免重复创建，限制数量为10个
-    private val regionDecoders = mutableMapOf<Int, Document>()
-    private val maxRegionDecoders = 10
+    // 缓存MuPDF Document，避免重复创建，按访问顺序淘汰
+    private val maxRegionDecoders = 5
+    private val regionDecoders = Collections.synchronizedMap(
+        object : LinkedHashMap<Int, Document>(maxRegionDecoders, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<Int, Document>
+            ): Boolean {
+                if (size > maxRegionDecoders) {
+                    try {
+                        eldest.value.destroy()
+                    } catch (e: Exception) {
+                        println("Error closing MuPDF Document: $e")
+                    }
+                    return true
+                }
+                return false
+            }
+        }
+    )
     public override var cacheBean: ReflowCacheBean? = null
 
-    // 缓存HeifLoader，避免重复创建，限制数量为10个
-    private val heifLoaders = mutableMapOf<Int, HeifLoader>()
+    // 缓存HeifLoader，避免重复创建，按访问顺序淘汰
+    private val heifLoaders = Collections.synchronizedMap(
+        object : LinkedHashMap<Int, HeifLoader>(maxRegionDecoders, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<Int, HeifLoader>
+            ): Boolean {
+                if (size > maxRegionDecoders) {
+                    try {
+                        eldest.value.close()
+                    } catch (e: Exception) {
+                        println("Error closing HeifLoader: $e")
+                    }
+                    return true
+                }
+                return false
+            }
+        }
+    )
 
     // 标记每个文件是否为HEIF格式
     private val isHeifFile = mutableListOf<Boolean>()
@@ -71,6 +107,10 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 }
             }
         }
+
+        isHeifFile.addAll(documents.map { doc ->
+            FileTypeUtils.isHeifFormat(File(doc.path ?: doc.uri ?: ""))
+        })
 
         // 初始化原始页面尺寸
         originalPageSizes = prepareSizes()
@@ -303,7 +343,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
         outWidth: Int,
         outHeight: Int
     ): ImageBitmap {
-        if (index >= documents.size) {
+        if (index >= documents.size || scale <= 0f) {
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
 
@@ -316,18 +356,29 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 // 使用HeifLoader解码HEIF图片
                 val heifLoader = getHeifLoader(index)
                 if (heifLoader != null) {
-                    val pageWidth = (region.width / scale).toInt()
-                    val pageHeight = (region.height / scale).toInt()
-                    val bitmap = heifLoader.decodeRegionToBitmap(
-                        (patchX / scale).toInt(),
-                        (patchY / scale).toInt(),
-                        pageWidth,
-                        pageHeight,
-                        scale
-                    )
+                    val originalSize = originalPageSizes[index]
+                    // 起点向下取整、终点向上取整，保证相邻 tile 覆盖完整，避免接缝
+                    val left = floor(region.left / scale).toInt().coerceIn(0, originalSize.width)
+                    val top = floor(region.top / scale).toInt().coerceIn(0, originalSize.height)
+                    val right = ceil(region.right / scale).toInt().coerceIn(0, originalSize.width)
+                    val bottom = ceil(region.bottom / scale).toInt().coerceIn(0, originalSize.height)
+                    val pageWidth = right - left
+                    val pageHeight = bottom - top
 
-                    bitmap?.toComposeImageBitmap()
-                        ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                    if (pageWidth > 0 && pageHeight > 0) {
+                        val bitmap = heifLoader.decodeRegionToBitmap(
+                            left,
+                            top,
+                            pageWidth,
+                            pageHeight,
+                            scale
+                        )
+
+                        bitmap?.toComposeImageBitmap()
+                            ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                    } else {
+                        ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+                    }
                 } else {
                     ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
                 }
@@ -355,8 +406,8 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
 
                     val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
 
-                    // 添加偏移，使渲染区域正确
-                    ctm.translate(-(patchX / scale), -(patchY / scale))
+                    // 使用精确的源坐标偏移，避免相邻 tile 出现接缝
+                    ctm.translate(-(region.left / scale), -(region.top / scale))
 
                     page.run(dev, ctm, null)
 
@@ -391,11 +442,14 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
-    ): ImageBitmap{
-        return ImageBitmap(
+    ): ImageBitmap {
+        return renderPageRegion(
+            task.pageSliceBounds,
+            task.pageIndex,
+            totalScale,
+            IntSize.Zero,
             task.width,
-            task.height,
-            ImageBitmapConfig.Rgb565
+            task.height
         )
     }
 
@@ -486,44 +540,26 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
     }
 
     /**
-     * 获取或创建MuPDF Document，限制缓存数量为10个
+     * 获取或创建MuPDF Document，按访问顺序淘汰，最多缓存5个
      */
     private fun getRegionDecoder(index: Int): Document? {
         if (index >= documents.size) return null
 
-        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
-        if (regionDecoders.size >= maxRegionDecoders && !regionDecoders.containsKey(index)) {
-            val oldestIndex = regionDecoders.keys.first()
-            val oldestDecoder = regionDecoders.remove(oldestIndex)
-            oldestDecoder?.destroy()
-            println("Removed region decoder for index $oldestIndex to make room for index $index")
-        }
-
         return regionDecoders.getOrPut(index) {
-            val file = documents[index]
-            return Document.openDocument((documents[i].path ?: documents[i].uri ?: ""))
+            Document.openDocument((documents[index].path ?: documents[index].uri ?: ""))
         }
     }
 
     /**
-     * 获取或创建HeifLoader，限制缓存数量为10个
+     * 获取或创建HeifLoader，按访问顺序淘汰，最多缓存5个
      */
     private fun getHeifLoader(index: Int): HeifLoader? {
         if (index >= documents.size) return null
 
-        // 如果缓存已满且当前索引不在缓存中，移除最旧的项
-        if (heifLoaders.size >= maxRegionDecoders && !heifLoaders.containsKey(index)) {
-            val oldestIndex = heifLoaders.keys.first()
-            val oldestLoader = heifLoaders.remove(oldestIndex)
-            oldestLoader?.close()
-            println("Removed heif loader for index $oldestIndex to make room for index $index")
-        }
-
         return heifLoaders.getOrPut(index) {
-            val file = documents[index]
             val loader = HeifLoader()
-            loader.openHeif((documents[i].path ?: documents[i].uri ?: ""))
-            return loader
+            loader.openHeif((documents[index].path ?: documents[index].uri ?: ""))
+            loader
         }
     }
 

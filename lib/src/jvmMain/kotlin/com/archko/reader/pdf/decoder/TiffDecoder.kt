@@ -2,7 +2,6 @@ package com.archko.reader.pdf.decoder
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
@@ -18,6 +17,8 @@ import com.archko.reader.pdf.entity.Item
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import java.io.File
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * @author: archko 2025/8/9 :6:26
@@ -183,10 +184,11 @@ public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         outHeight: Int
     ): ImageBitmap {
         return try {
-            val pageWidth = (region.width / scale).toInt()
-            val pageHeight = (region.height / scale).toInt()
-            val patchX = (region.left / scale).toInt()
-            val patchY = (region.top / scale).toInt()
+            // 宽高向上取整，配合 native 的像素中心采样，避免相邻 tile 出现接缝
+            val pageWidth = ceil(region.width / scale).toInt().coerceAtLeast(1)
+            val pageHeight = ceil(region.height / scale).toInt().coerceAtLeast(1)
+            val patchX = floor(region.left / scale).toInt()
+            val patchY = floor(region.top / scale).toInt()
             //精度的问题,jni那边不支持小数进位四舍五入,所以这里的高宽要修正一下.
             val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 patchX,
@@ -211,10 +213,13 @@ public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         task: DecodeTask,
         totalScale: Float
     ): ImageBitmap {
-        return ImageBitmap(
+        return renderPageRegion(
+            task.pageSliceBounds,
+            task.pageIndex,
+            totalScale,
+            IntSize.Zero,
             task.width,
-            task.height,
-            ImageBitmapConfig.Rgb565
+            task.height
         )
     }
 
