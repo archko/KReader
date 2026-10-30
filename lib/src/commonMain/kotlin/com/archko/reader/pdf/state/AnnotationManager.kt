@@ -64,6 +64,9 @@ public class AnnotationManager(public val path: String) {
     public fun addPath(pageIndex: Int, path: AnnotationPath) {
         val list = annotations.getOrPut(pageIndex) { mutableListOf() }
         list.add(path)
+        // 内部 list 是普通 MutableList，直接 add 不会通知 Compose；
+        // 重新 put 成新的 list，确保画完松手后立即重绘（draw 已不再每帧执行）。
+        annotations[pageIndex] = list.toMutableList()
         undoStack.add(UndoAction.Add(pageIndex, path))
         redoStack.clear() // 新操作会清空重做栈
 
@@ -161,7 +164,13 @@ public class AnnotationManager(public val path: String) {
                                                 }
                                             })
                                             put("config", buildJsonObject {
-                                                put("c", (path.config.color.value and 0xFFFFFFFFUL).toString(16).padStart(8, '0'))
+                                                // Compose Color.value 是 64 位 packed 值，ARGB 在高 32 位；
+                                                // 这里保存真正的 32 位 ARGB，避免存成 00000000（透明）。
+                                                put(
+                                                    "c",
+                                                    ((path.config.color.value shr 32) and 0xFFFFFFFFUL)
+                                                        .toString(16).padStart(8, '0')
+                                                )
                                                 put("s", path.config.strokeWidth)
                                                 put("d", path.config.drawType.name)
                                             })
@@ -252,9 +261,20 @@ public class AnnotationManager(public val path: String) {
                                     Offset(x, y)
                                 }
 
-                                val colorStr = configObj["c"]?.jsonPrimitive?.content ?: "ff000000"
-                                val colorValue = colorStr.toULongOrNull(16) ?: 0xFFff0000UL
-                                val color = Color(colorValue.toLong())
+                                val colorStr = configObj["c"]?.jsonPrimitive?.content ?: "ffff0000"
+                                val rawColor = colorStr.toULongOrNull(16) ?: 0xFFff0000UL
+                                // 兼容两种旧格式：
+                                // 1) 16 位：完整 packed value，ARGB 在高 32 位；
+                                // 2) 8 位：ARGB；
+                                // 3) 历史 bug 写成的 00000000：无法还原颜色，回退为默认红色。
+                                val argb = if (colorStr.length > 8) {
+                                    (rawColor shr 32) and 0xFFFFFFFFUL
+                                } else {
+                                    rawColor and 0xFFFFFFFFUL
+                                }
+                                // 旧 bug 写成的透明色无法还原，使用默认红色（PathConfig 默认 Color.Red）
+                                val visibleArgb = if (argb == 0UL) 0xFFff0000UL else argb
+                                val color = Color(visibleArgb.toLong())
                                 val strokeWidth =
                                     configObj["s"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 4f
                                 val drawTypeStr = configObj["d"]?.jsonPrimitive?.content ?: "CURVE"

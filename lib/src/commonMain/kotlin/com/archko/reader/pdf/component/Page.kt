@@ -439,15 +439,21 @@ public class Page(
         drawNodes(drawScope, currentWidth, currentHeight, currentBounds)
 
         if (thumbReady) {
+            // 链接是在缩略图解码时顺带解析并缓存到 decoder 里的（PdfDecoder.decodePageLinks），
+            // 必须等缩略图就绪后再取，否则会拿到空列表并永久缓存成 linksLoaded=true。
+            if (!linksLoaded) {
+                loadLinks()
+            }
             drawLinks(drawScope, currentBounds)
-
-            // 绘制文本选择高亮
-            drawTextSelection(drawScope, currentBounds)
-            drawSearchHighlight(drawScope, currentBounds)
-            drawSpeakingIndicator(drawScope, currentBounds)
-            drawAnnotation(drawScope)
-            drawSeparator(drawScope, currentBounds)
         }
+
+        // 画笔、选择、搜索等覆盖层不再依赖缩略图是否就绪。
+        // 否则缩略图被缓存淘汰/尚未加载时，画完的笔迹会因为跳过 drawAnnotation 而“消失”。
+        drawTextSelection(drawScope, currentBounds)
+        drawSearchHighlight(drawScope, currentBounds)
+        drawSpeakingIndicator(drawScope, currentBounds)
+        drawAnnotation(drawScope)
+        drawSeparator(drawScope, currentBounds)
     }
 
     /**
@@ -857,14 +863,12 @@ public class Page(
     }
 
     /**
-     * 页面级资源准备：缩略图与链接。
+     * 页面级资源准备：缩略图。
      * 从 draw 中移出，避免在绘制阶段写 Compose State。
+     * 链接不能在这里加载：它依赖缩略图解码时顺带解析的结果。
      */
     private fun preparePage() {
         loadThumbnail()
-        if (!linksLoaded) {
-            loadLinks()
-        }
     }
 
     /**
