@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.DjvuLoader
 import com.archko.reader.pdf.cache.APageSizeLoader
+import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.DecodeTask
@@ -29,6 +30,41 @@ import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import java.io.File
 import kotlin.math.ceil
 import kotlin.math.floor
+
+private fun decodeDjvuRegionToBitmap(
+    loader: DjvuLoader,
+    pageIndex: Int,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    scale: Float,
+    pageWidth: Int,
+    pageHeight: Int
+): Bitmap? {
+    val patchX = x.coerceAtLeast(0)
+    val patchY = y.coerceAtLeast(0)
+    val clippedWidth = width.coerceAtMost((pageWidth - patchX).coerceAtLeast(1))
+    val clippedHeight = height.coerceAtMost((pageHeight - patchY).coerceAtLeast(1))
+    val outWidth = (clippedWidth * scale).toInt().coerceAtLeast(1)
+    val outHeight = (clippedHeight * scale).toInt().coerceAtLeast(1)
+
+    val bitmap = BitmapPool.acquire(outWidth, outHeight)
+    val success = loader.decodeRegionToBitmap(
+        pageIndex,
+        patchX,
+        patchY,
+        clippedWidth,
+        clippedHeight,
+        scale,
+        bitmap
+    )
+    if (!success) {
+        BitmapPool.release(bitmap)
+        return null
+    }
+    return bitmap
+}
 
 /**
  * @author: archko 2025/11/9 :6:26
@@ -89,13 +125,16 @@ public class DjvuDecoder(
 
                 println("renderDjvuPage:目标尺寸=$outWidth-$outHeight, 原始=${pageWidth}x${pageHeight}, 缩放=$scale")
 
-                val bitmap = djvuLoader.decodeRegionToBitmap(
+                val bitmap = decodeDjvuRegionToBitmap(
+                    djvuLoader,
                     0,
                     0,
                     0,
                     pageWidth,
                     pageHeight,
                     scale,
+                    pageWidth,
+                    pageHeight
                 )
 
                 val imageBitmap = bitmap?.asImageBitmap()
@@ -205,6 +244,7 @@ public class DjvuDecoder(
             val bitmap = renderCoverPage(djvuLoader!!, 160, 200)
 
             CustomImageFetcher.cacheBitmap(bitmap?.asAndroidBitmap(), path)
+            bitmap?.let { BitmapPool.release(it.asAndroidBitmap()) }
         } catch (e: Exception) {
             println("缓存封面失败: ${e.message}")
         }
@@ -449,13 +489,16 @@ public class DjvuDecoder(
             val pageHeight =
                 (ceil(region.bottom / scale).toInt() - patchY).coerceAtLeast(1)
 
-            val bitmap = loader.decodeRegionToBitmap(
+            val bitmap = decodeDjvuRegionToBitmap(
+                loader,
                 index,
                 patchX,
                 patchY,
                 pageWidth,
                 pageHeight,
                 scale,
+                originalSize.width,
+                originalSize.height
             )
 
             bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
@@ -484,13 +527,17 @@ public class DjvuDecoder(
         }
 
         val originalSize = originalPageSizes[index]
-        val bitmap = djvuLoader?.decodeRegionToBitmap(
+        val loader = djvuLoader ?: return null
+        val bitmap = decodeDjvuRegionToBitmap(
+            loader,
             index,
             0,
             0,
             originalSize.width,
             originalSize.height,
-            scale
+            scale,
+            originalSize.width,
+            originalSize.height
         ) ?: return null
 
         fullPageCacheIndex = index
@@ -534,13 +581,16 @@ public class DjvuDecoder(
 
                 println("DjvuDecoder.renderPage:croped page=$index, $outWidth-$outHeight, 切边后尺寸=${(scale * cropBounds.width).toInt()}x${(scale * cropBounds.height).toInt()}, bounds=$cropBounds")
 
-                val bitmap = djvuLoader!!.decodeRegionToBitmap(
+                val bitmap = decodeDjvuRegionToBitmap(
+                    djvuLoader!!,
                     index,
                     cropBounds.left.toInt(),
                     cropBounds.top.toInt(),
                     cropBounds.width.toInt(),
                     cropBounds.height.toInt(),
                     scale,
+                    originalSize.width,
+                    originalSize.height
                 )
 
                 // 在解码缩略图时同时解析链接
@@ -559,13 +609,16 @@ public class DjvuDecoder(
 
                 println("DjvuDecoder.renderPage:page=$index, 目标尺寸=$outWidth-$outHeight, 原始=${originalSize.width}x${originalSize.height}, 缩放=$scale")
 
-                val bitmap = djvuLoader!!.decodeRegionToBitmap(
+                val bitmap = decodeDjvuRegionToBitmap(
+                    djvuLoader!!,
                     index,
                     0,
                     0,
                     originalSize.width,
                     originalSize.height,
                     scale,
+                    originalSize.width,
+                    originalSize.height
                 )
 
                 val imageBitmap = bitmap?.asImageBitmap() ?: ImageBitmap(
@@ -610,6 +663,7 @@ public class DjvuDecoder(
 
                         // 真正对图片进行切边处理
                         val croppedBitmap = cropImageBitmap(index, imageBitmap, cropBounds)
+                        BitmapPool.release(bitmap)
                         return croppedBitmap
                     }
                 }

@@ -13,8 +13,6 @@ import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -288,7 +286,7 @@ public class Page internal constructor(
                     }
                     val newState = ImageCache.putPage(key, bitmap)
                     val acquired = newState.acquire()
-                    CoroutineScope(Dispatchers.Main).launch {
+                    pageViewState.mainScope.launch {
                         thumbLoading.set(false)
                         if (acquired &&
                             !pageViewState.isShutdown() &&
@@ -382,7 +380,7 @@ public class Page internal constructor(
                     }
                     val newState = ImageCache.putNode(node.id.key, bitmap)
                     val acquired = newState.acquire()
-                    CoroutineScope(Dispatchers.Main).launch {
+                    pageViewState.mainScope.launch {
                         if (acquired && !node.removed.get() && !pageViewState.isShutdown()) {
                             node.bitmap?.let { ImageCache.releaseNode(it) }
                             node.bitmap = newState

@@ -22,6 +22,8 @@ import com.archko.reader.pdf.state.AnnotationManager
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -73,8 +75,9 @@ public class PageViewState(
     public var currentSearchResultIndex: Int by mutableStateOf(-1)
         private set
 
-    private var preloadScreens: Float = 0.0f
+    private var preloadScreens: Float = 1.0f
     private val scanScratch = ArrayList<Page>(16)
+    private val preloadScratch = ArrayList<Page>(16)
 
     private var isShutdown = false
     private var lastInteractionAt: Long = 0L
@@ -88,6 +91,9 @@ public class PageViewState(
 
     public var decodeService: DecodeService? = null
         private set
+
+    // 解码完成回到主线程统一使用的 scope，避免每次解码都新建 CoroutineScope
+    internal val mainScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     public var activeDrawingAnno: Pair<Int, AnnotationPath>? by mutableStateOf(null)
 
@@ -198,6 +204,7 @@ public class PageViewState(
 
     public fun shutdown() {
         isShutdown = true
+        mainScope.cancel()
         pendingCropPages.clear()
         decodeService?.shutdown()
         pages.forEach { it.recycle() }
@@ -441,41 +448,69 @@ public class PageViewState(
         }
         val visible = viewport.docRect
         scanPages(visible, scanScratch)
-        val previous = pageToRender
-        var changed = !samePages(scanScratch, previous)
+        var changed = !samePages(scanScratch, pageToRender)
 
         // 捏合过程中页集合没变：只靠图层变换，不做额外工作
         if (!changed && !request) {
             return
         }
 
-        if (changed) {
-            pageToRender = ArrayList(scanScratch)
-            val included = scanScratch.toHashSet()
-            previous.forEach {
-                if (!included.contains(it)) {
-                    it.clearVisibleTiles()
+        // 预加载范围：可见区域按屏幕尺寸向四周扩展，保证翻页前相邻页的缩略图（底图）已就绪
+        val preload = preloadRect(visible)
+        scanPages(preload, preloadScratch)
+        val retain = HashSet<Int>(preloadScratch.size)
+        for (page in preloadScratch) {
+            retain.add(page.index)
+        }
+        // 只有彻底离开预加载范围的页面才释放 tile 与缩略图
+        val previousWanted = wantedPagesRef.get()
+        if (previousWanted.isNotEmpty()) {
+            for (index in previousWanted) {
+                if (!retain.contains(index)) {
+                    pages.getOrNull(index)?.clearVisibleTiles()
                 }
             }
-            val wanted = HashSet<Int>(scanScratch.size)
-            for (page in scanScratch) {
-                wanted.add(page.index)
-            }
-            wantedPagesRef.set(wanted)
+        }
+        wantedPagesRef.set(retain)
+
+        if (changed) {
+            pageToRender = ArrayList(scanScratch)
         }
 
-        for (page in scanScratch) {
-            if (request) {
+        // 预加载页先准备缩略图，翻页时能立刻作为底图显示，避免白屏
+        for (page in preloadScratch) {
+            page.requestThumbnail()
+        }
+
+        // 只有真正可见的页面才请求分块解码与裁剪探测
+        if (request) {
+            for (page in scanScratch) {
                 if (page.updateVisibleTiles(visible, vZoom, true)) {
                     changed = true
                 }
                 requestCropProbe(page)
             }
-            page.requestThumbnail()
         }
         if (changed) {
             revision++
         }
+    }
+
+    /**
+     * 以可见区域为中心，按预加载屏数向四周扩展，得到预加载范围（文档空间）。
+     */
+    private fun preloadRect(visible: Rect): Rect {
+        if (preloadScreens <= 0f || vZoom <= 0f) {
+            return visible
+        }
+        val marginX = viewSize.width / vZoom * preloadScreens
+        val marginY = viewSize.height / vZoom * preloadScreens
+        return Rect(
+            visible.left - marginX,
+            visible.top - marginY,
+            visible.right + marginX,
+            visible.bottom + marginY
+        )
     }
 
     private fun samePages(scanned: List<Page>, current: List<Page>): Boolean {
@@ -646,7 +681,7 @@ public class PageViewState(
                 }
 
                 override fun onFinish(pageNumber: Int) {
-                    CoroutineScope(Dispatchers.Main).launch {
+                    mainScope.launch {
                         onPageGeometryDetected(page)
                     }
                 }
@@ -671,7 +706,7 @@ public class PageViewState(
             return
         }
         cropRelayoutScheduled = true
-        CoroutineScope(Dispatchers.Main).launch {
+        mainScope.launch {
             delay(50)
             cropRelayoutScheduled = false
             applyPendingCropResults()
@@ -686,7 +721,7 @@ public class PageViewState(
         if (System.currentTimeMillis() - lastInteractionAt < 300L) {
             if (!cropRelayoutScheduled) {
                 cropRelayoutScheduled = true
-                CoroutineScope(Dispatchers.Main).launch {
+                mainScope.launch {
                     delay(120)
                     cropRelayoutScheduled = false
                     applyPendingCropResults()
