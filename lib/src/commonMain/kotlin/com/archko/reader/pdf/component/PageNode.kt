@@ -12,8 +12,6 @@ import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.Page.Companion.MAX_BLOCK
 import com.archko.reader.pdf.entity.APage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -123,60 +121,50 @@ public class PageNode(
     ) {
         // 页码合法性判断，防止越界
         if (aPage.index < 0 || aPage.index >= pageViewState.list.size) {
-            recycle()
             return
         }
         val pixelRect = getCachedPixelRect(pageWidth, pageHeight, xOffset, yOffset)
 
-        // 1. 首先检查是否在预加载区域内（复用pixelRect坐标，零额外对象分配）
-        val isInPreloadArea = pageViewState.isTileVisible(
-            pixelRect.left, pixelRect.top, pixelRect.right, pixelRect.bottom,
-            strictMode = false
-        )
-        if (!isInPreloadArea) {
-            //println("[PageNode.draw] page=${aPage.index}, recycle")
-            recycle()  // 完全超出预加载区域，回收
+        // 一次计算同时得到「是否可见」和「是否在预加载区域」，不再调用两次 isTileVisible。
+        // recycle 交给 updateVisibleNodes / clearVisibleNodes 处理。
+        if (pageViewState.getTileVisibility(
+                pixelRect.left, pixelRect.top, pixelRect.right, pixelRect.bottom
+            ) == PageViewState.VISIBILITY_NONE
+        ) {
             return
         }
 
-        // 2. 检查是否在严格可见区域内
-        val isStrictlyVisible = pageViewState.isTileVisible(
-            pixelRect.left, pixelRect.top, pixelRect.right, pixelRect.bottom,
-            strictMode = true
-        )
+        val state = bitmapState
+        if (state != null && !state.isRecycled()) {
+            // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
+            val dstLeft = (pixelRect.left).toInt()
+            val dstTop = (pixelRect.top).toInt()
+            val dstWidth = (pixelRect.width).toInt()
+            val dstHeight = (pixelRect.height).toInt()
 
-        if (null != bitmapState && bitmapState!!.isRecycled()) {
-            bitmapState = null
+            drawScope.drawImage(
+                state.bitmap,
+                dstOffset = IntOffset(dstLeft, dstTop),
+                // 关键点：给宽高各增加 1 像素的微量溢出，覆盖邻居边缘
+                dstSize = IntSize(dstWidth + 1, dstHeight + 1)
+            )
         }
 
-        //println("[PageNode.draw] page=${aPage.index}, isStrictlyVisible:$isStrictlyVisible, isDecoding:$isDecoding $bitmapState")
-        // 3. 只有严格可见才绘制
-        if (isStrictlyVisible) {
-            bitmapState?.let { state ->
-                //println("[PageNode.draw] page=${aPage.index}, bounds=$bounds, page.W-H=$pageWidth-$pageHeight, xOffset=$xOffset, yOffset=$yOffset, pixelRect=$pixelRect, bitmapSize=${state.bitmap.width}x${state.bitmap.height}")
-                // 确保绘制区域没有间隙，使用向下取整的起始位置和向上取整的尺寸
-                val dstLeft = (pixelRect.left).toInt()
-                val dstTop = (pixelRect.top).toInt()
-                val dstWidth = (pixelRect.width).toInt()
-                val dstHeight = (pixelRect.height).toInt()
-
-                drawScope.drawImage(
-                    state.bitmap,
-                    dstOffset = IntOffset(dstLeft, dstTop),
-                    // 关键点：给宽高各增加 1 像素的微量溢出，覆盖邻居边缘
-                    dstSize = IntSize(dstWidth + 1, dstHeight + 1)
-                )
-            }
-        }
-
-        // 4. 无论是否绘制，都尝试解码（预加载区域内）
-        if (bitmapState == null && !isDecoding) {
+        // 恢复原有的更新机制：draw 时如果没有可用图片就触发解码
+        if ((state == null || state.isRecycled()) && !isDecoding) {
             decode(pageWidth, pageHeight, pageViewState.vZoom)
         }
     }
 
     public fun decode(pageWidth: Float, pageHeight: Float, vZoom: Float) {
         val currentKey = cacheKey
+
+        // 位图已被缓存淘汰时，允许用同一个 key 重新解码
+        val currentState = bitmapState
+        if (currentState != null && currentState.isRecycled()) {
+            bitmapState = null
+            activeDecodeKey = null
+        }
 
         //println("[PageNode.decode] page=${aPage.index}, isDecoding:$isDecoding, $activeDecodeKey->$currentKey, bitmapState:$bitmapState")
         if (activeDecodeKey == currentKey || isDecoding || (null != bitmapState && !bitmapState!!.isRecycled())) {
@@ -256,7 +244,7 @@ public class PageNode(
                     if (bitmap != null && !pageViewState.isShutdown()) {
                         //println("[PageNode.onDecodeComplete] page=${aPage.index}")
                         val newState = ImageCache.putNode(currentKey, bitmap)
-                        CoroutineScope(Dispatchers.Main).launch {
+                        pageViewState.mainScope.launch {
                             if (pageViewState.isTileVisible(
                                     tileSpec,
                                     strictMode = false

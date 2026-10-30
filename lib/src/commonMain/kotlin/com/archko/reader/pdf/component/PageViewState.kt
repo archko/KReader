@@ -13,9 +13,16 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.state.AnnotationManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+
+// 低于该距离的滚动不再重复计算可见页/节点，合并同一帧内的多个 pointer event
+private const val VISIBLE_UPDATE_MIN_DISTANCE_SQ = 4f
 
 /**
  * @author: archko 2025/7/24 :08:21
@@ -52,10 +59,22 @@ public class PageViewState(
     public var currentSearchResultIndex: Int by mutableStateOf(-1)
         private set
 
+    // 解码完成回到主线程使用，避免每次解码都新建 CoroutineScope
+    internal val mainScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     // 预加载配置
     private var preloadScreens: Float = 0.8f // 预加载1屏的距离
 
-    private var lastPageKeys: Set<Int> = emptySet()
+    // 可见页集合：用数组代替 Set<Int>，避免每次 contains 的装箱和哈希
+    private var lastPageIds: IntArray = IntArray(0)
+    private var newPageIds: IntArray = IntArray(0)
+    private var lastVisibleCount: Int = 0
+    private var visibleFlags: BooleanArray = BooleanArray(0)
+
+    // 最近一次真正计算可见页时的 offset，用于合并同一帧内的多次调用
+    private var lastVisibleOffsetX: Float = Float.NaN
+    private var lastVisibleOffsetY: Float = Float.NaN
+    private var lastVisibleZoom: Float = 0f
 
     // 添加关闭标志
     private var isShutdown = false
@@ -211,6 +230,37 @@ public class PageViewState(
         }
     }
 
+    /**
+     * 一次性计算 tile 的可见状态，避免 draw 里连续调用两次 isTileVisible。
+     * @return VISIBILITY_NONE / VISIBILITY_PRELOAD / VISIBILITY_VISIBLE
+     */
+    public fun getTileVisibility(
+        tileLeft: Float, tileTop: Float, tileRight: Float, tileBottom: Float
+    ): Int {
+        val visLeft = -viewOffset.x
+        val visTop = -viewOffset.y
+        val visRight = viewSize.width - viewOffset.x
+        val visBottom = viewSize.height - viewOffset.y
+
+        val strictlyVisible = tileLeft < visRight && tileRight > visLeft &&
+                tileTop < visBottom && tileBottom > visTop
+        if (strictlyVisible) return VISIBILITY_VISIBLE
+
+        val preloadRight = if (orientation == Vertical) {
+            visRight
+        } else {
+            visRight + viewSize.width * preloadScreens
+        }
+        val preloadBottom = if (orientation == Vertical) {
+            visBottom + viewSize.height * preloadScreens
+        } else {
+            visBottom
+        }
+        val inPreloadArea = tileLeft < preloadRight && tileRight > visLeft &&
+                tileTop < preloadBottom && tileBottom > visTop
+        return if (inPreloadArea) VISIBILITY_PRELOAD else VISIBILITY_NONE
+    }
+
     // 严格可见：必须与屏幕区域相交
     private fun isVisibleInline(
         left: Float, top: Float, right: Float, bottom: Float
@@ -266,6 +316,7 @@ public class PageViewState(
 
     public fun shutdown() {
         isShutdown = true
+        mainScope.cancel()
         decodeService?.shutdown()
 
         pages.forEach {
@@ -412,6 +463,13 @@ public class PageViewState(
             init = true
         }
         println("PageViewState.invalidatePageSizes.viewSize:$viewSize, totalHeight:$totalHeight, totalWidth:$totalWidth, columnCount:$columnCount, zoom:$vZoom, orientation:$orientation, crop:$cropEnabled")
+
+        // 布局变化（旋转/切换横竖屏、缩放结束、切边、列数变化）后 offset 可能没变，
+        // 只靠 updateOffset 不会再刷新可见页，Page.update() 已经清空了 visibleNodes，
+        // 这里主动重建一次，避免只剩缩略图、没有任何分块。
+        if (init) {
+            updateVisiblePages(viewOffset, viewSize, vZoom)
+        }
     }
 
     private fun createPages(): List<Page> {
@@ -555,9 +613,15 @@ public class PageViewState(
     }
 
     public fun updateVisiblePages(offset: Offset, viewSize: IntSize, currentVZoom: Float = vZoom) {
+        this.viewOffset = offset
+        lastVisibleOffsetX = offset.x
+        lastVisibleOffsetY = offset.y
+        lastVisibleZoom = currentVZoom
+
         // 优化：使用二分查找定位可见页面范围
         if (pages.isEmpty()) {
             pageToRender = emptyList()
+            applyVisiblePages(emptyList())
             notifyDecodeCompleted()
             return
         }
@@ -572,26 +636,17 @@ public class PageViewState(
                 right = viewSize.width - offset.x,
                 bottom = viewSize.height - offset.y
             )
-            // 多列布局：需要同时考虑水平和垂直方向的可见性
+            // 多列布局：需要同时考虑水平和垂直方向的可见性（内联判断，避免每页分配 Rect）
             val tilesToRenderCopy = pages.filter { page ->
-                val scaledBounds = Rect(
-                    left = page.bounds.left * scaleRatio,
-                    top = page.bounds.top * scaleRatio,
-                    right = page.bounds.right * scaleRatio,
-                    bottom = page.bounds.bottom * scaleRatio
-                )
-                scaledBounds.overlaps(visibleRect)
+                val left = page.bounds.left * scaleRatio
+                val top = page.bounds.top * scaleRatio
+                val right = page.bounds.right * scaleRatio
+                val bottom = page.bounds.bottom * scaleRatio
+                left < visibleRect.right && right > visibleRect.left &&
+                        top < visibleRect.bottom && bottom > visibleRect.top
             }
 
-            val newPageKeys = tilesToRenderCopy.map { page ->
-                page.aPage.index
-            }.toSet()
-            val toRemove = lastPageKeys - newPageKeys
-            toRemove.forEach { key ->
-                val page = pages.getOrNull(key) ?: return@forEach
-                page.clearVisibleNodes()
-            }
-            lastPageKeys = newPageKeys
+            applyVisiblePages(tilesToRenderCopy)
 
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
@@ -620,15 +675,7 @@ public class PageViewState(
                 emptyList()
             }
             // 主动移除不再可见的页面图片缓存
-            val newPageKeys = tilesToRenderCopy.map { page ->
-                page.aPage.index
-            }.toSet()
-            val toRemove = lastPageKeys - newPageKeys
-            toRemove.forEach { key ->
-                val page = pages.getOrNull(key) ?: return@forEach
-                page.clearVisibleNodes()
-            }
-            lastPageKeys = newPageKeys
+            applyVisiblePages(tilesToRenderCopy)
 
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
@@ -657,15 +704,7 @@ public class PageViewState(
                 emptyList()
             }
             // 主动移除不再可见的页面图片缓存
-            val newPageKeys = tilesToRenderCopy.map { page ->
-                page.aPage.index
-            }.toSet()
-            val toRemove = lastPageKeys - newPageKeys
-            toRemove.forEach { key ->
-                val page = pages.getOrNull(key) ?: return@forEach
-                page.clearVisibleNodes()
-            }
-            lastPageKeys = newPageKeys
+            applyVisiblePages(tilesToRenderCopy)
 
             if (tilesToRenderCopy != pageToRender) {
                 pageToRender = tilesToRenderCopy
@@ -677,29 +716,88 @@ public class PageViewState(
             }
         }
     }
+
+    /**
+     * 更新可见页集合（数组实现，避免 Set<Int> 装箱），并清空离开列表页面的节点
+     */
+    private fun applyVisiblePages(tilesToRender: List<Page>) {
+        val count = tilesToRender.size
+        if (visibleFlags.size < pages.size) {
+            visibleFlags = BooleanArray(pages.size)
+        }
+        if (lastPageIds.size < count) {
+            lastPageIds = IntArray(count)
+        }
+        if (newPageIds.size < count) {
+            newPageIds = IntArray(count)
+        }
+
+        for (i in 0 until count) {
+            newPageIds[i] = tilesToRender[i].aPage.index
+        }
+
+        val oldCount = lastVisibleCount
+        // 清除上一次的标记
+        for (i in 0 until oldCount) {
+            val id = lastPageIds[i]
+            if (id >= 0 && id < visibleFlags.size) {
+                visibleFlags[id] = false
+            }
+        }
+        // 标记本次可见页
+        for (i in 0 until count) {
+            val id = newPageIds[i]
+            if (id >= 0 && id < visibleFlags.size) {
+                visibleFlags[id] = true
+            }
+        }
+        // 上一次可见、这一次不可见的页面，清理节点
+        for (i in 0 until oldCount) {
+            val id = lastPageIds[i]
+            if (id < 0 || id >= visibleFlags.size || !visibleFlags[id]) {
+                pages.getOrNull(id)?.clearVisibleNodes()
+            }
+        }
+
+        // 交换数组，复用容量
+        val tmp = lastPageIds
+        lastPageIds = newPageIds
+        newPageIds = tmp
+        lastVisibleCount = count
+    }
     
     /**
      * 可见,有可能是预加载
      * 优化：O(1) 快速检查页面是否在可见列表中
      */
     public fun isPageInVisibleList(pageIndex: Int): Boolean {
-        return lastPageKeys.contains(pageIndex)
+        return pageIndex >= 0 && pageIndex < visibleFlags.size && visibleFlags[pageIndex]
     }
 
     public fun updateOffset(newOffset: Offset) {
-        if (viewOffset != newOffset) {
-            this.viewOffset = newOffset
-            updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
+        this.viewOffset = newOffset
+        // 合并同一帧内的多个 pointer event：滚动距离过小时不重复计算可见页
+        if (!shouldRefreshVisiblePages(newOffset)) {
+            return
         }
+        updateVisiblePages(newOffset, viewSize, vZoom)  // 在offset改变时计算可见页面
+    }
+
+    private fun shouldRefreshVisiblePages(newOffset: Offset): Boolean {
+        if (lastVisibleOffsetX.isNaN() || lastVisibleZoom != vZoom) {
+            return true
+        }
+        val dx = newOffset.x - lastVisibleOffsetX
+        val dy = newOffset.y - lastVisibleOffsetY
+        return dx * dx + dy * dy >= VISIBLE_UPDATE_MIN_DISTANCE_SQ
     }
 
     public fun drawVisiblePages(
         drawScope: DrawScope,
-        offset: Offset,
         vZoom: Float,
     ) {
         pageToRender.forEach { page ->
-            page.draw(drawScope, offset, vZoom)
+            page.draw(drawScope, vZoom)
         }
     }
 
@@ -754,6 +852,10 @@ public class PageViewState(
     }
 
     public companion object {
+
+        public const val VISIBILITY_NONE: Int = 0
+        public const val VISIBILITY_PRELOAD: Int = 1
+        public const val VISIBILITY_VISIBLE: Int = 2
 
         public fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
             // 获取画布的可视区域

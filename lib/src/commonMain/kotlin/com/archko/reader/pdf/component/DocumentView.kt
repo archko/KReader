@@ -783,7 +783,9 @@ internal fun DocumentViewCanvas(
                 renderEffect = null
             }
             .drawWithContent {
-                pageViewState.drawVisiblePages(this, state.offset.value, state.vZoom.value)
+                // 注意：这里不再读取 offset，滚动时只更新 graphicsLayer 的 translation，
+                // draw 不会因为滚动而重新执行，页面内容绘制在内容坐标系中。
+                pageViewState.drawVisiblePages(this, state.vZoom.value)
 
                 if (isTextSelecting.value && selectionStartPos.value != null && selectionEndPos.value != null) {
                     val start = selectionStartPos.value!!

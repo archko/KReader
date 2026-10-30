@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
@@ -16,8 +17,6 @@ import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.Hyperlink
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.Future
 import kotlin.math.abs
@@ -54,6 +53,10 @@ public class Page(
     // 页面链接
     public var links: List<Hyperlink> = emptyList()
     private var linksLoaded = false
+
+    // 复用链接绘制的 Path，把 N 次 drawRect 合并成 1~2 次 drawPath
+    private val pageLinkPath = Path()
+    private val urlLinkPath = Path()
 
     // 文本选择相关
     private var structuredText: StructuredText? = null
@@ -234,6 +237,12 @@ public class Page(
 
     // 异步加载缩略图，参考PageNode解码逻辑
     public fun loadThumbnail() {
+        // 已经有可用缩略图时直接返回，避免重复 acquire 造成引用计数泄漏
+        val currentThumb = thumbBitmapState
+        if (currentThumb != null) {
+            if (!currentThumb.isRecycled()) return
+            thumbBitmapState = null
+        }
         if (thumbDecoding) return
 
         val cacheKey = cachedCacheKey ?: run {
@@ -284,7 +293,7 @@ public class Page(
                 ) {
                         if (bitmap != null && !pageViewState.isShutdown()) {
                             val newState = ImageCache.putPage(cacheKey, bitmap)
-                            CoroutineScope(Dispatchers.Main).launch {
+                            pageViewState.mainScope.launch {
                                 if (!pageViewState.isShutdown()) {
                                     thumbBitmapState?.let { ImageCache.releasePage(it) }
                                     thumbBitmapState = newState
@@ -396,7 +405,7 @@ public class Page(
         }
     }
 
-    public fun draw(drawScope: DrawScope, offset: Offset, vZoom: Float) {
+    public fun draw(drawScope: DrawScope, vZoom: Float) {
         // 计算当前缩放下的实际显示尺寸和位置
         // Page 的属性是基于 pageViewState.vZoom 计算的，但当前的 vZoom 可能已经改变,直接用bounds在缩放的时候会白屏
         val scaleRatio = vZoom / pageViewState.vZoom
@@ -407,88 +416,37 @@ public class Page(
             bounds.bottom * scaleRatio
         )
 
-        // 直接计算可见区域边界，避免创建 visibleRect 对象
-        val vrLeft = -offset.x
-        val vrTop = -offset.y
-        val vrRight = drawScope.size.width - offset.x
-        val vrBottom = drawScope.size.height - offset.y
-
-        // 检查页面是否真正可见：内联 overlaps 检查
-        val isActuallyVisible = currentBounds.left < vrRight
-                && currentBounds.right > vrLeft
-                && currentBounds.top < vrBottom
-                && currentBounds.bottom > vrTop
-
-        // 如果页面不在可见区域且不在预加载列表中，直接返回
-        if (!isActuallyVisible && !pageViewState.isPageInVisibleList(aPage.index)) {
-            return
-        }
-
-        val cacheKey = cachedCacheKey ?: run {
-            val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
-                aPage.width,
-                aPage.height
-            )
-            val cacheKey =
-                "thumb-${aPage.index}-${thumbWidth}x${thumbHeight}-${pageViewState.isCropEnabled()}"
-            cachedCacheKey = cacheKey
-            cacheKey
-        }
-
-        // 尝试获取缓存的缩略图
-        if (thumbBitmapState == null) {
-            val cachedState = ImageCache.acquirePage(cacheKey)
-            if (cachedState != null) {
-                thumbBitmapState = cachedState
-            }
-        }
-
-        if (null != thumbBitmapState && thumbBitmapState!!.isRecycled()) {
-            thumbBitmapState = null
-        }
-
-        // 始终尝试加载缩略图（包括预加载页面）
-        if (thumbBitmapState == null && !thumbDecoding) {
-            loadThumbnail()
-            return
-        }
-
-        // 计算当前尺寸（无论是否可见都需要，因为node需要这些参数）
         val currentWidth = width * scaleRatio
         val currentHeight = height * scaleRatio
 
-        // 只有真正可见的页面才绘制缩略图和UI元素
-        if (isActuallyVisible) {
-            //println("page.draw.page:${aPage.index}, offset:$offset, bounds:$bounds, currentBounds:$currentBounds, $thumbBitmapState")
+        // 这里不再读取 offset 做逐页裁剪：pageToRender 已经是可见 + 预加载页面，
+        // 绘制坐标是内容坐标，滚动时只更新 graphicsLayer 的 translation，
+        // 不会再触发 draw，从而避免每一帧重绘整个文档。
+        val thumbState = thumbBitmapState
+        val thumbReady = thumbState != null && !thumbState.isRecycled()
 
-            // 优先绘制缩略图
-            thumbBitmapState?.let { state ->
-                drawScope.drawImage(
-                    image = state.bitmap,
-                    dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
-                    dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
-                )
-
-                if (!linksLoaded) {
-                    loadLinks()
-                }
-            }
+        // 直接绘制缩略图作为底图：一次 drawImage 比遍历分块判断更便宜，
+        // 而且现在滚动只更新 graphicsLayer 平移，draw 不是每帧执行，
+        // 这点 overdraw 只在重绘时发生，保留底图可以避免放大移动时闪白。
+        if (thumbReady) {
+            drawScope.drawImage(
+                image = thumbState!!.bitmap,
+                dstOffset = IntOffset(currentBounds.left.toInt(), currentBounds.top.toInt()),
+                dstSize = IntSize(currentWidth.toInt(), currentHeight.toInt())
+            )
         }
 
         drawNodes(drawScope, currentWidth, currentHeight, currentBounds)
 
-        // 绘制分割线
-        if (isActuallyVisible) {
-            thumbBitmapState?.let { _ ->
-                drawLinks(drawScope, currentBounds)
+        if (thumbReady) {
+            drawLinks(drawScope, currentBounds)
 
-                // 绘制文本选择高亮
-                drawTextSelection(drawScope, currentBounds)
-                drawSearchHighlight(drawScope, currentBounds)
-                drawSpeakingIndicator(drawScope, currentBounds)
-                drawAnnotation(drawScope)
-                drawSeparator(drawScope, currentBounds)
-            }
+            // 绘制文本选择高亮
+            drawTextSelection(drawScope, currentBounds)
+            drawSearchHighlight(drawScope, currentBounds)
+            drawSpeakingIndicator(drawScope, currentBounds)
+            drawAnnotation(drawScope)
+            drawSeparator(drawScope, currentBounds)
         }
     }
 
@@ -497,6 +455,11 @@ public class Page(
      */
     private fun drawLinks(drawScope: DrawScope, currentBounds: Rect) {
         if (links.isEmpty()) return
+
+        pageLinkPath.reset()
+        urlLinkPath.reset()
+        var hasPageLink = false
+        var hasUrlLink = false
 
         for (link in links) {
             val bbox = link.bbox ?: continue
@@ -541,19 +504,30 @@ public class Page(
                 )
             }
 
-            // 根据链接类型选择颜色
-            val linkColor = if (link.linkType == Hyperlink.LINKTYPE_URL) {
-                Color(0x66336EE5) // 半透明蓝色
+            // 按类型累积到两条 Path，最后只做 1~2 次 drawPath，避免逐条 drawRect
+            if (link.linkType == Hyperlink.LINKTYPE_URL) {
+                addRectToPath(urlLinkPath, linkRect)
+                hasUrlLink = true
             } else {
-                Color(0x40FFA500) // 半透明橙色
+                addRectToPath(pageLinkPath, linkRect)
+                hasPageLink = true
             }
-
-            drawScope.drawRect(
-                color = linkColor,
-                topLeft = Offset(linkRect.left, linkRect.top),
-                size = Size(linkRect.width, linkRect.height)
-            )
         }
+
+        if (hasUrlLink) {
+            drawScope.drawPath(urlLinkPath, Color(0x66336EE5)) // 半透明蓝色
+        }
+        if (hasPageLink) {
+            drawScope.drawPath(pageLinkPath, Color(0x40FFA500)) // 半透明橙色
+        }
+    }
+
+    private fun addRectToPath(path: Path, rect: Rect) {
+        path.moveTo(rect.left, rect.top)
+        path.lineTo(rect.right, rect.top)
+        path.lineTo(rect.right, rect.bottom)
+        path.lineTo(rect.left, rect.bottom)
+        path.close()
     }
 
     /**
@@ -821,11 +795,11 @@ public class Page(
 
         // 单块模式：只有一个 node
         if (config.isSingleBlock) {
-            visibleNodes.values.forEach { pageViewState.nodePool.release(it) }
-            visibleNodes.clear()
-            val node = pageViewState.nodePool.acquire(pageViewState, Rect(0f, 0f, 1f, 1f), aPage)
-            visibleNodes[0] = node  // key=0 表示 (0,0)
-            //node.decode(currentWidth, currentHeight, pageViewState.vZoom)
+            // 只在缺失时创建，避免每一帧把 node 回池再取，导致 bitmap 反复释放/重新解码
+            visibleNodes[0] ?: pageViewState.nodePool.acquire(
+                pageViewState, Rect(0f, 0f, 1f, 1f), aPage
+            ).also { visibleNodes[0] = it }  // key=0 表示 (0,0)
+            preparePage()
             return
         }
 
@@ -866,8 +840,8 @@ public class Page(
             }
         }
 
-        // 移除不在范围内的 nodes，同时触发保留节点的解码
-        /*val iterator = visibleNodes.iterator()
+        // 移除不在范围内的 nodes，节点的解码仍然由 draw 驱动（原有更新机制）
+        val iterator = visibleNodes.entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
             val key = entry.key
@@ -876,10 +850,21 @@ public class Page(
             if (x !in minBlockX..maxBlockX || y !in minBlockY..maxBlockY) {
                 pageViewState.nodePool.release(entry.value)
                 iterator.remove()
-            } else {
-                entry.value.decode(currentWidth, currentHeight, pageViewState.vZoom)
             }
-        }*/
+        }
+
+        preparePage()
+    }
+
+    /**
+     * 页面级资源准备：缩略图与链接。
+     * 从 draw 中移出，避免在绘制阶段写 Compose State。
+     */
+    private fun preparePage() {
+        loadThumbnail()
+        if (!linksLoaded) {
+            loadLinks()
+        }
     }
 
     /**
