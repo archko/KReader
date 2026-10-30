@@ -1,8 +1,9 @@
 package com.archko.reader.pdf.component
 
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.AnimationVector2D
 import androidx.compose.animation.core.TwoWayConverter
+import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -55,6 +56,9 @@ private const val max_zoom = 30f
 
 // 点击翻页时保留的上下文高度
 private val tap_page_keep_dp = 10.dp
+
+// 平移/惯性过程中重建 tile 的最小间隔，避免每帧都做完整重建
+private const val tile_refresh_interval_ms = 100L
 
 /**
  * 文档视图状态封装
@@ -221,9 +225,7 @@ internal fun DocumentViewEffects(
     LaunchedEffect(pageViewState) {
         pageViewState.onPageLinkClick = { pageIndex ->
             isJumping.value = true
-            val newOffset = pageViewState.offsetForPage(pageIndex)
-            offset.value = newOffset
-            pageViewState.updateOffset(newOffset)
+            pageViewState.updateOffset(pageViewState.offsetForPage(pageIndex))
             offset.value = pageViewState.viewOffset
             isJumping.value = false
         }
@@ -280,7 +282,6 @@ internal fun DocumentViewEffects(
             }
 
             flingJob.value?.cancel()
-            offset.value = newOffset
             pageViewState.updateOffset(newOffset)
             offset.value = pageViewState.viewOffset
             isJumping.value = false
@@ -490,6 +491,7 @@ internal fun CommonGestureHandler(
                             var isDragging = false
                             var totalPan = Offset.Zero
                             var lastChange: PointerInputChange? = null
+                            var lastTileRefreshAt = 0L
 
                             val down = awaitFirstDown(requireUnconsumed = false)
                             flingJob.value?.cancel()
@@ -518,7 +520,6 @@ internal fun CommonGestureHandler(
                                                     centroid.y - content.y * newZoom
                                                 )
                                                 vZoom.value = newZoom
-                                                offset.value = newOffset
                                                 pageViewState.updateViewport(
                                                     newZoom,
                                                     newOffset,
@@ -539,11 +540,16 @@ internal fun CommonGestureHandler(
                                             else -> Offset.Zero
                                         }
                                         if (delta != Offset.Zero) {
-                                            offset.value += delta
+                                            val now = System.currentTimeMillis()
+                                            val requestTiles =
+                                                now - lastTileRefreshAt >= tile_refresh_interval_ms
+                                            if (requestTiles) {
+                                                lastTileRefreshAt = now
+                                            }
                                             pageViewState.updateViewport(
                                                 vZoom.value,
-                                                offset.value,
-                                                true
+                                                offset.value + delta,
+                                                requestTiles
                                             )
                                             offset.value = pageViewState.viewOffset
                                             velocityTracker.addPosition(
@@ -600,7 +606,8 @@ internal fun CommonGestureHandler(
 }
 
 /**
- * 文档视图绘制器：内容层做 GPU 变换，覆盖层在屏幕坐标绘制。
+ * 文档视图绘制器：内容与覆盖层共用同一个 GPU 图层，均以文档坐标绘制。
+ * 平移只更新图层位移，不触发 Canvas 重绘。
  */
 @Composable
 internal fun DocumentViewCanvas(
@@ -627,14 +634,8 @@ internal fun DocumentViewCanvas(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 pageViewState.revision
                 pageViewState.drawVisiblePages(this, Offset.Zero, 1f)
+                pageViewState.drawOverlay(this)
             }
-        }
-
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            state.offset.value
-            state.vZoom.value
-            pageViewState.revision
-            pageViewState.drawOverlay(this)
         }
     }
 }
@@ -711,18 +712,31 @@ internal fun performFling(
 
     val scaledVelocity = Offset(velocity.x * 1.1f, velocity.y * 1.1f)
     val job = scope.launch {
-        val animatable = Animatable(
+        val animationState = AnimationState(
+            typeConverter = OffsetToVector,
             initialValue = offset.value,
-            typeConverter = OffsetToVector
+            initialVelocity = scaledVelocity
         )
 
-        animatable.animateDecay(scaledVelocity, decay) {
+        var lastTileRefreshAt = 0L
+        animationState.animateDecay(decay) {
             val bounded = pageViewState.viewport.clampOffset(value)
             offset.value = bounded
-            pageViewState.updateViewport(vZoom, bounded, true)
+            val now = System.currentTimeMillis()
+            val requestTiles = now - lastTileRefreshAt >= tile_refresh_interval_ms
+            if (requestTiles) {
+                lastTileRefreshAt = now
+            }
+            pageViewState.updateViewport(vZoom, bounded, requestTiles)
+            // 已经顶到边界且速度还在往外推，继续跑只会空转
+            val current = this.velocity
+            val blockedX = current.x == 0f || current.x * (value.x - bounded.x) > 0f
+            val blockedY = current.y == 0f || current.y * (value.y - bounded.y) > 0f
+            if (blockedX && blockedY) {
+                cancelAnimation()
+            }
         }
         pageViewState.updateViewport(vZoom, offset.value, true)
-        offset.value = pageViewState.viewOffset
     }
     flingJob.value = job
 }

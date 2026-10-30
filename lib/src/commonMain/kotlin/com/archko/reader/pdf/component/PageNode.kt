@@ -10,21 +10,29 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val TILE_CONTENT_PX: Float = 1024f
 internal const val TILE_LONG_CONTENT_PX: Float = 1536f
-internal const val MIN_TILE_LEVEL: Int = -6
-internal const val MAX_TILE_LEVEL: Int = 8
 
 /**
- * tile 身份：页内局部，不含文档位置与缩放。
- * level 允许为负（大页在 fit 缩放下就需要较低的纹理分辨率）。
+ * level 以 1/8 档为步进，textureScale = 2^(level/8)。
+ * 2 的幂档位会让纹理最多 2 倍于屏幕分辨率，tile 在屏幕上缩到 512px，
+ * 可见 tile 数量随之翻几倍（放大后尤其明显），所以这里用细档位。
  */
-internal data class TileId(
-    val page: Int,
-    val geometryId: Int,
-    val level: Int,
-    val row: Int,
-    val col: Int
-) {
-    val key: String get() = "tile/$page/$geometryId/$level/$row/$col"
+internal const val LEVEL_STEPS_PER_OCTAVE: Int = 8
+internal const val MIN_TILE_LEVEL: Int = -6 * LEVEL_STEPS_PER_OCTAVE
+internal const val MAX_TILE_LEVEL: Int = 8 * LEVEL_STEPS_PER_OCTAVE
+
+private const val TILE_COL_BITS = 24
+private const val TILE_ROW_BITS = 24
+private const val TILE_COL_MASK = (1L shl TILE_COL_BITS) - 1
+private const val TILE_ROW_MASK = (1L shl TILE_ROW_BITS) - 1
+
+/**
+ * 页内 tile 的唯一 key：level/row/col 打包成 Long。
+ * 查找时不再创建对象，也没有装箱/哈希分配。
+ */
+internal fun tileKey(level: Int, row: Int, col: Int): Long {
+    return ((level + 128).toLong() shl (TILE_ROW_BITS + TILE_COL_BITS)) or
+            ((row.toLong() and TILE_ROW_MASK) shl TILE_COL_BITS) or
+            (col.toLong() and TILE_COL_MASK)
 }
 
 /**
@@ -32,8 +40,11 @@ internal data class TileId(
  * fraction 是页内归一化矩形；srcRect 是解码器需要的 level 纹理像素区域。
  */
 public class PageNode internal constructor(
-    internal val page: Page,
-    internal val id: TileId,
+    internal val key: Long,
+    internal val cacheKey: String,
+    internal val level: Int,
+    internal val row: Int,
+    internal val col: Int,
     internal val fraction: Rect,
     internal val srcRect: Rect,
     internal val outWidth: Int,

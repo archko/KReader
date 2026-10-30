@@ -31,6 +31,7 @@ import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 import kotlin.math.min
 
@@ -75,6 +76,9 @@ public fun DesktopDocumentView(
 
     // 焦点请求器
     val focusRequester = remember { FocusRequester() }
+
+    // 滚轮/触控板滚动的 tile 刷新节流，避免每个滚轮事件都重建 tile
+    val lastScrollTileRefreshAt = remember { AtomicLong(0L) }
 
     // 创建文档视图状态
     val stateHolder = rememberDocumentViewState(
@@ -461,8 +465,17 @@ public fun DesktopDocumentView(
                             0f
                         )
 
-                    stateHolder.offset.value = Offset(newX, newY)
-                    stateHolder.pageViewState.updateOffset(stateHolder.offset.value)
+                    val now = System.currentTimeMillis()
+                    val requestTiles = now - lastScrollTileRefreshAt.get() >= 100L
+                    if (requestTiles) {
+                        lastScrollTileRefreshAt.set(now)
+                    }
+                    stateHolder.pageViewState.updateViewport(
+                        stateHolder.vZoom.value,
+                        Offset(newX, newY),
+                        requestTiles
+                    )
+                    stateHolder.offset.value = stateHolder.pageViewState.viewOffset
                 }
                 .onKeyEvent(handleKeyboardEvent),
         )

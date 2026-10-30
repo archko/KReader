@@ -103,7 +103,10 @@ private class InnerImageCache(
             if (System.currentTimeMillis() - entry.timestamp < CANDIDATE_TIMEOUT) {
                 if (entry.state.acquire()) {
                     candidateMemoryBytes.addAndGet(-entry.state.byteSize)
-                    cache[key] = entry.state
+                    synchronized(evictionLock) {
+                        cache[key] = entry.state
+                        lruList[key] = entry.state
+                    }
                     currentMemoryBytes.addAndGet(entry.state.byteSize)
                     return entry.state
                 }

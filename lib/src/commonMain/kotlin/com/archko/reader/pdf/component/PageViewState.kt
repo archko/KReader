@@ -482,12 +482,14 @@ public class PageViewState(
             page.requestThumbnail()
         }
 
-        // 只有真正可见的页面才请求分块解码与裁剪探测
-        if (request) {
+        // 只有真正可见的页面才请求分块解码与裁剪探测；平移中页集合变化时也需要补齐
+        if (request || changed) {
             for (page in scanScratch) {
                 if (page.updateVisibleTiles(visible, vZoom, true)) {
                     changed = true
                 }
+                // 可见页提前加载链接，避免打开文档或刚翻到时链接不显示
+                page.ensureLinks()
                 requestCropProbe(page)
             }
         }
@@ -749,15 +751,12 @@ public class PageViewState(
         }
     }
 
+    /**
+     * 覆盖层与内容层共用同一个缩放图层，坐标全部是文档空间，
+     * 这样平移只需要更新图层位移，不需要每帧重算/重绘覆盖层。
+     */
     public fun drawOverlay(drawScope: DrawScope) {
         for (page in pageToRender) {
-            val base = page.baseRect
-            val visible = viewport.docRect
-            if (base.right < visible.left || base.left > visible.right ||
-                base.bottom < visible.top || base.top > visible.bottom
-            ) {
-                continue
-            }
             drawLinks(drawScope, page)
             drawTextSelection(drawScope, page)
             drawSearchHighlight(drawScope, page)
@@ -765,10 +764,6 @@ public class PageViewState(
             drawAnnotations(drawScope, page)
             drawSeparator(drawScope, page)
         }
-    }
-
-    private fun toScreen(page: Page, x: Float, y: Float): Offset {
-        return viewport.toScreen(page.geometry.originalToDoc(x, y, page.baseRect))
     }
 
     private fun drawLinks(drawScope: DrawScope, page: Page) {
@@ -782,8 +777,6 @@ public class PageViewState(
                 continue
             }
             val rect = geometry.originalRectToDoc(bbox, page.baseRect)
-            val topLeft = viewport.toScreen(Offset(rect.left, rect.top))
-            val bottomRight = viewport.toScreen(Offset(rect.right, rect.bottom))
             val linkColor = if (link.linkType == Hyperlink.LINKTYPE_URL) {
                 Color(0x66336EE5)
             } else {
@@ -791,8 +784,8 @@ public class PageViewState(
             }
             drawScope.drawRect(
                 color = linkColor,
-                topLeft = topLeft,
-                size = GeomSize(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y)
+                topLeft = Offset(rect.left, rect.top),
+                size = GeomSize(rect.width, rect.height)
             )
         }
     }
@@ -802,13 +795,13 @@ public class PageViewState(
         val selector = textSelector ?: return
         val color = Color(0x6633B5E5)
         selection.quads.forEach { quad ->
-            val screenQuad = selector.quadToScreenQuad(quad) { x, y ->
-                toScreen(page, x, y)
+            val docQuad = selector.quadToScreenQuad(quad) { x, y ->
+                page.geometry.originalToDoc(x, y, page.baseRect)
             }
-            val left = minOf(screenQuad.ul.x, screenQuad.ur.x, screenQuad.ll.x, screenQuad.lr.x)
-            val top = minOf(screenQuad.ul.y, screenQuad.ur.y, screenQuad.ll.y, screenQuad.lr.y)
-            val right = maxOf(screenQuad.ul.x, screenQuad.ur.x, screenQuad.ll.x, screenQuad.lr.x)
-            val bottom = maxOf(screenQuad.ul.y, screenQuad.ur.y, screenQuad.ll.y, screenQuad.lr.y)
+            val left = minOf(docQuad.ul.x, docQuad.ur.x, docQuad.ll.x, docQuad.lr.x)
+            val top = minOf(docQuad.ul.y, docQuad.ur.y, docQuad.ll.y, docQuad.lr.y)
+            val right = maxOf(docQuad.ul.x, docQuad.ur.x, docQuad.ll.x, docQuad.lr.x)
+            val bottom = maxOf(docQuad.ul.y, docQuad.ur.y, docQuad.ll.y, docQuad.lr.y)
             drawScope.drawRect(
                 color = color,
                 topLeft = Offset(left, top),
@@ -829,10 +822,12 @@ public class PageViewState(
     }
 
     private fun drawScreenQuad(drawScope: DrawScope, page: Page, quad: DocQuad, color: Color) {
-        val ul = toScreen(page, quad.ul.x, quad.ul.y)
-        val ur = toScreen(page, quad.ur.x, quad.ur.y)
-        val ll = toScreen(page, quad.ll.x, quad.ll.y)
-        val lr = toScreen(page, quad.lr.x, quad.lr.y)
+        val geometry = page.geometry
+        val base = page.baseRect
+        val ul = geometry.originalToDoc(quad.ul.x, quad.ul.y, base)
+        val ur = geometry.originalToDoc(quad.ur.x, quad.ur.y, base)
+        val ll = geometry.originalToDoc(quad.ll.x, quad.ll.y, base)
+        val lr = geometry.originalToDoc(quad.lr.x, quad.lr.y, base)
         val left = minOf(ul.x, ur.x, ll.x, lr.x)
         val top = minOf(ul.y, ur.y, ll.y, lr.y)
         val right = maxOf(ul.x, ur.x, ll.x, lr.x)
@@ -847,13 +842,11 @@ public class PageViewState(
     private fun drawSpeakingIndicator(drawScope: DrawScope, page: Page) {
         val speakingPage = speakingPageIndex
         if (speakingPage != null && speakingPage == page.index) {
-            val topLeft = viewport.toScreen(Offset(page.baseRect.left, page.baseRect.top))
-            val bottomRight = viewport.toScreen(Offset(page.baseRect.right, page.baseRect.bottom))
             drawScope.drawRect(
                 color = Color.Red,
-                topLeft = topLeft,
-                size = GeomSize(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y),
-                style = Stroke(width = 8f)
+                topLeft = Offset(page.baseRect.left, page.baseRect.top),
+                size = GeomSize(page.baseRect.width, page.baseRect.height),
+                style = Stroke(width = 8f / vZoom)
             )
         }
     }
@@ -871,39 +864,46 @@ public class PageViewState(
 
     private fun drawAnnotationPath(drawScope: DrawScope, page: Page, anno: AnnotationPath) {
         if (anno.points.size < 2) return
+        drawScope.drawPath(
+            docPathFor(page, anno),
+            anno.config.color,
+            style = Stroke(width = anno.config.strokeWidth / vZoom)
+        )
+    }
+
+    private fun docPathFor(page: Page, anno: AnnotationPath): Path {
+        val base = page.baseRect
+        val cached = anno.cachedPath
+        if (cached != null && anno.cachedPathBase == base && anno.cachedPathPoints === anno.points) {
+            return cached
+        }
         val path = Path()
         anno.points.forEachIndexed { i, rel ->
-            val doc = Offset(
-                page.baseRect.left + rel.x * page.baseRect.width,
-                page.baseRect.top + rel.y * page.baseRect.height
-            )
-            val screen = viewport.toScreen(doc)
-            if (i == 0) path.moveTo(screen.x, screen.y) else path.lineTo(screen.x, screen.y)
+            val x = base.left + rel.x * base.width
+            val y = base.top + rel.y * base.height
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawScope.drawPath(path, anno.config.color, style = Stroke(width = anno.config.strokeWidth))
+        anno.cachedPath = path
+        anno.cachedPathBase = base
+        anno.cachedPathPoints = anno.points
+        return path
     }
 
     private fun drawSeparator(drawScope: DrawScope, page: Page) {
         val color = Color(0xFF999999)
+        val thickness = 2f / vZoom
+        val base = page.baseRect
         if (orientation == Vertical || columnCount > 1) {
-            val topLeft = viewport.toScreen(
-                Offset(page.baseRect.left, page.baseRect.bottom - 2f / viewport.zoom)
-            )
-            val right = viewport.toScreen(Offset(page.baseRect.left + page.baseRect.width / 4, page.baseRect.bottom))
             drawScope.drawRect(
                 color = color,
-                topLeft = topLeft,
-                size = GeomSize(right.x - topLeft.x, 2f)
+                topLeft = Offset(base.left, base.bottom - thickness),
+                size = GeomSize(base.width / 4, thickness)
             )
         } else {
-            val topLeft = viewport.toScreen(
-                Offset(page.baseRect.right - 2f / viewport.zoom, page.baseRect.top)
-            )
-            val bottom = viewport.toScreen(Offset(page.baseRect.right, page.baseRect.top + page.baseRect.height / 4))
             drawScope.drawRect(
                 color = color,
-                topLeft = topLeft,
-                size = GeomSize(2f, bottom.y - topLeft.y)
+                topLeft = Offset(base.right - thickness, base.top),
+                size = GeomSize(thickness, base.height / 4)
             )
         }
     }

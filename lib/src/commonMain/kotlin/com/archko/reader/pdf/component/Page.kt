@@ -40,9 +40,15 @@ public class Page internal constructor(
     public val yOffset: Float get() = baseRect.top
 
     private var currentLevel: Int = Int.MIN_VALUE
-    private val tileNodes = HashMap<TileId, PageNode>()
+    private val tileNodes = ArrayList<PageNode>()
     private var visibleTiles: List<PageNode> = emptyList()
     private var fallbackTiles: List<PageNode> = emptyList()
+
+    // 上次计算出的可见 tile 范围，范围不变时不做任何重建
+    private var lastColStart: Int = -1
+    private var lastColEnd: Int = -1
+    private var lastRowStart: Int = -1
+    private var lastRowEnd: Int = -1
 
     private var thumbBitmap: BitmapState? by mutableStateOf(null)
     private val thumbLoading: AtomicBoolean = AtomicBoolean(false)
@@ -51,7 +57,7 @@ public class Page internal constructor(
     internal var cropProbeRequested: Boolean = false
 
     // 页面链接
-    public var links: List<Hyperlink> = emptyList()
+    public var links: List<Hyperlink> by mutableStateOf(emptyList())
     private var linksLoaded = false
 
     // 文本选择相关
@@ -63,6 +69,14 @@ public class Page internal constructor(
 
     internal fun updateLayout(rect: Rect) {
         baseRect = rect
+        resetVisibleRange()
+    }
+
+    private fun resetVisibleRange() {
+        lastColStart = -1
+        lastColEnd = -1
+        lastRowStart = -1
+        lastRowEnd = -1
     }
 
     internal fun updateGeometry(newGeometry: PageGeometry) {
@@ -74,6 +88,7 @@ public class Page internal constructor(
         releaseThumbnail()
         geometry = newGeometry
         currentLevel = Int.MIN_VALUE
+        resetVisibleRange()
         currentSelection = null
     }
 
@@ -98,7 +113,7 @@ public class Page internal constructor(
     }
 
     private fun textureScale(level: Int): Float {
-        return 2.0.pow(level.toDouble()).toFloat()
+        return 2.0.pow(level.toDouble() / LEVEL_STEPS_PER_OCTAVE).toFloat()
     }
 
     internal fun levelFor(zoom: Float): Int {
@@ -113,7 +128,9 @@ public class Page internal constructor(
         if (needed <= 0.0001f) {
             return MIN_TILE_LEVEL
         }
-        val level = ceil(log2(needed.toDouble())).toInt()
+        // 细档位：保证 textureScale 只略大于 needed，tile 在屏幕上接近 TILE_CONTENT_PX，
+        // 避免 2 的幂档位产生一堆 512px 的小 tile
+        val level = ceil(log2(needed.toDouble()) * LEVEL_STEPS_PER_OCTAVE).toInt()
         return level.coerceIn(MIN_TILE_LEVEL, MAX_TILE_LEVEL)
     }
 
@@ -128,12 +145,17 @@ public class Page internal constructor(
         }
         val previousVisible = visibleTiles
 
-        val level = levelFor(zoom)
+        // 档位只在真正请求解码时切换，捏合过程中沿用当前档位，避免逐帧重建
+        val level = if (request || currentLevel == Int.MIN_VALUE) {
+            levelFor(zoom)
+        } else {
+            currentLevel
+        }
         if (level != currentLevel) {
             releaseFallbackTiles()
             val oldVisible = visibleTiles
             fallbackTiles = oldVisible
-            for (node in tileNodes.values) {
+            for (node in tileNodes) {
                 if (!oldVisible.contains(node)) {
                     node.release()
                 }
@@ -141,6 +163,7 @@ public class Page internal constructor(
             tileNodes.clear()
             visibleTiles = emptyList()
             currentLevel = level
+            resetVisibleRange()
         }
 
         val cols = colsAt(level)
@@ -151,20 +174,37 @@ public class Page internal constructor(
         val localBottom = ((visibleDoc.bottom - baseRect.top) / baseRect.height).coerceIn(0f, 1f)
 
         val colStart = floor(localLeft * cols).toInt().coerceIn(0, cols - 1)
-        val colEnd = ceil(localRight * cols).toInt().coerceIn(0, cols - 1)
+        val colEnd = (ceil(localRight * cols).toInt() - 1).coerceIn(0, cols - 1)
         val rowStart = floor(localTop * rows).toInt().coerceIn(0, rows - 1)
-        val rowEnd = ceil(localBottom * rows).toInt().coerceIn(0, rows - 1)
+        val rowEnd = (ceil(localBottom * rows).toInt() - 1).coerceIn(0, rows - 1)
+
+        // 可见范围没变（平移/缩放的绝大多数帧）：不重建任何东西
+        if (colStart == lastColStart && colEnd == lastColEnd &&
+            rowStart == lastRowStart && rowEnd == lastRowEnd
+        ) {
+            if (request) {
+                requestPendingDecodes(visibleTiles)
+            }
+            return false
+        }
+        lastColStart = colStart
+        lastColEnd = colEnd
+        lastRowStart = rowStart
+        lastRowEnd = rowEnd
 
         val scale = textureScale(level)
         val nodes = ArrayList<PageNode>((colEnd - colStart + 1) * (rowEnd - rowStart + 1))
-        val ids = HashSet<TileId>()
 
         for (row in rowStart..rowEnd) {
-            for (col in colStart..colEnd) {
-                val id = TileId(index, geometry.id, level, row, col)
-                ids.add(id)
-                val node = tileNodes[id] ?: createNode(
-                    id,
+            var col = colStart
+            while (col <= colEnd) {
+                val key = tileKey(level, row, col)
+                val existing = findNode(key)
+                val node = existing ?: createNode(
+                    key,
+                    level,
+                    row,
+                    col,
                     Rect(
                         col.toFloat() / cols,
                         row.toFloat() / rows,
@@ -172,44 +212,34 @@ public class Page internal constructor(
                         (row + 1).toFloat() / rows
                     ),
                     scale
-                )?.also { tileNodes[id] = it } ?: continue
-                nodes.add(node)
+                )?.also { tileNodes.add(it) }
+                if (node != null) {
+                    nodes.add(node)
+                }
+                col++
             }
         }
 
         // 未解码的离屏 tile 立刻取消；已解码的保留少量作为回滚缓冲。
-        var retainedOffscreen = tileNodes.size - ids.size
-        val iterator = tileNodes.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (!ids.contains(entry.key)) {
-                val node = entry.value
-                if (node.bitmap == null || retainedOffscreen > MAX_RETAINED_TILES) {
-                    node.release()
-                    iterator.remove()
-                    retainedOffscreen--
-                }
+        var retainedOffscreen = tileNodes.size - nodes.size
+        var last = tileNodes.size - 1
+        while (last >= 0) {
+            val node = tileNodes[last]
+            val inRange = node.level == level &&
+                    node.row >= rowStart && node.row <= rowEnd &&
+                    node.col >= colStart && node.col <= colEnd
+            if (!inRange && (node.bitmap == null || retainedOffscreen > MAX_RETAINED_TILES)) {
+                node.release()
+                tileNodes.removeAt(last)
+                retainedOffscreen--
             }
+            last--
         }
 
         visibleTiles = nodes
 
         if (request) {
-            for (node in nodes) {
-                val current = node.bitmap
-                if (current != null && current.isRecycled()) {
-                    node.bitmap = null
-                    node.queued.set(false)
-                }
-                if (node.bitmap == null && node.queued.get() &&
-                    System.currentTimeMillis() - node.requestAt > 3000L
-                ) {
-                    node.queued.set(false)
-                }
-                if (node.bitmap == null && !node.queued.get()) {
-                    requestDecode(node)
-                }
-            }
+            requestPendingDecodes(nodes)
         }
         if (fallbackTiles.isNotEmpty() && nodes.isNotEmpty() &&
             nodes.all { it.bitmap != null }
@@ -219,7 +249,42 @@ public class Page internal constructor(
         return previousVisible != nodes
     }
 
-    private fun createNode(id: TileId, fraction: Rect, scale: Float): PageNode? {
+    private fun requestPendingDecodes(nodes: List<PageNode>) {
+        for (node in nodes) {
+            val current = node.bitmap
+            if (current != null && current.isRecycled()) {
+                node.bitmap = null
+                node.queued.set(false)
+            }
+            if (node.bitmap == null && node.queued.get() &&
+                System.currentTimeMillis() - node.requestAt > 3000L
+            ) {
+                node.queued.set(false)
+            }
+            if (node.bitmap == null && !node.queued.get()) {
+                requestDecode(node)
+            }
+        }
+    }
+
+    private fun findNode(key: Long): PageNode? {
+        for (i in tileNodes.indices) {
+            val node = tileNodes[i]
+            if (node.key == key) {
+                return node
+            }
+        }
+        return null
+    }
+
+    private fun createNode(
+        key: Long,
+        level: Int,
+        row: Int,
+        col: Int,
+        fraction: Rect,
+        scale: Float
+    ): PageNode? {
         val ox = geometry.left + fraction.left * geometry.width
         val oy = geometry.top + fraction.top * geometry.height
         val ox2 = geometry.left + fraction.right * geometry.width
@@ -231,8 +296,11 @@ public class Page internal constructor(
             return null
         }
         return PageNode(
-            page = this,
-            id = id,
+            key = key,
+            cacheKey = "tile/$index/${geometry.id}/$level/$row/$col",
+            level = level,
+            row = row,
+            col = col,
             fraction = fraction,
             srcRect = srcRect,
             outWidth = outWidth,
@@ -298,6 +366,8 @@ public class Page internal constructor(
                         } else if (acquired) {
                             ImageCache.releasePage(newState)
                         }
+                        // 缩略图解码时已顺带解析链接，这里及时补上
+                        loadLinks()
                     }
                 }
 
@@ -321,6 +391,7 @@ public class Page internal constructor(
         releaseThumbnail()
         cropProbeRequested = false
         currentLevel = Int.MIN_VALUE
+        resetVisibleRange()
     }
 
     private fun releaseFallbackTiles() {
@@ -329,7 +400,9 @@ public class Page internal constructor(
     }
 
     private fun releaseTileNodes() {
-        tileNodes.values.forEach { it.release() }
+        for (node in tileNodes) {
+            node.release()
+        }
         tileNodes.clear()
         visibleTiles = emptyList()
     }
@@ -348,7 +421,7 @@ public class Page internal constructor(
         val service = pageViewState.decodeService ?: return
         node.queued.set(true)
         node.requestAt = System.currentTimeMillis()
-        val cached = ImageCache.acquireNode(node.id.key)
+        val cached = ImageCache.acquireNode(node.cacheKey)
         if (cached != null) {
             if (!cached.isRecycled()) {
                 node.bitmap = cached
@@ -361,7 +434,7 @@ public class Page internal constructor(
         val task = DecodeTask(
             type = TaskType.NODE,
             pageIndex = index,
-            key = node.id.key,
+            key = node.cacheKey,
             aPage = aPage,
             zoom = node.textureScale,
             pageSliceBounds = node.srcRect,
@@ -378,7 +451,7 @@ public class Page internal constructor(
                         node.queued.set(false)
                         return
                     }
-                    val newState = ImageCache.putNode(node.id.key, bitmap)
+                    val newState = ImageCache.putNode(node.cacheKey, bitmap)
                     val acquired = newState.acquire()
                     pageViewState.mainScope.launch {
                         if (acquired && !node.removed.get() && !pageViewState.isShutdown()) {
@@ -432,10 +505,17 @@ public class Page internal constructor(
     }
 
     private fun drawBitmap(drawScope: DrawScope, state: BitmapState, rect: Rect) {
+        val left = floor(rect.left).toInt()
+        val top = floor(rect.top).toInt()
+        val right = ceil(rect.right).toInt()
+        val bottom = ceil(rect.bottom).toInt()
         drawScope.drawImage(
             image = state.bitmap,
-            dstOffset = IntOffset(rect.left.toInt(), rect.top.toInt()),
-            dstSize = IntSize(rect.width.toInt() + 1, rect.height.toInt() + 1)
+            dstOffset = IntOffset(left, top),
+            dstSize = IntSize(
+                (right - left).coerceAtLeast(1),
+                (bottom - top).coerceAtLeast(1)
+            )
         )
     }
 
@@ -458,8 +538,11 @@ public class Page internal constructor(
 
     public fun loadLinks() {
         if (linksLoaded) return
-        links = pageViewState.state.getPageLinks(index)
-        linksLoaded = true
+        val loaded = pageViewState.state.getPageLinks(index)
+        if (loaded.isNotEmpty()) {
+            links = loaded
+            linksLoaded = true
+        }
     }
 
     internal fun ensureLinks() {
@@ -548,6 +631,8 @@ public class Page internal constructor(
     }
 
     private companion object {
-        const val MAX_RETAINED_TILES = 16
+        // 已解码的离屏 tile 由 ImageCache 统一缓存，页内只保留极少量作回滚缓冲，
+        // 否则每页最多常驻 16 张 1024x1024 位图，放大后内存/纹理压力会非常大。
+        const val MAX_RETAINED_TILES = 4
     }
 }
