@@ -1,6 +1,7 @@
 package com.archko.reader.pdf.decoder
 
 import android.content.ContentResolver
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
@@ -9,6 +10,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader
+import com.archko.reader.pdf.cache.BitmapPool
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
@@ -151,6 +153,35 @@ public class TiffDecoder(
         return list
     }
 
+    private fun createOutputBitmap(width: Int, height: Int): Bitmap {
+        val info = tiffLoader?.tiffInfo
+        val useRgb565 = info != null && info.bitsPerSample == 8 &&
+                info.photometricInterpretation != 3 &&
+                ((info.photometricInterpretation == 2 && info.samplesPerPixel <= 3) ||
+                        ((info.photometricInterpretation == 0 || info.photometricInterpretation == 1) &&
+                                info.samplesPerPixel == 1))
+        val config = if (useRgb565) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
+        return BitmapPool.acquire(width.coerceAtLeast(1), height.coerceAtLeast(1), config)
+    }
+
+    private fun decodeRegionToImageBitmap(
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+        scale: Float,
+        outWidth: Int,
+        outHeight: Int
+    ): ImageBitmap {
+        val bitmap = createOutputBitmap(outWidth, outHeight)
+        val success = tiffLoader!!.decodeRegionToBitmap(x, y, width, height, scale, bitmap)
+        if (!success) {
+            BitmapPool.release(bitmap)
+            return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
+        }
+        return bitmap.asImageBitmap()
+    }
+
     public override fun renderPageRegion(
         region: Rect,
         index: Int,
@@ -161,20 +192,23 @@ public class TiffDecoder(
     ): ImageBitmap {
         return try {
             // 宽高向上取整，配合 native 的像素中心采样，避免相邻 tile 出现接缝
-            val pageWidth = ceil(region.width / scale).toInt().coerceAtLeast(1)
-            val pageHeight = ceil(region.height / scale).toInt().coerceAtLeast(1)
             val patchX = (region.left / scale).toInt()
             val patchY = (region.top / scale).toInt()
+            val originalSize = originalPageSizes[index]
+            val pageWidth = ceil(region.width / scale).toInt()
+                .coerceIn(1, (originalSize.width - patchX).coerceAtLeast(1))
+            val pageHeight = ceil(region.height / scale).toInt()
+                .coerceIn(1, (originalSize.height - patchY).coerceAtLeast(1))
             //精度的问题,jni那边不支持小数进位四舍五入,所以这里的高宽要修正一下.
-            val bitmap = tiffLoader!!.decodeRegionToBitmap(
+            decodeRegionToImageBitmap(
                 patchX,
                 patchY,
                 pageWidth,
                 pageHeight,
                 scale,
+                ceil(pageWidth * scale).toInt(),
+                ceil(pageHeight * scale).toInt()
             )
-
-            bitmap?.asImageBitmap() ?: ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         } catch (e: Exception) {
             println("renderPageRegion error: ${documentInfo ?: ""}, $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
@@ -213,18 +247,14 @@ public class TiffDecoder(
 
             println("TiffDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale (scaleX=$scaleX, scaleY=$scaleY)")
 
-            val bitmap = tiffLoader!!.decodeRegionToBitmap(
+            return decodeRegionToImageBitmap(
                 0,
                 0,
                 originalSize.width,
                 originalSize.height,
                 scale,
-            )
-
-            return bitmap?.asImageBitmap() ?: ImageBitmap(
-                outWidth,
-                outHeight,
-                ImageBitmapConfig.Rgb565
+                ceil(originalSize.width * scale).toInt(),
+                ceil(originalSize.height * scale).toInt()
             )
         } catch (e: Exception) {
             println("renderPage error: $e")
