@@ -32,6 +32,7 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.util.Collections
 import java.util.LinkedHashMap
+import kotlin.math.round
 
 /**
  * @author: archko 2025/4/11 :11:26
@@ -250,7 +251,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
         try {
             if (FileTypeUtils.isReflowable(docPath)) {
-                val css = FontCSSGenerator.generateCSS(null, "10px")
+                val css = FontCSSGenerator.generateFontCSS(null, "10px")
                 println("应用自定义CSS: $css")
                 com.artifex.mupdf.fitz.Context.setUserCSS(css)
             }
@@ -814,8 +815,9 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
 
         try {
-            val patchX = region.left.toInt()
-            val patchY = region.top.toInt()
+            // 与 Page 的整数纹理边界一致：相邻 tile 的补丁原点首尾相接，不重叠
+            val patchX = round(region.left).toInt()
+            val patchY = round(region.top).toInt()
             println("PdfDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
             val bitmap = acquireReusableBitmap(outWidth, outHeight)

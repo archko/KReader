@@ -24,6 +24,7 @@ import java.util.Collections
 import java.util.LinkedHashMap
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.round
 
 /**
  * 图片文件解码器，支持多个图片文件
@@ -233,7 +234,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 }
             }
         } catch (e: Exception) {
-            println("renderImageAtScale error for file ${documents[index].absolutePath}: $e")
+            println("renderImageAtScale error for file ${documents[index]}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -357,11 +358,11 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 val heifLoader = getHeifLoader(index)
                 if (heifLoader != null) {
                     val originalSize = originalPageSizes[index]
-                    // 起点向下取整、终点向上取整，保证相邻 tile 覆盖完整，避免接缝
-                    val left = floor(region.left / scale).toInt().coerceIn(0, originalSize.width)
-                    val top = floor(region.top / scale).toInt().coerceIn(0, originalSize.height)
-                    val right = ceil(region.right / scale).toInt().coerceIn(0, originalSize.width)
-                    val bottom = ceil(region.bottom / scale).toInt().coerceIn(0, originalSize.height)
+                    // 四舍五入到内容像素边界：相邻 tile 共享公共边，解码区域互不重叠
+                    val left = round(region.left / scale).toInt().coerceIn(0, originalSize.width)
+                    val top = round(region.top / scale).toInt().coerceIn(0, originalSize.height)
+                    val right = round(region.right / scale).toInt().coerceIn(0, originalSize.width)
+                    val bottom = round(region.bottom / scale).toInt().coerceIn(0, originalSize.height)
                     val pageWidth = right - left
                     val pageHeight = bottom - top
 
@@ -434,7 +435,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 }
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${documents[index].absolutePath}: $e")
+            println("renderPageRegion error for file ${documents[index]}: $e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }

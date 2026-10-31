@@ -18,6 +18,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.pow
+import kotlin.math.round
 
 /**
  * 页面：基础布局矩形（文档空间，不含 zoom）+ 内容几何 + 页内 LOD tile。
@@ -285,24 +286,44 @@ public class Page internal constructor(
         fraction: Rect,
         scale: Float
     ): PageNode? {
-        val ox = geometry.left + fraction.left * geometry.width
-        val oy = geometry.top + fraction.top * geometry.height
-        val ox2 = geometry.left + fraction.right * geometry.width
-        val oy2 = geometry.top + fraction.bottom * geometry.height
-        val srcRect = Rect(ox * scale, oy * scale, ox2 * scale, oy2 * scale)
-        val outWidth = ceil((ox2 - ox) * scale).toInt().coerceAtLeast(1)
-        val outHeight = ceil((oy2 - oy) * scale).toInt().coerceAtLeast(1)
+        // 内容像素边界取整：相邻 tile 在公共边上算出的整数完全一致，
+        // 解码区域与绘制区域因此共用同一条边，接缝处不会重复绘制一列/一行像素。
+        // 旧实现用 ceil(宽) + floor/ceil(目标矩形) 会让相邻 tile 相互覆盖，
+        // 放大后这段重复内容被放大成可见的“文字重叠”。
+        val cx = round(geometry.left + fraction.left * geometry.width)
+        val cy = round(geometry.top + fraction.top * geometry.height)
+        val cx2 = round(geometry.left + fraction.right * geometry.width)
+        val cy2 = round(geometry.top + fraction.bottom * geometry.height)
+        if (cx2 <= cx || cy2 <= cy) {
+            return null
+        }
+        // 纹理像素边界同样取整，保证位图覆盖的纹理区间正好是 [tx, tx2)，
+        // 解码器不再需要 floor/ceil 向两侧“补一像素”。
+        val tx = round(cx * scale)
+        val ty = round(cy * scale)
+        val tx2 = round(cx2 * scale)
+        val ty2 = round(cy2 * scale)
+        val outWidth = (tx2 - tx).toInt().coerceAtLeast(1)
+        val outHeight = (ty2 - ty).toInt().coerceAtLeast(1)
         if (outWidth > 4096 || outHeight > 4096) {
             return null
         }
+        // 目标矩形改用取整后的内容边界反算归一化比例，
+        // 绘制时再统一 round，相邻 tile 的边界值相同 -> 不重叠也不留缝。
+        val snappedFraction = Rect(
+            (cx - geometry.left) / geometry.width,
+            (cy - geometry.top) / geometry.height,
+            (cx2 - geometry.left) / geometry.width,
+            (cy2 - geometry.top) / geometry.height
+        )
         return PageNode(
             key = key,
             cacheKey = "tile/$index/${geometry.id}/$level/$row/$col",
             level = level,
             row = row,
             col = col,
-            fraction = fraction,
-            srcRect = srcRect,
+            fraction = snappedFraction,
+            srcRect = Rect(tx, ty, tx2, ty2),
             outWidth = outWidth,
             outHeight = outHeight,
             textureScale = scale,
@@ -505,10 +526,12 @@ public class Page internal constructor(
     }
 
     private fun drawBitmap(drawScope: DrawScope, state: BitmapState, rect: Rect) {
-        val left = floor(rect.left).toInt()
-        val top = floor(rect.top).toInt()
-        val right = ceil(rect.right).toInt()
-        val bottom = ceil(rect.bottom).toInt()
+        // 统一 round 而不是外扩的 floor/ceil：相邻 tile 共享同一条边，
+        // 否则每个 tile 都向外多占 1 个文档像素，缩放后会互相覆盖。
+        val left = round(rect.left).toInt()
+        val top = round(rect.top).toInt()
+        val right = round(rect.right).toInt()
+        val bottom = round(rect.bottom).toInt()
         drawScope.drawImage(
             image = state.bitmap,
             dstOffset = IntOffset(left, top),

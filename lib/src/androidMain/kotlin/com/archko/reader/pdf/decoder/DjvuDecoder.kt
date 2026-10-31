@@ -30,6 +30,7 @@ import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import java.io.File
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.round
 
 private fun decodeDjvuRegionToBitmap(
     loader: DjvuLoader,
@@ -464,10 +465,11 @@ public class DjvuDecoder(
             if (pageOutWidth > outWidth + 1 || pageOutHeight > outHeight + 1) {
                 val fullBitmap = getFullPageBitmap(index, scale, pageOutWidth, pageOutHeight)
                 if (fullBitmap != null) {
-                    val left = floor(region.left).toInt().coerceIn(0, fullBitmap.width)
-                    val top = floor(region.top).toInt().coerceIn(0, fullBitmap.height)
-                    val right = ceil(region.right).toInt().coerceIn(left, fullBitmap.width)
-                    val bottom = ceil(region.bottom).toInt().coerceIn(top, fullBitmap.height)
+                    // region 已是纹理像素，直接四舍五入取整，相邻 tile 边界完全一致
+                    val left = round(region.left).toInt().coerceIn(0, fullBitmap.width)
+                    val top = round(region.top).toInt().coerceIn(0, fullBitmap.height)
+                    val right = round(region.right).toInt().coerceIn(left, fullBitmap.width)
+                    val bottom = round(region.bottom).toInt().coerceIn(top, fullBitmap.height)
 
                     if (right > left && bottom > top) {
                         return Bitmap.createBitmap(
@@ -481,13 +483,13 @@ public class DjvuDecoder(
                 }
             }
 
-            // 起点向下取整、宽高向上取整，保证相邻 tile 覆盖完整，避免接缝
-            val patchX = floor(region.left / scale).toInt()
-            val patchY = floor(region.top / scale).toInt()
+            // 四舍五入到内容像素边界：相邻 tile 共享公共边，不重复解码邻居像素
+            val patchX = round(region.left / scale).toInt()
+            val patchY = round(region.top / scale).toInt()
             val pageWidth =
-                (ceil(region.right / scale).toInt() - patchX).coerceAtLeast(1)
+                (round(region.right / scale).toInt() - patchX).coerceAtLeast(1)
             val pageHeight =
-                (ceil(region.bottom / scale).toInt() - patchY).coerceAtLeast(1)
+                (round(region.bottom / scale).toInt() - patchY).coerceAtLeast(1)
 
             val bitmap = decodeDjvuRegionToBitmap(
                 loader,

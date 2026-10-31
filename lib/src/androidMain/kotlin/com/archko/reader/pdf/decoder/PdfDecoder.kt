@@ -49,6 +49,7 @@ import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import java.io.File
 import java.util.Collections
 import java.util.LinkedHashMap
+import kotlin.math.round
 
 /**
  * @author: archko 2025/4/11 :11:26
@@ -806,8 +807,9 @@ public class PdfDecoder(
         }
 
         try {
-            val patchX = region.left.toInt()
-            val patchY = region.top.toInt()
+            // 与 Page 的整数纹理边界一致：相邻 tile 的补丁原点首尾相接，不重叠
+            val patchX = round(region.left).toInt()
+            val patchY = round(region.top).toInt()
 
             val start = System.currentTimeMillis()
             val bitmap = acquireReusableBitmap(outWidth, outHeight)

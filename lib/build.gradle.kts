@@ -38,6 +38,7 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.material3)
                 implementation(libs.jetbrains.lifecycle.viewmodel)
+                implementation(libs.jetbrains.lifecycle.runtime.compose)
                 api(libs.coil.kt)
                 api(libs.coil.kt.compose)
                 api(libs.coil.kt.okhttp)

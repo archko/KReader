@@ -28,6 +28,7 @@ import java.util.Collections
 import java.util.LinkedHashMap
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.round
 
 /**
  * 图片文件解码器，支持多个图片文件
@@ -204,12 +205,14 @@ public class ImagesDecoder(
             val regionDecoder = getRegionDecoder(index)
             if (regionDecoder != null) {
                 val originalSize = originalPageSizes[index]
-                // 起点向下取整、终点向上取整，保证相邻 tile 覆盖完整，避免接缝
+                // 四舍五入到内容像素边界：Page 传入的 region 由整数内容边界 × scale 得到，
+                // 相邻 tile 在公共边上得到完全相同的整数，解码区域互不重叠，
+                // 不会把邻居的一列/一行像素重复画进当前 tile。
                 val scaledRegion = android.graphics.Rect(
-                    floor(region.left / scale).toInt().coerceIn(0, originalSize.width),
-                    floor(region.top / scale).toInt().coerceIn(0, originalSize.height),
-                    ceil(region.right / scale).toInt().coerceIn(0, originalSize.width),
-                    ceil(region.bottom / scale).toInt().coerceIn(0, originalSize.height)
+                    round(region.left / scale).toInt().coerceIn(0, originalSize.width),
+                    round(region.top / scale).toInt().coerceIn(0, originalSize.height),
+                    round(region.right / scale).toInt().coerceIn(0, originalSize.width),
+                    round(region.bottom / scale).toInt().coerceIn(0, originalSize.height)
                 )
 
                 if (scaledRegion.width() > 0 && scaledRegion.height() > 0) {

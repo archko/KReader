@@ -23,6 +23,7 @@ import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import java.io.File
 import kotlin.math.ceil
+import kotlin.math.round
 
 /**
  * @author: archko 2025/8/9 :6:26
@@ -191,13 +192,13 @@ public class TiffDecoder(
         outHeight: Int
     ): ImageBitmap {
         return try {
-            // 宽高向上取整，配合 native 的像素中心采样，避免相邻 tile 出现接缝
-            val patchX = (region.left / scale).toInt()
-            val patchY = (region.top / scale).toInt()
+            // 四舍五入到内容像素边界：相邻 tile 共享公共边，解码区域互不重叠。
+            val patchX = round(region.left / scale).toInt()
+            val patchY = round(region.top / scale).toInt()
             val originalSize = originalPageSizes[index]
-            val pageWidth = ceil(region.width / scale).toInt()
+            val pageWidth = (round(region.right / scale).toInt() - patchX)
                 .coerceIn(1, (originalSize.width - patchX).coerceAtLeast(1))
-            val pageHeight = ceil(region.height / scale).toInt()
+            val pageHeight = (round(region.bottom / scale).toInt() - patchY)
                 .coerceIn(1, (originalSize.height - patchY).coerceAtLeast(1))
             //精度的问题,jni那边不支持小数进位四舍五入,所以这里的高宽要修正一下.
             decodeRegionToImageBitmap(
