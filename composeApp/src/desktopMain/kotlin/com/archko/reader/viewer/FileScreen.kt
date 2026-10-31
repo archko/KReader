@@ -165,7 +165,14 @@ fun FileScreen(
                             showDirectoryDialog = false
                             pendingImagePath?.let { imagePath ->
                                 // 只打开单个图片
-                                openDocRequest = OpenDocRequest(listOf(imagePath), 0)
+                                openDocRequest = OpenDocRequest(
+                                    listOf(
+                                        DocumentInfo(
+                                            path = imagePath,
+                                            fileSize = File(imagePath).length()
+                                        )
+                                    ), 0
+                                )
                             }
                             pendingImagePath = null
                         }
@@ -438,7 +445,7 @@ fun FileScreen(
             } else {
                 onShowBottomBarChanged(false)
                 CustomView(
-                    paths = openDocRequest!!.paths,
+                    documents = openDocRequest!!.documents,
                     progressPage = openDocRequest!!.page,
                     onSaveDocument = { page, pageCount, zoom, scrollX, scrollY, scrollOri, reflow, crop ->
                         viewModel.updateRecent(

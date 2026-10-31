@@ -102,7 +102,7 @@ private fun ToolbarContent(
     ) {
         var showColumn by remember {
             mutableStateOf(
-                if (documents.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
+                if (paths.size > 1 || FileTypeUtils.isImageFile(currentPath)) {
                     false
                 } else {
                     true
@@ -271,7 +271,7 @@ private fun ToolbarContent(
                     )
                 }
                 // 只有单文档文件才显示大纲按钮
-                    if (FileTypeUtils.shouldShowOutline(documents)) {
+                    if (FileTypeUtils.shouldShowOutline(paths)) {
                     IconButton(onClick = { onOutlineDialogShow() }) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_toc),
@@ -362,6 +362,9 @@ fun CustomView(
     var isNeedPass by remember { mutableStateOf(false) }
     var pathConfig by remember { mutableStateOf(PathConfig()) }
 
+    // TTS 朗读服务
+    val speechService: SpeechService = remember { TtsQueueService() }
+
     // AI对话相关状态
     var showAIDialog by remember { mutableStateOf(false) }
 
@@ -403,9 +406,6 @@ fun CustomView(
     // 多文件支持
     val currentDoc = documents.getOrNull(0) ?: documents.first()
     val currentPath = currentDoc.path ?: currentDoc.uri ?: ""
-    // 兼容性：从documents中提取路径列表供旧代码使用
-    val contentResolver = context.contentResolver
-
     Box(
         modifier = Modifier
             .fillMaxSize()
