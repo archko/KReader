@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # 项目配置
 PROJECT_NAME="KReader"
-VERSION="1.2.2"
+VERSION="1.2.5"
 BUILD_DIR="build/packages"
 COMPOSE_BUILD_DIR="composeApp/build/compose/binaries/main"
 
