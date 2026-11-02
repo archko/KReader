@@ -31,6 +31,7 @@ import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.MobileDocumentView
+import com.archko.reader.pdf.component.PagerDocumentView
 import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
@@ -104,7 +105,7 @@ private fun ToolbarContent(
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, TtsServiceBinder) -> Unit,
     isReflow: Boolean,
-    documents: List<DocumentInfo>
+    documents: List<DocumentInfo>,
 ) {
     Surface(
         color = Color(0xCC222222),
@@ -622,6 +623,11 @@ fun CustomView(
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
             var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
+            var isPagerMode by remember { mutableStateOf(false) }
+            val canEnterPagerMode = FileTypeUtils.isDocumentFile(currentPath) ||
+                FileTypeUtils.isImageFile(currentPath) ||
+                FileTypeUtils.isTiffFile(currentPath) ||
+                documents.size > 1
 
             var showSleepDialog by remember { mutableStateOf(false) }
             var showQueueDialog by remember { mutableStateOf(false) }
@@ -884,6 +890,22 @@ fun CustomView(
                     initialOrientation = orientation,
                     reflow = 1L,
                 )
+            } else if (isPagerMode) {
+                // 单页 ViewPager 模式（无切边、无多列、简化工具栏）
+                key(isPagerMode) {
+                    PagerDocumentView(
+                        list = list,
+                        decoder = decoder!!,
+                        initialPage = currentPage,
+                        jumpToPage = jumpIntent.page,
+                        onPageChanged = { page ->
+                            currentPage = page
+                            currentPageRef.intValue = page
+                        },
+                        onTapCenter = { showToolbar = !showToolbar },
+                        onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
+                    )
+                }
             } else {
                 // 文档视图（最底层）
                 MobileDocumentView(
@@ -896,23 +918,26 @@ fun CustomView(
                     columnCount = columnCount,
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
                     onCloseDocument = {
-                        println("onCloseDocument.isReflow:$isReflow")
-                        // 保存阅读统计
-                        if (FileTypeUtils.isDocumentFile(currentPath)) {
-                            val sessionDuration = readingTimeTracker.pauseSession()
-                            val annotationCount =
-                                annotationManager.annotations.values.sumOf { it.size }
-                            val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
-                            readingStatsViewModel.endSession(
-                                path = currentPath,
-                                sessionDuration = sessionDuration,
-                                currentPage = currentPageRef.intValue,
-                                annotationCount = annotationCount,
-                                bookmarkCount = bookmarkCount
-                            )
-                        }
-                        if (!isReflow) {
-                            onCloseDocument?.invoke()
+                        println("onCloseDocument.isReflow:$isReflow, isPagerMode:$isPagerMode")
+                        // 切换到单页模式时 MobileDocumentView 只是退出组合，不能关闭文档
+                        if (!isPagerMode) {
+                            // 保存阅读统计
+                            if (FileTypeUtils.isDocumentFile(currentPath)) {
+                                val sessionDuration = readingTimeTracker.pauseSession()
+                                val annotationCount =
+                                    annotationManager.annotations.values.sumOf { it.size }
+                                val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
+                                readingStatsViewModel.endSession(
+                                    path = currentPath,
+                                    sessionDuration = sessionDuration,
+                                    currentPage = currentPageRef.intValue,
+                                    annotationCount = annotationCount,
+                                    bookmarkCount = bookmarkCount
+                                )
+                            }
+                            if (!isReflow) {
+                                onCloseDocument?.invoke()
+                            }
                         }
                     }, // 只在非重排模式下传递关闭回调
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
@@ -943,6 +968,7 @@ fun CustomView(
                     currentPath = currentPath,
                     searchHighlightQuads = searchHighlightQuads,
                     currentSearchPageIndex = currentSearchPageIndex,
+                    closeDecoderOnShutdown = false,
                 )
             }
 
@@ -951,33 +977,52 @@ fun CustomView(
                 visible = showToolbar,
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
-                ToolbarContent(
-                    onCloseDocument = onCloseDocument,
-                    currentPath = currentPath,
-                    ttsServiceBinder = ttsServiceBinder,
-                    isSpeaking = isSpeaking,
-                    currentPage = currentPage,
-                    decoder = decoder!!,
-                    onGestureModeChange = { mode -> gestureMode = mode },
-                    gestureMode = gestureMode,
-                    onCropChange = { isCrop = !isCrop },
-                    isCrop = isCrop,
-                    onOutlineDialogShow = { showOutlineDialog = true },
-                    onAIDialogShow = { showAIDialog = true },
-                    onBookmarkDialogShow = { showAddBookmarkDialog = true },
-                    onSearchBarShow = { showSearchBar = !showSearchBar },
-                    onFontDialogShow = { showFontDialog = true },
-                    onThumbnailDialogShow = { showThumbnailDialog = true },
-                    scope = scope,
-                    onStartSpeaking = { page, dec, binder ->
-                        scope.launch {
-                            speakingPageIndex = page
-                            speakFromCurrentPage(page, dec, binder, currentPath)
-                        }
-                    },
-                    isReflow = isReflow,
-                    documents = documents
-                )
+                if (isPagerMode) {
+                    PagerToolbarContent(
+                        onCloseDocument = onCloseDocument,
+                        currentPage = currentPage,
+                        pageCount = pageCount,
+                        onPrevPage = {
+                            if (currentPage > 0) {
+                                jumpIntent = JumpIntent(currentPage - 1, JumpMode.PageNavigation)
+                            }
+                        },
+                        onNextPage = {
+                            if (currentPage < pageCount - 1) {
+                                jumpIntent = JumpIntent(currentPage + 1, JumpMode.PageNavigation)
+                            }
+                        },
+                        onExitPagerMode = { isPagerMode = false },
+                    )
+                } else {
+                    ToolbarContent(
+                        onCloseDocument = onCloseDocument,
+                        currentPath = currentPath,
+                        ttsServiceBinder = ttsServiceBinder,
+                        isSpeaking = isSpeaking,
+                        currentPage = currentPage,
+                        decoder = decoder!!,
+                        onGestureModeChange = { mode -> gestureMode = mode },
+                        gestureMode = gestureMode,
+                        onCropChange = { isCrop = !isCrop },
+                        isCrop = isCrop,
+                        onOutlineDialogShow = { showOutlineDialog = true },
+                        onAIDialogShow = { showAIDialog = true },
+                        onBookmarkDialogShow = { showAddBookmarkDialog = true },
+                        onSearchBarShow = { showSearchBar = !showSearchBar },
+                        onFontDialogShow = { showFontDialog = true },
+                        onThumbnailDialogShow = { showThumbnailDialog = true },
+                        scope = scope,
+                        onStartSpeaking = { page, dec, binder ->
+                            scope.launch {
+                                speakingPageIndex = page
+                                speakFromCurrentPage(page, dec, binder, currentPath)
+                            }
+                        },
+                        isReflow = isReflow,
+                        documents = documents,
+                    )
+                }
             }
 
             AnimatedVisibility(
@@ -1078,7 +1123,7 @@ fun CustomView(
 
             // 底部SeekBar - 考虑导航栏（上层）
             AnimatedVisibility(
-                visible = showToolbar,
+                visible = showToolbar && !isPagerMode,
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 Column(
@@ -1170,6 +1215,20 @@ fun CustomView(
                                         }
                                     }
                                 }
+
+                                // 文档 / 图片目录支持切换到单页模式
+                                if (canEnterPagerMode) {
+                                    VerticalDivider(modifier = Modifier.height(20.dp))
+                                    IconButton(
+                                        onClick = { isPagerMode = true },
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(Res.drawable.ic_view_carousel_outline),
+                                            contentDescription = "单页模式",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
                             }
 
                             var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
@@ -1231,6 +1290,20 @@ fun CustomView(
                         }
                     }
                 }
+            }
+
+            // 单页模式底部页码滑块：拖动后直接跳转页面
+            AnimatedVisibility(
+                visible = showToolbar && isPagerMode,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                PagerBottomSlider(
+                    currentPage = currentPage,
+                    pageCount = pageCount,
+                    onPageSelected = { targetPage ->
+                        jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
+                    }
+                )
             }
 
             // 睡眠定时对话框
@@ -1416,6 +1489,162 @@ fun CustomView(
                     },
                     onDismiss = { showSearchResultDialog = false }
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Pager 模式底部页码滑块
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PagerBottomSlider(
+    currentPage: Int,
+    pageCount: Int,
+    onPageSelected: (Int) -> Unit,
+) {
+    var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
+    LaunchedEffect(currentPage) {
+        sliderValue = (currentPage + 1).toFloat()
+    }
+
+    Surface(
+        color = Color(0xCC222222),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "${sliderValue.toInt()} / $pageCount",
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            Slider(
+                value = sliderValue,
+                onValueChange = { sliderValue = it },
+                valueRange = 1f..pageCount.toFloat(),
+                steps = (pageCount - 2).coerceAtLeast(0),
+                onValueChangeFinished = {
+                    val targetPage = sliderValue.toInt() - 1
+                    if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                        onPageSelected(targetPage)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.White,
+                    inactiveTrackColor = Color.Gray
+                ),
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        modifier = Modifier.height(2.dp),
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = Color.White,
+                            inactiveTrackColor = Color.Gray
+                        )
+                    )
+                },
+                thumb = {
+                    SliderDefaults.Thumb(
+                        interactionSource = remember { MutableInteractionSource() },
+                        modifier = Modifier.size(16.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Pager 模式顶部工具栏：返回键 + 翻页 + 页码 + 模式切换
+ */
+@Composable
+private fun PagerToolbarContent(
+    onCloseDocument: (() -> Unit)?,
+    currentPage: Int,
+    pageCount: Int,
+    onPrevPage: () -> Unit,
+    onNextPage: () -> Unit,
+    onExitPagerMode: () -> Unit,
+) {
+    Surface(
+        color = Color(0xCC222222),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                IconButton(onClick = { onCloseDocument?.invoke() }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_back),
+                        contentDescription = stringResource(Res.string.back),
+                        tint = Color.White
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onPrevPage,
+                    enabled = currentPage > 0
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_chevron_left),
+                        contentDescription = "上一页",
+                        tint = if (currentPage > 0) Color.White else Color.Gray
+                    )
+                }
+                Text(
+                    text = "${currentPage + 1} / $pageCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                IconButton(
+                    onClick = onNextPage,
+                    enabled = currentPage < pageCount - 1
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_chevron_right),
+                        contentDescription = "下一页",
+                        tint = if (currentPage < pageCount - 1) Color.White else Color.Gray
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                IconButton(onClick = { onExitPagerMode() }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_view_carousel_outline),
+                        contentDescription = "退出单页模式",
+                        tint = Color(0xFF2196F3)
+                    )
+                }
             }
         }
     }

@@ -39,7 +39,6 @@ import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.DocQuad
@@ -103,6 +102,7 @@ internal fun rememberDocumentViewState(
     currentPath: String,
     annotationManager: AnnotationManager,
     speakingPageIndex: Int?,
+    closeDecoderOnShutdown: Boolean = true,
 ): DocumentViewState {
     val viewSize = remember { mutableStateOf(IntSize.Zero) }
     val offset = remember {
@@ -141,7 +141,8 @@ internal fun rememberDocumentViewState(
             orientation.intValue,
             crop,
             columnCount = columnCount,
-            textSelector = textSelector
+            textSelector = textSelector,
+            closeDecoderOnShutdown = closeDecoderOnShutdown
         )
     }
 
@@ -340,7 +341,6 @@ internal fun DocumentViewEffects(
             saveDocumentState()
             onCloseDocument?.invoke()
             pageViewState.shutdown()
-            ImageCache.clear()
         }
     }
 }

@@ -69,13 +69,17 @@ public class DecoderAdapter(
             val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height)
 
             //println("decodePage.page:${task.pageIndex}, $thumbWidth-$thumbHeight")
-            imageDecoder.renderPage(
-                aPage = aPage,
-                viewSize = viewSize,
-                outWidth = thumbWidth,
-                outHeight = thumbHeight,
-                crop = task.crop
-            )
+            // 多个 PageViewState 可能共享同一个 ImageDecoder（单页/连续模式切换、Pager 预加载相邻页），
+            // 原生文档句柄不是线程安全的，必须串行化所有解码调用。
+            synchronized(imageDecoder) {
+                imageDecoder.renderPage(
+                    aPage = aPage,
+                    viewSize = viewSize,
+                    outWidth = thumbWidth,
+                    outHeight = thumbHeight,
+                    crop = task.crop
+                )
+            }
         } catch (e: Exception) {
             println("PdfDecoderAdapter.decodePage error: ${e.message}")
             null
@@ -83,14 +87,16 @@ public class DecoderAdapter(
     }
 
     override suspend fun decodeNode(task: DecodeTask): ImageBitmap {
-        return imageDecoder.renderPageRegion(
-            task.pageSliceBounds,
-            task.pageIndex,
-            task.zoom,
-            IntSize.Zero,
-            task.width,
-            task.height
-        )
+        return synchronized(imageDecoder) {
+            imageDecoder.renderPageRegion(
+                task.pageSliceBounds,
+                task.pageIndex,
+                task.zoom,
+                IntSize.Zero,
+                task.width,
+                task.height
+            )
+        }
     }
 
     override suspend fun processCrop(task: DecodeTask): CropResult? {
@@ -107,13 +113,15 @@ public class DecoderAdapter(
             val ratio: Float = 1f * aPage.width / thumbWidth
             val thumbHeight = (aPage.height / ratio).toInt()
 
-            val thumbBitmap = imageDecoder.renderPage(
-                aPage = aPage,
-                viewSize = viewSize,
-                outWidth = thumbWidth,
-                outHeight = thumbHeight,
-                crop = false // 切边检测时不使用已有的切边信息
-            )
+            val thumbBitmap = synchronized(imageDecoder) {
+                imageDecoder.renderPage(
+                    aPage = aPage,
+                    viewSize = viewSize,
+                    outWidth = thumbWidth,
+                    outHeight = thumbHeight,
+                    crop = false // 切边检测时不使用已有的切边信息
+                )
+            }
 
             // 检测切边区域
             val cropBounds = SmartCropUtils.detectSmartCropBounds(thumbBitmap)

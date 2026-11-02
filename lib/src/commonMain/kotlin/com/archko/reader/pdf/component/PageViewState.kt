@@ -41,7 +41,9 @@ public class PageViewState(
     public var orientation: Int = Vertical,
     crop: Boolean,
     public var columnCount: Int = 1,
-    public val textSelector: TextSelector? = null
+    public val textSelector: TextSelector? = null,
+    private val closeDecoderOnShutdown: Boolean = true,
+    private val fitPageToViewport: Boolean = false
 ) {
     internal val viewport = ViewportState()
 
@@ -286,6 +288,9 @@ public class PageViewState(
     }
 
     public fun shutdown() {
+        if (isShutdown) {
+            return
+        }
         isShutdown = true
         lastScannedVisible = null
         mainScope.cancel()
@@ -294,8 +299,12 @@ public class PageViewState(
         pages.forEach { it.recycle() }
         pages = emptyList()
         pageToRender = emptyList()
-        state.close()
-        ImageCache.clear()
+        // 多视图共享同一个 decoder（例如连续滚动与单页模式切换）时，
+        // 只能由最外层持有者关闭 decoder，否则会关闭其他视图仍在使用的文档。
+        if (closeDecoderOnShutdown) {
+            state.close()
+            ImageCache.clear()
+        }
     }
 
     /**
@@ -326,7 +335,11 @@ public class PageViewState(
             relayout()
         } else if (zoomChanged) {
             viewport.setContentSize(docWidth, docHeight)
-            viewport.offset = viewport.clampOffset(viewport.offset)
+            viewport.offset = if (fitPageToViewport) {
+                centeredViewportOffset()
+            } else {
+                viewport.clampOffset(viewport.offset)
+            }
             viewOffset = viewport.offset
             updateTotals()
             updateVisibleNow(true)
@@ -344,7 +357,10 @@ public class PageViewState(
         }
         val anchor = captureAnchor()
         computeRects()
-        if (anchor != null) {
+        if (fitPageToViewport) {
+            // 单页模式：整页居中适配视口，不保留锚点
+            viewport.offset = centeredViewportOffset()
+        } else if (anchor != null) {
             applyAnchor(anchor)
         } else {
             viewport.offset = viewport.clampOffset(viewport.offset)
@@ -415,7 +431,22 @@ public class PageViewState(
         val viewWidth = viewSize.width.toFloat()
         val viewHeight = viewSize.height.toFloat()
 
-        if (columnCount > 1) {
+        if (fitPageToViewport && pages.isNotEmpty()) {
+            // 单页模式：等比适配视口并在视口中居中（类似 ViewPager 的 fitCenter）
+            for (page in pages) {
+                val scale = min(
+                    viewWidth / page.geometry.width,
+                    viewHeight / page.geometry.height
+                )
+                val pageWidth = page.geometry.width * scale
+                val pageHeight = page.geometry.height * scale
+                val left = (viewWidth - pageWidth) / 2f
+                val top = (viewHeight - pageHeight) / 2f
+                page.updateLayout(Rect(left, top, left + pageWidth, top + pageHeight))
+            }
+            docWidth = viewWidth
+            docHeight = viewHeight
+        } else if (columnCount > 1) {
             val columnWidth = viewWidth / columnCount
             var currentY = 0f
             var i = 0
@@ -471,6 +502,18 @@ public class PageViewState(
     private fun updateTotals() {
         totalWidth = docWidth * vZoom
         totalHeight = docHeight * vZoom
+    }
+
+    /**
+     * 单页适配模式下，让缩放中心保持在视口中心所需的视口偏移。
+     */
+    private fun centeredViewportOffset(): Offset {
+        return viewport.clampOffset(
+            Offset(
+                viewSize.width * (1f - vZoom) / 2f,
+                viewSize.height * (1f - vZoom) / 2f
+            )
+        )
     }
 
     /**

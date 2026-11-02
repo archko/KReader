@@ -40,6 +40,7 @@ public fun MobileDocumentView(
     currentPath: String,
     searchHighlightQuads: Map<Int, List<DocQuad>> = emptyMap(),
     currentSearchPageIndex: Int? = null,
+    closeDecoderOnShutdown: Boolean = true,
 ) {
     // 创建文档视图状态
     val stateHolder = rememberDocumentViewState(
@@ -54,6 +55,7 @@ public fun MobileDocumentView(
         currentPath = currentPath,
         annotationManager = annotationManager,
         speakingPageIndex = speakingPageIndex,
+        closeDecoderOnShutdown = closeDecoderOnShutdown,
     )
 
     // 创建文本选择器
