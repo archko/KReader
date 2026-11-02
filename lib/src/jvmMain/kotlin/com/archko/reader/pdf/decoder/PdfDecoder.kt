@@ -588,9 +588,13 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         patchX: Int,
         patchY: Int,
         decodeLink: Boolean,
-        useDisplayList: Boolean = false
+        useDisplayList: Boolean = false,
+        pageOffsetX: Float = 0f,
+        pageOffsetY: Float = 0f,
+        scaleX: Float = scale,
+        scaleY: Float = scale
     ): ImageBitmap {
-        val ctm = Matrix(scale)
+        val ctm = Matrix(scaleX, scaleY)
 
         val bbox = com.artifex.mupdf.fitz.Rect(
             0f,
@@ -605,8 +609,8 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
         val dev = com.artifex.mupdf.fitz.DrawDevice(pixmap)
 
-        // 添加偏移，使渲染区域正确
-        ctm.translate(-(patchX / scale), -(patchY / scale))
+        // 添加偏移，使渲染区域正确；切边缩略图用页内小数偏移，避免整数 patch 造成整体偏移
+        ctm.translate(-(patchX / scale) + pageOffsetX, -(patchY / scale) + pageOffsetY)
 
         try {
             val displayList = if (useDisplayList) {
@@ -673,13 +677,18 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                     1f
                 }
 
-                val patchX = cropBounds.left.toInt() * scale
-                val patchY = cropBounds.top.toInt() * scale
-                val height = scale * cropBounds.height
-                val bitmap =
-                    acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
+                // 切边缩略图把 cropBounds 的小数偏移放进 CTM，并让切边区域正好铺满位图
+                val bitmapWidth = round(scale * cropBounds.width).toInt().coerceAtLeast(1)
+                val bitmapHeight = round(scale * cropBounds.height).toInt().coerceAtLeast(1)
+                val bitmap = acquireReusableBitmap(bitmapWidth, bitmapHeight)
 
-                return decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
+                return decode(
+                    index, scale, bitmap, 0, 0, true,
+                    pageOffsetX = -cropBounds.left,
+                    pageOffsetY = -cropBounds.top,
+                    scaleX = bitmapWidth / cropBounds.width,
+                    scaleY = bitmapHeight / cropBounds.height
+                )
             } else {
                 val cropBounds = androidx.compose.ui.geometry.Rect(
                     0f,

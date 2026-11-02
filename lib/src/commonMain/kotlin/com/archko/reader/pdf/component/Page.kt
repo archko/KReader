@@ -55,7 +55,12 @@ public class Page internal constructor(
     private val thumbLoading: AtomicBoolean = AtomicBoolean(false)
     private var thumbKey: String? = null
 
-    internal var cropProbeRequested: Boolean = false
+    // 切边探测是否已完成（探测结果是无切边时也会置为 true）
+    internal var cropProbed: Boolean =
+        !pageViewState.isCropEnabled() || aPage.cropBounds != null
+
+    internal val isCropPending: Boolean
+        get() = pageViewState.isCropEnabled() && !cropProbed
 
     // 页面链接
     public var links: List<Hyperlink> by mutableStateOf(emptyList())
@@ -80,17 +85,35 @@ public class Page internal constructor(
         lastRowEnd = -1
     }
 
-    internal fun updateGeometry(newGeometry: PageGeometry) {
+    internal fun updateGeometry(newGeometry: PageGeometry, keepThumbnail: Boolean = false) {
         if (newGeometry == geometry) {
             return
         }
         releaseTileNodes()
         releaseFallbackTiles()
-        releaseThumbnail()
+        if (!keepThumbnail) {
+            releaseThumbnail()
+        }
         geometry = newGeometry
         currentLevel = Int.MIN_VALUE
         resetVisibleRange()
         currentSelection = null
+    }
+
+    /**
+     * 切边开关变化：没有切边数据的页面需要重新探测，并清掉旧的未切边内容，避免先显示未切边页面。
+     */
+    internal fun prepareForCropChange(enabled: Boolean) {
+        if (enabled && aPage.cropBounds == null) {
+            cropProbed = false
+            releaseTileNodes()
+            releaseFallbackTiles()
+            releaseThumbnail()
+            currentLevel = Int.MIN_VALUE
+            resetVisibleRange()
+        } else {
+            cropProbed = true
+        }
     }
 
     private fun colsAt(level: Int): Int {
@@ -146,6 +169,17 @@ public class Page internal constructor(
     }
 
     internal fun updateVisibleTiles(visibleDoc: Rect, zoom: Float, request: Boolean): Boolean {
+        // 切边还没探测完时不要解码 tile：tile 是按未切边坐标算的，先显示出来会再闪一次
+        if (isCropPending) {
+            val hadTiles = visibleTiles.isNotEmpty()
+            if (hadTiles) {
+                releaseTileNodes()
+                releaseFallbackTiles()
+                currentLevel = Int.MIN_VALUE
+                resetVisibleRange()
+            }
+            return hadTiles
+        }
         if (baseRect.width <= 0f || baseRect.height <= 0f ||
             visibleDoc.left >= baseRect.right || visibleDoc.right <= baseRect.left ||
             visibleDoc.top >= baseRect.bottom || visibleDoc.bottom <= baseRect.top
@@ -345,21 +379,30 @@ public class Page internal constructor(
         if (thumbBitmap?.isRecycled() == true) {
             releaseThumbnail()
         }
-        if (thumbBitmap != null || thumbLoading.get()) {
-            return
-        }
         val service = pageViewState.decodeService ?: return
         val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
             aPage.width,
             aPage.height
         )
         val geometryId = geometry.id
-        val key = "thumb-${index}-${thumbWidth}x${thumbHeight}-$geometryId"
+        val key =
+            "thumb-${index}-${thumbWidth}x${thumbHeight}-$geometryId-${pageViewState.isCropEnabled()}"
+        // 已有缩略图但对应旧 geometry（切边前）：释放旧图，重新解码切边后的版本
+        if (thumbBitmap != null && thumbKey != key) {
+            releaseThumbnail()
+        }
+        if (thumbBitmap != null || thumbLoading.get()) {
+            return
+        }
         val cached = ImageCache.acquirePage(key)
         if (cached != null) {
-            thumbBitmap = cached
-            thumbKey = key
-            return
+            if (!isCropPending) {
+                thumbBitmap = cached
+                thumbKey = key
+                return
+            }
+            // 还没有切边数据：缓存里的可能是不切边的图，必须重新解码顺带探测
+            ImageCache.releasePage(cached)
         }
         thumbKey = key
         thumbLoading.set(true)
@@ -372,7 +415,8 @@ public class Page internal constructor(
             pageSliceBounds = Rect(0f, 0f, 1f, 1f),
             width = thumbWidth,
             height = thumbHeight,
-            crop = pageViewState.isCropEnabled() && aPage.cropBounds != null,
+            // 没有 cropBounds 时也交给渲染器顺带探测切边，这样第一张缩略图就是切边后的
+            crop = pageViewState.isCropEnabled(),
             callback = object : DecodeCallback {
                 override fun onDecodeComplete(
                     bitmap: androidx.compose.ui.graphics.ImageBitmap?,
@@ -390,7 +434,6 @@ public class Page internal constructor(
                         if (acquired &&
                             !pageViewState.isShutdown() &&
                             thumbKey == key &&
-                            geometry.id == geometryId &&
                             thumbBitmap == null
                         ) {
                             thumbBitmap = newState
@@ -399,6 +442,16 @@ public class Page internal constructor(
                         }
                         // 缩略图解码时已顺带解析链接，这里及时补上
                         loadLinks()
+                        if (!pageViewState.isShutdown() &&
+                            thumbKey == key &&
+                            pageViewState.isCropEnabled()
+                        ) {
+                            pageViewState.onCropProbeFinished(
+                                this@Page,
+                                success = true,
+                                fromThumbnail = true
+                            )
+                        }
                     }
                 }
 
@@ -420,7 +473,6 @@ public class Page internal constructor(
         releaseTileNodes()
         releaseFallbackTiles()
         releaseThumbnail()
-        cropProbeRequested = false
         currentLevel = Int.MIN_VALUE
         resetVisibleRange()
     }

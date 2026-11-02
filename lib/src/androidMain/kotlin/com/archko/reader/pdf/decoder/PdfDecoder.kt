@@ -607,9 +607,17 @@ public class PdfDecoder(
         patchX: Int,
         patchY: Int,
         decodeLink: Boolean,
-        useDisplayList: Boolean = false
+        useDisplayList: Boolean = false,
+        pageOffsetX: Float = 0f,
+        pageOffsetY: Float = 0f,
+        scaleX: Float = scale,
+        scaleY: Float = scale
     ) {
-        val ctm = Matrix(scale)
+        val ctm = Matrix(scaleX, scaleY)
+        // 页内小数偏移直接在页面坐标里平移，比整数 patch 更精确，切边缩略图不会偏一像素
+        if (pageOffsetX != 0f || pageOffsetY != 0f) {
+            ctm.translate(pageOffsetX, pageOffsetY)
+        }
         val dev = AndroidDrawDevice(bitmap, patchX, patchY, 0, 0, bitmap.width, bitmap.height)
 
         try {
@@ -662,14 +670,20 @@ public class PdfDecoder(
                 val scaleY = outHeight.toFloat() / cropBounds.height
                 val scale = minOf(scaleX, scaleY)
 
-                val patchX = cropBounds.left.toInt() * scale
-                val patchY = cropBounds.top.toInt() * scale
-                val height = scale * cropBounds.height
-                val bitmap =
-                    acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
+                // 缩略图按整像素落位，但页面坐标里的小数偏移直接进 CTM：
+                // 这样切边区域正好铺满缩略图，不会像整数 patch 那样整体偏左。
+                val bitmapWidth = round(scale * cropBounds.width).toInt().coerceAtLeast(1)
+                val bitmapHeight = round(scale * cropBounds.height).toInt().coerceAtLeast(1)
+                val bitmap = acquireReusableBitmap(bitmapWidth, bitmapHeight)
 
-                decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
-                println("PdfDecoder.renderPage:croped page=$index, cos:${System.currentTimeMillis() - start}, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
+                decode(
+                    index, scale, bitmap, 0, 0, true,
+                    pageOffsetX = -cropBounds.left,
+                    pageOffsetY = -cropBounds.top,
+                    scaleX = bitmapWidth / cropBounds.width,
+                    scaleY = bitmapHeight / cropBounds.height
+                )
+                println("PdfDecoder.renderPage:croped page=$index, cos:${System.currentTimeMillis() - start}, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, offset:${cropBounds.left}-${cropBounds.top}, bounds=$cropBounds")
                 val imageBitmap = bitmap.asImageBitmap()
                 return imageBitmap
             } else {

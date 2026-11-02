@@ -495,14 +495,18 @@ public class PdfiumDecoder(
                 val scaleY = outHeight.toFloat() / cropBounds.height
                 val scale = minOf(scaleX, scaleY)
 
-                val patchX = cropBounds.left.toInt() * scale
-                val patchY = cropBounds.top.toInt() * scale
-                val height = scale * cropBounds.height
-                val bitmap =
-                    acquireReusableBitmap((scale * cropBounds.width).toInt(), height.toInt())
+                // patch 用精确浮点坐标取整，避免 cropBounds 的小数部分丢失后缩略图整体偏移
+                val patchX = round(cropBounds.left * scale).toInt()
+                val patchY = round(cropBounds.top * scale).toInt()
+                val right = round(cropBounds.right * scale).toInt()
+                val bottom = round(cropBounds.bottom * scale).toInt()
+                val bitmap = acquireReusableBitmap(
+                    (right - patchX).coerceAtLeast(1),
+                    (bottom - patchY).coerceAtLeast(1)
+                )
                 println("PdfiumDecoder.renderPage:croped page=$index, cos:${System.currentTimeMillis() - start}, $outWidth-$outHeight, 切边后尺寸=${bitmap.width}x${bitmap.height}, patch:$patchX-$patchY, bounds=$cropBounds")
 
-                decode(index, scale, bitmap, patchX.toInt(), patchY.toInt(), true)
+                decode(index, scale, bitmap, patchX, patchY, true)
                 val imageBitmap = bitmap.asImageBitmap()
                 return imageBitmap
             } else {

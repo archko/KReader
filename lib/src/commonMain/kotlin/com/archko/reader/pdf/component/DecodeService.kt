@@ -78,7 +78,10 @@ public class DecodeService(
             return
         }
 
-        if (task.callback?.shouldRender(task.pageIndex, task.type == TaskType.PAGE) != true) {
+        // 没有回调的后台任务（例如启动时的批量切边）默认都需要执行
+        val shouldRender =
+            task.callback?.shouldRender(task.pageIndex, task.type == TaskType.PAGE) ?: true
+        if (!shouldRender) {
             synchronized(lock) {
                 if (pendingJobs[task.key] === task) {
                     pendingJobs.remove(task.key)

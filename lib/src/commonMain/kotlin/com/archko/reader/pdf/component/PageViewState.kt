@@ -105,6 +105,8 @@ public class PageViewState(
     public var decodeService: DecodeService? = null
         private set
 
+    private var decoderAdapter: DecoderAdapter? = null
+
     // 解码完成回到主线程统一使用的 scope，避免每次解码都新建 CoroutineScope
     internal val mainScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -143,7 +145,51 @@ public class PageViewState(
             viewSize = viewSize,
             isCropEnabled = { cropEnabled }
         )
+        decoderAdapter = decoder
         decodeService = DecodeService(decoder)
+        // 启动后在低优先级的 CROP 队列里补齐所有页面的切边，避免翻到未切边的页面时再闪一次
+        submitBackgroundCropTasks()
+    }
+
+    /**
+     * 提交全量切边任务。CROP 在解码服务里优先级最低，不会和缩略图/tile 抢线程。
+     * 已有 cropBounds 的页面会被 generateCropTasks 跳过。
+     */
+    private fun submitBackgroundCropTasks() {
+        if (!cropEnabled) {
+            return
+        }
+        val service = decodeService ?: return
+        val adapter = decoderAdapter ?: return
+        val tasks = adapter.generateCropTasks().mapNotNull { task ->
+            val page = pages.getOrNull(task.pageIndex) ?: return@mapNotNull null
+            task.copy(callback = object : DecodeCallback {
+                override fun onDecodeComplete(
+                    bitmap: androidx.compose.ui.graphics.ImageBitmap?,
+                    isThumb: Boolean,
+                    error: Throwable?
+                ) {
+                }
+
+                override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
+                    return !isShutdown
+                }
+
+                override fun onFinish(pageNumber: Int) {
+                    mainScope.launch {
+                        onCropProbeFinished(
+                            page,
+                            success = page.aPage.cropBounds != null,
+                            fromThumbnail = false
+                        )
+                    }
+                }
+            })
+        }
+        if (tasks.isNotEmpty()) {
+            service.submitCropTasks(tasks)
+        }
+        println("PageViewState.submitBackgroundCropTasks: ${tasks.size} tasks")
     }
 
     public fun notifyDecodeCompleted() {
@@ -165,7 +211,7 @@ public class PageViewState(
         cropEnabled = enabled
         pendingCropPages.clear()
         pages.forEach {
-            it.cropProbeRequested = false
+            it.prepareForCropChange(enabled)
             it.updateGeometry(
                 PageGeometry(
                     it.aPage.width.toFloat(),
@@ -176,6 +222,9 @@ public class PageViewState(
             )
         }
         relayout()
+        if (enabled) {
+            submitBackgroundCropTasks()
+        }
     }
 
     public fun isCropEnabled(): Boolean = cropEnabled
@@ -547,11 +596,12 @@ public class PageViewState(
                 }
             }
             wantedPagesRef.set(retain)
+        }
 
-            // 预加载页先准备缩略图，翻页时能立刻作为底图显示，避免白屏
-            for (page in preloadScratch) {
-                page.requestThumbnail()
-            }
+        // 预加载页先准备缩略图，翻页时能立刻作为底图显示，避免白屏。
+        // requestThumbnail 内部有幂等判断，每次刷新都确认一次，切边重排后也能补上缩略图。
+        for (page in preloadScratch) {
+            page.requestThumbnail()
         }
 
         if (pagesChanged) {
@@ -570,7 +620,6 @@ public class PageViewState(
                 }
                 // 可见页提前加载链接，避免打开文档或刚翻到时链接不显示
                 page.ensureLinks()
-                requestCropProbe(page)
             }
             if (tilesChanged) {
                 revision++
@@ -729,61 +778,41 @@ public class PageViewState(
         }
     }
 
-    private fun requestCropProbe(page: Page) {
-        if (!cropEnabled || page.aPage.cropBounds != null || page.cropProbeRequested) {
+    /**
+     * 切边探测完成。缩略图解码会顺带探测切边，启动后的后台批量任务也走这里。
+     */
+    internal fun onCropProbeFinished(page: Page, success: Boolean, fromThumbnail: Boolean) {
+        if (isShutdown || !cropEnabled || !success) {
             return
         }
-        val service = decodeService ?: return
-        page.cropProbeRequested = true
-        val (thumbWidth, thumbHeight) = DecoderAdapter.calculateThumbnailSize(
-            page.aPage.width,
-            page.aPage.height,
-            200
-        )
-        val task = DecodeTask(
-            type = TaskType.CROP,
-            pageIndex = page.index,
-            key = "crop-${page.index}-${page.geometry.id}",
-            aPage = page.aPage,
-            zoom = 1f,
-            pageSliceBounds = Rect(0f, 0f, 1f, 1f),
-            width = thumbWidth,
-            height = thumbHeight,
-            crop = true,
-            callback = object : DecodeCallback {
-                override fun onDecodeComplete(
-                    bitmap: androidx.compose.ui.graphics.ImageBitmap?,
-                    isThumb: Boolean,
-                    error: Throwable?
-                ) {
-                }
-
-                override fun shouldRender(pageNumber: Int, isFullPage: Boolean): Boolean {
-                    return !isShutdown && isPageWanted(pageNumber)
-                }
-
-                override fun onFinish(pageNumber: Int) {
-                    mainScope.launch {
-                        onPageGeometryDetected(page)
-                    }
-                }
-            }
-        )
-        service.submitTask(task)
-    }
-
-    private fun onPageGeometryDetected(page: Page) {
-        if (isShutdown) return
+        page.cropProbed = true
         val newGeometry = PageGeometry(
             page.aPage.width.toFloat(),
             page.aPage.height.toFloat(),
             page.aPage.cropBounds,
             cropEnabled
         )
-        if (newGeometry == page.geometry) {
+        if (newGeometry != page.geometry) {
+            // 缩略图已经按新切边渲染好了（可能还在解码中），更新几何时保留它，避免再白屏一次
+            page.updateGeometry(newGeometry, keepThumbnail = true)
+            if (fromThumbnail) {
+                // 可见页的缩略图已经解码完，立即重排，避免先用旧矩形短暂拉伸
+                relayout()
+            } else {
+                pendingCropPages.add(page.index)
+                scheduleCropRelayout()
+            }
             return
         }
-        pendingCropPages.add(page.index)
+        if (isPageWanted(page.index)) {
+            // 没有切边需求：几何没变，但之前挂起的 tile 现在可以请求了
+            if (page.updateVisibleTiles(viewport.docRect, vZoom, true)) {
+                revision++
+            }
+        }
+    }
+
+    private fun scheduleCropRelayout() {
         if (cropRelayoutScheduled) {
             return
         }
@@ -811,6 +840,7 @@ public class PageViewState(
             }
             return
         }
+        val hadPending = pendingCropPages.isNotEmpty()
         var changed = false
         for (index in pendingCropPages) {
             val page = pages.getOrNull(index) ?: continue
@@ -826,7 +856,7 @@ public class PageViewState(
             }
         }
         pendingCropPages.clear()
-        if (changed) {
+        if (changed || hadPending) {
             relayout()
         }
     }
