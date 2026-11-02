@@ -35,6 +35,7 @@ public object BookProgressParser {
                 }
             } ?: ""
             put("path", encodedPath)
+            put("uri", recent.uri ?: "")
             put("name", recent.name ?: "")
             put("ext", recent.ext ?: "")
             put("pageCount", recent.pageCount ?: 0)
@@ -73,6 +74,7 @@ public object BookProgressParser {
                     it // 如果解码失败，使用原始值
                 }
             }
+            recent.uri = jsonObject["uri"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotEmpty() }
             recent.name = jsonObject["name"]?.jsonPrimitive?.contentOrNull
             recent.ext = jsonObject["ext"]?.jsonPrimitive?.contentOrNull
             recent.pageCount = jsonObject["pageCount"]?.jsonPrimitive?.longOrNull ?: 0

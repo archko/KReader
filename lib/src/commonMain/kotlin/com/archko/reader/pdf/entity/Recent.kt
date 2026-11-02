@@ -19,6 +19,9 @@ public class Recent {
     @ColumnInfo(name = "path")
     public var path: String? = null
 
+    @ColumnInfo(name = "uri")
+    public var uri: String? = null
+
     @ColumnInfo(name = "updateAt")
     public var updateAt: Long? = 0
 
@@ -138,6 +141,7 @@ public class Recent {
                 ", scrollX=" + scrollX +
                 ", scrollY=" + scrollY +
                 ", path='" + path + '\'' +
+                ", uri='" + uri + '\'' +
                 ", name='" + name + '\'' +
                 ", ext='" + ext + '\'' +
                 ", size=" + size +
@@ -153,6 +157,7 @@ public class Recent {
         if (other !is Recent) return false
 
         return path == other.path &&
+                uri == other.uri &&
                 page == other.page &&
                 pageCount == other.pageCount &&
                 updateAt == other.updateAt &&
@@ -174,6 +179,7 @@ public class Recent {
 
     override fun hashCode(): Int {
         var result = path?.hashCode() ?: 0
+        result = 31 * result + (uri?.hashCode() ?: 0)
         result = 31 * result + (page?.hashCode() ?: 0)
         result = 31 * result + (pageCount?.hashCode() ?: 0)
         result = 31 * result + (updateAt?.hashCode() ?: 0)

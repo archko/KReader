@@ -101,6 +101,12 @@ open class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> {
                 val uri = intent.data
                 if (uri != null) {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {
+                    }
                     val path = IntentFile.getPath(this, uri)
                     DocumentInfo(uri = uri.toString(), path = path)
                 } else {

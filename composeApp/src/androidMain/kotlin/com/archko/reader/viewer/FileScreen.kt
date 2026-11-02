@@ -78,7 +78,9 @@ import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
 import com.archko.reader.viewer.viewmodel.FontViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
@@ -110,6 +112,7 @@ fun FileScreen(
         var openDocRequest by remember { mutableStateOf<OpenDocRequest?>(null) }
 
         var showBookInfoDialog by remember { mutableStateOf<Recent?>(null) }
+        var pendingReauthRecent by remember { mutableStateOf<Recent?>(null) }
 
         val isDarkTheme = isSystemInDarkTheme()
         val gridState = rememberLazyGridState()
@@ -159,6 +162,11 @@ fun FileScreen(
                         ext = recent?.ext ?: path.getExtension()
                     }
                     ext = ext ?: ""
+                    val resolvedDocument = externalDocument.copy(
+                        fileSize = fileSize,
+                        mimeType = mimeType ?: externalDocument.mimeType,
+                        ext = ext
+                    )
 
                     when {
                         mimeType != null && FileTypeUtils.isImageMimeType(mimeType) ||
@@ -167,9 +175,12 @@ fun FileScreen(
                         }
                         mimeType != null && FileTypeUtils.isDocumentMimeType(mimeType) ||
                                 ext.isNotEmpty() && FileTypeUtils.isDocumentExtension(ext) -> {
-                            val docs = listOf(externalDocument)
+                            val docs = listOf(resolvedDocument)
                             if (FileTypeUtils.shouldSaveProgress(docs)) {
-                                viewModel.getRecent(path ?: externalDocument.uri ?: "")
+                                viewModel.getRecent(
+                                    path ?: resolvedDocument.uri ?: "",
+                                    resolvedDocument.uri
+                                )
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(docs, startPage)
                             } else {
@@ -202,41 +213,6 @@ fun FileScreen(
             }
         }
 
-        // 书本信息对话框
-        showBookInfoDialog?.let { recent ->
-            BookInfoDialog(
-                recent = recent,
-                readingStatsViewModel = readingStatsViewModel,
-                bookmarkViewModel = bookmarkViewModel,
-                onDismiss = { showBookInfoDialog = null },
-                onRead = { bookRecent ->
-                    val path = getAbsolutePath(bookRecent.path)
-                    val file = File(path)
-                    if (file.exists()) {
-                        val fileSize = bookRecent.size ?: file.length()
-                        scope.launch {
-                            val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
-                            val docs = listOf(docInfo)
-                            if (FileTypeUtils.shouldSaveProgress(docs)) {
-                                viewModel.getRecent(bookRecent.path!!)
-                                val startPage = viewModel.recent?.page?.toInt() ?: 0
-                                openDocRequest = OpenDocRequest(docs, startPage)
-                            } else {
-                                openDocRequest = OpenDocRequest(docs, 0)
-                            }
-                        }
-                    } else {
-                        Toast.makeText(
-                            context,
-                            "File Not Found!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                    showBookInfoDialog = null
-                }
-            )
-        }
-
         val pickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult()
         ) { result ->
@@ -259,6 +235,8 @@ fun FileScreen(
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
+
+                uriPathPairs.forEach { (uri, _) -> persistUriPermission(context, uri) }
 
                 scope.launch {
                     if (uriPathPairs.isNotEmpty()) {
@@ -319,7 +297,10 @@ fun FileScreen(
                             val firstDoc = documentDocs.first()
                             val docs = listOf(firstDoc)
                             if (FileTypeUtils.shouldSaveProgress(docs)) {
-                                viewModel.getRecent(firstDoc.path ?: firstDoc.uri ?: "")
+                                viewModel.getRecent(
+                                    firstDoc.path ?: firstDoc.uri ?: "",
+                                    firstDoc.uri
+                                )
                                 val startPage = viewModel.recent?.page?.toInt() ?: 0
                                 openDocRequest = OpenDocRequest(docs, startPage)
                             } else {
@@ -357,6 +338,107 @@ fun FileScreen(
             }
         }
 
+        val reauthLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val recent = pendingReauthRecent
+            pendingReauthRecent = null
+            if (result.resultCode == Activity.RESULT_OK && recent != null) {
+                val newUri = result.data?.data
+                if (newUri != null) {
+                    persistUriPermission(context, newUri)
+                    scope.launch {
+                        viewModel.updateUri(recent.path, newUri.toString())
+                        viewModel.getRecent(newUri.toString(), newUri.toString())
+                        val startPage = viewModel.recent?.page?.toInt() ?: recent.page?.toInt() ?: 0
+                        openDocRequest = OpenDocRequest(
+                            listOf(
+                                DocumentInfo(
+                                    uri = newUri.toString(),
+                                    fileSize = recent.size ?: 0L,
+                                    ext = recent.ext
+                                )
+                            ),
+                            startPage
+                        )
+                    }
+                }
+            }
+        }
+
+        fun requestReauth(recent: Recent) {
+            pendingReauthRecent = recent
+            Toast.makeText(context, "文件访问权限已失效或文件不可访问，请重新选择文件以恢复进度", Toast.LENGTH_LONG).show()
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+            reauthLauncher.launch(intent)
+        }
+
+        fun openRecent(recent: Recent) {
+            val uriString = recent.uri?.takeIf { it.startsWith("content://") }
+            val path = recent.path
+            val target = uriString ?: path
+            if (target.isNullOrEmpty()) return
+
+            if (!uriString.isNullOrEmpty()) {
+                scope.launch {
+                    var canOpen = false
+                    var permissionLost = false
+                    withContext(Dispatchers.IO) {
+                        try {
+                            context.contentResolver.openFileDescriptor(Uri.parse(uriString), "r")?.use {
+                                canOpen = true
+                            }
+                        } catch (e: SecurityException) {
+                            permissionLost = true
+                        } catch (e: Exception) {
+                            canOpen = false
+                        }
+                    }
+                    when {
+                        canOpen -> {
+                            viewModel.getRecent(path ?: uriString, uriString)
+                            val startPage = viewModel.recent?.page?.toInt() ?: recent.page?.toInt() ?: 0
+                            openDocRequest = OpenDocRequest(
+                                listOf(
+                                    DocumentInfo(
+                                        uri = uriString,
+                                        path = path,
+                                        fileSize = recent.size ?: 0L,
+                                        ext = recent.ext
+                                    )
+                                ),
+                                startPage
+                            )
+                        }
+                        permissionLost -> requestReauth(recent)
+                        else -> Toast.makeText(context, "文件不存在或已被移动", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                val absolutePath = getAbsolutePath(path)
+                val file = File(absolutePath)
+                if (file.exists()) {
+                    val fileSize = recent.size ?: file.length()
+                    scope.launch {
+                        val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
+                        val docs = listOf(docInfo)
+                        if (FileTypeUtils.shouldSaveProgress(docs)) {
+                            viewModel.getRecent(path!!, recent.uri)
+                            val startPage = viewModel.recent?.page?.toInt() ?: 0
+                            openDocRequest = OpenDocRequest(docs, startPage)
+                        } else {
+                            openDocRequest = OpenDocRequest(docs, 0)
+                        }
+                    }
+                } else {
+                    requestReauth(recent)
+                }
+            }
+        }
+
         fun selectFiles() {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -364,6 +446,20 @@ fun FileScreen(
                 type = "*/*"
             }
             pickerLauncher.launch(intent)
+        }
+
+        // 书本信息对话框
+        showBookInfoDialog?.let { recent ->
+            BookInfoDialog(
+                recent = recent,
+                readingStatsViewModel = readingStatsViewModel,
+                bookmarkViewModel = bookmarkViewModel,
+                onDismiss = { showBookInfoDialog = null },
+                onRead = { bookRecent ->
+                    openRecent(bookRecent)
+                    showBookInfoDialog = null
+                }
+            )
         }
 
         Surface(
@@ -461,32 +557,7 @@ fun FileScreen(
                             ) { i ->
                                 RecentItem(
                                     recent = recentList[i],
-                                    onClick = {
-                                        val path = getAbsolutePath(it.path)
-                                        val file = File(path)
-                                        if (file.exists()) {
-                                            val fileSize = it.size ?: file.length()
-                                            scope.launch {
-                                                val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
-                                                val docs = listOf(docInfo)
-                                                if (FileTypeUtils.shouldSaveProgress(docs)) {
-                                                    viewModel.getRecent(it.path!!)
-                                                    val startPage =
-                                                        viewModel.recent?.page?.toInt() ?: 0
-                                                    openDocRequest =
-                                                        OpenDocRequest(docs, startPage)
-                                                } else {
-                                                    openDocRequest = OpenDocRequest(docs, 0)
-                                                }
-                                            }
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "File Not Found!",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    },
+                                    onClick = { openRecent(it) },
                                     onInfo = { recent ->
                                         showBookInfoDialog = recent
                                     },
@@ -575,6 +646,15 @@ fun FileScreen(
                 )
             }
         }
+    }
+}
+
+private fun persistUriPermission(context: android.content.Context, uri: Uri) {
+    try {
+        context.contentResolver.takePersistableUriPermission(
+            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+    } catch (_: Exception) {
     }
 }
 

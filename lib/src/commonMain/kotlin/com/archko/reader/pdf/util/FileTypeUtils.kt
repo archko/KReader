@@ -124,7 +124,7 @@ public object FileTypeUtils {
      * 只有单文档文件才保存进度
      */
     public fun shouldSaveProgress(documents: List<DocumentInfo>): Boolean {
-        return documents.size == 1 && isDocumentFile(documents.first().path ?: documents.first().uri ?: "")
+        return documents.size == 1 && isDocument(documents.first())
     }
 
     /**
@@ -132,7 +132,20 @@ public object FileTypeUtils {
      * 只有单文档文件才显示大纲
      */
     public fun shouldShowOutline(documents: List<DocumentInfo>): Boolean {
-        return documents.size == 1 && isDocumentFile(documents.first().path ?: documents.first().uri ?: "")
+        return documents.size == 1 && isDocument(documents.first())
+    }
+
+    private fun isDocument(document: DocumentInfo): Boolean {
+        val path = document.path ?: document.uri ?: ""
+        if (path.isNotEmpty() && isDocumentFile(path)) {
+            return true
+        }
+        val ext = document.ext ?: ""
+        if (ext.isNotEmpty() && isDocumentExtension(ext)) {
+            return true
+        }
+        val mimeType = document.mimeType
+        return mimeType != null && isDocumentMimeType(mimeType)
     }
 
     /**

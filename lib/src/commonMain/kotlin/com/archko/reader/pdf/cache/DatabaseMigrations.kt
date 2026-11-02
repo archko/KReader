@@ -156,3 +156,10 @@ public val MIGRATION_4_5: Migration = object : Migration(4, 5) {
         connection.execSQL("CREATE INDEX IF NOT EXISTS index_ai_page_conversation_document_path_page_index ON ai_page_conversation(document_path, page_index)")
     }
 }
+
+public val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        // Add uri column to recent table for persisting content:// access
+        connection.execSQL("ALTER TABLE recent ADD COLUMN uri TEXT")
+    }
+}

@@ -34,6 +34,7 @@ public class PdfViewModel : ViewModel() {
 
     public var recent: Recent? = null
     public var path: String? = null
+    public var uri: String? = null
 
     init {
         viewModelScope.launch {
@@ -200,13 +201,19 @@ public class PdfViewModel : ViewModel() {
         }
         viewModelScope.launch {
             val normalizedPath = normalizePath(path!!)
+            val currentUri = uri
             val absolutePath = getAbsolutePath(normalizedPath)
             val file = File(absolutePath)
             // 如果recent为空但path不为空，则新建一个记录
             if (recent == null && path != null) {
                 println("PdfViewModel.get:$normalizedPath, path:$path, page:$page")
 
-                recent = database?.recentDao()?.getRecent(normalizedPath)
+                recent = if (!currentUri.isNullOrEmpty()) {
+                    database?.recentDao()?.getRecentByUri(currentUri)
+                } else null
+                if (recent == null) {
+                    recent = database?.recentDao()?.getRecent(normalizedPath)
+                }
             }
             if (recent == null) {
                 val recent = Recent(
@@ -229,8 +236,13 @@ public class PdfViewModel : ViewModel() {
                     isFavorited = 0L,
                     inRecent = 1L
                 )
+                recent.uri = currentUri
                 database?.recentDao()?.addRecent(recent)
-                this@PdfViewModel.recent = database?.recentDao()?.getRecent(normalizedPath)
+                this@PdfViewModel.recent = if (!currentUri.isNullOrEmpty()) {
+                    database?.recentDao()?.getRecentByUri(currentUri)
+                } else {
+                    database?.recentDao()?.getRecent(normalizedPath)
+                }
                 println("PdfViewModel.updateRecent-created:${this@PdfViewModel.recent}")
             } else {
                 // 更新现有记录
@@ -249,9 +261,14 @@ public class PdfViewModel : ViewModel() {
                         this.name = absolutePath.getFileName()
                         this.ext = absolutePath.getExtension()
                         this.size = file.length()
+                        this.uri = currentUri ?: this.uri
                     }
                     database?.recentDao()?.updateRecent(recent!!)
-                    recent = database?.recentDao()?.getRecent(normalizedPath)
+                    recent = if (!currentUri.isNullOrEmpty()) {
+                        database?.recentDao()?.getRecentByUri(currentUri)
+                    } else {
+                        database?.recentDao()?.getRecent(normalizedPath)
+                    }
                     println("PdfViewModel.updateRecent.after:$recent")
                 }
             }
@@ -294,6 +311,28 @@ public class PdfViewModel : ViewModel() {
                 database?.recentDao()?.updateRecent(old)
                 println("PdfViewModel.updateRecent.after:$old")
             }
+        }
+    }
+
+    public suspend fun updateUri(oldPath: String?, newUri: String) {
+        if (oldPath.isNullOrEmpty()) return
+        val normalizedUri = normalizePath(newUri)
+        val old = database?.recentDao()?.getRecent(normalizePath(oldPath))
+            ?: database?.recentDao()?.getRecentByUri(normalizePath(oldPath))
+            ?: database?.recentDao()?.getRecentByUri(normalizedUri)
+            ?: return
+        old.uri = normalizedUri
+        if (old.path.isNullOrEmpty() || old.path!!.startsWith("content://")) {
+            old.path = normalizedUri
+        }
+        old.updateAt = System.currentTimeMillis()
+        database?.recentDao()?.updateRecent(old)
+
+        val currentList = _recentList.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == old.id }
+        if (index != -1) {
+            currentList[index] = old
+            _recentList.value = currentList
         }
     }
 
@@ -384,13 +423,21 @@ public class PdfViewModel : ViewModel() {
         }
     }
 
-    public suspend fun getRecent(absolutePath: String) {
+    public suspend fun getRecent(absolutePath: String, uri: String? = null) {
         this.path = absolutePath
+        this.uri = uri
         val deferred = CompletableDeferred<Unit>()
         viewModelScope.launch {
             val normalizedPath = normalizePath(absolutePath)
-            recent = database?.recentDao()?.getRecent(normalizedPath)
-            println("PdfViewModel.getRecent:normalizedPath:$normalizedPath, path:$absolutePath, $recent")
+            recent = if (!uri.isNullOrEmpty()) {
+                database?.recentDao()?.getRecentByUri(uri)
+            } else {
+                database?.recentDao()?.getRecent(normalizedPath)
+            }
+            if (recent == null) {
+                recent = database?.recentDao()?.getRecent(normalizedPath)
+            }
+            println("PdfViewModel.getRecent:normalizedPath:$normalizedPath, path:$absolutePath, uri:$uri, $recent")
             deferred.complete(Unit)
         }
         deferred.await()

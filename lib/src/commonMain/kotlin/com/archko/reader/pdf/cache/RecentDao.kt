@@ -31,6 +31,9 @@ public interface RecentDao {
     @Query("SELECT * FROM recent WHERE path = :path")
     public suspend fun getRecent(path: String): Recent?
 
+    @Query("SELECT * FROM recent WHERE uri = :uri")
+    public suspend fun getRecentByUri(uri: String): Recent?
+
     @Query("SELECT * FROM recent WHERE id IN (SELECT MAX(id) FROM recent GROUP BY path ORDER BY MAX(updateAt) DESC) ORDER BY updateAt DESC LIMIT :start, :count")
     public suspend fun getRecents(start: Int, count: Int): List<Recent>?
 
