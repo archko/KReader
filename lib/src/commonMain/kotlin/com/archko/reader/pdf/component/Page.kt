@@ -132,6 +132,16 @@ public class Page internal constructor(
         // 细档位：保证 textureScale 只略大于 needed，tile 在屏幕上接近 TILE_CONTENT_PX，
         // 避免 2 的幂档位产生一堆 512px 的小 tile
         val level = ceil(log2(needed.toDouble()) * LEVEL_STEPS_PER_OCTAVE).toInt()
+        val current = currentLevel
+        if (current != Int.MIN_VALUE) {
+            // 档位迟滞：缩放停在档位边界附近时沿用当前档位，避免来回重建整页 tile
+            val currentScale = textureScale(current)
+            if (needed <= currentScale * LEVEL_HYSTERESIS_BLUR &&
+                currentScale <= needed * LEVEL_HYSTERESIS_OVERSCALE
+            ) {
+                return current
+            }
+        }
         return level.coerceIn(MIN_TILE_LEVEL, MAX_TILE_LEVEL)
     }
 
@@ -673,5 +683,9 @@ public class Page internal constructor(
         // 已解码的离屏 tile 由 ImageCache 统一缓存，页内只保留极少量作回滚缓冲，
         // 否则每页最多常驻 16 张 1024x1024 位图，放大后内存/纹理压力会非常大。
         const val MAX_RETAINED_TILES = 4
+
+        // 档位迟滞区间：允许少量欠采样/过采样，避免缩放停在档位边界时反复重建、反复解码
+        const val LEVEL_HYSTERESIS_BLUR = 1.10f
+        const val LEVEL_HYSTERESIS_OVERSCALE = 1.30f
     }
 }

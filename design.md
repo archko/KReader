@@ -1,21 +1,22 @@
-# 文档视图重构设计（LOD / 硬件加速 / 动态切边）
+# 文档视图设计（LOD / 图层变换 / 动态切边）
 
-## 一、目标与不变量
+## 一、核心模型
 
-重写 `DocumentView / DocumentCanvas / Page / PageNode`，把"整篇文档展开成一张大图、在其中滚动并解码 tile"这个模型做正确：
+整篇文档在文档坐标系中展开，缩放与滚动只属于视口：
 
-1. **基础布局不含 zoom**。布局只由 `viewportSize / orientation / columnCount / 每页几何（含切边）` 决定；zoom 与 offset 只属于视口。缩放不重排。
-2. **tile 身份是页内局部的**：`(pageIndex, geometryId, level, row, col)`。文档位置、页宽、缩放都不参与 key；布局变化不会让 tile 失效。
-3. **每页主尺寸统一**：垂直滚动时所有页 `baseWidth` 相同（= 视口宽 / 列数）；水平滚动时所有页 `baseHeight` 相同（= 视口高）。切边改变内容宽高比，只改变另一维，主尺寸不变。
-4. **缩放/平移只更新图层变换**：捏合期间不重排、不重绘内容、不重解码；只有跨 LOD 档位或视口范围变化才更新 tile 集合。
-5. **切边是版本化几何**：只让受影响页的 tile 失效，不清全局缓存。
-6. **功能与旧实现一致**：滚动、翻页点击、双击、链接、文本选择、划线、搜索高亮、朗读边框、跳页、恢复、方向/列数、TTS 页码、存档。
+- 基础布局不包含 zoom，只由 `viewportSize / orientation / columnCount / 每页几何` 决定。
+- 缩放、平移只更新 `graphicsLayer` 的变换矩阵，不重新布局、不重组。
+- 页面内容是页内 LOD tile 网格，tile 身份与文档位置、页宽、缩放无关。
+- 切边是版本化几何，只影响对应页的 tile，不清全局缓存。
+- 解码为单线程队列，绘制阶段不发解码请求。
 
-实现约定：
+设计规则：
 
-- 保留 `PageViewState / Page / PageNode` 类名，仅替换内部语义；对外 `MobileDocumentView / DesktopDocumentView / onSaveDocument` 签名不变。
-- 解码仍为单线程，不改变 `DecodeService` 的线程模型。
-- 旧存档坐标不做兼容迁移。
+1. 垂直滚动时所有页 `baseWidth` 相同（视口宽 / 列数）；水平滚动时所有页 `baseHeight` 相同（视口高）。切边只改变另一维。
+2. tile key 为 `(pageIndex, geometryId, level, row, col)`。
+3. 每页始终有一张整页缩略图作为兜底，当前档 tile 覆盖其上。
+4. 捏合过程中只改变视口与图层矩阵，不刷新 tile；松手后再按当前档刷新。
+5. 布局变化（视口、方向、列数、切边）统一通过锚点重排，锚点用内容比例。
 
 ## 二、坐标空间
 
@@ -23,67 +24,89 @@
 Content space   原始页像素中的内容区域（切边后）
 Document space  基础布局，zoom = 1 时的文档像素
 Screen space    screen = doc * zoom + offset
-Tile space      (page, geometryId, level, row, col) → content 源矩形 / doc 目标矩形
+Tile space      (pageIndex, geometryId, level, row, col) → content 源矩形 / doc 目标矩形
 ```
+
+`ViewportState` 负责三件事：
 
 ```kotlin
 class ViewportState {
-    var viewSize: IntSize              // 屏幕
+    var viewSize: IntSize      // 屏幕尺寸
     var zoom: Float
-    var offset: Offset                 // 屏幕像素平移
+    var offset: Offset         // 屏幕像素平移
     var docWidth: Float
     var docHeight: Float
 
+    val docRect: Rect          // 可见文档区域
     fun toDoc(screen: Offset): Offset
     fun toScreen(doc: Offset): Offset
-    val docRect: Rect                  // 可见文档区域
     fun clampOffset(target: Offset): Offset
 }
 ```
 
-所有交互（点击、链接、选择、标注、搜索高亮、翻页、存档）统一走 `toDoc/toScreen`，不再出现 `width * scaleRatio` 这类散落换算。
+- `docRect = toDoc(0,0) .. toDoc(viewSize)`。
+- 滚动边界：`scaledWidth = docWidth * zoom`，`minX = min(0, viewSize.width - scaledWidth)`，Y 同理。
+- 点击、链接、文本选择、标注、搜索高亮、翻页、存档统一走 `toDoc / toScreen`。
 
-## 三、组件职责
+## 三、组件与数据流
 
-### 1. `DocumentView`（Compose 外壳）
-`MobileDocumentView / DesktopDocumentView` 负责：
-- 手势（`CommonGestureHandler`）：只改 `vZoom / offset`，通过 `PageViewState.updateViewport(zoom, offset, request)` 同步。
-- 生命周期、存档、跳页、TTS、搜索、切边事件转发。
-- 布局变化（视口尺寸、方向、列数、切边、懒切边结果）后同步 `offset = pageViewState.viewOffset`。
+### 1. 入口外壳
 
-`DocumentViewCanvas`：
+`MobileDocumentView` / `DesktopDocumentView`：
+
+- 用 `rememberDocumentViewState(...)` 创建 `DocumentViewState`。
+- 用 `Box + onSizeChanged` 把 `viewSize` 写入状态，并同步 `offset = pageViewState.viewOffset`。
+- 组合 `CommonGestureHandler`、`DocumentViewCanvas`、`TextActionToolbarWrapper`。
+- 桌面端额外接入滚轮、键盘、焦点处理。
+
+`DocumentViewState` 持有一份视图状态：
+
+```kotlin
+class DocumentViewState(
+    viewSize, offset, vZoom, orientation, toPage, isJumping,
+    pageViewState,
+    isTextSelecting, selectedPage, showTextActionToolbar,
+    selectionStartPos, selectionEndPos,
+    drawingPoints, activeDrawingPage,
+    flingJob, lastTapTime, tapDelayJob, scope
+)
 ```
-Box(fillMaxSize)
-  Box(graphicsLayer {
-        translationX = offset.x; translationY = offset.y
-        scaleX = zoom; scaleY = zoom
-        transformOrigin = (0,0); clip = false
-  }) {
-    Canvas { revision; drawVisiblePages() }   // 文档坐标
-  }
-  Canvas { offset; zoom; revision; drawOverlay() }  // 屏幕坐标
-```
 
-- 内容层只读 `revision` 与 tile 快照，不读 zoom/offset；捏合只更新图层矩阵。
-- 覆盖层读取 offset/zoom（Compose state）与 `revision`，在捏合时重绘，但只处理可见页，且描边保持屏幕像素。
-- 不设置 `compositingStrategy = Offscreen`。
+`DocumentViewEffects` 负责副作用：
 
-### 2. `PageViewState`（文档编排）
-持有：`viewport`、`pages: List<Page>`、`pageToRender`、`decodeService`、搜索/朗读/标注状态、`revision`、`layoutVersion`。
+- `columnCount / crop / orientation / viewSize / jumpToPage / speakingPageIndex / searchHighlightQuads` 变化时同步到 `PageViewState`。
+- 设置页内链接、URL 链接回调。
+- `snapshotFlow { firstVisiblePageIndex() }` → `onPageChanged`。
+- 生命周期 `ON_PAUSE` 与 `onDispose` 时存档；`onDispose` 还会取消延时任务、调用 `onCloseDocument`、`shutdown()`、清理 `ImageCache`。
 
-职责：
-- `updateViewSize(size, zoom, orientation)`：视口尺寸/方向变化 → 重排；zoom 变化 → 只更新视口。
-- `updateColumnCount / setCropEnabled`：重排（保留锚点）。
-- `updateViewport(zoom, offset, request)`：手势路径；拖动/惯性中 `request=true` 持续请求新出现的 tile；捏合中 `request=false`，松手后刷新当前档。
-- `updateOffset / updateVisiblePages`：兼容旧调用，更新视口并刷新 tile。
-- `updateVisibleNow`：计算可见页与每页可见 tile；请求 tile、页面缩略图、低优先级切边探测。只处理可见页，不扫描/清理全部页。
+### 2. PageViewState（文档编排）
+
+持有：
+
+- `viewport: ViewportState`
+- `pages: List<Page>`、`pageToRender: List<Page>`
+- `docWidth / docHeight`、`viewOffset`、`vZoom`、`viewSize`
+- `revision`：可见页或可见 tile 集合变化，用于内容层失效
+- `layoutVersion`：重排完成
+- `overlayZoom`：覆盖层重录时使用的 zoom 快照
+- `isInteracting`：手势/fling 活动标记
+- `decodeService`、`mainScope`
+- 朗读、搜索高亮、标注、切边探测状态
+- `onPageLinkClick / onUrlLinkClick / onDecodeCompleted / onLayoutApplied`
+- `wantedPagesRef`：预加载页集合，解码线程用它判断任务是否过期
+
+主要职责：
+
+- `updateViewSize`：视口尺寸/方向变化重排；仅 zoom 变化时只更新视口并刷新可见 tile。
+- `updateColumnCount / setCropEnabled`：重排并保留锚点。
+- `updateViewport(zoom, offset, request)`：手势路径，只更新视口字段；`request=true` 时调度可见性刷新，`request=false` 时按 16ms 节流检查是否需要重新扫描。
+- `updateOffset / updateVisiblePages`：跳页与外部定位，更新视口并立即刷新。
+- `updateVisibleNow`：扫描可见页、维护预加载页、请求缩略图与 tile、触发切边探测。
 - `drawVisiblePages / drawOverlay`。
-- `handleClick`、`offsetForPage`、`offsetForDoc`、`firstVisiblePageIndex`。
+- `handleClick / offsetForPage / offsetForDoc / firstVisiblePageIndex`。
 
-### 3. `ViewportState`
-视口变换与边界；`docRect` 用于可见页/可见 tile 计算。
+### 3. PageGeometry
 
-### 4. `PageGeometry`
 内容几何的不可变快照：
 
 ```kotlin
@@ -100,255 +123,371 @@ class PageGeometry(
 }
 ```
 
-### 5. `Page`
+- `id` 由 left/top/width/height 计算；关闭再开启切边若内容矩形相同，`id` 相同。
+- 懒切边结果写回 `APage.cropBounds` 后，回到主线程构建新的 `PageGeometry`。
+
+### 4. Page
+
 纯布局 + 页内 LOD，不含 zoom 尺寸：
 
 ```kotlin
 class Page {
-    var baseRect: Rect                    // 文档空间
+    var baseRect: Rect                 // 文档空间
     var geometry: PageGeometry
-    val visibleTiles: List<PageNode>      // 当前档
+    private var currentLevel: Int
+    private val tileNodes: List<PageNode>
+    private var visibleTiles: List<PageNode>
+    private var fallbackTiles: List<PageNode>
 
     var currentSelection: TextSelection?
     var links: List<Hyperlink>
 
     fun updateLayout(rect)
-    fun updateGeometry(g)                 // geometry id 变化才清 tile
-    fun updateVisibleTiles(visibleDoc, zoom, request)
-    fun drawTiles(scope)
+    fun updateGeometry(g)
     fun levelFor(zoom): Int
+    fun updateVisibleTiles(visibleDoc, zoom, request): Boolean
+    fun requestThumbnail()
+    fun clearVisibleTiles()
+    fun drawTiles(scope)
+
+    fun loadText()
+    fun loadLinks()
+    fun findLinkAtPoint(docX, docY)
+    fun startTextSelection(docX, docY)
+    fun updateTextSelection(docX, docY)
+    fun endTextSelection()
+    fun recycle()
 }
 ```
 
+- `updateLayout` 只改 `baseRect` 并重置可见范围，不丢 tile。
+- `updateGeometry` 在 geometry 变化时释放 tile、fallback、缩略图，重置档位与选择。
 - 页内网格由内容尺寸决定，不依赖布局尺寸。
-- 底层只画页面缩略图；当前档 tile 覆盖其上，缺失时自然露出缩略图，不做多级 fallback。
-- 链接/文本选择命中测试走 `geometry.docToOriginal`。
 
-### 6. `PageNode` / `TileId`
+### 5. PageNode
 
 ```kotlin
-data class TileId(page, geometryId, level, row, col) {
-    val key = "tile/$page/$geometryId/$level/$row/$col"
-}
-
 class PageNode(
-    val id: TileId,
-    val fraction: Rect,       // 页内归一化矩形
-    val srcRect: Rect,        // level 纹理像素区域
+    val key: Long,          // level/row/col 打包，用于页内查找
+    val cacheKey: String,   // tile/page/geometryId/level/row/col
+    val level: Int,
+    val row: Int,
+    val col: Int,
+    val fraction: Rect,     // 页内归一化矩形
+    val srcRect: Rect,      // level 纹理像素区域
     val outWidth: Int,
     val outHeight: Int,
     val textureScale: Float,
-    val crop: Boolean,
-    var bitmap: BitmapState?,
-    var queued: Boolean
+    val crop: Boolean
 ) {
+    var bitmap: BitmapState?   // Compose state
+    val queued: AtomicBoolean
+    val removed: AtomicBoolean
+    var requestAt: Long
     fun docRect(base: Rect): Rect
 }
 ```
 
-- key 稳定，不含文档位置与 zoom。
-- 解码请求由 `Page.updateVisibleTiles` 发出，不在 draw 阶段发请求。
-- 缓存命中时同步 `acquire` 并直接显示，避免排队。
+- `bitmap` 是 `mutableStateOf`，tile 到位会让内容层失效。
+- `removed` 由释放路径设置，解码线程执行前可据此跳过过期任务。
+- `docRect = baseRect × fraction`。
+
+### 6. DecodeService / Decoder
+
+`Decoder` 接口提供三种任务：
+
+- `TaskType.PAGE`：整页缩略图。
+- `TaskType.NODE`：LOD tile 区域。
+- `TaskType.CROP`：切边探测。
+
+`DecoderAdapter` 把 `ImageDecoder` 适配为 `Decoder`：
+
+- `decodePage`：按 `calculateThumbnailSize` 生成缩略图，超大页逐步降低基准尺寸。
+- `decodeNode`：调用 `renderPageRegion(srcRect, pageIndex, textureScale, ..., outWidth, outHeight)`。
+- `processCrop`：渲染小图后由 `SmartCropUtils` 检测切边并写回 `APage.cropBounds`。
 
 ## 四、基础布局
 
+`PageViewState.computeRects()`：
+
 ```
-Vertical（单列）:
+Vertical（单列）：
   baseWidth  = viewportWidth
   baseHeight = baseWidth * contentHeight / contentWidth
   pageRect   = (0, top, baseWidth, top + baseHeight)
 
-Vertical（columnCount = C）:
-  baseWidth = viewportWidth / C
-  pageRect  = (col * baseWidth, rowTop, +baseWidth, +rowHeight)
-  rowTop   += max(row 内各页 baseHeight)
+Vertical（columnCount = C）：
+  columnWidth = viewportWidth / C
+  pageRect    = (col * columnWidth, rowTop, +columnWidth, +columnWidth * contentHeight / contentWidth)
+  rowTop     += max(row 内各页 baseHeight)
 
-Horizontal:
+Horizontal：
   baseHeight = viewportHeight
   baseWidth  = baseHeight * contentWidth / contentHeight
-  pageRect   = (left, 0, +baseWidth, +baseHeight)
+  pageRect   = (left, 0, left + baseWidth, baseHeight)
 ```
 
 - `docWidth / docHeight` 为文档总尺寸，不含 zoom。
-- 滚动边界：`contentSize = docSize * zoom`，`min = min(0, viewport - content)`。
-- 可见页：线性/区间扫描；取可见列表首项作为当前页。
-- 多列只用于垂直方向。
-
-## 五、LOD 金字塔
-
-### 1. 网格在 content 空间
+- 重排统一走锚点：
 
 ```
-CT = 1024                                // 每个 tile 的目标纹理像素
-textureScale(L) = 2^L                    // 内容像素 -> 纹理像素
-
-cols(L) = max(1, ceil(C.width  * 2^L / CT))
-rows(L) = max(1, ceil(C.height * 2^L / CT))
-
-tileOutputPx = ceil(C.width * 2^L / cols(L)) <= CT
+anchor = (pageIndex, fx, fy, anchorScreenPos)
+computeRects()
+offset = anchorScreenPos - newDocPoint * zoom
+clampOffset + updateVisibleNow
 ```
 
-- 网格只依赖 `C`（`geometry.id`）与 level。列数、横竖屏、视口尺寸变化不改变 tile id。
-- 网格按"目标纹理像素 CT"直接计算，保证每个 tile 的纹理不超过 CT，同时 tile 数量最少。
-- 超长页（高 > 宽×3 或宽 > 高×3）在该轴上使用 `TILE_LONG_CONTENT_PX=1536`，减少长条页面的切块数量；普通页仍为 1024。
-- 允许负 level：大页在 fit 缩放下就需要低于 1:1 的纹理分辨率。
-- tile 的 doc 矩形 = `baseRect` × `fraction`。
-- 解码源矩形 = 内容矩形（原始页坐标）× `textureScale(L)`；`DecoderAdapter.decodeNode` 的 `scale` 即 `textureScale(L)`，解码器接口不变。
-- `tileOutputPx` 超过 4096 时跳过该 tile（防御）。
+- 锚点使用视口左上角在锚点页内的内容比例，切边改变页高也不漂移。
+- 可见页扫描：垂直/水平单列用二分定位，再向前后扩展；多列模式逐页线性检测。
+
+## 五、LOD
+
+### 1. 页内网格（content 空间）
+
+```
+TILE_CONTENT_PX      = 1024
+TILE_LONG_CONTENT_PX = 1536      // 长条页在长边方向使用
+LEVEL_STEPS_PER_OCTAVE = 8
+textureScale(L) = 2^(L / 8)
+MIN_TILE_LEVEL = -48
+MAX_TILE_LEVEL = 64
+
+cols(L) = max(1, ceil(contentWidth  * textureScale(L) / targetWidth))
+rows(L) = max(1, ceil(contentHeight * textureScale(L) / targetHeight))
+```
+
+- 普通页目标 1024；`width > height * 3` 时长边用 1536，`height > width * 3` 时同理。
+- 网格只依赖 `geometry.id` 与 level，列数、横竖屏、视口尺寸变化不改变 tile id。
+- tile 的 content 边界与纹理边界都取整，相邻 tile 共用同一条边界，绘制时统一 `round`，避免接缝重叠。
+- 单 tile 输出超过 4096 时跳过该 tile。
 
 ### 2. 档位选择（逐页）
 
 ```
-baseScale = baseWidth / C.width        // 水平模式用 baseHeight / C.height
-needed    = baseScale * zoom
-level     = clamp(ceil(log2(needed)), MIN_TILE_LEVEL, MAX_TILE_LEVEL)
+vertical = orientation == Vertical || columnCount > 1
+baseMain    = vertical ? baseWidth : baseHeight
+contentMain = vertical ? contentWidth : contentHeight
+baseScale   = baseMain / contentMain
+needed      = baseScale * zoom
+idealLevel  = ceil(log2(needed) * LEVEL_STEPS_PER_OCTAVE)
 ```
 
-- `textureScale >= needed`，纹理分辨率在屏幕需求的 1~2 倍之间。
-- 档位只决定取哪一层 tile，不影响布局与 tile 索引。
-- 切换档位时释放当前档 tile 节点，缩略图继续显示；新档逐块到位后覆盖缩略图。
-
-### 3. 兜底策略
-
-1. **页面缩略图**：每页一张低分辨率整页图，**始终绘制在 tile 下方**；请求一次，缓存在 `ImageCache.pageCache`。缩略图不做切边探测，保证解码快。
-2. **上一档 fallback**：level 变化时先把当前可见档的 tile 移入 `fallbackTiles`（保留位图），新档 tile 覆盖其上；新档可见 tile 全部就绪后再释放上一档。只保留一级，避免缓存膨胀。
-3. **当前档 tile**：覆盖在上一档与缩略图之上；尚未解码或不在可见范围的 tile 不绘制，由下层兜底。
-4. 这样放大/缩小过程中底部始终有页面图像：切档时旧档继续显示，新档逐块覆盖，不会白屏或闪烁。
-
-### 4. 超长图 / 单张 TIFF / 长条漫画
-
-- 当前阶段不做长条专项优化，按普通页处理：可见 tile + 页面缩略图。tile 尺寸取 1024，减少单线程解码的 tile 数量。
-- `baseRows` 可能很大，但只是索引空间，`visibleTiles` 始终只有几十个。
-- TIFF 走 `decodeRegionToBitmap`，图片走 `BitmapRegionDecoder`，PDF/Djvu 走区域渲染。
-- 纹理尺寸上限 4096；超长文档的 floating origin 作为后续硬化项（见第十三节）。
-
-## 六、动态切边
-
-### 1. 几何版本
-
-- `PageGeometry.id` 由内容矩形（left/top/width/height）哈希得到。
-- 关闭再开启切边若内容矩形相同，`id` 相同，可直接命中旧缓存。
-- 切边探测结果在后台写入 `APage.cropBounds`，回主线程后再构建新 `PageGeometry`。
-
-### 2. 两种切边模式
-
-- **预切边**：`APage.cropBounds` 在首次布局前已知（持久化/预扫），构造 `Page` 时直接使用，只布局一次，无跳动。
-- **懒切边**：可见页且 `cropBounds == null` 时，提交 `TaskType.CROP` 探测任务（最低优先级）；`DecoderAdapter.processCrop` 检测成功后写回 `APage.cropBounds`，回调主线程更新该页 geometry 并重排。
-
-### 3. 重排原语
-
-所有布局变化（视口尺寸、方向、列数、切边、懒切边结果）统一走：
+档位带迟滞，避免缩放停在档位边界时反复重建：
 
 ```
-anchor = (pageIndex, contentFx, contentFy, anchorScreenPos)
-computeRects()
-offset = anchorScreenPos - newDocPoint * zoom
-clampOffset + updateVisible
+当前档位的 textureScale 记为 currentScale
+若 needed <= currentScale * 1.10 且 currentScale <= needed * 1.30，则沿用 currentLevel
+否则取 idealLevel 并 clamp 到 [MIN_TILE_LEVEL, MAX_TILE_LEVEL]
 ```
 
-- 锚点使用**内容比例**，切边改变页高也不会漂移。
-- 页面高度变化导致上方页面位移时，锚点公式自动补偿。
-- 只对 `geometry.id` 变化的页清空 tile；其他页仅 `baseRect` 平移，不重解码。
-- 懒切边结果按 50ms 窗口批量合并，一次重排。
+- 允许最多 10% 欠采样、30% 过采样，档位只在真正超出区间时切换。
+- 捏合过程中不切档（`request=false`），松手后才按迟滞规则决定是否切换。
+- 切档时旧档可见 tile 移入 `fallbackTiles` 保留位图，新档 tile 就绪后覆盖并释放旧档。
 
-## 七、渲染与硬件加速
+### 3. 页内兜底
 
-- 内容层：`graphicsLayer` 应用 `translation + scale`；缩放/平移只更新图层属性，沿用已有纹理，由 GPU 重采样。
-- 内容绘制在文档坐标；`drawTiles` 不读 zoom/offset。
-- 绘制失效来源：`revision`（可见页或可见 tile 集合变化）、`PageNode.bitmap`（tile 到位）。单纯平移/缩放且页与 tile 集合不变时不重新录制内容，只更新图层矩阵；缩小时缩略图随内容一起缩放，不会白屏。
-- 页面缩略图只在“可见 tile 未全部就绪”时绘制；全部就绪后不再画整页大图。
-- 覆盖层在屏幕坐标绘制：链接框、搜索高亮、文本选择、标注路径、朗读边框、页面分隔线；只画可见页；描边宽度按屏幕像素。
-- 视口外页面/瓦片不进入绘制集合，控制 overdraw。
-- `clip = false` 允许内容越出视口节点绘制；手势与绘制节点分离，避免变换影响命中测试。
+绘制顺序（自下而上）：
+
+1. **页面缩略图**：每页一张整页低分辨率图，缓存于 `ImageCache` 页缓存。
+2. **上一档 fallback**：切档期间保留的旧档可见 tile。
+3. **当前档 tile**：已解码且属于当前可见范围的 tile。
+
+绘制规则：
+
+- `visibleTiles` 全部就绪且**不在交互中**时，跳过整页缩略图，减少全屏 overdraw。
+- 交互中（手势或最近 300ms 内发生过视口更新）保留缩略图，保证平移/缩放露出的新区域有底图。
+- `visibleTiles` 未全部就绪时才绘制 fallback。
+- 页面缩略图首次可见时请求一次；解码完成后回调主线程挂到 `Page`，并补加载链接。
+
+### 4. 可见 tile 生命周期
+
+`Page.updateVisibleTiles(visibleDoc, zoom, request)`：
+
+- `request=false` 且当前档位有效时沿用 `currentLevel`，避免捏合逐帧重算档位。
+- 根据可见文档矩形与页内网格计算 `colStart..colEnd / rowStart..rowEnd`。
+- 范围不变时只做 `requestPendingDecodes`，不重建列表。
+- 范围变化时复用已有节点，缺失节点新建并请求解码；可见 tile 集合变化会让 `PageViewState.revision++`，确保 draw 先观察到新节点的 `bitmap == null`。
+- 未解码且离开范围的节点立即释放；已解码的离屏节点保留 `MAX_RETAINED_TILES = 4` 作为回滚缓冲，其余释放。
+- 新档可见 tile 全部就绪后释放 fallback。
+
+## 六、渲染
+
+### 1. 图层结构
+
+```
+Box(fillMaxSize)
+  Box(graphicsLayer {
+        translationX = offset.x
+        translationY = offset.y
+        scaleX = zoom
+        scaleY = zoom
+        transformOrigin = (0, 0)
+        clip = false
+  }) {
+    Canvas { revision; drawVisiblePages() }   // 内容层，文档坐标
+    Canvas { drawOverlay() }                  // 覆盖层，文档坐标
+  }
+```
+
+- 内容层与覆盖层共用一个变换图层，都以文档坐标绘制。
+- 平移/缩放只更新 `offset / vZoom` 这两个图层属性，不触发重组；`offset / vZoom` 只在 `graphicsLayer` 块中读取。
+- 覆盖层独立成一张 Canvas：tile 解码只让内容层失效，不连带重算链接框、选区、搜索高亮。
+- 不使用 `compositingStrategy = Offscreen`；`clip = false` 允许内容越出视口节点绘制。
+
+### 2. 内容层
+
+`PageViewState.drawVisiblePages` 只遍历 `pageToRender`：
+
+```
+for (page in pageToRender) page.drawTiles(drawScope)
+```
+
+`Page.drawTiles` 依次绘制缩略图（按规则）、fallback（按规则）、可见 tile。
+
+- draw 不读 zoom / offset。
+- 绘制失效来源：`revision`、`pageToRender`、`PageNode.bitmap`、页面缩略图状态。
+- 视口外页面与 tile 不进入绘制集合。
+
+### 3. 覆盖层
+
+`PageViewState.drawOverlay` 只遍历 `pageToRender`，绘制：
+
+- 链接高亮框
+- 文本选择 quad
+- 搜索高亮与当前结果
+- 朗读页边框
+- 标注路径（页内内容比例）
+- 页面分隔线
+
+- 覆盖层同样在文档坐标绘制，描边宽度除以 `overlayZoom` 保持屏幕像素。
+- `overlayZoom` 只在可见性刷新时更新，捏合过程中不更新，因此捏合不会因覆盖层读取 zoom 而让 Canvas 逐帧失效。
+- 标注路径按 `baseRect` 与点列表缓存，布局不变时不重建 Path。
+
+## 七、手势与视口更新
+
+`CommonGestureHandler` 按 `GestureMode` 分支：
+
+### VIEW
+
+- `awaitEachGesture` 处理按下、移动、抬起。
+- 按下：`beginInteraction()`、取消进行中的 fling。
+- 双指：`vZoom` 更新，围绕 centroid 计算新 offset，`updateViewport(..., request=false)`；不切档、不重建 tile。
+- 单指：超过 touchSlop 后进入拖动，累积 pan，`updateViewport(..., request = 距上次请求 >= 100ms)`。
+- 抬起：用 `VelocityTracker` 计算速度；未拖动时进入点击处理。
+
+### 视口更新策略
+
+`PageViewState.updateViewport`：
+
+- 写入 viewport 的 zoom/offset、`viewOffset`、总尺寸，并记录交互时间。
+- `request=true`：通过 `mainScope.launch { yield(); updateVisibleNow(true) }` 调度，合并同一帧内的多次请求。
+- `request=false`：最多每 16ms 检查一次；只有可见矩形超出上次扫描范围（可能进入新页）时才重新扫描。
+- 捏合期间 `request=false`，不刷新 tile；松手后一次 `request=true` 按当前档刷新。
+
+### 点击与翻页
+
+`handleTapGestureInternal`：
+
+- 300ms 内第二次点击视为双击，垂直方向 1/4~3/4 区域触发 `onDoubleTapToolbar`。
+- 单击延迟 300ms：先尝试链接点击；未命中则 `ViewUtils.handleTapGesture` 做屏幕空间翻页（保留 `tap_page_keep_dp`）；仍未命中则回调 `onTapNonPageArea`。
+- 翻页后通过 `updateOffset` 更新视口。
+
+### 惯性
+
+`performFling`：
+
+- `exponentialDecay`，`frictionMultiplier = 0.35`，`absVelocityThreshold = 0.5`，初速度乘 1.1。
+- 每帧 clamp offset；tile 请求每 100ms 一次。
+- 顶到边界且速度继续向外时取消动画。
+- 动画结束调用 `endInteraction()`。
+
+### SELECTION / DRAW
+
+- SELECTION：`detectDragGestures`，屏幕 → 文档 → 原始页坐标，调用 `Page.startTextSelection / updateTextSelection / endTextSelection`，完成后显示文本工具栏。
+- DRAW：记录页内归一化点；`DrawType.LINE` 走直线点集，否则自由绘制；实时更新 `activeDrawingAnno`，抬手写入 `AnnotationManager`。
 
 ## 八、解码与缓存
 
-- 单解码线程，使用现有 `DecodeService`；不改变线程模型。
-- 解码请求只在视口/可见集合更新时发出；**不在 draw 阶段发请求**。
-- 拖动/惯性中 `request=true`：新出现的页/瓦片即时请求，保证滚动过程中内容能持续变清晰（接受一定的解码 CPU 开销）。
-- 捏合中 `request=false`：只更新视口与可见页/缩略图，松手后刷新当前档 tile。
-- 懒切边结果的重排延迟到交互结束后应用，避免运动过程中改布局；但 tile 请求不延迟。
-- 缓存 key：`tile/page/geometryId/level/row/col`；同一档来回缩放可命中。
-- `putNode/putPage` 返回的 `BitmapState` 引用计数为 0；挂到 `PageNode`/缩略图前必须 `acquire()`，否则可能在主线程赋值前被缓存回收，导致 tile 永久空白。
-- 可见 tile 3 秒仍未拿到位图会重置排队状态并重新请求，避免异常情况下永久缺块。
-- `ImageCache.pageCache` 继续供缩略图对话框、封面、文本工具栏使用；viewer 的 tile 缓存使用独立 key 空间，不合并。
-- 页面离开可见区域时释放 `PageNode`/缩略图引用；缓存由 LRU 决定淘汰。
-- 同一页内已解码的离屏 tile 最多保留 `MAX_RETAINED_TILES=16`；未解码的离屏 tile 立即取消（`PageNode.removed` 让解码线程跳过）。
-- 解码回调只接受当前可见页的请求（`wantedPages` 集合），滚动后不再解过期页。
-- 跳过的任务必须从 `pendingJobs` 移除，且只移除同一任务实例，避免滚动/缩放时队列与 pending 泄漏。
-- 缓存 `acquire` 在 UI 线程保持无锁；候选池回收不做 O(n) 扫描，减少解码线程持锁时间。
+### 1. 线程与队列
 
-## 九、交互与功能等价
+- `DecodeService` 使用单个常驻线程 `Decode-Worker-Thread`。
+- Android 上解码线程为 `THREAD_PRIORITY_DEFAULT`，避免和 RenderThread/UI 抢调度；桌面为略高于普通线程。
+- 队列优先级：`PAGE > NODE > CROP`。
+- NODE 队列后进先出，新请求对应最新视口，先处理积压旧任务只会浪费 CPU。
+- 提交 NODE 前移除同 key 的排队任务，避免重试导致重复入队。
+- `pendingJobs` 保存每个 key 的最新任务实例；执行前若发现已被替换则直接跳过。
+- 执行前调用 `callback.shouldRender`；页面已离开预加载范围、节点已释放、或已 shutdown 时不解码。
+
+### 2. 请求时机
+
+- 只在可见性刷新时请求：`PageViewState.updateVisibleNow` → `Page.updateVisibleTiles` / `Page.requestThumbnail`。
+- 绘制阶段只读 bitmap，不发解码请求。
+- 可见 tile 3 秒仍未拿到位图会重置排队标记并重新请求。
+- 解码在 worker 线程完成；`ImageCache.putNode/putPage` 后通过 `mainScope` 回到主线程，`acquire()` 成功后赋给 `PageNode.bitmap` 或缩略图。
+
+### 3. 缓存
+
+- `ImageCache` 分 tile 缓存与页缓存，默认上限分别为 256MB / 48MB。
+- tile key：`tile/page/geometryId/level/row/col`。
+- `BitmapState` 内置引用计数；从缓存取出后必须 `acquire()`，离开绘制/可见集合时 `release()`。
+- 主缓存查询使用 `ConcurrentHashMap`，主线程读路径无锁；候选池按时间淘汰。
+- 已解码的离屏 tile 由缓存统一保留，页内只保留 `MAX_RETAINED_TILES = 4`。
+- 页面离开预加载范围时释放页内 tile 与缩略图引用。
+
+## 九、动态切边
+
+- `PageGeometry.id` 由内容矩形哈希得到，切边版本由 id 表达。
+- 预切边：`APage.cropBounds` 已知时，首次布局直接使用，只排一次。
+- 懒切边：可见页且 `cropBounds == null` 时提交最低优先级 CROP 任务。
+- `DecoderAdapter.processCrop` 检测成功后写回 `APage.cropBounds`。
+- 回调主线程后：
+  - 记录待应用页，50ms 窗口内批量合并。
+  - 若最近 300ms 内有交互，延后 120ms 再应用，避免运动中改布局。
+  - 应用时只对 `geometry.id` 变化的页 `updateGeometry`，然后统一 `relayout()`。
+- `relayout` 使用内容比例锚点，切边导致页高变化不会让视口漂移；未变化页不重新解码。
+
+## 十、功能映射
 
 | 功能 | 实现 |
 |---|---|
-| 平移 / 捏合 / 惯性 | 手势保留；读写 `ViewportState`，边界 `docSize * zoom` |
-| 单击翻页（1/4 区、keepPx） | `ViewUtils.handleTapGesture`，屏幕空间平移后 clamp |
-| 双击工具栏 | `handleTapGestureInternal`，沿用 |
-| 页码回调 | `ViewUtils.firstPage` → `firstVisiblePageIndex` |
-| URL/页内链接 | `Page.findLinkAtPoint` + `geometry.docToOriginal` |
-| 文本选择 + 工具栏 | 屏幕 → 文档 → 原始页坐标；`TextSelector` 不变；overlay 绘制 |
-| 划线/批注 | `drawingPoints` 为页内内容比例；overlay 绘制；数据格式不变 |
-| 搜索高亮 / 当前结果 | `DocQuad` 原始页坐标 → 文档 → 屏幕 |
-| 朗读边框 / TTS 页 | overlay + `speakingPageIndex` |
+| 平移 / 捏合 / 惯性 | `CommonGestureHandler` → `ViewportState` |
+| 点击翻页 | `ViewUtils.handleTapGesture`，屏幕空间 + `tap_page_keep_dp` |
+| 双击工具栏 | `handleTapGestureInternal`，中间区域 |
+| 页码回调 | `snapshotFlow { firstVisiblePageIndex() }` |
+| URL / 页内链接 | `Page.findLinkAtPoint` + `geometry.docToOriginal` |
+| 文本选择 + 工具栏 | SELECTION 手势 + `Page` 选区 + overlay |
+| 划线 / 批注 | DRAW 手势 + 页内归一化点 + `AnnotationManager` |
+| 搜索高亮 / 当前结果 | `DocQuad` 原始页坐标 → 文档坐标 → overlay |
+| 朗读边框 / TTS 页 | 覆盖层 + `speakingPageIndex` |
 | 跳页 / 恢复 / offsetY | `offsetForPage` / `offsetForDoc` |
-| 切边开关 / 懒切 | `setCropEnabled` + geometry + 重排 |
+| 切边开关 / 懒切边 | `setCropEnabled` + `PageGeometry` + 锚点重排 |
 | 方向 / 列数 | 重排，保留 zoom 与锚点 |
-| 缩略图对话框 | 继续使用 `ImageCache.pageCache` |
-| 页面分隔线 | overlay |
+| 页面分隔线 | 覆盖层 |
 | 存档 | 文档坐标 + zoom + 方向 + 切边 |
-| Reflow | 独立 `ReflowView`，不在本次范围 |
+| Reflow | 独立 `ReflowView` |
 
-## 十、存档
+## 十一、存档与生命周期
 
-保存：
+存档字段：
 
 ```
-pageIndex, scrollX(docX), scrollY(docY), zoom, orientation, reflow, crop
+pageIndex, pageCount, docX, docY, zoom, orientation, reflow, crop
 ```
 
 - `docX = -offset.x / zoom`，`docY = -offset.y / zoom`。
-- 恢复：`offset = -doc * zoom`，再 clamp。
-- 不再兼容旧版本屏幕像素语义。
+- 恢复时 `offset = -doc * zoom`，再 clamp。
+- `ON_PAUSE` 与 `onDispose` 时保存。
+- `onDispose`：
+  - 取消延时任务
+  - 保存一次
+  - `onCloseDocument`
+  - `PageViewState.shutdown()`：取消解码服务、回收页 tile、关闭 decoder、清理缓存
+  - `ImageCache.clear()`
 
-## 十一、生命周期 / 线程
+线程约定：
 
-- `PageNode` 位图在主线程赋值；后台只做解码与 `ImageCache.putNode`。
-- `shutdown()`：取消解码服务、回收所有页 tile、关闭 decoder、清理缓存。
-- 懒切边探测、tile 解码均在 `DecodeService` 单线程队列中；CROP 任务优先级最低。
-- 链接、文本选择、搜索 quad 使用原始页坐标，切边只影响映射，不影响数据；标注沿用旧实现的"内容比例"语义。
-
-## 十二、文件级重构清单
-
-| 文件 | 职责 |
-|---|---|
-| `ViewportState.kt`（新增） | 视口变换、可见文档矩形、边界 clamp |
-| `PageGeometry.kt`（新增） | 内容矩形、geometry id、原图↔文档坐标 |
-| `PageViewState.kt` | 文档编排：布局、可见页、tile 调度、切边探测、overlay 绘制 |
-| `Page.kt` | 文档空间布局 + 页内 LOD + 页面缩略图兜底 |
-| `PageNode.kt` | tile 精灵：`TileId`、fraction、srcRect、bitmap |
-| `PageNodePool.kt` | 旧对象池废弃，保留空实现 |
-| `DocumentView.kt` | 手势、effects、存档、双层 Canvas |
-| `ViewUtils.kt` | 文档空间的点击/翻页/可见页计算 |
-| `DecoderAdapter.kt` | `processCrop` 写回 `cropBounds`；`decodeNode` 接口不变 |
-| `MobileDocumentView.kt` / `DesktopDocumentView.kt` | 尺寸/缩放变化后同步 `offset` |
-
-## 十三、验证清单与后续硬化
-
-验证：
-
-- 捏合全过程不重排、不重绘内容、不清空；松手跨档只短暂变糊。
-- 1↔2 列、横竖屏切换 tile id 不变；切回命中缓存。
-- 放大/缩小跨档时上一档 tile 继续显示，新档就绪后覆盖，无白屏/闪烁。
-- 预切边首屏无跳动；懒切边锚点不跳、zoom 不重置、其他页不重解码。
-- 当前页上方/下方页面懒切边完成时，视口内容不移动。
-- 长条图按普通页处理：缩略图 + 可见 tile，不崩溃、不阻塞滚动（本阶段不做专项优化）。
-- 双页两页都解码；翻页后预取下一 spread。
-- 划线/选择/高亮在切边、缩放、双页下位置正确。
-- 缩略图对话框、封面、文本工具栏不受 viewer 缓存改动影响。
-
-后续硬化（不改变上述结构）：
-
-- floating origin：超长文档以锚点页/视口为原点，offset 保持有界，绝对位置用 Double。
-- 解码队列优先级与 epoch 取消：在不增加线程的前提下，按"当前页可见 tile > 页面缩略图"排序并丢弃过期请求。
-- 标注坐标改为原始页坐标，切边开关时位置稳定。
+- 布局、可见性、tile 请求、bitmap 赋值都在主线程。
+- 解码与 `ImageCache.put*` 在 worker 线程。
+- 懒切边、tile 解码、缩略图解码共用 `DecodeService` 单线程队列，CROP 最低优先级。
+- 链接、文本、搜索 quad 使用原始页坐标；切边只影响坐标映射，不影响数据。
+- 标注使用页内内容比例，切边与缩放时位置稳定。
