@@ -4,7 +4,7 @@ compose-multiplatform = "1.12.1"
 kotlin = "2.4.10"
 androidx-activityCompose = "1.13.0"
 jetbrains-lifecycle = "2.10.0"
-androidx-room = "2.8.4"
+androidx-room = "3.0.3"
 androidx-navigation = "2.10.2"
 sqlite = "2.7.0"
 coil = "3.6.1"
@@ -46,8 +46,8 @@ filePicker = { module = "com.mohamedrejeb.calf:calf-file-picker", version.ref = 
 mupdf-fitz = { module = "com.artifex.mupdf:mupdf-fitz-java", version.ref = "mupdfFitz" }
 mupdf-fitz-aar = { module = "com.artifex.mupdf:mupdf-fitz", version.ref = "mupdfFitzAar" }
 
-androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidx-room" }
-androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "androidx-room" }
+androidx-room-compiler = { group = "androidx.room3", name = "room3-compiler", version.ref = "androidx-room" }
+androidx-room-runtime = { group = "androidx.room3", name = "room3-runtime", version.ref = "androidx-room" }
 sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 
 jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "jetbrains-lifecycle" }
@@ -100,4 +100,4 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 androidKmpLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-room = { id = "androidx.room", version.ref = "androidx-room" }
+room = { id = "androidx.room3", version.ref = "androidx-room" }

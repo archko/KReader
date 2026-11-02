@@ -1,8 +1,8 @@
 package com.archko.reader.pdf.cache
 
-import androidx.room.Database
-import androidx.room.RoomDatabase
-import androidx.room.RoomDatabaseConstructor
+import androidx.room3.Database
+import androidx.room3.RoomDatabase
+import androidx.room3.RoomDatabaseConstructor
 import com.archko.reader.pdf.entity.AICache
 import com.archko.reader.pdf.entity.AIConversation
 import com.archko.reader.pdf.entity.AIPageConversation

@@ -1,6 +1,6 @@
 package com.archko.reader.pdf.cache
 
-import androidx.room.migration.Migration
+import androidx.room3.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 
@@ -10,7 +10,7 @@ import androidx.sqlite.execSQL
  * @author: archko 2025/11/18
  */
 public val MIGRATION_1_2: Migration = object : Migration(1, 2) {
-    override fun migrate(connection: SQLiteConnection) {
+    override suspend fun migrate(connection: SQLiteConnection) {
         // Add new columns to recent table
         connection.execSQL("ALTER TABLE recent ADD COLUMN name TEXT")
         connection.execSQL("ALTER TABLE recent ADD COLUMN ext TEXT")
@@ -23,7 +23,7 @@ public val MIGRATION_1_2: Migration = object : Migration(1, 2) {
 }
 
 public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
-    override fun migrate(connection: SQLiteConnection) {
+    override suspend fun migrate(connection: SQLiteConnection) {
         // Create bookmark table
         connection.execSQL(
             """
@@ -71,7 +71,7 @@ public val MIGRATION_2_3: Migration = object : Migration(2, 3) {
 }
 
 public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
-    override fun migrate(connection: SQLiteConnection) {
+    override suspend fun migrate(connection: SQLiteConnection) {
         // Create ai_provider table
         connection.execSQL(
             """
@@ -135,7 +135,7 @@ public val MIGRATION_3_4: Migration = object : Migration(3, 4) {
 
 
 public val MIGRATION_4_5: Migration = object : Migration(4, 5) {
-    override fun migrate(connection: SQLiteConnection) {
+    override suspend fun migrate(connection: SQLiteConnection) {
         // Create ai_page_conversation table
         connection.execSQL(
             """
