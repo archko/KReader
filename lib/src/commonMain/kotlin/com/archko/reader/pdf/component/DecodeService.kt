@@ -27,7 +27,8 @@ public class DecodeService(
                 val task = synchronized(lock) {
                     val next = when {
                         pageQueue.isNotEmpty() -> pageQueue.removeAt(0)
-                        nodeQueue.isNotEmpty() -> nodeQueue.removeAt(0)
+                        // tile 任务后进先出：新任务对应当前视口，先解码旧的积压任务只会白费 CPU
+                        nodeQueue.isNotEmpty() -> nodeQueue.removeAt(nodeQueue.size - 1)
                         cropQueue.isNotEmpty() -> cropQueue.removeAt(0)
                         else -> null
                     }
@@ -44,6 +45,10 @@ public class DecodeService(
 
     public fun submitTask(task: DecodeTask) {
         synchronized(lock) {
+            if (task.type == TaskType.NODE) {
+                // 同一 tile 只保留最后一次请求，避免 3s 重试时旧任务继续占队列
+                nodeQueue.removeAll { it.key == task.key }
+            }
             pendingJobs[task.key] = task
             when (task.type) {
                 TaskType.PAGE -> pageQueue.add(task)

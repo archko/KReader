@@ -506,15 +506,31 @@ public class Page internal constructor(
         if (baseRect.width <= 0f || baseRect.height <= 0f) {
             return
         }
-        thumbBitmap?.let { state ->
-            if (!state.isRecycled()) {
-                drawBitmap(drawScope, state, baseRect)
+        var allTilesReady = visibleTiles.isNotEmpty()
+        if (allTilesReady) {
+            for (node in visibleTiles) {
+                val state = node.bitmap
+                if (state == null || state.isRecycled()) {
+                    allTilesReady = false
+                    break
+                }
             }
         }
-        for (node in fallbackTiles) {
-            val state = node.bitmap
-            if (state != null && !state.isRecycled()) {
-                drawBitmap(drawScope, state, node.docRect(baseRect))
+        // 交互中保留整页底图：平移/捏合时会露出还没请求到的区域，
+        // 静止且 tile 已铺满时再省掉这层全屏 overdraw。
+        if (!allTilesReady || pageViewState.isInteractionActive()) {
+            thumbBitmap?.let { state ->
+                if (!state.isRecycled()) {
+                    drawBitmap(drawScope, state, baseRect)
+                }
+            }
+        }
+        if (!allTilesReady) {
+            for (node in fallbackTiles) {
+                val state = node.bitmap
+                if (state != null && !state.isRecycled()) {
+                    drawBitmap(drawScope, state, node.docRect(baseRect))
+                }
             }
         }
         for (node in visibleTiles) {

@@ -26,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlin.math.max
 import kotlin.math.min
 
@@ -59,6 +60,18 @@ public class PageViewState(
     public var vZoom: Float by mutableFloatStateOf(1f)
     public var revision: Int by mutableIntStateOf(0)
     public var layoutVersion: Int by mutableIntStateOf(0)
+
+    // 覆盖层只在真正需要时重录：捏合过程中不再读取 vZoom 状态，
+    // 否则每次缩放事件都会让整张 Canvas 失效，破坏缩放平滑度。
+    internal var overlayZoom: Float by mutableFloatStateOf(1f)
+        private set
+
+    internal var isInteracting: Boolean = false
+        private set
+
+    private var visibleUpdateScheduled: Boolean = false
+    private var lastScannedVisible: Rect? = null
+    private var lastVisibleScanAt: Long = 0L
 
     private var docWidth: Float = 0f
     private var docHeight: Float = 0f
@@ -202,8 +215,30 @@ public class PageViewState(
 
     public fun isShutdown(): Boolean = isShutdown
 
+    internal fun beginInteraction() {
+        if (isInteracting) {
+            return
+        }
+        isInteracting = true
+        revision++
+    }
+
+    internal fun endInteraction() {
+        if (!isInteracting) {
+            return
+        }
+        isInteracting = false
+        updateVisibleNow(true)
+        revision++
+    }
+
+    internal fun isInteractionActive(): Boolean {
+        return isInteracting || System.currentTimeMillis() - lastInteractionAt < 300L
+    }
+
     public fun shutdown() {
         isShutdown = true
+        lastScannedVisible = null
         mainScope.cancel()
         pendingCropPages.clear()
         decodeService?.shutdown()
@@ -436,65 +471,110 @@ public class PageViewState(
         viewport.offset = viewport.clampOffset(offset)
         viewOffset = viewport.offset
         updateTotals()
-        updateVisibleNow(request)
         lastInteractionAt = System.currentTimeMillis()
+
+        if (request) {
+            scheduleVisibleUpdate()
+            return
+        }
+        // 每个 pointer event 不重复扫描：最多每 16ms 检查一次，且可见区域没有超出上次范围时直接跳过
+        val now = System.currentTimeMillis()
+        if (now - lastVisibleScanAt < 16L) {
+            return
+        }
+        val visible = viewport.docRect
+        val scanned = lastScannedVisible
+        if (scanned == null ||
+            visible.left < scanned.left || visible.top < scanned.top ||
+            visible.right > scanned.right || visible.bottom > scanned.bottom
+        ) {
+            lastVisibleScanAt = now
+            updateVisibleNow(false)
+        }
+    }
+
+    private fun scheduleVisibleUpdate() {
+        if (visibleUpdateScheduled || isShutdown) {
+            return
+        }
+        visibleUpdateScheduled = true
+        mainScope.launch {
+            // 合并同一帧内的多次请求，避免在事件回调里同步做完整可见性/解码请求
+            yield()
+            visibleUpdateScheduled = false
+            if (!isShutdown) {
+                updateVisibleNow(true)
+            }
+        }
     }
 
     private fun updateVisibleNow(request: Boolean) {
         if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty() || !init) {
             pageToRender = emptyList()
             wantedPagesRef.set(emptySet())
+            lastScannedVisible = null
             return
+        }
+        if (request) {
+            overlayZoom = vZoom
         }
         val visible = viewport.docRect
+        lastScannedVisible = visible
         scanPages(visible, scanScratch)
-        var changed = !samePages(scanScratch, pageToRender)
+        val pagesChanged = !samePages(scanScratch, pageToRender)
 
         // 捏合过程中页集合没变：只靠图层变换，不做额外工作
-        if (!changed && !request) {
+        if (!pagesChanged && !request) {
             return
         }
 
-        // 预加载范围：可见区域按屏幕尺寸向四周扩展，保证翻页前相邻页的缩略图（底图）已就绪
-        val preload = preloadRect(visible)
-        scanPages(preload, preloadScratch)
-        val retain = HashSet<Int>(preloadScratch.size)
-        for (page in preloadScratch) {
-            retain.add(page.index)
-        }
-        // 只有彻底离开预加载范围的页面才释放 tile 与缩略图
-        val previousWanted = wantedPagesRef.get()
-        if (previousWanted.isNotEmpty()) {
-            for (index in previousWanted) {
-                if (!retain.contains(index)) {
-                    pages.getOrNull(index)?.clearVisibleTiles()
+        // 预加载范围只在页集合变化时重算：避免每个 100ms tick 都分配集合、重建预取页
+        if (pagesChanged || wantedPagesRef.get().isEmpty()) {
+            // 预加载范围：可见区域按屏幕尺寸向四周扩展，保证翻页前相邻页的缩略图（底图）已就绪
+            val preload = preloadRect(visible)
+            scanPages(preload, preloadScratch)
+            val retain = HashSet<Int>(preloadScratch.size)
+            for (page in preloadScratch) {
+                retain.add(page.index)
+            }
+            // 只有彻底离开预加载范围的页面才释放 tile 与缩略图
+            val previousWanted = wantedPagesRef.get()
+            if (previousWanted.isNotEmpty()) {
+                for (index in previousWanted) {
+                    if (!retain.contains(index)) {
+                        pages.getOrNull(index)?.clearVisibleTiles()
+                    }
                 }
             }
-        }
-        wantedPagesRef.set(retain)
+            wantedPagesRef.set(retain)
 
-        if (changed) {
+            // 预加载页先准备缩略图，翻页时能立刻作为底图显示，避免白屏
+            for (page in preloadScratch) {
+                page.requestThumbnail()
+            }
+        }
+
+        if (pagesChanged) {
             pageToRender = ArrayList(scanScratch)
-        }
-
-        // 预加载页先准备缩略图，翻页时能立刻作为底图显示，避免白屏
-        for (page in preloadScratch) {
-            page.requestThumbnail()
+            revision++
         }
 
         // 只有真正可见的页面才请求分块解码与裁剪探测；平移中页集合变化时也需要补齐
-        if (request || changed) {
+        if (request || pagesChanged) {
+            var tilesChanged = false
             for (page in scanScratch) {
+                // 新增 tile 时仍要重录一次：新节点 bitmap 为 null，需要让 draw 先观察它，
+                // 否则解码完成写 bitmap 时没有任何观察者，tile 不会出现。
                 if (page.updateVisibleTiles(visible, vZoom, true)) {
-                    changed = true
+                    tilesChanged = true
                 }
                 // 可见页提前加载链接，避免打开文档或刚翻到时链接不显示
                 page.ensureLinks()
                 requestCropProbe(page)
             }
-        }
-        if (changed) {
-            revision++
+            if (tilesChanged) {
+                revision++
+            }
         }
     }
 
@@ -846,7 +926,7 @@ public class PageViewState(
                 color = Color.Red,
                 topLeft = Offset(page.baseRect.left, page.baseRect.top),
                 size = GeomSize(page.baseRect.width, page.baseRect.height),
-                style = Stroke(width = 8f / vZoom)
+                style = Stroke(width = 8f / overlayZoom)
             )
         }
     }
@@ -867,7 +947,7 @@ public class PageViewState(
         drawScope.drawPath(
             docPathFor(page, anno),
             anno.config.color,
-            style = Stroke(width = anno.config.strokeWidth / vZoom)
+            style = Stroke(width = anno.config.strokeWidth / overlayZoom)
         )
     }
 
@@ -891,7 +971,7 @@ public class PageViewState(
 
     private fun drawSeparator(drawScope: DrawScope, page: Page) {
         val color = Color(0xFF999999)
-        val thickness = 2f / vZoom
+        val thickness = 2f / overlayZoom
         val base = page.baseRect
         if (orientation == Vertical || columnCount > 1) {
             drawScope.drawRect(

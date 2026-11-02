@@ -215,6 +215,7 @@ internal fun DocumentViewEffects(
 
     LaunchedEffect(speakingPageIndex) {
         flingJob.value?.cancel()
+        pageViewState.endInteraction()
         pageViewState.updateSpeakingPageIndex(speakingPageIndex)
     }
 
@@ -283,6 +284,7 @@ internal fun DocumentViewEffects(
 
             flingJob.value?.cancel()
             pageViewState.updateOffset(newOffset)
+            pageViewState.endInteraction()
             offset.value = pageViewState.viewOffset
             isJumping.value = false
         }
@@ -494,6 +496,7 @@ internal fun CommonGestureHandler(
                             var lastTileRefreshAt = 0L
 
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            pageViewState.beginInteraction()
                             flingJob.value?.cancel()
 
                             do {
@@ -596,6 +599,9 @@ internal fun CommonGestureHandler(
                                 }
                             }
 
+                            if (!isDragging) {
+                                pageViewState.endInteraction()
+                            }
                             pageViewState.updateViewport(vZoom.value, offset.value, true)
                             offset.value = pageViewState.viewOffset
                         }
@@ -634,6 +640,9 @@ internal fun DocumentViewCanvas(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 pageViewState.revision
                 pageViewState.drawVisiblePages(this, Offset.Zero, 1f)
+            }
+            // 覆盖层独立成一张 Canvas：tile 解码只让内容层失效，不再连带重算链接/选区/搜索高亮
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 pageViewState.drawOverlay(this)
             }
         }
@@ -737,6 +746,7 @@ internal fun performFling(
             }
         }
         pageViewState.updateViewport(vZoom, offset.value, true)
+        pageViewState.endInteraction()
     }
     flingJob.value = job
 }
