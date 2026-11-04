@@ -602,7 +602,7 @@ fun CustomView(
             val readingTimeTracker = remember { ReadingTimeTracker() }
 
             // 对于单图片文件，根据尺寸自动调整滚动方向
-            LaunchedEffect(decoder) {
+            SideEffect(decoder) {
                 decoder?.let { dec ->
                     if (documents.size == 1 &&
                         (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(
@@ -683,7 +683,7 @@ fun CustomView(
             }
 
             // 设置TTS进度监听器
-            LaunchedEffect(speechService) {
+            SideEffect(speechService) {
                 speechService.setProgressListener(object : TtsProgressListener {
                     override fun onStart(bean: ReflowBean) {
                         // Segment开始朗读，更新speakingPageIndex和跳转
@@ -1013,7 +1013,7 @@ fun CustomView(
                         ) {
                             var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
                             // 当currentPage变化时更新sliderValue
-                            LaunchedEffect(currentPage) {
+                            SideEffect(currentPage) {
                                 isExternalChange = true
                                 sliderValue = (currentPage + 1).toFloat()
                                 isExternalChange = false

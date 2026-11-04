@@ -17,6 +17,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -316,12 +317,12 @@ private fun PagerPage(
 
     // 放大时禁用 Pager 自身的手势，完全由缩放/平移逻辑接管
     val isZoomed = zoom > 1f
-    LaunchedEffect(isZoomed) {
+    SideEffect(isZoomed) {
         currentOnZoomedChanged(isZoomed)
     }
 
     // 视口或 zoom 变化时通知 PageViewState 重新布局
-    LaunchedEffect(viewSize, zoom) {
+    SideEffect(viewSize, zoom) {
         if (viewSize.width > 0 && viewSize.height > 0) {
             // 缩放后重新限制平移范围，缩小到 1x 时自动回到居中
             val maxPan = maxPanOffset()
@@ -345,7 +346,7 @@ private fun PagerPage(
     }
 
     // 翻页动画结束后重置非当前页的缩放和平移
-    LaunchedEffect(isSettledPage) {
+    SideEffect(isSettledPage) {
         if (!isSettledPage) {
             zoom = 1f
             panOffset = Offset.Zero

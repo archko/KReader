@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,7 +107,7 @@ fun FileScreen(
 
         val gridState = rememberLazyGridState()
 
-        LaunchedEffect(Unit) {
+        SideEffect(Unit) {
             if (recentList.isEmpty()) {
                 viewModel.loadRecents()
             }

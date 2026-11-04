@@ -394,7 +394,7 @@ fun CustomView(
         }
     }
 
-    LaunchedEffect(Unit) {
+    SideEffect(Unit) {
         applyFullScreen()
 
         val runtime = Runtime.getRuntime()
@@ -663,7 +663,7 @@ fun CustomView(
             val currentSearchPageIndex = searchState.currentResult?.pageIndex
 
             // 对于单图片文件，根据尺寸自动调整滚动方向
-            LaunchedEffect(decoder) {
+            SideEffect(decoder) {
                 decoder?.let { dec ->
                     if (documents.size == 1 &&
                         (FileTypeUtils.isTiffFile(currentPath) || FileTypeUtils.isImageFile(
@@ -774,7 +774,7 @@ fun CustomView(
             }
 
             // 设置TTS进度监听器 - 用于页面跳转和进度保存
-            LaunchedEffect(ttsServiceBinder) {
+            SideEffect(ttsServiceBinder) {
                 ttsServiceBinder?.setProgressListener(object : TtsProgressListener {
                     override fun onStart(bean: ReflowBean) {
                         // Segment开始朗读
@@ -1233,7 +1233,7 @@ fun CustomView(
 
                             var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
                             // 当currentPage变化时更新sliderValue
-                            LaunchedEffect(currentPage) {
+                            SideEffect(currentPage) {
                                 isExternalChange = true
                                 sliderValue = (currentPage + 1).toFloat()
                                 isExternalChange = false
@@ -1505,7 +1505,7 @@ private fun PagerBottomSlider(
     onPageSelected: (Int) -> Unit,
 ) {
     var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-    LaunchedEffect(currentPage) {
+    SideEffect(currentPage) {
         sliderValue = (currentPage + 1).toFloat()
     }
 

@@ -209,22 +209,22 @@ internal fun DocumentViewEffects(
     val isJumping = state.isJumping
     val flingJob = state.flingJob
 
-    LaunchedEffect(columnCount) {
+    SideEffect(columnCount) {
         pageViewState.updateColumnCount(columnCount)
         offset.value = pageViewState.viewOffset
     }
 
-    LaunchedEffect(speakingPageIndex) {
+    SideEffect(speakingPageIndex) {
         flingJob.value?.cancel()
         pageViewState.endInteraction()
         pageViewState.updateSpeakingPageIndex(speakingPageIndex)
     }
 
-    LaunchedEffect(searchHighlightQuads, currentSearchPageIndex) {
+    SideEffect(searchHighlightQuads, currentSearchPageIndex) {
         pageViewState.updateSearchHighlight(searchHighlightQuads, currentSearchPageIndex)
     }
 
-    LaunchedEffect(pageViewState) {
+    SideEffect(pageViewState) {
         pageViewState.onPageLinkClick = { pageIndex ->
             isJumping.value = true
             pageViewState.updateOffset(pageViewState.offsetForPage(pageIndex))
@@ -237,11 +237,11 @@ internal fun DocumentViewEffects(
         }
     }
 
-    LaunchedEffect(pageViewState.layoutVersion) {
+    SideEffect(pageViewState.layoutVersion) {
         offset.value = pageViewState.viewOffset
     }
 
-    LaunchedEffect(pageViewState, viewSize.value) {
+    SideEffect(pageViewState, viewSize.value) {
         if (viewSize.value != IntSize.Zero) {
             pageViewState.updateViewSize(
                 viewSize.value,
@@ -252,7 +252,7 @@ internal fun DocumentViewEffects(
         }
     }
 
-    LaunchedEffect(jumpToPage, jumpOffsetY, initialOrientation, pageViewState.init) {
+    SideEffect(jumpToPage, jumpOffsetY, initialOrientation, pageViewState.init) {
         if (pageViewState.init && initialOrientation != orientation.value) {
             isJumping.value = true
             orientation.value = initialOrientation
@@ -291,7 +291,7 @@ internal fun DocumentViewEffects(
         }
     }
 
-    LaunchedEffect(crop) {
+    SideEffect(crop) {
         pageViewState.setCropEnabled(crop)
         offset.value = pageViewState.viewOffset
     }
