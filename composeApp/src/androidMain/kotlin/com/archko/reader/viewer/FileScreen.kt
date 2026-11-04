@@ -378,6 +378,7 @@ fun FileScreen(
 
         fun openRecent(recent: Recent) {
             val uriString = recent.uri?.takeIf { it.startsWith("content://") }
+                ?: recent.path?.takeIf { it.startsWith("content://") }
             val path = recent.path
             val target = uriString ?: path
             if (target.isNullOrEmpty()) return
