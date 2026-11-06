@@ -13,6 +13,7 @@ import com.archko.reader.pdf.component.SearchResult
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
@@ -41,6 +42,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     private var document: Document? = null
     public override var pageCount: Int = 0
+    public override var cropMode: Int = CropMode.NONE
 
     // 私有变量存储原始页面尺寸
     public override var originalPageSizes: List<Size> = listOf()
@@ -432,7 +434,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         if (cachePage && !aPageList.isNullOrEmpty()) {
             println("PdfDecoder.close:${aPageList.size}")
             try {
-                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
             } catch (e: Exception) {
                 println("PdfDecoder.close: 保存缓存失败: ${e.message}")
             }
@@ -495,7 +497,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             // 保存到缓存
             if (cachePage && aPageList!!.isNotEmpty()) {
                 try {
-                    APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                    APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
                 } catch (e: Exception) {
                     println("PdfDecoder: 缓存页面尺寸失败: ${e.message}")
                 }
@@ -711,7 +713,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 val imageBitmap = decode(index, scale, bitmap, patchX, patchY, true)
 
                 // 如果启用了切边功能但没有cropBounds，检测并设置
-                if (crop) {
+                if (crop && cropMode == CropMode.AUTO) {
                     val cropBounds = CropUtils.detectCropBounds(imageBitmap)
                     if (cropBounds != null) {
                         // 将缩略图坐标转换为原始PDF坐标
@@ -730,7 +732,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                             bottomBound
                         )
 
-                        aPage.cropBounds = pdfCropBounds
+                        aPage.autoCropBounds = pdfCropBounds
 
                         // 真正对图片进行切边处理
                         val croppedBitmap = cropImageBitmap(imageBitmap, cropBounds)

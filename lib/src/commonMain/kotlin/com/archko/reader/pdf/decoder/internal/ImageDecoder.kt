@@ -20,6 +20,7 @@ public interface ImageDecoder {
     public var pageSizes: List<Size>
     public var originalPageSizes: List<Size>
     public var outlineItems: List<Item>?
+    public var cropMode: Int
     public val aPageList: MutableList<APage>?
     public var cacheBean: ReflowCacheBean?
 

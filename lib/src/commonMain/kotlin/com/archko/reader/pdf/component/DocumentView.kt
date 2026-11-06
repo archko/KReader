@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -41,6 +42,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
@@ -97,7 +99,7 @@ internal fun rememberDocumentViewState(
     initialScrollY: Long,
     initialZoom: Double,
     initialOrientation: Int,
-    crop: Boolean,
+    cropMode: Int,
     columnCount: Int,
     currentPath: String,
     annotationManager: AnnotationManager,
@@ -139,7 +141,7 @@ internal fun rememberDocumentViewState(
             decoder,
             annotationManager,
             orientation.intValue,
-            crop,
+            cropMode,
             columnCount = columnCount,
             textSelector = textSelector,
             closeDecoderOnShutdown = closeDecoderOnShutdown
@@ -192,7 +194,9 @@ internal fun DocumentViewEffects(
     initialScrollY: Long,
     initialZoom: Double,
     reflow: Long,
-    crop: Boolean,
+    cropMode: Int,
+    manualCropRect: Rect? = null,
+    onManualCropApplied: (() -> Unit)? = null,
     speakingPageIndex: Int?,
     columnCount: Int,
     searchHighlightQuads: Map<Int, List<DocQuad>>,
@@ -291,8 +295,12 @@ internal fun DocumentViewEffects(
         }
     }
 
-    SideEffect(crop) {
-        pageViewState.setCropEnabled(crop)
+    SideEffect(cropMode to manualCropRect) {
+        pageViewState.setCropMode(cropMode)
+        if (cropMode == CropMode.MANUAL && manualCropRect != null) {
+            pageViewState.applyManualCrop(manualCropRect)
+            onManualCropApplied?.invoke()
+        }
         offset.value = pageViewState.viewOffset
     }
 
@@ -322,7 +330,7 @@ internal fun DocumentViewEffects(
                 docY.toLong(),
                 orientation.value.toLong(),
                 reflow,
-                if (pageViewState.isCropEnabled()) 0L else 1L
+                pageViewState.getCropMode().toLong()
             )
         }
     }

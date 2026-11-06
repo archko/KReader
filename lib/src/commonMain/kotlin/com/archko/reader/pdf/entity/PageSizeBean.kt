@@ -6,9 +6,10 @@ package com.archko.reader.pdf.entity
 public class PageSizeBean {
     public var list: MutableList<APage>? = null
     public var crop: Boolean = false
+    public var cropMode: Int = CropMode.NONE
     public var fileSize: Long = 0L
 
     override fun toString(): String {
-        return "PageSizeBean(crop=$crop, fileSize=$fileSize, list=${list?.size})"
+        return "PageSizeBean(crop=$crop, cropMode=$cropMode, fileSize=$fileSize, list=${list?.size})"
     }
 }

@@ -10,8 +10,22 @@ public data class APage(
     val width: Int,
     val height: Int,
     var scale: Float = 1f,
-    var cropBounds: Rect? = null  // 切边区域结果
+    var cropBounds: Rect? = null,  // 当前有效的切边区域
+    var autoCropBounds: Rect? = null,  // 自动切边结果
+    var manualCropBounds: Rect? = null  // 手动切边结果
 ) {
+
+    public fun selectCropBounds(mode: Int): Rect? {
+        return when (mode) {
+            CropMode.AUTO -> autoCropBounds
+            CropMode.MANUAL -> manualCropBounds ?: autoCropBounds
+            else -> null
+        }
+    }
+
+    public fun applyCropMode(mode: Int) {
+        cropBounds = selectCropBounds(mode)
+    }
 
     /**
      * 获取页面宽度

@@ -63,6 +63,7 @@ import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ReflowCacheLoader
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Recent
@@ -640,7 +641,7 @@ fun FileScreen(
                     initialZoom = viewModel.recent?.zoom ?: 1.0,
                     scrollOri = viewModel.recent?.scrollOri ?: 0,
                     reflow = viewModel.recent?.reflow ?: 0L,
-                    crop = 0L == viewModel.recent?.crop,
+                    cropMode = viewModel.recent?.crop?.toInt() ?: CropMode.NONE,
                     fontViewModel = fontViewModel,
                     bookmarkViewModel = bookmarkViewModel,
                     readingStatsViewModel = readingStatsViewModel,

@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -24,6 +25,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.cache.ReflowCacheLoader
 import com.archko.reader.pdf.component.GestureMode
@@ -40,6 +42,7 @@ import com.archko.reader.pdf.decoder.PdfDecoder
 import com.archko.reader.pdf.decoder.TiffDecoder
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.ReflowBean
@@ -51,12 +54,14 @@ import com.archko.reader.pdf.util.ReadingTimeTracker
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
+import com.archko.reader.viewer.component.CropModeMenuItem
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.component.SearchBar
 import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.FontDialog
+import com.archko.reader.viewer.dialog.ManualCropDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
@@ -94,8 +99,8 @@ private fun ToolbarContent(
     decoder: ImageDecoder,
     onGestureModeChange: (gestureMode: GestureMode) -> Unit,
     gestureMode: GestureMode,
-    onCropChange: () -> Unit,
-    isCrop: Boolean,
+    cropMode: Int,
+    onCropModeSelected: (Int) -> Unit,
     onOutlineDialogShow: () -> Unit,
     onAIDialogShow: () -> Unit,
     onBookmarkDialogShow: () -> Unit,
@@ -198,14 +203,60 @@ private fun ToolbarContent(
                     }
 
                     item {
-                        IconButton(onClick = { onCropChange() }) {
-                            Icon(
-                                painter = painterResource(if (isCrop) Res.drawable.ic_crop else Res.drawable.ic_no_crop),
-                                contentDescription = if (isCrop) stringResource(Res.string.crop) else stringResource(
-                                    Res.string.no_crop
-                                ),
-                                tint = Color.White
-                            )
+                        var showCropMenu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { showCropMenu = true }) {
+                                Icon(
+                                    painter = painterResource(
+                                        when (cropMode) {
+                                            CropMode.NONE -> Res.drawable.ic_no_crop
+                                            CropMode.MANUAL -> Res.drawable.ic_manual_crop
+                                            else -> Res.drawable.ic_crop
+                                        }
+                                    ),
+                                    contentDescription = when (cropMode) {
+                                        CropMode.NONE -> "无切边"
+                                        CropMode.MANUAL -> "手动切边"
+                                        else -> "自动切边"
+                                    },
+                                    tint = Color.White
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showCropMenu,
+                                onDismissRequest = { showCropMenu = false }
+                            ) {
+                                CropModeMenuItem(
+                                    mode = CropMode.NONE,
+                                    currentMode = cropMode,
+                                    iconRes = Res.drawable.ic_no_crop,
+                                    label = "无切边",
+                                    onClick = {
+                                        showCropMenu = false
+                                        onCropModeSelected(CropMode.NONE)
+                                    }
+                                )
+                                CropModeMenuItem(
+                                    mode = CropMode.AUTO,
+                                    currentMode = cropMode,
+                                    iconRes = Res.drawable.ic_crop,
+                                    label = "自动切边",
+                                    onClick = {
+                                        showCropMenu = false
+                                        onCropModeSelected(CropMode.AUTO)
+                                    }
+                                )
+                                CropModeMenuItem(
+                                    mode = CropMode.MANUAL,
+                                    currentMode = cropMode,
+                                    iconRes = Res.drawable.ic_manual_crop,
+                                    label = "手动切边",
+                                    onClick = {
+                                        showCropMenu = false
+                                        onCropModeSelected(CropMode.MANUAL)
+                                    }
+                                )
+                            }
                         }
                     }
 
@@ -371,7 +422,7 @@ fun CustomView(
     initialZoom: Double = 1.0,
     scrollOri: Long = 0,
     reflow: Long = 0,
-    crop: Boolean? = null,
+    cropMode: Int = CropMode.NONE,
     fontViewModel: FontViewModel,
     bookmarkViewModel: BookmarkViewModel,
     readingStatsViewModel: ReadingStatsViewModel,
@@ -435,7 +486,8 @@ fun CustomView(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    var isCrop by remember { mutableStateOf(crop == true) }
+    var isCropMode by remember { mutableStateOf(cropMode) }
+    var manualCropRect by remember { mutableStateOf<Rect?>(null) }
     var isNeedPass by remember { mutableStateOf(false) }
 
     // 字体选择相关状态
@@ -470,7 +522,7 @@ fun CustomView(
         LaunchedEffect(currentPath) {
             withContext(Dispatchers.IO) {
                 delay(20.milliseconds)
-                println("init:$viewportSize, reflow:$reflow, crop:$crop, $currentPath")
+                println("init:$viewportSize, reflow:$reflow, cropMode:$cropMode, $currentPath")
                 if (!FileTypeUtils.isDocumentFile(currentPath)
                     && !FileTypeUtils.isImageFile(currentPath)
                     && !FileTypeUtils.isTiffFile(currentPath)
@@ -485,7 +537,7 @@ fun CustomView(
                         null
                     } else {
                         if (documents.size > 1) {
-                            isCrop = false
+                            isCropMode = CropMode.NONE
                             ImagesDecoder(documents, contentResolver)
                         } else {
                             if (FileTypeUtils.isDjvuFile(currentPath)) {
@@ -495,10 +547,10 @@ fun CustomView(
                                 val djvuDecoder = DjvuDecoder(currentDoc, contentResolver)
                                 djvuDecoder
                             } else if (FileTypeUtils.isImageFile(currentPath)) {
-                                isCrop = false
+                                isCropMode = CropMode.NONE
                                 ImagesDecoder(documents, contentResolver)
                             } else if (FileTypeUtils.isTiffFile(currentPath)) {
-                                isCrop = false
+                                isCropMode = CropMode.NONE
                                 val tiffDecoder = TiffDecoder(currentDoc, contentResolver)
                                 tiffDecoder
                             } else if (FileTypeUtils.isDocumentFile(currentPath) || currentDoc.hasUri()) {
@@ -517,7 +569,7 @@ fun CustomView(
 
                                 pdfDecoder
                             } else {
-                                isCrop = false
+                                isCropMode = CropMode.NONE
                                 ImagesDecoder(documents, contentResolver)
                             }
                         }
@@ -619,6 +671,7 @@ fun CustomView(
             var showToolbar by remember { mutableStateOf(false) }
             var showOutlineDialog by remember { mutableStateOf(false) }
             var showThumbnailDialog by remember { mutableStateOf(false) }
+            var showManualCropDialog by remember { mutableStateOf(false) }
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
@@ -811,7 +864,7 @@ fun CustomView(
                                     initialScrollY,
                                     if (isVertical) Vertical.toLong() else Horizontal.toLong(),
                                     if (isReflow) 1L else 0L,
-                                    if (isCrop) 1L else 0L
+                                    isCropMode.toLong()
                                 )
                             }
                             TtsTempProgressHelper.clearTempProgress(context, currentPath)
@@ -903,6 +956,7 @@ fun CustomView(
                             currentPageRef.intValue = page
                         },
                         onTapCenter = { showToolbar = !showToolbar },
+                        cropMode = isCropMode,
                         onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
                     )
                 }
@@ -960,7 +1014,20 @@ fun CustomView(
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
-                    crop = isCrop,
+                    cropMode = isCropMode,
+                    manualCropRect = manualCropRect,
+                    onManualCropApplied = {
+                        val path = currentDoc.path ?: currentDoc.uri ?: ""
+                        scope.launch(Dispatchers.IO) {
+                            APageSizeLoader.savePageSizeToFile(
+                                CropMode.MANUAL,
+                                path,
+                                currentDoc.fileSize,
+                                list
+                            )
+                        }
+                        manualCropRect = null
+                    },
                     speakingPageIndex = speakingPageIndex,
                     gestureMode = gestureMode,
                     pathConfig = pathConfig,
@@ -1004,8 +1071,19 @@ fun CustomView(
                         decoder = decoder!!,
                         onGestureModeChange = { mode -> gestureMode = mode },
                         gestureMode = gestureMode,
-                        onCropChange = { isCrop = !isCrop },
-                        isCrop = isCrop,
+                        cropMode = isCropMode,
+                        onCropModeSelected = { mode ->
+                            if (mode == CropMode.MANUAL) {
+                                val hasManual = list.any { it.manualCropBounds != null }
+                                if (isCropMode == CropMode.MANUAL || !hasManual) {
+                                    showManualCropDialog = true
+                                } else {
+                                    isCropMode = CropMode.MANUAL
+                                }
+                            } else {
+                                isCropMode = mode
+                            }
+                        },
                         onOutlineDialogShow = { showOutlineDialog = true },
                         onAIDialogShow = { showAIDialog = true },
                         onBookmarkDialogShow = { showAddBookmarkDialog = true },
@@ -1415,6 +1493,22 @@ fun CustomView(
                         showToolbar = false
                     },
                     onDismiss = { showThumbnailDialog = false },
+                )
+            }
+
+            if (showManualCropDialog && list.isNotEmpty()) {
+                val pageIndex = currentPage.coerceIn(0, list.lastIndex)
+                val aPage = list[pageIndex]
+                ManualCropDialog(
+                    page = aPage,
+                    decoder = decoder!!,
+                    initialCrop = aPage.manualCropBounds ?: aPage.autoCropBounds,
+                    onConfirm = { rect ->
+                        manualCropRect = rect
+                        isCropMode = CropMode.MANUAL
+                        showManualCropDialog = false
+                    },
+                    onDismiss = { showManualCropDialog = false }
                 )
             }
 

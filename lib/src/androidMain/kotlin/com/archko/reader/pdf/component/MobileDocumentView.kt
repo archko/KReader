@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 
@@ -32,7 +34,9 @@ public fun MobileDocumentView(
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
     reflow: Long = 0,
-    crop: Boolean = false,
+    cropMode: Int = CropMode.NONE,
+    manualCropRect: Rect? = null,
+    onManualCropApplied: (() -> Unit)? = null,
     speakingPageIndex: Int? = null,
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
@@ -50,7 +54,7 @@ public fun MobileDocumentView(
         initialScrollY = initialScrollY,
         initialZoom = initialZoom,
         initialOrientation = initialOrientation,
-        crop = crop,
+        cropMode = cropMode,
         columnCount = columnCount,
         currentPath = currentPath,
         annotationManager = annotationManager,
@@ -82,7 +86,9 @@ public fun MobileDocumentView(
         initialScrollY = initialScrollY,
         initialZoom = initialZoom,
         reflow = reflow,
-        crop = crop,
+        cropMode = cropMode,
+        manualCropRect = manualCropRect,
+        onManualCropApplied = onManualCropApplied,
         speakingPageIndex = speakingPageIndex,
         columnCount = columnCount,
         searchHighlightQuads = searchHighlightQuads,

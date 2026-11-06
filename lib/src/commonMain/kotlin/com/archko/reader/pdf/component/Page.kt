@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.BitmapState
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.Hyperlink
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.launch
@@ -57,7 +58,9 @@ public class Page internal constructor(
 
     // 切边探测是否已完成（探测结果是无切边时也会置为 true）
     internal var cropProbed: Boolean =
-        !pageViewState.isCropEnabled() || aPage.cropBounds != null
+        !pageViewState.isCropEnabled() ||
+                pageViewState.cropMode != CropMode.AUTO ||
+                aPage.autoCropBounds != null
 
     internal val isCropPending: Boolean
         get() = pageViewState.isCropEnabled() && !cropProbed
@@ -103,8 +106,8 @@ public class Page internal constructor(
     /**
      * 切边开关变化：没有切边数据的页面需要重新探测，并清掉旧的未切边内容，避免先显示未切边页面。
      */
-    internal fun prepareForCropChange(enabled: Boolean) {
-        if (enabled && aPage.cropBounds == null) {
+    internal fun prepareForCropChange(mode: Int) {
+        if (mode == CropMode.AUTO && aPage.autoCropBounds == null) {
             cropProbed = false
             releaseTileNodes()
             releaseFallbackTiles()

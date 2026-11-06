@@ -13,7 +13,7 @@ import com.archko.reader.pdf.util.SmartCropUtils
 public class DecoderAdapter(
     private val imageDecoder: ImageDecoder,
     private val viewSize: IntSize,
-    private val isCropEnabled: () -> Boolean
+    private val isAutoCropEnabled: () -> Boolean
 ) : Decoder {
 
     public companion object {
@@ -103,9 +103,13 @@ public class DecoderAdapter(
         return try {
             val aPage = task.aPage
 
+            if (!isAutoCropEnabled()) {
+                return CropResult(task.pageIndex, aPage.autoCropBounds)
+            }
+
             // 如果已经有切边信息，直接返回
-            if (aPage.cropBounds != null) {
-                return CropResult(task.pageIndex, aPage.cropBounds)
+            if (aPage.autoCropBounds != null) {
+                return CropResult(task.pageIndex, aPage.autoCropBounds)
             }
 
             // 渲染缩略图用于切边检测
@@ -139,7 +143,7 @@ public class DecoderAdapter(
                 Rect(0f, 0f, aPage.width.toFloat(), aPage.height.toFloat())
             }
 
-            aPage.cropBounds = finalCropBounds
+            aPage.autoCropBounds = finalCropBounds
             println("PdfDecoderAdapter.processCrop: page=${task.pageIndex}, cropBounds=$finalCropBounds")
 
             CropResult(task.pageIndex, finalCropBounds)
@@ -152,13 +156,13 @@ public class DecoderAdapter(
     override fun generateCropTasks(): List<DecodeTask> {
         val tasks = mutableListOf<DecodeTask>()
 
-        if (!isCropEnabled()) {
+        if (!isAutoCropEnabled()) {
             return tasks
         }
 
-        // 为所有没有切边信息的页面生成切边任务
+        // 为所有没有自动切边信息的页面生成切边任务
         imageDecoder.aPageList?.forEachIndexed { index, aPage ->
-            if (aPage.cropBounds == null) {
+            if (aPage.autoCropBounds == null) {
                 val task = DecodeTask(
                     type = TaskType.CROP,
                     pageIndex = index,

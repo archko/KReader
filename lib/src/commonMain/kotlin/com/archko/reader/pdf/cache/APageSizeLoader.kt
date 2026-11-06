@@ -2,6 +2,7 @@ package com.archko.reader.pdf.cache
 
 import androidx.compose.ui.geometry.Rect
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.PageSizeBean
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -54,7 +55,7 @@ public class APageSizeLoader {
         }
 
         public fun savePageSizeToFile(
-            crop: Boolean,
+            cropMode: Int,
             path: String,
             fileSize: Long,
             list: MutableList<APage>?,
@@ -62,7 +63,7 @@ public class APageSizeLoader {
             list?.run {
                 val saveFile = getPageCacheFile(path)
                 saveFile.parentFile?.mkdirs()
-                val content = toJson(crop, fileSize, list)
+                val content = toJson(cropMode, fileSize, list)
                 saveFile.writeText(content, Charsets.UTF_8)
             }
         }
@@ -88,8 +89,17 @@ public class APageSizeLoader {
             }
             val pageSizeBean = PageSizeBean()
             val list = fromJson(ja)
+            val crop = jo["crop"]?.jsonPrimitive?.booleanOrNull ?: false
+            val cropMode = jo["cropMode"]?.jsonPrimitive?.intOrNull
+                ?: if (crop || list.any { it.autoCropBounds != null }) {
+                    CropMode.AUTO
+                } else {
+                    CropMode.NONE
+                }
+            list.forEach { it.applyCropMode(cropMode) }
             pageSizeBean.list = list
-            pageSizeBean.crop = jo["crop"]?.jsonPrimitive?.booleanOrNull ?: false
+            pageSizeBean.crop = crop
+            pageSizeBean.cropMode = cropMode
             return pageSizeBean
         }
 
@@ -103,10 +113,11 @@ public class APageSizeLoader {
             return list
         }
 
-        private fun toJson(crop: Boolean, fileSize: Long, list: List<APage>): String {
+        private fun toJson(cropMode: Int, fileSize: Long, list: List<APage>): String {
             return try {
                 buildJsonObject {
-                    put("crop", crop)
+                    put("crop", cropMode != CropMode.NONE)
+                    put("cropMode", cropMode)
                     put("filesize", fileSize)
                     put("pagesize", toJsons(list))
                 }.toString()
@@ -130,11 +141,17 @@ public class APageSizeLoader {
                 put("width", aPage.width.toDouble())
                 put("height", aPage.height.toDouble())
                 put("zoom", aPage.scale.toDouble())
-                aPage.cropBounds?.let { bounds ->
+                aPage.autoCropBounds?.let { bounds ->
                     put("cbleft", bounds.left)
                     put("cbtop", bounds.top)
                     put("cbright", bounds.right)
                     put("cbbottom", bounds.bottom)
+                }
+                aPage.manualCropBounds?.let { bounds ->
+                    put("mbleft", bounds.left)
+                    put("mbtop", bounds.top)
+                    put("mbright", bounds.right)
+                    put("mbbottom", bounds.bottom)
                 }
             }
         }
@@ -148,11 +165,27 @@ public class APageSizeLoader {
             val cbtop = jo["cbtop"]?.jsonPrimitive?.floatOrNull ?: 0f
             val cbright = jo["cbright"]?.jsonPrimitive?.floatOrNull ?: 0f
             val cbbottom = jo["cbbottom"]?.jsonPrimitive?.floatOrNull ?: 0f
-            var cropBounds: Rect? = null
+            var autoCropBounds: Rect? = null
             if (cbright > 0 && cbbottom > 0) {
-                cropBounds = Rect(cbleft, cbtop, cbright, cbbottom)
+                autoCropBounds = Rect(cbleft, cbtop, cbright, cbbottom)
             }
-            val aPage = APage(index, width.toInt(), height.toInt(), scale, cropBounds)
+            val mbleft = jo["mbleft"]?.jsonPrimitive?.floatOrNull ?: 0f
+            val mbtop = jo["mbtop"]?.jsonPrimitive?.floatOrNull ?: 0f
+            val mbright = jo["mbright"]?.jsonPrimitive?.floatOrNull ?: 0f
+            val mbbottom = jo["mbbottom"]?.jsonPrimitive?.floatOrNull ?: 0f
+            var manualCropBounds: Rect? = null
+            if (mbright > 0 && mbbottom > 0) {
+                manualCropBounds = Rect(mbleft, mbtop, mbright, mbbottom)
+            }
+            val aPage = APage(
+                index = index,
+                width = width.toInt(),
+                height = height.toInt(),
+                scale = scale,
+                cropBounds = autoCropBounds,
+                autoCropBounds = autoCropBounds,
+                manualCropBounds = manualCropBounds
+            )
             return aPage
         }
     }

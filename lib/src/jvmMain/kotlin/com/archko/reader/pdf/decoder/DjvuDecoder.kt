@@ -16,6 +16,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
@@ -36,6 +37,7 @@ import kotlin.math.round
 public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     public override var pageCount: Int = 0
+    public override var cropMode: Int = CropMode.NONE
 
     // 私有变量存储原始页面尺寸
     public override var originalPageSizes: List<Size> = listOf()
@@ -248,7 +250,7 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         if (cachePage && aPageList.isNotEmpty()) {
             println("DjvuDecoder.close:${aPageList.size}")
             try {
-                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
             } catch (e: Exception) {
                 println("DjvuDecoder.close: 保存缓存失败: ${e.message}")
             }
@@ -293,7 +295,7 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         // 保存到缓存
         if (cachePage && aPageList.isNotEmpty()) {
             try {
-                APageSizeLoader.savePageSizeToFile(false, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
             } catch (e: Exception) {
                 println("DjvuDecoder: 缓存页面尺寸失败: ${e.message}")
             }
@@ -565,7 +567,7 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 parseLinksIfNeeded(index, false, true)
 
                 // 如果启用了切边功能但没有cropBounds，检测并设置
-                if (crop && bitmap != null) {
+                if (crop && bitmap != null && cropMode == CropMode.AUTO) {
                     val cropBounds = SmartCropUtils.detectSmartCropBounds(imageBitmap)
                     if (cropBounds != null) {
                         // 将缩略图坐标转换为原始DjVu坐标
@@ -585,7 +587,7 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                         println("DjvuDecoder.cropBounds:$index, 原始尺寸=${originalSize.width}x${originalSize.height}, 切边区域=($cropBounds), 切边后尺寸=${djvuCropBounds}")
 
                         if (djvuCropBounds.width < 0 || djvuCropBounds.height < 0) {
-                            aPage.cropBounds = Rect(
+                            aPage.autoCropBounds = Rect(
                                 0f,
                                 0f,
                                 imageBitmap.width.toFloat(),
@@ -593,7 +595,7 @@ public class DjvuDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                             )
                             return imageBitmap
                         }
-                        aPage.cropBounds = djvuCropBounds
+                        aPage.autoCropBounds = djvuCropBounds
 
                         // 真正对图片进行切边处理
                         val croppedBitmap = cropImageBitmap(index, imageBitmap, cropBounds)

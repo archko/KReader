@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.state.AnnotationManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -90,6 +91,7 @@ public fun PagerDocumentView(
     jumpToPage: Int? = null,
     onPageChanged: ((page: Int) -> Unit)? = null,
     onTapCenter: (() -> Unit)? = null,
+    cropMode: Int = CropMode.NONE,
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
 ) {
     val pageCount = list.size
@@ -133,7 +135,7 @@ public fun PagerDocumentView(
                     scrollY,     // 前面各页累积高度 → 切回连续模式可精准恢复
                     Vertical.toLong(),
                     0L,          // reflow
-                    1L           // crop=1 表示不切边（与普通模式 isCropEnabled=false 对应）
+                    cropMode.toLong()
                 )
             }
         }
@@ -201,7 +203,7 @@ private fun PagerPage(
             state = decoder,
             annotationManager = AnnotationManager(""),
             orientation = Vertical,
-            crop = false,
+            cropMode = CropMode.NONE,
             columnCount = 1,
             textSelector = null,
             closeDecoderOnShutdown = false,

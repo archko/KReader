@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -29,6 +30,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.state.AnnotationManager
 import java.util.concurrent.atomic.AtomicLong
@@ -58,7 +60,9 @@ public fun DesktopDocumentView(
     initialScrollY: Long = 0L,
     zoom: Double = 1.0,
     reflow: Long = 0,
-    crop: Boolean = false,
+    cropMode: Int = CropMode.NONE,
+    manualCropRect: Rect? = null,
+    onManualCropApplied: (() -> Unit)? = null,
     speakingPageIndex: Int? = null,
     gestureMode: GestureMode = GestureMode.VIEW,
     pathConfig: PathConfig,
@@ -88,7 +92,7 @@ public fun DesktopDocumentView(
         initialScrollY = initialScrollY,
         initialZoom = zoom,
         initialOrientation = initialOrientation,
-        crop = crop,
+        cropMode = cropMode,
         columnCount = columnCount,
         currentPath = currentPath,
         annotationManager = annotationManager,
@@ -119,7 +123,9 @@ public fun DesktopDocumentView(
         initialScrollY = initialScrollY,
         initialZoom = zoom,
         reflow = reflow,
-        crop = crop,
+        cropMode = cropMode,
+        manualCropRect = manualCropRect,
+        onManualCropApplied = onManualCropApplied,
         speakingPageIndex = speakingPageIndex,
         columnCount = columnCount,
         searchHighlightQuads = searchHighlightQuads,

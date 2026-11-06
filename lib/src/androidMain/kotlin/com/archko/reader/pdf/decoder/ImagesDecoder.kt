@@ -17,6 +17,7 @@ import com.archko.reader.pdf.component.DecodeTask
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.entity.Item
@@ -40,6 +41,7 @@ public class ImagesDecoder(
 ) : ImageDecoder {
 
     public override var pageCount: Int = documents.size
+    public override var cropMode: Int = CropMode.NONE
 
     // 私有变量存储原始页面尺寸
     public override var originalPageSizes: List<Size> = listOf()

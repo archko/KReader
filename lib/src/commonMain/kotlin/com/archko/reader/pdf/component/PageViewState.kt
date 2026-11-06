@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.entity.CropMode
 import com.archko.reader.pdf.entity.DocQuad
 import com.archko.reader.pdf.entity.Hyperlink
 import com.archko.reader.pdf.state.AnnotationManager
@@ -39,7 +40,7 @@ public class PageViewState(
     public val state: ImageDecoder,
     public val annotationManager: AnnotationManager,
     public var orientation: Int = Vertical,
-    crop: Boolean,
+    cropMode: Int,
     public var columnCount: Int = 1,
     public val textSelector: TextSelector? = null,
     private val closeDecoderOnShutdown: Boolean = true,
@@ -47,7 +48,9 @@ public class PageViewState(
 ) {
     internal val viewport = ViewportState()
 
-    private var cropEnabled: Boolean = crop
+    internal var cropMode: Int = cropMode
+        private set
+    private var cropEnabled: Boolean = CropMode.isEnabled(cropMode)
     private val pendingCropPages = LinkedHashSet<Int>()
     private var cropRelayoutScheduled: Boolean = false
 
@@ -122,11 +125,13 @@ public class PageViewState(
     )
 
     init {
+        state.cropMode = cropMode
         initDecodeService()
     }
 
     private fun createPages(): List<Page> {
         return list.map { aPage ->
+            aPage.applyCropMode(cropMode)
             Page(
                 this,
                 aPage,
@@ -145,7 +150,7 @@ public class PageViewState(
         val decoder = DecoderAdapter(
             imageDecoder = state,
             viewSize = viewSize,
-            isCropEnabled = { cropEnabled }
+            isAutoCropEnabled = { cropEnabled && cropMode == CropMode.AUTO }
         )
         decoderAdapter = decoder
         decodeService = DecodeService(decoder)
@@ -155,10 +160,10 @@ public class PageViewState(
 
     /**
      * 提交全量切边任务。CROP 在解码服务里优先级最低，不会和缩略图/tile 抢线程。
-     * 已有 cropBounds 的页面会被 generateCropTasks 跳过。
+     * 已有自动切边结果的页面会被 generateCropTasks 跳过。
      */
     private fun submitBackgroundCropTasks() {
-        if (!cropEnabled) {
+        if (!cropEnabled || cropMode != CropMode.AUTO) {
             return
         }
         val service = decodeService ?: return
@@ -181,7 +186,7 @@ public class PageViewState(
                     mainScope.launch {
                         onCropProbeFinished(
                             page,
-                            success = page.aPage.cropBounds != null,
+                            success = page.aPage.autoCropBounds != null,
                             fromThumbnail = false
                         )
                     }
@@ -207,29 +212,72 @@ public class PageViewState(
     }
 
     public fun setCropEnabled(enabled: Boolean) {
-        if (cropEnabled == enabled) {
+        setCropMode(if (enabled) CropMode.AUTO else CropMode.NONE)
+    }
+
+    public fun setCropMode(mode: Int) {
+        if (cropMode == mode) {
             return
         }
-        cropEnabled = enabled
+        cropMode = mode
+        cropEnabled = CropMode.isEnabled(mode)
+        state.cropMode = mode
         pendingCropPages.clear()
         pages.forEach {
-            it.prepareForCropChange(enabled)
+            it.aPage.applyCropMode(mode)
+            it.prepareForCropChange(mode)
             it.updateGeometry(
                 PageGeometry(
                     it.aPage.width.toFloat(),
                     it.aPage.height.toFloat(),
                     it.aPage.cropBounds,
-                    enabled
+                    cropEnabled
                 )
             )
         }
         relayout()
-        if (enabled) {
+        if (cropMode == CropMode.AUTO) {
             submitBackgroundCropTasks()
         }
     }
 
+    public fun applyManualCrop(cropBounds: Rect) {
+        if (cropBounds.width <= 0f || cropBounds.height <= 0f) {
+            return
+        }
+        pendingCropPages.clear()
+        pages.forEach { page ->
+            val aPage = page.aPage
+            val left = cropBounds.left.coerceIn(0f, aPage.width.toFloat())
+            val top = cropBounds.top.coerceIn(0f, aPage.height.toFloat())
+            val right = cropBounds.right.coerceIn(left, aPage.width.toFloat())
+            val bottom = cropBounds.bottom.coerceIn(top, aPage.height.toFloat())
+            if (right <= left || bottom <= top) {
+                return@forEach
+            }
+            val bounds = Rect(left, top, right, bottom)
+            aPage.manualCropBounds = bounds
+            if (cropMode == CropMode.MANUAL) {
+                aPage.cropBounds = bounds
+            }
+            page.cropProbed = true
+            page.updateGeometry(
+                PageGeometry(
+                    aPage.width.toFloat(),
+                    aPage.height.toFloat(),
+                    bounds,
+                    CropMode.isEnabled(cropMode)
+                ),
+                keepThumbnail = false
+            )
+        }
+        relayout()
+        revision++
+    }
+
     public fun isCropEnabled(): Boolean = cropEnabled
+
+    public fun getCropMode(): Int = cropMode
 
     public fun updateColumnCount(columnCount: Int) {
         if (this.columnCount != columnCount) {
@@ -825,10 +873,11 @@ public class PageViewState(
      * 切边探测完成。缩略图解码会顺带探测切边，启动后的后台批量任务也走这里。
      */
     internal fun onCropProbeFinished(page: Page, success: Boolean, fromThumbnail: Boolean) {
-        if (isShutdown || !cropEnabled || !success) {
+        if (isShutdown || !cropEnabled || cropMode != CropMode.AUTO || !success) {
             return
         }
         page.cropProbed = true
+        page.aPage.applyCropMode(cropMode)
         val newGeometry = PageGeometry(
             page.aPage.width.toFloat(),
             page.aPage.height.toFloat(),
@@ -887,6 +936,7 @@ public class PageViewState(
         var changed = false
         for (index in pendingCropPages) {
             val page = pages.getOrNull(index) ?: continue
+            page.aPage.applyCropMode(cropMode)
             val geometry = PageGeometry(
                 page.aPage.width.toFloat(),
                 page.aPage.height.toFloat(),
