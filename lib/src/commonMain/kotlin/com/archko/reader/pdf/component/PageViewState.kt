@@ -874,6 +874,33 @@ public class PageViewState(
         )
     }
 
+    /**
+     * 根据候选视口偏移计算该状态下首个可见页面的索引（与 [firstVisiblePageIndex] 语义一致）。
+     *
+     * 恢复阅读进度时用来校验"偏移量换算出的页码"是否和保存的页码一致：
+     * 偏移量是文档坐标系下的绝对像素，依赖视口尺寸、屏幕方向、缩放、列数、切边等，
+     * 只要其中任一条件与保存时不同，换算出的页码就可能与保存的页码不符。
+     */
+    public fun pageIndexAtViewportOffset(offset: Offset): Int {
+        if (pages.isEmpty()) {
+            return 0
+        }
+        val zoom = if (viewport.zoom > 0f) viewport.zoom else 1f
+        val docLeft = -offset.x / zoom
+        val docTop = -offset.y / zoom
+        val docRight = docLeft + viewport.viewSize.width / zoom
+        val docBottom = docTop + viewport.viewSize.height / zoom
+        for (page in pages) {
+            val base = page.baseRect
+            if (base.right > docLeft && base.left < docRight &&
+                base.bottom > docTop && base.top < docBottom
+            ) {
+                return page.index
+            }
+        }
+        return 0
+    }
+
     public fun offsetForPage(pageIndex: Int, originalY: Float? = null): Offset {
         val page = pages.getOrNull(pageIndex) ?: return viewport.offset
         viewport.setContentSize(docWidth, docHeight)

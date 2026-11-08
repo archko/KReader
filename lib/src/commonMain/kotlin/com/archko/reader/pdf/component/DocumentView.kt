@@ -281,9 +281,17 @@ internal fun DocumentViewEffects(
                     if (initialScrollX == 0L && initialScrollY == 0L) {
                         pageViewState.offsetForPage(jumpToPage)
                     } else {
-                        pageViewState.offsetForDoc(
+                        val restored = pageViewState.offsetForDoc(
                             Offset(initialScrollX.toFloat(), initialScrollY.toFloat())
                         )
+                        // 保存的偏移量是文档坐标系下的绝对像素，依赖视口尺寸/方向/缩放等。
+                        // 例如横屏时保存的偏移量在竖屏下打开就无法套用，
+                        // 换算出的页码与保存的页码不一致时，以页码为准。
+                        if (pageViewState.pageIndexAtViewportOffset(restored) != jumpToPage) {
+                            pageViewState.offsetForPage(jumpToPage)
+                        } else {
+                            restored
+                        }
                     }
                 }
 

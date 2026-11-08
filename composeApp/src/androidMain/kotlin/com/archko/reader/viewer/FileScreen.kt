@@ -79,6 +79,8 @@ import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.dialog.BookInfoDialog
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
+import com.archko.reader.viewer.utils.isDocumentPathReadable
+import com.archko.reader.viewer.utils.resolveDocumentForOpen
 import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -382,11 +384,40 @@ fun FileScreen(
             val uriString = recent.uri?.takeIf { it.startsWith("content://") }
                 ?: recent.path?.takeIf { it.startsWith("content://") }
             val path = recent.path
-            val target = uriString ?: path
-            if (target.isNullOrEmpty()) return
+            if (path.isNullOrEmpty() && uriString.isNullOrEmpty()) return
 
-            if (!uriString.isNullOrEmpty()) {
-                scope.launch {
+            scope.launch {
+                val candidate = DocumentInfo(
+                    uri = uriString,
+                    path = path,
+                    fileSize = recent.size ?: 0L,
+                    ext = recent.ext
+                )
+
+                // 路径真正可读时优先用路径打开，避免依赖 uri 授权。
+                // 不能通过权限状态判断，部分设备即使有权限也读不了文件
+                val usePath = withContext(Dispatchers.IO) {
+                    isDocumentPathReadable(candidate)
+                }
+                if (usePath) {
+                    val pathDoc = withContext(Dispatchers.IO) {
+                        resolveDocumentForOpen(candidate)
+                    }
+                    val docs = listOf(pathDoc)
+                    if (FileTypeUtils.shouldSaveProgress(docs)) {
+                        // 使用历史记录中保存的原始 path 查询，保证能匹配到已有记录
+                        viewModel.getRecent(path ?: pathDoc.path ?: "", uriString)
+                        val startPage =
+                            viewModel.recent?.page?.toInt() ?: recent.page?.toInt() ?: 0
+                        openDocRequest = OpenDocRequest(docs, startPage)
+                    } else {
+                        openDocRequest = OpenDocRequest(docs, 0)
+                    }
+                    return@launch
+                }
+
+                // 路径不可读时才回退到 uri
+                if (!uriString.isNullOrEmpty()) {
                     var canOpen = false
                     var permissionLost = false
                     withContext(Dispatchers.IO) {
@@ -403,7 +434,8 @@ fun FileScreen(
                     when {
                         canOpen -> {
                             viewModel.getRecent(path ?: uriString, uriString)
-                            val startPage = viewModel.recent?.page?.toInt() ?: recent.page?.toInt() ?: 0
+                            val startPage =
+                                viewModel.recent?.page?.toInt() ?: recent.page?.toInt() ?: 0
                             openDocRequest = OpenDocRequest(
                                 listOf(
                                     DocumentInfo(
@@ -417,24 +449,8 @@ fun FileScreen(
                             )
                         }
                         permissionLost -> requestReauth(recent)
-                        else -> Toast.makeText(context, "文件不存在或已被移动", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } else {
-                val absolutePath = getAbsolutePath(path)
-                val file = File(absolutePath)
-                if (file.exists()) {
-                    val fileSize = recent.size ?: file.length()
-                    scope.launch {
-                        val docInfo = DocumentInfo(path = file.absolutePath, fileSize = fileSize)
-                        val docs = listOf(docInfo)
-                        if (FileTypeUtils.shouldSaveProgress(docs)) {
-                            viewModel.getRecent(path!!, recent.uri)
-                            val startPage = viewModel.recent?.page?.toInt() ?: 0
-                            openDocRequest = OpenDocRequest(docs, startPage)
-                        } else {
-                            openDocRequest = OpenDocRequest(docs, 0)
-                        }
+                        else -> Toast.makeText(context, "文件不存在或已被移动", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 } else {
                     requestReauth(recent)
