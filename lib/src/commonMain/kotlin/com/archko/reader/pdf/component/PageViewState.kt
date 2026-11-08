@@ -23,6 +23,7 @@ import com.archko.reader.pdf.state.AnnotationManager
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -54,7 +55,9 @@ public class PageViewState(
     private val pendingCropPages = LinkedHashSet<Int>()
     private var cropRelayoutScheduled: Boolean = false
 
-    public var viewOffset: Offset = Offset.Zero
+    // 唯一数据源是 viewport.offset：派生读取，避免多个入口手动同步时漏写，
+    // 导致 graphicsLayer 的位移和 docRect（可见性判断/解码请求）不一致。
+    public val viewOffset: Offset get() = viewport.offset
     public var init: Boolean by mutableStateOf(false)
     public var totalHeight: Float by mutableFloatStateOf(0f)
     public var totalWidth: Float by mutableFloatStateOf(0f)
@@ -106,6 +109,11 @@ public class PageViewState(
 
     private var isShutdown = false
     private var lastInteractionAt: Long = 0L
+
+    // 交互态暴露成 State：drawTiles 每帧读取它决定是否保留缩略图底图，
+    // 交互开始/结束时只失效一次绘制，绘制路径上不再反复调用 System.currentTimeMillis()。
+    private var interactionActive: Boolean by mutableStateOf(false)
+    private var interactionExpiryJob: Job? = null
 
     private val wantedPagesRef = AtomicReference<Set<Int>>(emptySet())
 
@@ -325,6 +333,7 @@ public class PageViewState(
         // 即使已经处于交互中（例如连续按下）也要取消 pending tap，
         // 否则旧的 300ms 任务会在拖动结束后继续执行翻页/链接逻辑。
         onInteractionStart?.invoke()
+        touchInteraction()
         if (isInteracting) {
             return
         }
@@ -339,11 +348,38 @@ public class PageViewState(
         isInteracting = false
         updateVisibleNow(true)
         revision++
+        // 抬起后仍保留一小段“交互中”，覆盖惯性滑动启动前的空档
+        touchInteraction()
     }
 
-    internal fun isInteractionActive(): Boolean {
-        return isInteracting || System.currentTimeMillis() - lastInteractionAt < 300L
+    /**
+     * 标记一次交互活动：交互态立即置为 true，并在最后一次活动 300ms 后自动回落。
+     * 整个交互过程只维护一个循环任务，避免每个 pointer event 都新建协程。
+     */
+    private fun touchInteraction() {
+        lastInteractionAt = System.currentTimeMillis()
+        if (!interactionActive) {
+            interactionActive = true
+        }
+        if (interactionExpiryJob?.isActive == true) {
+            return
+        }
+        interactionExpiryJob = mainScope.launch {
+            while (!isShutdown) {
+                val remain = INTERACTION_HOLD_MS - (System.currentTimeMillis() - lastInteractionAt)
+                if (remain <= 0L) {
+                    break
+                }
+                delay(remain)
+            }
+            interactionExpiryJob = null
+            if (!isShutdown) {
+                interactionActive = false
+            }
+        }
     }
+
+    internal fun isInteractionActive(): Boolean = interactionActive
 
     public fun shutdown() {
         if (isShutdown) {
@@ -398,7 +434,6 @@ public class PageViewState(
             } else {
                 viewport.clampOffset(viewport.offset)
             }
-            viewOffset = viewport.offset
             updateTotals()
             updateVisibleNow(true)
         }
@@ -423,7 +458,6 @@ public class PageViewState(
         } else {
             viewport.offset = viewport.clampOffset(viewport.offset)
         }
-        viewOffset = viewport.offset
         updateTotals()
         init = true
         layoutVersion++
@@ -575,24 +609,26 @@ public class PageViewState(
     }
 
     /**
-     * 兼容旧调用：更新视口偏移。
+     * 兼容旧调用：更新视口偏移（点击翻页/跳转）。
+     * 统一委托给 [updateViewport]，与手势路径共用 clamp、totals、交互态与可见性刷新。
      */
     public fun updateOffset(newOffset: Offset) {
         if (!init) {
+            // 还没布局时没有文档尺寸，clamp 会把偏移压成 0，先原样记录
             viewport.offset = newOffset
-            viewOffset = newOffset
             return
         }
-        viewport.setContentSize(docWidth, docHeight)
-        viewport.offset = viewport.clampOffset(newOffset)
-        viewOffset = viewport.offset
-        updateTotals()
-        updateVisibleNow(true)
+        updateViewport(vZoom, newOffset, request = true)
     }
 
     /**
      * 兼容旧调用：更新视口并刷新可见 tile。
+     * 仅同步视口尺寸，其余全部走 [updateViewport]。
      */
+    @Deprecated(
+        message = "改用 updateViewport(zoom, offset, request) 或 updateOffset(offset)",
+        replaceWith = ReplaceWith("updateViewport(currentVZoom, offset, request = true)")
+    )
     public fun updateVisiblePages(
         offset: Offset,
         viewSize: IntSize,
@@ -603,14 +639,7 @@ public class PageViewState(
             return
         }
         this.viewSize = viewSize
-        this.vZoom = currentVZoom
-        viewport.viewSize = viewSize
-        viewport.zoom = currentVZoom
-        viewport.setContentSize(docWidth, docHeight)
-        viewport.offset = viewport.clampOffset(offset)
-        viewOffset = viewport.offset
-        updateTotals()
-        updateVisibleNow(true)
+        updateViewport(currentVZoom, offset, request = true)
     }
 
     internal fun updateViewport(zoom: Float, offset: Offset, request: Boolean) {
@@ -619,9 +648,8 @@ public class PageViewState(
         viewport.zoom = zoom
         viewport.setContentSize(docWidth, docHeight)
         viewport.offset = viewport.clampOffset(offset)
-        viewOffset = viewport.offset
         updateTotals()
-        lastInteractionAt = System.currentTimeMillis()
+        touchInteraction()
 
         if (request) {
             scheduleVisibleUpdate()
@@ -868,11 +896,9 @@ public class PageViewState(
         )
     }
 
-    public fun drawVisiblePages(
-        drawScope: DrawScope,
-        offset: Offset,
-        vZoom: Float,
-    ) {
+    public fun drawVisiblePages(drawScope: DrawScope) {
+        // 平移/缩放统一由外层 graphicsLayer 完成，这里只按文档空间绘制，
+        // 不再接收 offset / vZoom（旧参数未被使用，容易误用）。
         val list = pageToRender
         for (page in list) {
             page.drawTiles(drawScope)
@@ -931,7 +957,7 @@ public class PageViewState(
             pendingCropPages.clear()
             return
         }
-        if (System.currentTimeMillis() - lastInteractionAt < 300L) {
+        if (System.currentTimeMillis() - lastInteractionAt < INTERACTION_HOLD_MS) {
             if (!cropRelayoutScheduled) {
                 cropRelayoutScheduled = true
                 mainScope.launch {
@@ -1159,6 +1185,9 @@ public class PageViewState(
     }
 
     public companion object {
+        // 抬起/最后一次移动后，仍视为“交互中”的时长（保留缩略图底图，避免露白）
+        private const val INTERACTION_HOLD_MS: Long = 300L
+
         public fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {
             val visibleRect = Rect(
                 left = -offset.x,

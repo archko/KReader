@@ -145,10 +145,11 @@ public fun DesktopDocumentView(
             stateHolder.vZoom.value,
             stateHolder.orientation.value
         )
-        stateHolder.pageViewState.updateVisiblePages(
+        // updateViewSize 之后视口尺寸/缩放已同步，这里直接走统一入口刷新可见范围
+        stateHolder.pageViewState.updateViewport(
+            stateHolder.vZoom.value,
             stateHolder.offset.value,
-            stateHolder.viewSize.value,
-            stateHolder.vZoom.value
+            request = true
         )
         stateHolder.offset.value = stateHolder.pageViewState.viewOffset
     }

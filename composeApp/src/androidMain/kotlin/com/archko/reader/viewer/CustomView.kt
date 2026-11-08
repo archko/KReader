@@ -1,6 +1,7 @@
 package com.archko.reader.viewer
 
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -1213,8 +1215,16 @@ fun CustomView(
                         modifier = Modifier
                             .fillMaxWidth()
                     ) {
-                        // Activity屏幕方向状态
-                        var isActivityPortrait by remember { mutableStateOf(true) }
+                        // Activity屏幕方向状态：以系统实际方向为初值，避免状态与真实方向不同步
+                        val configuration = LocalConfiguration.current
+                        val actualPortrait =
+                            configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                        var isActivityPortrait by remember { mutableStateOf(actualPortrait) }
+
+                        // 设备旋转或方向锁定变化时，同步按钮状态
+                        LaunchedEffect(actualPortrait) {
+                            isActivityPortrait = actualPortrait
+                        }
 
                         Column(
                             modifier = Modifier
@@ -1247,9 +1257,16 @@ fun CustomView(
 
                                 IconButton(
                                     onClick = {
-                                        isActivityPortrait = !isActivityPortrait
+                                        // 以系统当前实际方向为准（而不是内部状态），
+                                        // 避免方向已变化但状态未同步时需要点击两次
+                                        val currentlyPortrait =
+                                            context.resources.configuration.orientation ==
+                                                Configuration.ORIENTATION_PORTRAIT
+                                        val targetPortrait = !currentlyPortrait
+                                        isActivityPortrait = targetPortrait
+
                                         val activity = context as? ComponentActivity
-                                        activity?.requestedOrientation = if (isActivityPortrait) {
+                                        activity?.requestedOrientation = if (targetPortrait) {
                                             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                                         } else {
                                             ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -1257,7 +1274,7 @@ fun CustomView(
 
                                         scope.launch {
                                             // 等待方向改变完成
-                                            delay(50)
+                                            delay(150)
                                             applyFullScreen()
                                         }
                                     },

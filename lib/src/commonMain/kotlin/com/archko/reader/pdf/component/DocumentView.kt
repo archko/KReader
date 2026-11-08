@@ -159,7 +159,8 @@ internal fun rememberDocumentViewState(
     val selectionEndPos = remember { mutableStateOf<Offset?>(null) }
 
     val drawingPoints = remember { mutableListOf<Offset>() }
-    var activeDrawingPage by remember { mutableIntStateOf(-1) }
+    // 直接持有 MutableIntState，避免 by 解构后又用 mutableStateOf 包一层
+    val activeDrawingPage = remember { mutableIntStateOf(-1) }
 
     return DocumentViewState(
         viewSize = viewSize,
@@ -175,7 +176,7 @@ internal fun rememberDocumentViewState(
         selectionStartPos = selectionStartPos,
         selectionEndPos = selectionEndPos,
         drawingPoints = drawingPoints,
-        activeDrawingPage = remember { mutableStateOf(activeDrawingPage) },
+        activeDrawingPage = activeDrawingPage,
         flingJob = flingJob,
         lastTapTime = lastTapTime,
         tapDelayJob = tapDelayJob,
@@ -654,12 +655,11 @@ internal fun DocumentViewCanvas(
                     scaleY = state.vZoom.value
                     transformOrigin = TransformOrigin(0f, 0f)
                     clip = false
-                    renderEffect = null
                 }
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 pageViewState.revision
-                pageViewState.drawVisiblePages(this, Offset.Zero, 1f)
+                pageViewState.drawVisiblePages(this)
             }
             // 覆盖层独立成一张 Canvas：tile 解码只让内容层失效，不再连带重算链接/选区/搜索高亮
             Canvas(modifier = Modifier.fillMaxSize()) {

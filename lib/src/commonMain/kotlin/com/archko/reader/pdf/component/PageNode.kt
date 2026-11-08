@@ -57,13 +57,26 @@ public class PageNode internal constructor(
     internal val removed: AtomicBoolean = AtomicBoolean(false)
     internal var requestAt: Long = 0L
 
+    // baseRect 在两次 relayout 之间是同一个实例（Rect 不可变），
+    // fraction 也是常量，命中缓存即可跳过每帧 4 次乘加。
+    private var cachedBase: Rect? = null
+    private var cachedDocRect: Rect? = null
+
     internal fun docRect(base: Rect): Rect {
-        return Rect(
+        val baseRef = cachedBase
+        val cached = cachedDocRect
+        if (cached != null && baseRef != null && (baseRef === base || baseRef == base)) {
+            return cached
+        }
+        val rect = Rect(
             base.left + fraction.left * base.width,
             base.top + fraction.top * base.height,
             base.left + fraction.right * base.width,
             base.top + fraction.bottom * base.height
         )
+        cachedBase = base
+        cachedDocRect = rect
+        return rect
     }
 
     internal fun release() {

@@ -430,7 +430,7 @@ private fun PagerPageCanvas(
     ) {
         // 在绘制阶段订阅 revision 与 tile bitmap，解码完成时能直接触发重绘
         pageViewState.revision
-        pageViewState.drawVisiblePages(this, Offset.Zero, zoom)
+        pageViewState.drawVisiblePages(this)
     }
 }
 
