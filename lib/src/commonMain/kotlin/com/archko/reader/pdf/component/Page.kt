@@ -200,14 +200,19 @@ public class Page internal constructor(
             currentLevel
         }
         if (level != currentLevel) {
+            // 档位切换时把所有已解码的 tile 留作回滚底图，只释放未解码/已移除的节点。
+            // 旧实现只保留 oldVisible，其余已解码的离屏 tile 直接被 release，
+            // 放大翻页时新页只能靠缩略图顶着，块与块之间更容易露缝。
             releaseFallbackTiles()
-            val oldVisible = visibleTiles
-            fallbackTiles = oldVisible
+            val retained = ArrayList<PageNode>(tileNodes.size)
             for (node in tileNodes) {
-                if (!oldVisible.contains(node)) {
+                if (node.bitmap != null && !node.removed.get()) {
+                    retained.add(node)
+                } else {
                     node.release()
                 }
             }
+            fallbackTiles = retained
             tileNodes.clear()
             visibleTiles = emptyList()
             currentLevel = level
@@ -333,35 +338,58 @@ public class Page internal constructor(
         fraction: Rect,
         scale: Float
     ): PageNode? {
-        // 内容像素边界取整：相邻 tile 在公共边上算出的整数完全一致，
-        // 解码区域与绘制区域因此共用同一条边，接缝处不会重复绘制一列/一行像素。
-        // 旧实现用 ceil(宽) + floor/ceil(目标矩形) 会让相邻 tile 相互覆盖，
-        // 放大后这段重复内容被放大成可见的“文字重叠”。
-        val cx = round(geometry.left + fraction.left * geometry.width)
-        val cy = round(geometry.top + fraction.top * geometry.height)
-        val cx2 = round(geometry.left + fraction.right * geometry.width)
-        val cy2 = round(geometry.top + fraction.bottom * geometry.height)
-        if (cx2 <= cx || cy2 <= cy) {
+        // 先在文档空间把目标矩形取整：相邻 tile 的公共边来自同一个 fraction 值，
+        // round 后得到完全相同的整数边界，绘制时既不重叠也不留缝。
+        // 旧实现用“内容边界取整 -> 反算 fraction”，边缘 tile 的 fraction 会略微内缩
+        // （round(geometry.left) != geometry.left），偏差是固定的文档像素，
+        // 放大后被放大成可见的缝。
+        val dstLeft = round(baseRect.left + fraction.left * baseRect.width)
+        val dstTop = round(baseRect.top + fraction.top * baseRect.height)
+        val dstRight = round(baseRect.left + fraction.right * baseRect.width)
+        val dstBottom = round(baseRect.top + fraction.bottom * baseRect.height)
+        if (dstRight <= dstLeft || dstBottom <= dstTop) {
             return null
         }
-        // 纹理像素边界同样取整，保证位图覆盖的纹理区间正好是 [tx, tx2)，
+        // 由取整后的目标矩形反算内容区域：相邻 tile 共用同一条整数边界，
+        // 反算出的内容边界也完全一致，解码区域首尾相接。
+        // 页面外边缘直接对齐内容边界，避免 round(geometry.left) 带来的半像素偏差。
+        val contentLeft = if (fraction.left <= 0f) {
+            geometry.left
+        } else {
+            geometry.left + (dstLeft - baseRect.left) / baseRect.width * geometry.width
+        }
+        val contentTop = if (fraction.top <= 0f) {
+            geometry.top
+        } else {
+            geometry.top + (dstTop - baseRect.top) / baseRect.height * geometry.height
+        }
+        val contentRight = if (fraction.right >= 1f) {
+            geometry.left + geometry.width
+        } else {
+            geometry.left + (dstRight - baseRect.left) / baseRect.width * geometry.width
+        }
+        val contentBottom = if (fraction.bottom >= 1f) {
+            geometry.top + geometry.height
+        } else {
+            geometry.top + (dstBottom - baseRect.top) / baseRect.height * geometry.height
+        }
+        // 纹理像素边界取整，保证位图覆盖的纹理区间正好是 [tx, tx2)，
         // 解码器不再需要 floor/ceil 向两侧“补一像素”。
-        val tx = round(cx * scale)
-        val ty = round(cy * scale)
-        val tx2 = round(cx2 * scale)
-        val ty2 = round(cy2 * scale)
+        val tx = round(contentLeft * scale)
+        val ty = round(contentTop * scale)
+        val tx2 = round(contentRight * scale)
+        val ty2 = round(contentBottom * scale)
         val outWidth = (tx2 - tx).toInt().coerceAtLeast(1)
         val outHeight = (ty2 - ty).toInt().coerceAtLeast(1)
         if (outWidth > 4096 || outHeight > 4096) {
             return null
         }
-        // 目标矩形改用取整后的内容边界反算归一化比例，
-        // 绘制时再统一 round，相邻 tile 的边界值相同 -> 不重叠也不留缝。
+        // 归一化比例同样由整数目标矩形反算，绘制时 round 回来就是同一条边。
         val snappedFraction = Rect(
-            (cx - geometry.left) / geometry.width,
-            (cy - geometry.top) / geometry.height,
-            (cx2 - geometry.left) / geometry.width,
-            (cy2 - geometry.top) / geometry.height
+            (dstLeft - baseRect.left) / baseRect.width,
+            (dstTop - baseRect.top) / baseRect.height,
+            (dstRight - baseRect.left) / baseRect.width,
+            (dstBottom - baseRect.top) / baseRect.height
         )
         return PageNode(
             key = key,

@@ -74,6 +74,13 @@ public class PageViewState(
     internal var isInteracting: Boolean = false
         private set
 
+    /**
+     * 交互开始时的回调（每次按下都会触发，包括重复按下）。
+     * 视图层用它取消上一次点击遗留的延迟任务（tapDelayJob），
+     * 保证所有手势入口在交互开始时都能统一清掉 pending tap。
+     */
+    internal var onInteractionStart: (() -> Unit)? = null
+
     private var visibleUpdateScheduled: Boolean = false
     private var lastScannedVisible: Rect? = null
     private var lastVisibleScanAt: Long = 0L
@@ -315,6 +322,9 @@ public class PageViewState(
     public fun isShutdown(): Boolean = isShutdown
 
     internal fun beginInteraction() {
+        // 即使已经处于交互中（例如连续按下）也要取消 pending tap，
+        // 否则旧的 300ms 任务会在拖动结束后继续执行翻页/链接逻辑。
+        onInteractionStart?.invoke()
         if (isInteracting) {
             return
         }

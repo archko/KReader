@@ -145,7 +145,11 @@ internal fun rememberDocumentViewState(
             columnCount = columnCount,
             textSelector = textSelector,
             closeDecoderOnShutdown = closeDecoderOnShutdown
-        )
+        ).also { pvs ->
+            // 任何交互入口开始时都取消上一次点击遗留的 300ms 延迟任务，
+            // 避免“拖动后仍然触发点击/翻页”。
+            pvs.onInteractionStart = { tapDelayJob.value?.cancel() }
+        }
     }
 
     val isTextSelecting = remember { mutableStateOf(false) }
@@ -504,6 +508,10 @@ internal fun CommonGestureHandler(
                             var lastTileRefreshAt = 0L
 
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            // 新一次按下即视为交互开始：取消上一次点击遗留的 300ms 延迟任务，
+                            // 否则用户按下后立刻拖动，拖动结束时不会触发 tap，
+                            // 但旧任务到期仍会执行翻页/链接逻辑（表现为“拖了还翻页”）。
+                            state.tapDelayJob.value?.cancel()
                             pageViewState.beginInteraction()
                             flingJob.value?.cancel()
 
@@ -544,6 +552,10 @@ internal fun CommonGestureHandler(
                                         val delta = when {
                                             !isDragging && totalPan.getDistance() > touchSlop -> {
                                                 isDragging = true
+                                                // 兜底：拖动开始后再取消一次 pending tap，
+                                                // 并重置双击判定基准，避免拖动结束后紧跟的点击被误判为双击。
+                                                state.tapDelayJob.value?.cancel()
+                                                state.lastTapTime.value = 0L
                                                 totalPan
                                             }
 
