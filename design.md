@@ -294,8 +294,7 @@ idealLevel  = ceil(log2(needed) * LEVEL_STEPS_PER_OCTAVE)
 
 绘制规则：
 
-- `visibleTiles` 全部就绪且**不在交互中**时，跳过整页缩略图，减少全屏 overdraw。
-- 交互中（手势或最近 300ms 内发生过视口更新）保留缩略图，保证平移/缩放露出的新区域有底图。
+- 整页缩略图始终作为底图：放大后相邻 tile 在非整数缩放下会出现亚像素接缝，底图可避免接缝直接露出阅读背景。
 - `visibleTiles` 未全部就绪时才绘制 fallback。
 - 页面缩略图首次可见时请求一次；解码完成后回调主线程挂到 `Page`，并补加载链接。
 
