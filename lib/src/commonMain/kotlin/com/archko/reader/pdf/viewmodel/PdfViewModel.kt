@@ -194,8 +194,11 @@ public class PdfViewModel : ViewModel() {
         scrollY: Long,
         scrollOri: Long,
         reflow: Long,
+        pageOffsetX: Long? = null,
+        pageOffsetY: Long? = null,
+        screenOrientation: Long? = null,
     ) {
-        println("PdfViewModel.updateRecent:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, old:$recent")
+        println("PdfViewModel.updateRecent:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, pageOffsetX:$pageOffsetX, pageOffsetY:$pageOffsetY, screenOrientation:$screenOrientation, old:$recent")
         if (path == null) {
             return
         }
@@ -228,6 +231,9 @@ public class PdfViewModel : ViewModel() {
                     zoom = zoom,
                     scrollX = scrollX,
                     scrollY = scrollY,
+                    pageOffsetX = pageOffsetX,
+                    pageOffsetY = pageOffsetY,
+                    screenOrientation = screenOrientation,
                     name = absolutePath.getFileName(),
                     ext = absolutePath.getExtension(),
                     size = file.length(),
@@ -256,6 +262,9 @@ public class PdfViewModel : ViewModel() {
                         this.zoom = zoom
                         this.scrollX = scrollX
                         this.scrollY = scrollY
+                        this.pageOffsetX = pageOffsetX
+                        this.pageOffsetY = pageOffsetY
+                        this.screenOrientation = screenOrientation
                         this.scrollOri = scrollOri
                         this.progress = if (pageCount > 0) (page * 100 / pageCount) else 0L
                         this.name = absolutePath.getFileName()

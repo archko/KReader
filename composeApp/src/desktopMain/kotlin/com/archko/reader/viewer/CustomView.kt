@@ -387,10 +387,12 @@ private fun ToolbarContent(
 fun CustomView(
     documents: List<DocumentInfo>,
     progressPage: Int? = null,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long, pageOffsetX: Long, pageOffsetY: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
+    initialPageOffsetX: Long? = null,
+    initialPageOffsetY: Long? = null,
     initialZoom: Double = 1.0,
     scrollOri: Long = 0,
     reflow: Long = 0,
@@ -700,7 +702,7 @@ fun CustomView(
             var jumpIntent by remember {
                 mutableStateOf(
                     when {
-                        progressPage != null && (initialScrollX != 0L || initialScrollY != 0L) ->
+                        progressPage != null && (initialPageOffsetX != null || initialScrollX != 0L || initialScrollY != 0L) ->
                             JumpIntent(progressPage, JumpMode.PageRestore)
 
                         progressPage != null ->
@@ -956,6 +958,8 @@ fun CustomView(
                             },
                             initialScrollX = initialScrollX,
                             initialScrollY = initialScrollY,
+                            initialPageOffsetX = initialPageOffsetX,
+                            initialPageOffsetY = initialPageOffsetY,
                             zoom = vZoom,
                             cropMode = isCropMode,
                             manualCropRect = manualCropRect,

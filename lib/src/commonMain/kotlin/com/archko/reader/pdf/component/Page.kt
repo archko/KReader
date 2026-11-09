@@ -617,13 +617,13 @@ public class Page internal constructor(
                 }
             }
         }
-        // 交互中保留整页底图：平移/捏合时会露出还没请求到的区域，
-        // 静止且 tile 已铺满时再省掉这层全屏 overdraw。
-        if (!allTilesReady || pageViewState.isInteractionActive()) {
-            thumbBitmap?.let { state ->
-                if (!state.isRecycled()) {
-                    drawBitmap(drawScope, state, baseRect)
-                }
+        // 整页缩略图始终作为底图：放大后相邻 tile 在非整数缩放下会出现亚像素接缝，
+        // 如果没有底图，接缝会直接露出阅读背景，表现为网格状缝隙线。
+        // 之前“tile 全部就绪就省掉底图”的检查会让静止时露缝，
+        // 而一拖动进入交互态又画回底图，所以缝线看起来会随移动消失。
+        thumbBitmap?.let { state ->
+            if (!state.isRecycled()) {
+                drawBitmap(drawScope, state, baseRect)
             }
         }
         if (!allTilesReady) {

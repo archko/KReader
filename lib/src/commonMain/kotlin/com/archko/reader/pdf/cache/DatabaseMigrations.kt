@@ -163,3 +163,12 @@ public val MIGRATION_5_6: Migration = object : Migration(5, 6) {
         connection.execSQL("ALTER TABLE recent ADD COLUMN uri TEXT")
     }
 }
+
+public val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        // Add screen orientation and page-internal offset columns to recent table
+        connection.execSQL("ALTER TABLE recent ADD COLUMN screenOrientation INTEGER DEFAULT 0")
+        connection.execSQL("ALTER TABLE recent ADD COLUMN pageOffsetX INTEGER")
+        connection.execSQL("ALTER TABLE recent ADD COLUMN pageOffsetY INTEGER")
+    }
+}

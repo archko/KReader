@@ -55,6 +55,17 @@ public class Recent {
     @ColumnInfo(name = "scrollY")
     public var scrollY: Long? = 0
 
+    @ColumnInfo(name = "pageOffsetX")
+    // 页面内偏移量：可见区域左上角相对当前页左上角的文档空间偏移
+    public var pageOffsetX: Long? = null
+
+    @ColumnInfo(name = "pageOffsetY")
+    public var pageOffsetY: Long? = null
+
+    @ColumnInfo(name = "screenOrientation")
+    //0未指定,1竖屏,2横屏
+    public var screenOrientation: Long? = 0
+
     @ColumnInfo(name = "name")
     public var name: String? = null
 
@@ -105,7 +116,10 @@ public class Recent {
         readTimes: Long?,
         progress: Long?,
         isFavorited: Long?,
-        inRecent: Long?
+        inRecent: Long?,
+        pageOffsetX: Long? = null,
+        pageOffsetY: Long? = null,
+        screenOrientation: Long? = 0
     ) {
         //this.id = id
         this.updateAt = updateAt
@@ -126,6 +140,9 @@ public class Recent {
         this.progress = progress
         this.favorited = isFavorited
         this.inRecent = inRecent
+        this.pageOffsetX = pageOffsetX
+        this.pageOffsetY = pageOffsetY
+        this.screenOrientation = screenOrientation
     }
 
     override fun toString(): String {
@@ -140,6 +157,9 @@ public class Recent {
                 ", zoom=" + zoom +
                 ", scrollX=" + scrollX +
                 ", scrollY=" + scrollY +
+                ", pageOffsetX=" + pageOffsetX +
+                ", pageOffsetY=" + pageOffsetY +
+                ", screenOrientation=" + screenOrientation +
                 ", path='" + path + '\'' +
                 ", uri='" + uri + '\'' +
                 ", name='" + name + '\'' +
@@ -168,6 +188,9 @@ public class Recent {
                 zoom == other.zoom &&
                 scrollX == other.scrollX &&
                 scrollY == other.scrollY &&
+                pageOffsetX == other.pageOffsetX &&
+                pageOffsetY == other.pageOffsetY &&
+                screenOrientation == other.screenOrientation &&
                 name == other.name &&
                 ext == other.ext &&
                 size == other.size &&
@@ -190,6 +213,9 @@ public class Recent {
         result = 31 * result + (zoom?.hashCode() ?: 0)
         result = 31 * result + (scrollX?.hashCode() ?: 0)
         result = 31 * result + (scrollY?.hashCode() ?: 0)
+        result = 31 * result + (pageOffsetX?.hashCode() ?: 0)
+        result = 31 * result + (pageOffsetY?.hashCode() ?: 0)
+        result = 31 * result + (screenOrientation?.hashCode() ?: 0)
         result = 31 * result + (name?.hashCode() ?: 0)
         result = 31 * result + (ext?.hashCode() ?: 0)
         result = 31 * result + (size?.hashCode() ?: 0)
@@ -211,6 +237,9 @@ public class Recent {
             zoom: Double,
             scrollX: Long,
             scrollY: Long,
+            pageOffsetX: Long? = null,
+            pageOffsetY: Long? = null,
+            screenOrientation: Long? = 0,
             name: String? = null,
             ext: String? = null,
             size: Long? = null,
@@ -231,6 +260,9 @@ public class Recent {
             recent.zoom = zoom
             recent.scrollX = scrollX
             recent.scrollY = scrollY
+            recent.pageOffsetX = pageOffsetX
+            recent.pageOffsetY = pageOffsetY
+            recent.screenOrientation = screenOrientation
             recent.name = name
             recent.ext = ext
             recent.size = size

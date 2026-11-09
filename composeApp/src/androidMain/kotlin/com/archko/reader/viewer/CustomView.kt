@@ -417,12 +417,15 @@ private fun TtsControlBarContent(
 fun CustomView(
     documents: List<DocumentInfo>,
     progressPage: Int? = null,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long, pageOffsetX: Long, pageOffsetY: Long) -> Unit)? = null,
     onCloseDocument: (() -> Unit)? = null,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
+    initialPageOffsetX: Long? = null,
+    initialPageOffsetY: Long? = null,
     initialZoom: Double = 1.0,
     scrollOri: Long = 0,
+    screenOrientation: Long = 0,
     reflow: Long = 0,
     cropMode: Int = CropMode.NONE,
     fontViewModel: FontViewModel,
@@ -590,6 +593,18 @@ fun CustomView(
             }
         }
 
+        // 打开文档时恢复上次保存的屏幕方向
+        LaunchedEffect(currentPath, screenOrientation) {
+            val activity = context as? ComponentActivity
+            when (screenOrientation.toInt()) {
+                Configuration.ORIENTATION_PORTRAIT ->
+                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+
+                Configuration.ORIENTATION_LANDSCAPE ->
+                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+        }
+
         DisposableEffect(currentPath) {
             onDispose {
                 println("CustomView.onDispose:$currentPath, $decoder")
@@ -750,7 +765,7 @@ fun CustomView(
             var jumpIntent by remember {
                 mutableStateOf(
                     when {
-                        progressPage != null && (initialScrollX != 0L || initialScrollY != 0L) ->
+                        progressPage != null && (initialPageOffsetX != null || initialScrollX != 0L || initialScrollY != 0L) ->
                             JumpIntent(progressPage, JumpMode.PageRestore)
 
                         progressPage != null ->
@@ -866,7 +881,9 @@ fun CustomView(
                                     initialScrollY,
                                     if (isVertical) Vertical.toLong() else Horizontal.toLong(),
                                     if (isReflow) 1L else 0L,
-                                    isCropMode.toLong()
+                                    isCropMode.toLong(),
+                                    0L,
+                                    0L
                                 )
                             }
                             TtsTempProgressHelper.clearTempProgress(context, currentPath)
@@ -1015,6 +1032,8 @@ fun CustomView(
                     },
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
+                    initialPageOffsetX = initialPageOffsetX,
+                    initialPageOffsetY = initialPageOffsetY,
                     initialZoom = initialZoom,
                     cropMode = isCropMode,
                     manualCropRect = manualCropRect,

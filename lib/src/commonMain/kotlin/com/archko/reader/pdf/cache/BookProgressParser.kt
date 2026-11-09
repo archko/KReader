@@ -49,6 +49,9 @@ public object BookProgressParser {
             put("zoomLevel", ((recent.zoom ?: 1.0) * 1000).toInt())
             put("offsetX", recent.scrollX ?: 0)
             put("offsetY", recent.scrollY ?: 0)
+            put("pageOffsetX", recent.pageOffsetX ?: -1)
+            put("pageOffsetY", recent.pageOffsetY ?: -1)
+            put("screenOrientation", recent.screenOrientation ?: 0)
             put("autoCrop", recent.crop ?: 1)
             put("reflow", recent.reflow ?: 0)
             put("isFavorited", recent.favorited ?: 0)
@@ -91,6 +94,11 @@ public object BookProgressParser {
 
             recent.scrollX = jsonObject["offsetX"]?.jsonPrimitive?.longOrNull ?: 0
             recent.scrollY = jsonObject["offsetY"]?.jsonPrimitive?.longOrNull ?: 0
+            recent.pageOffsetX = jsonObject["pageOffsetX"]?.jsonPrimitive?.longOrNull
+                ?.takeIf { it >= 0 }
+            recent.pageOffsetY = jsonObject["pageOffsetY"]?.jsonPrimitive?.longOrNull
+                ?.takeIf { it >= 0 }
+            recent.screenOrientation = jsonObject["screenOrientation"]?.jsonPrimitive?.longOrNull ?: 0
             recent.crop = jsonObject["autoCrop"]?.jsonPrimitive?.longOrNull ?: 1
             recent.reflow = jsonObject["reflow"]?.jsonPrimitive?.longOrNull ?: 0
             recent.favorited = jsonObject["isFavorited"]?.jsonPrimitive?.longOrNull ?: 0

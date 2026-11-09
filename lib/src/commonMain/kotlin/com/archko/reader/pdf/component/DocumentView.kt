@@ -198,6 +198,8 @@ internal fun DocumentViewEffects(
     initialScrollX: Long,
     initialScrollY: Long,
     initialZoom: Double,
+    initialPageOffsetX: Long? = null,
+    initialPageOffsetY: Long? = null,
     reflow: Long,
     cropMode: Int,
     manualCropRect: Rect? = null,
@@ -206,7 +208,7 @@ internal fun DocumentViewEffects(
     columnCount: Int,
     searchHighlightQuads: Map<Int, List<DocQuad>>,
     currentSearchPageIndex: Int?,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)?,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long, pageOffsetX: Long, pageOffsetY: Long) -> Unit)?,
     onCloseDocument: (() -> Unit)?,
     onPageChanged: ((page: Int) -> Unit)?,
 ) {
@@ -278,7 +280,15 @@ internal fun DocumentViewEffects(
 
             val newOffset = when (jumpMode) {
                 JumpMode.PageRestore -> {
-                    if (initialScrollX == 0L && initialScrollY == 0L) {
+                    if (initialPageOffsetX != null && initialPageOffsetY != null) {
+                        // 新记录：先用页码定位到页面，再用页面内偏移量精确恢复位置。
+                        // 页面内偏移量相对页面自身，不依赖屏幕方向/缩放等绝对坐标。
+                        pageViewState.offsetForPageAt(
+                            jumpToPage,
+                            initialPageOffsetX,
+                            initialPageOffsetY
+                        )
+                    } else if (initialScrollX == 0L && initialScrollY == 0L) {
                         pageViewState.offsetForPage(jumpToPage)
                     } else {
                         val restored = pageViewState.offsetForDoc(
@@ -333,6 +343,19 @@ internal fun DocumentViewEffects(
         val currentPage = pageViewState.firstVisiblePageIndex()
         val docX = -offset.value.x / vZoom.value
         val docY = -offset.value.y / vZoom.value
+        // 页面内偏移量：可见区域左上角相对当前页左上角的文档空间偏移。
+        // 恢复时先按页码定位页面，再叠加该偏移，避免绝对坐标受屏幕方向/尺寸影响。
+        val page = pageViewState.pages.getOrNull(currentPage)
+        val pageOffsetX = if (page != null) {
+            (docX - page.baseRect.left).toLong()
+        } else {
+            0L
+        }
+        val pageOffsetY = if (page != null) {
+            (docY - page.baseRect.top).toLong()
+        } else {
+            0L
+        }
 
         if (!list.isEmpty()) {
             onSaveDocument?.invoke(
@@ -343,7 +366,9 @@ internal fun DocumentViewEffects(
                 docY.toLong(),
                 orientation.value.toLong(),
                 reflow,
-                pageViewState.getCropMode().toLong()
+                pageViewState.getCropMode().toLong(),
+                pageOffsetX,
+                pageOffsetY
             )
         }
     }
@@ -517,6 +542,9 @@ internal fun CommonGestureHandler(
                             var lastTileRefreshAt = 0L
 
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            // 按下时如果正在惯性滚动，这次手势只用于“停止滚动”，
+                            // 抬起时不应再触发点击（否则滚动后想停下会误弹出页码 toast）。
+                            val wasFlinging = flingJob.value?.isActive == true
                             // 新一次按下即视为交互开始：取消上一次点击遗留的 300ms 延迟任务，
                             // 否则用户按下后立刻拖动，拖动结束时不会触发 tap，
                             // 但旧任务到期仍会执行翻页/链接逻辑（表现为“拖了还翻页”）。
@@ -601,7 +629,7 @@ internal fun CommonGestureHandler(
                             if (!isZooming) {
                                 val dragDistance =
                                     (finalChange.position - down.position).getDistance()
-                                if (!isDragging && dragDistance < touchSlop) {
+                                if (!isDragging && !wasFlinging && dragDistance < touchSlop) {
                                     handleTapGestureInternal(
                                         finalChange.position,
                                         offset,

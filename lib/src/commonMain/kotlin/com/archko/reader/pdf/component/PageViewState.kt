@@ -23,7 +23,6 @@ import com.archko.reader.pdf.state.AnnotationManager
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -109,11 +108,6 @@ public class PageViewState(
 
     private var isShutdown = false
     private var lastInteractionAt: Long = 0L
-
-    // 交互态暴露成 State：drawTiles 每帧读取它决定是否保留缩略图底图，
-    // 交互开始/结束时只失效一次绘制，绘制路径上不再反复调用 System.currentTimeMillis()。
-    private var interactionActive: Boolean by mutableStateOf(false)
-    private var interactionExpiryJob: Job? = null
 
     private val wantedPagesRef = AtomicReference<Set<Int>>(emptySet())
 
@@ -348,38 +342,15 @@ public class PageViewState(
         isInteracting = false
         updateVisibleNow(true)
         revision++
-        // 抬起后仍保留一小段“交互中”，覆盖惯性滑动启动前的空档
         touchInteraction()
     }
 
     /**
-     * 标记一次交互活动：交互态立即置为 true，并在最后一次活动 300ms 后自动回落。
-     * 整个交互过程只维护一个循环任务，避免每个 pointer event 都新建协程。
+     * 记录一次交互活动时间，用于切边重排时避开交互过程。
      */
     private fun touchInteraction() {
         lastInteractionAt = System.currentTimeMillis()
-        if (!interactionActive) {
-            interactionActive = true
-        }
-        if (interactionExpiryJob?.isActive == true) {
-            return
-        }
-        interactionExpiryJob = mainScope.launch {
-            while (!isShutdown) {
-                val remain = INTERACTION_HOLD_MS - (System.currentTimeMillis() - lastInteractionAt)
-                if (remain <= 0L) {
-                    break
-                }
-                delay(remain)
-            }
-            interactionExpiryJob = null
-            if (!isShutdown) {
-                interactionActive = false
-            }
-        }
     }
-
-    internal fun isInteractionActive(): Boolean = interactionActive
 
     public fun shutdown() {
         if (isShutdown) {
@@ -901,6 +872,20 @@ public class PageViewState(
         return 0
     }
 
+    /**
+     * 以页面为基准恢复位置：先定位到页面左上角，再叠加页面内偏移量。
+     * 页面内偏移量是文档空间下相对页面左上角的像素偏移，恢复时随页面布局一起适配。
+     */
+    public fun offsetForPageAt(pageIndex: Int, pageOffsetX: Long, pageOffsetY: Long): Offset {
+        val page = pages.getOrNull(pageIndex) ?: return viewport.offset
+        viewport.setContentSize(docWidth, docHeight)
+        val docX = page.baseRect.left + pageOffsetX
+        val docY = page.baseRect.top + pageOffsetY
+        return viewport.clampOffset(
+            Offset(-docX * viewport.zoom, -docY * viewport.zoom)
+        )
+    }
+
     public fun offsetForPage(pageIndex: Int, originalY: Float? = null): Offset {
         val page = pages.getOrNull(pageIndex) ?: return viewport.offset
         viewport.setContentSize(docWidth, docHeight)
@@ -1212,7 +1197,7 @@ public class PageViewState(
     }
 
     public companion object {
-        // 抬起/最后一次移动后，仍视为“交互中”的时长（保留缩略图底图，避免露白）
+        // 最后一次交互后，切边重排延迟的时长，避开拖动/缩放手势
         private const val INTERACTION_HOLD_MS: Long = 300L
 
         public fun isVisible(viewSize: IntSize, offset: Offset, bounds: Rect, page: Int): Boolean {

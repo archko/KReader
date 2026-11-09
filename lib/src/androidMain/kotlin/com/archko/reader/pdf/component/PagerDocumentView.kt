@@ -92,7 +92,7 @@ public fun PagerDocumentView(
     onPageChanged: ((page: Int) -> Unit)? = null,
     onTapCenter: (() -> Unit)? = null,
     cropMode: Int = CropMode.NONE,
-    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long) -> Unit)? = null,
+    onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long, pageOffsetX: Long, pageOffsetY: Long) -> Unit)? = null,
 ) {
     val pageCount = list.size
     if (pageCount == 0) return
@@ -135,7 +135,9 @@ public fun PagerDocumentView(
                     scrollY,     // 前面各页累积高度 → 切回连续模式可精准恢复
                     Vertical.toLong(),
                     0L,          // reflow
-                    cropMode.toLong()
+                    cropMode.toLong(),
+                    0L,
+                    0L
                 )
             }
         }
