@@ -7,9 +7,9 @@ public class DecodeService(
     private val decoder: Decoder
 ) {
     // 多平台通用的锁和队列
-    private val pageQueue = mutableListOf<DecodeTask>()
-    private val nodeQueue = mutableListOf<DecodeTask>()
-    private val cropQueue = mutableListOf<DecodeTask>()
+    private val pageQueue = ArrayDeque<DecodeTask>()
+    private val nodeQueue = ArrayDeque<DecodeTask>()
+    private val cropQueue = ArrayDeque<DecodeTask>()
     private val pendingJobs = mutableMapOf<String, DecodeTask>()
     
     private val isShutdown = AtomicBoolean(false)
@@ -26,10 +26,10 @@ public class DecodeService(
             while (!isShutdown.get()) {
                 val task = synchronized(lock) {
                     val next = when {
-                        pageQueue.isNotEmpty() -> pageQueue.removeAt(0)
+                        pageQueue.isNotEmpty() -> pageQueue.removeFirst()
                         // tile 任务后进先出：新任务对应当前视口，先解码旧的积压任务只会白费 CPU
-                        nodeQueue.isNotEmpty() -> nodeQueue.removeAt(nodeQueue.size - 1)
-                        cropQueue.isNotEmpty() -> cropQueue.removeAt(0)
+                        nodeQueue.isNotEmpty() -> nodeQueue.removeLast()
+                        cropQueue.isNotEmpty() -> cropQueue.removeFirst()
                         else -> null
                     }
                     if (next == null) {

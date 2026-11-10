@@ -84,6 +84,8 @@ public class PageViewState(
     internal var onInteractionStart: (() -> Unit)? = null
 
     private var visibleUpdateScheduled: Boolean = false
+    // 被合并的可见性刷新是否全部来自惯性滚动；只要混入一次需要完整刷新的请求就置 false
+    private var visibleUpdateDuringMotion: Boolean = false
     private var lastScannedVisible: Rect? = null
     private var lastVisibleScanAt: Long = 0L
 
@@ -332,7 +334,6 @@ public class PageViewState(
             return
         }
         isInteracting = true
-        revision++
     }
 
     internal fun endInteraction() {
@@ -341,7 +342,6 @@ public class PageViewState(
         }
         isInteracting = false
         updateVisibleNow(true)
-        revision++
         touchInteraction()
     }
 
@@ -613,7 +613,12 @@ public class PageViewState(
         updateViewport(currentVZoom, offset, request = true)
     }
 
-    internal fun updateViewport(zoom: Float, offset: Offset, request: Boolean) {
+    internal fun updateViewport(
+        zoom: Float,
+        offset: Offset,
+        request: Boolean,
+        duringMotion: Boolean = false
+    ) {
         this.vZoom = zoom
         viewport.viewSize = viewSize
         viewport.zoom = zoom
@@ -623,7 +628,7 @@ public class PageViewState(
         touchInteraction()
 
         if (request) {
-            scheduleVisibleUpdate()
+            scheduleVisibleUpdate(duringMotion)
             return
         }
         // 每个 pointer event 不重复扫描：最多每 16ms 检查一次，且可见区域没有超出上次范围时直接跳过
@@ -638,26 +643,34 @@ public class PageViewState(
             visible.right > scanned.right || visible.bottom > scanned.bottom
         ) {
             lastVisibleScanAt = now
-            updateVisibleNow(false)
+            updateVisibleNow(false, duringMotion)
         }
     }
 
-    private fun scheduleVisibleUpdate() {
-        if (visibleUpdateScheduled || isShutdown) {
+    private fun scheduleVisibleUpdate(duringMotion: Boolean) {
+        if (visibleUpdateScheduled) {
+            // 合并同一帧内的多次请求；只要有一次不是惯性滚动期间的请求，就按完整刷新执行
+            visibleUpdateDuringMotion = visibleUpdateDuringMotion && duringMotion
+            return
+        }
+        if (isShutdown) {
             return
         }
         visibleUpdateScheduled = true
+        visibleUpdateDuringMotion = duringMotion
         mainScope.launch {
             // 合并同一帧内的多次请求，避免在事件回调里同步做完整可见性/解码请求
             yield()
+            val motion = visibleUpdateDuringMotion
             visibleUpdateScheduled = false
+            visibleUpdateDuringMotion = false
             if (!isShutdown) {
-                updateVisibleNow(true)
+                updateVisibleNow(true, motion)
             }
         }
     }
 
-    private fun updateVisibleNow(request: Boolean) {
+    private fun updateVisibleNow(request: Boolean, duringMotion: Boolean = false) {
         if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty() || !init) {
             pageToRender = emptyList()
             wantedPagesRef.set(emptySet())
@@ -706,11 +719,13 @@ public class PageViewState(
 
         if (pagesChanged) {
             pageToRender = ArrayList(scanScratch)
-            revision++
         }
+        var changed = pagesChanged
 
-        // 只有真正可见的页面才请求分块解码与裁剪探测；平移中页集合变化时也需要补齐
-        if (request || pagesChanged) {
+        // 惯性滚动期间只有可见页集合变化时才更新 tile；同一页内的高速滚动交给缩略图底图，
+        // 停下后再用完整刷新补齐精确 tile，避免每 100ms 遍历可见 tile 造成主线程开销。
+        val refreshTiles = if (duringMotion) pagesChanged else (request || pagesChanged)
+        if (refreshTiles) {
             var tilesChanged = false
             for (page in scanScratch) {
                 // 新增 tile 时仍要重录一次：新节点 bitmap 为 null，需要让 draw 先观察它，
@@ -722,8 +737,12 @@ public class PageViewState(
                 page.ensureLinks()
             }
             if (tilesChanged) {
-                revision++
+                changed = true
             }
+        }
+        // 一次刷新只失效一次绘制，避免同一帧里重复 revision++
+        if (changed) {
+            revision++
         }
     }
 

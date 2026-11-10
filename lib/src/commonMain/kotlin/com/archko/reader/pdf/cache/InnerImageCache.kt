@@ -58,7 +58,7 @@ public class BitmapState(
 }
 
 /**
- * 线程安全的图片缓存，使用 ConcurrentHashMap + 独立的 LRU 列表，
+ * 线程安全的图片缓存，使用 ConcurrentHashMap + 独立的近似 LRU 列表，
  * 将内存记账 eviction 与 查询/插入 分离，主线程读写完全无锁。
  */
 private class InnerImageCache(
@@ -92,6 +92,9 @@ private class InnerImageCache(
 
     public fun acquire(key: String): BitmapState? {
         // 1. 检查主缓存（ConcurrentHashMap 无锁读）
+        // 注意：命中后不刷新 lruList 的顺序。刷新需要 evictionLock，会让主线程查询
+        // 重新回到锁竞争路径；所以淘汰顺序是“近似 LRU”（按插入/候选提升顺序），
+        // 被反复命中的条目仍可能先于真正的冷条目被淘汰。当前内存预算下可接受。
         cache[key]?.let { state ->
             if (state.acquire()) {
                 return state
@@ -100,21 +103,21 @@ private class InnerImageCache(
 
         // 2. 检查候选池
         candidatePool.remove(key)?.let { entry ->
-            if (System.currentTimeMillis() - entry.timestamp < CANDIDATE_TIMEOUT) {
-                if (entry.state.acquire()) {
-                    candidateMemoryBytes.addAndGet(-entry.state.byteSize)
-                    synchronized(evictionLock) {
-                        cache[key] = entry.state
-                        lruList[key] = entry.state
-                    }
-                    currentMemoryBytes.addAndGet(entry.state.byteSize)
-                    return entry.state
+            val expired = System.currentTimeMillis() - entry.timestamp >= CANDIDATE_TIMEOUT
+            // acquire 失败说明位图已被其他路径标记回收，下面统一走回收兜底，
+            // 避免候选条目已从池中移除但引用/内存记账没有收尾。
+            if (!expired && entry.state.acquire()) {
+                candidateMemoryBytes.addAndGet(-entry.state.byteSize)
+                synchronized(evictionLock) {
+                    cache[key] = entry.state
+                    lruList[key] = entry.state
                 }
-            } else {
-                if (entry.state.markRecycled()) {
-                    candidateMemoryBytes.addAndGet(-entry.state.byteSize)
-                    recycleImageBitmap(entry.state.bitmap)
-                }
+                currentMemoryBytes.addAndGet(entry.state.byteSize)
+                return entry.state
+            }
+            if (entry.state.markRecycled()) {
+                candidateMemoryBytes.addAndGet(-entry.state.byteSize)
+                recycleImageBitmap(entry.state.bitmap)
             }
         }
         return null
