@@ -792,7 +792,7 @@ internal fun performFling(
             if (requestTiles) {
                 lastTileRefreshAt = now
             }
-            pageViewState.updateViewport(vZoom, bounded, requestTiles, duringMotion = true)
+            pageViewState.updateViewport(vZoom, bounded, requestTiles)
             // 已经顶到边界且速度还在往外推，继续跑只会空转
             val current = this.velocity
             val blockedX = current.x == 0f || current.x * (value.x - bounded.x) > 0f
