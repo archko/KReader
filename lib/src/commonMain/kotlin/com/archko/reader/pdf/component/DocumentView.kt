@@ -56,7 +56,7 @@ import kotlinx.coroutines.launch
 private const val max_zoom = 30f
 
 // 点击翻页时保留的上下文高度
-private val tap_page_keep_dp = 12.dp
+private val tap_page_keep_dp = 16.dp
 
 // 平移/惯性过程中重建 tile 的最小间隔，避免每帧都做完整重建
 private const val tile_refresh_interval_ms = 100L

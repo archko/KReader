@@ -22,6 +22,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -112,6 +116,7 @@ private fun ToolbarContent(
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, TtsServiceBinder) -> Unit,
     isReflow: Boolean,
+    onToggleReflow: () -> Unit,
     documents: List<DocumentInfo>,
 ) {
     Surface(
@@ -313,17 +318,17 @@ private fun ToolbarContent(
                         }
                     }
 
-                    /*item {
-                        IconButton(onClick = { isReflow = !isReflow }) {
+                    item {
+                        IconButton(onClick = { onToggleReflow() }) {
                             Icon(
                                 painter = painterResource(Res.drawable.ic_reflow),
                                 contentDescription = stringResource(Res.string.reflow),
                                 tint = if (isReflow) Color.Green else Color.White
                             )
                         }
-                    }*/
+                    }
 
-                    if (FileTypeUtils.isReflowable(currentPath)) {
+                    /*if (FileTypeUtils.isReflowable(currentPath)) {
                         item {
                             IconButton(onClick = { onFontDialogShow() }) {
                                 Icon(
@@ -333,7 +338,7 @@ private fun ToolbarContent(
                                 )
                             }
                         }
-                    }
+                    }*/
                 }
 
                 item {
@@ -692,6 +697,8 @@ fun CustomView(
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
+            var reflowWordSpacing by remember { mutableFloatStateOf(0.3f) }
+            var reflowFontSize by remember { mutableFloatStateOf(1.0f) }
             var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
             var isPagerMode by remember { mutableStateOf(false) }
             val canEnterPagerMode = FileTypeUtils.isDocumentFile(currentPath) ||
@@ -756,8 +763,8 @@ fun CustomView(
 
             // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
             val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
-            // 当前页与总页数
-            var currentPage by remember { mutableIntStateOf(progressPage ?: 0) }
+            // 当前页与总页数 - 使用全局引用保持模式切换时的页码
+            val currentPage by remember { derivedStateOf { currentPageRef.intValue } }
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
             val pageCount: Int = list.size
@@ -933,16 +940,12 @@ fun CustomView(
                 ReflowView(
                     decoder = decoder!!,
                     pageCount = pageCount,
+                    currentPath = currentPath,
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
-                    onCloseDocument = {
-                        println("onCloseDocument.isReflow:$isReflow")
-                        if (!isReflow) {
-                            onCloseDocument?.invoke()
-                        }
-                    }, // 只在非重排模式下传递关闭回调
+                    onCloseDocument = null, // ReflowView 不处理文档关闭，只保存状态
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page ->
-                        currentPage = page
+                        currentPageRef.intValue = page
                     },
                     onTapNonPageArea = { clickedPageIndex ->
                         // 点击非翻页区域时隐藏工具栏，但朗读时保持朗读工具条显示
@@ -961,6 +964,8 @@ fun CustomView(
                     initialZoom = initialZoom,
                     initialOrientation = orientation,
                     reflow = 1L,
+                    wordSpacing = reflowWordSpacing,
+                    fontSize = reflowFontSize,
                 )
             } else if (isPagerMode) {
                 // 单页 ViewPager 模式（无切边、无多列、简化工具栏）
@@ -968,10 +973,9 @@ fun CustomView(
                     PagerDocumentView(
                         list = list,
                         decoder = decoder!!,
-                        initialPage = currentPage,
+                        initialPage = currentPageRef.intValue,
                         jumpToPage = jumpIntent.page,
                         onPageChanged = { page ->
-                            currentPage = page
                             currentPageRef.intValue = page
                         },
                         onTapCenter = { showToolbar = !showToolbar },
@@ -1015,7 +1019,6 @@ fun CustomView(
                     }, // 只在非重排模式下传递关闭回调
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page ->
-                        currentPage = page
                         currentPageRef.intValue = page
                     },
                     onTapNonPageArea = { clickedPageIndex ->
@@ -1065,7 +1068,13 @@ fun CustomView(
                 visible = showToolbar,
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
-                if (isPagerMode) {
+                if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
+                    ReflowToolbarContent(
+                        onCloseDocument = onCloseDocument,
+                        isReflow = isReflow,
+                        onToggleReflow = { isReflow = !isReflow },
+                    )
+                } else if (isPagerMode) {
                     PagerToolbarContent(
                         onCloseDocument = onCloseDocument,
                         currentPage = currentPage,
@@ -1119,6 +1128,7 @@ fun CustomView(
                             }
                         },
                         isReflow = isReflow,
+                        onToggleReflow = { isReflow = !isReflow },
                         documents = documents,
                     )
                 }
@@ -1229,180 +1239,195 @@ fun CustomView(
                     modifier = Modifier
                         .fillMaxWidth()
                 ) {
-                    Surface(
-                        color = Color(0xCC222222),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                    ) {
-                        // Activity屏幕方向状态：以系统实际方向为初值，避免状态与真实方向不同步
-                        val configuration = LocalConfiguration.current
-                        val actualPortrait =
-                            configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-                        var isActivityPortrait by remember { mutableStateOf(actualPortrait) }
-
-                        // 设备旋转或方向锁定变化时，同步按钮状态
-                        LaunchedEffect(actualPortrait) {
-                            isActivityPortrait = actualPortrait
-                        }
-
-                        Column(
+                    if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
+                        // 重排模式底部：字间距 + 字号 + 页面进度
+                        ReflowBottomControls(
+                            wordSpacing = reflowWordSpacing,
+                            onWordSpacingChange = { reflowWordSpacing = it },
+                            fontSize = reflowFontSize,
+                            onFontSizeChange = { reflowFontSize = it },
+                            currentPage = currentPage,
+                            pageCount = pageCount,
+                            onPageSelected = { targetPage ->
+                                jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
+                            },
+                        )
+                    } else {
+                        Surface(
+                            color = Color(0xCC222222),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
                         ) {
-                            Row(
+                            // Activity屏幕方向状态：以系统实际方向为初值，避免状态与真实方向不同步
+                            val configuration = LocalConfiguration.current
+                            val actualPortrait =
+                                configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                            var isActivityPortrait by remember { mutableStateOf(actualPortrait) }
+
+                            // 设备旋转或方向锁定变化时，同步按钮状态
+                            LaunchedEffect(actualPortrait) {
+                                isActivityPortrait = actualPortrait
+                            }
+
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 8.dp, end = 8.dp),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
                             ) {
-                                // 方向按钮（仅在单列且文档文件时显示）
-                                if (columnCount <= 1) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp, end = 8.dp),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // 方向按钮（仅在单列且文档文件时显示）
+                                    if (columnCount <= 1) {
+                                        IconButton(
+                                            onClick = { isVertical = !isVertical },
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
+                                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                                    Res.string.horizontal
+                                                ),
+                                                tint = Color.White
+                                            )
+                                        }
+
+                                        VerticalDivider(modifier = Modifier.height(20.dp))
+                                    }
+
                                     IconButton(
-                                        onClick = { isVertical = !isVertical },
+                                        onClick = {
+                                            // 以系统当前实际方向为准（而不是内部状态），
+                                            // 避免方向已变化但状态未同步时需要点击两次
+                                            val currentlyPortrait =
+                                                context.resources.configuration.orientation ==
+                                                    Configuration.ORIENTATION_PORTRAIT
+                                            val targetPortrait = !currentlyPortrait
+                                            isActivityPortrait = targetPortrait
+
+                                            val activity = context as? ComponentActivity
+                                            activity?.requestedOrientation = if (targetPortrait) {
+                                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                            } else {
+                                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                            }
+
+                                            scope.launch {
+                                                // 等待方向改变完成
+                                                delay(150)
+                                                applyFullScreen()
+                                            }
+                                        },
                                     ) {
                                         Icon(
-                                            painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                            contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
-                                                Res.string.horizontal
-                                            ),
+                                            painter = painterResource(if (isActivityPortrait) Res.drawable.ic_portrait else Res.drawable.ic_landscape),
+                                            contentDescription = if (isActivityPortrait) "竖屏" else "横屏",
                                             tint = Color.White
                                         )
                                     }
 
-                                    VerticalDivider(modifier = Modifier.height(20.dp))
+                                    if (showColumn && isVertical) {
+                                        VerticalDivider(modifier = Modifier.height(20.dp))
+                                        if (columnCount == 1) {
+                                            IconButton(
+                                                onClick = { columnCount = 2 },
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(Res.drawable.ic_column_two),
+                                                    contentDescription = "",
+                                                    tint = Color.White
+                                                )
+                                            }
+                                        } else {
+                                            IconButton(
+                                                onClick = { columnCount = 1 },
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(Res.drawable.ic_column_one),
+                                                    contentDescription = "",
+                                                    tint = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // 文档 / 图片目录支持切换到单页模式
+                                    if (canEnterPagerMode) {
+                                        VerticalDivider(modifier = Modifier.height(20.dp))
+                                        IconButton(
+                                            onClick = { isPagerMode = true },
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(Res.drawable.ic_view_carousel_outline),
+                                                contentDescription = "单页模式",
+                                                tint = Color.White
+                                            )
+                                        }
+                                    }
                                 }
 
-                                IconButton(
-                                    onClick = {
-                                        // 以系统当前实际方向为准（而不是内部状态），
-                                        // 避免方向已变化但状态未同步时需要点击两次
-                                        val currentlyPortrait =
-                                            context.resources.configuration.orientation ==
-                                                Configuration.ORIENTATION_PORTRAIT
-                                        val targetPortrait = !currentlyPortrait
-                                        isActivityPortrait = targetPortrait
+                                var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
+                                // 当currentPage变化时更新sliderValue
+                                SideEffect(currentPage) {
+                                    isExternalChange = true
+                                    sliderValue = (currentPage + 1).toFloat()
+                                    isExternalChange = false
+                                }
 
-                                        val activity = context as? ComponentActivity
-                                        activity?.requestedOrientation = if (targetPortrait) {
-                                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                        } else {
-                                            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                        }
-
-                                        scope.launch {
-                                            // 等待方向改变完成
-                                            delay(150)
-                                            applyFullScreen()
+                                Text(
+                                    text = "${sliderValue.toInt()} / $pageCount",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                )
+                                Slider(
+                                    value = sliderValue,
+                                    onValueChange = { sliderValue = it },
+                                    valueRange = 1f..pageCount.toFloat(),
+                                    steps = (pageCount - 2).coerceAtLeast(0),
+                                    onValueChangeFinished = {
+                                        if (!isExternalChange) {
+                                            val targetPage = sliderValue.toInt() - 1
+                                            if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                                jumpIntent =
+                                                    JumpIntent(targetPage, JumpMode.PageNavigation)
+                                            }
                                         }
                                     },
-                                ) {
-                                    Icon(
-                                        painter = painterResource(if (isActivityPortrait) Res.drawable.ic_portrait else Res.drawable.ic_landscape),
-                                        contentDescription = if (isActivityPortrait) "竖屏" else "横屏",
-                                        tint = Color.White
-                                    )
-                                }
-
-                                if (showColumn && isVertical) {
-                                    VerticalDivider(modifier = Modifier.height(20.dp))
-                                    if (columnCount == 1) {
-                                        IconButton(
-                                            onClick = { columnCount = 2 },
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_column_two),
-                                                contentDescription = "",
-                                                tint = Color.White
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(20.dp),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color.White,
+                                        activeTrackColor = Color.White,
+                                        inactiveTrackColor = Color.Gray
+                                    ),
+                                    track = { sliderState ->
+                                        SliderDefaults.Track(
+                                            sliderState = sliderState,
+                                            modifier = Modifier.height(2.dp),
+                                            colors = SliderDefaults.colors(
+                                                activeTrackColor = Color.White,
+                                                inactiveTrackColor = Color.Gray
                                             )
-                                        }
-                                    } else {
-                                        IconButton(
-                                            onClick = { columnCount = 1 },
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(Res.drawable.ic_column_one),
-                                                contentDescription = "",
-                                                tint = Color.White
+                                        )
+                                    },
+                                    thumb = {
+                                        SliderDefaults.Thumb(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            modifier = Modifier.size(16.dp),
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = Color.White
                                             )
-                                        }
-                                    }
-                                }
-
-                                // 文档 / 图片目录支持切换到单页模式
-                                if (canEnterPagerMode) {
-                                    VerticalDivider(modifier = Modifier.height(20.dp))
-                                    IconButton(
-                                        onClick = { isPagerMode = true },
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(Res.drawable.ic_view_carousel_outline),
-                                            contentDescription = "单页模式",
-                                            tint = Color.White
                                         )
                                     }
-                                }
+                                )
                             }
-
-                            var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-                            // 当currentPage变化时更新sliderValue
-                            SideEffect(currentPage) {
-                                isExternalChange = true
-                                sliderValue = (currentPage + 1).toFloat()
-                                isExternalChange = false
-                            }
-
-                            Text(
-                                text = "${sliderValue.toInt()} / $pageCount",
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.align(Alignment.CenterHorizontally)
-                            )
-                            Slider(
-                                value = sliderValue,
-                                onValueChange = { sliderValue = it },
-                                valueRange = 1f..pageCount.toFloat(),
-                                steps = (pageCount - 2).coerceAtLeast(0),
-                                onValueChangeFinished = {
-                                    if (!isExternalChange) {
-                                        val targetPage = sliderValue.toInt() - 1
-                                        if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                            jumpIntent =
-                                                JumpIntent(targetPage, JumpMode.PageNavigation)
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(20.dp),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = Color.White,
-                                    inactiveTrackColor = Color.Gray
-                                ),
-                                track = { sliderState ->
-                                    SliderDefaults.Track(
-                                        sliderState = sliderState,
-                                        modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
-                                        colors = SliderDefaults.colors(
-                                            activeTrackColor = Color.White,
-                                            inactiveTrackColor = Color.Gray
-                                        )
-                                    )
-                                },
-                                thumb = {
-                                    SliderDefaults.Thumb(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = Color.White
-                                        )
-                                    )
-                                }
-                            )
                         }
-                    }
+                    } // end else (non-reflow bottom bar)
                 }
             }
 
@@ -1461,7 +1486,7 @@ fun CustomView(
 
                                 scope.launch {
                                     jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
-                                    currentPage = targetPage
+                                    currentPageRef.intValue = targetPage
 
                                     // 停止当前朗读
                                     binder.stop()
@@ -1625,6 +1650,230 @@ fun CustomView(
 }
 
 /**
+ * 重排模式顶部工具栏：返回键 + 退出重排按钮
+ */
+@Composable
+private fun ReflowToolbarContent(
+    onCloseDocument: (() -> Unit)?,
+    isReflow: Boolean,
+    onToggleReflow: () -> Unit,
+) {
+    Surface(
+        color = Color(0xCC222222),
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { onCloseDocument?.invoke() }) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_back),
+                    contentDescription = stringResource(Res.string.back),
+                    tint = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(onClick = onToggleReflow) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_reflow),
+                    contentDescription = stringResource(Res.string.reflow),
+                    tint = if (isReflow) Color.Green else Color.White
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 重排模式底部控制栏：字间距 Slider + 字号 Slider + 页码 Slider
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReflowBottomControls(
+    wordSpacing: Float,
+    onWordSpacingChange: (Float) -> Unit,
+    fontSize: Float,
+    onFontSizeChange: (Float) -> Unit,
+    currentPage: Int,
+    pageCount: Int,
+    onPageSelected: (Int) -> Unit,
+) {
+    Surface(
+        color = Color(0xCC222222),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            // 字间距 Slider  0.1 – 0.8, step 0.1
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "字间距",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.width(52.dp)
+                )
+                Slider(
+                    value = wordSpacing,
+                    onValueChange = onWordSpacingChange,
+                    valueRange = 0.1f..0.8f,
+                    steps = 6,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
+                        inactiveTrackColor = Color.Gray
+                    ),
+                    track = { sliderState ->
+                        SliderDefaults.Track(
+                            sliderState = sliderState,
+                            modifier = Modifier.height(3.dp),
+                            colors = SliderDefaults.colors(
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color.Gray
+                            )
+                        )
+                    },
+                    thumb = {
+                        SliderDefaults.Thumb(
+                            interactionSource = remember { MutableInteractionSource() },
+                            modifier = Modifier.size(22.dp),
+                            colors = SliderDefaults.colors(thumbColor = Color.White)
+                        )
+                    }
+                )
+                Text(
+                    text = String.format("%.1f", wordSpacing),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.width(36.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
+
+            // 字号 Slider  0.6 – 1.5, step 0.1
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "字号",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.width(52.dp)
+                )
+                Slider(
+                    value = fontSize,
+                    onValueChange = onFontSizeChange,
+                    valueRange = 0.6f..1.5f,
+                    steps = 8,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.White,
+                        activeTrackColor = Color.White,
+                        inactiveTrackColor = Color.Gray
+                    ),
+                    track = { sliderState ->
+                        SliderDefaults.Track(
+                            sliderState = sliderState,
+                            modifier = Modifier.height(3.dp),
+                            colors = SliderDefaults.colors(
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color.Gray
+                            )
+                        )
+                    },
+                    thumb = {
+                        SliderDefaults.Thumb(
+                            interactionSource = remember { MutableInteractionSource() },
+                            modifier = Modifier.size(22.dp),
+                            colors = SliderDefaults.colors(thumbColor = Color.White)
+                        )
+                    }
+                )
+                Text(
+                    text = String.format("%.1f", fontSize),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.width(36.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
+
+            // 页码 Slider
+            var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
+            SideEffect(currentPage) {
+                sliderValue = (currentPage + 1).toFloat()
+            }
+            Text(
+                text = "${sliderValue.toInt()} / $pageCount",
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            Slider(
+                value = sliderValue,
+                onValueChange = { sliderValue = it },
+                valueRange = 1f..pageCount.toFloat(),
+                steps = (pageCount - 2).coerceAtLeast(0),
+                onValueChangeFinished = {
+                    val targetPage = sliderValue.toInt() - 1
+                    if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                        onPageSelected(targetPage)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.White,
+                    inactiveTrackColor = Color.Gray
+                ),
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        modifier = Modifier.height(2.dp),
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = Color.White,
+                            inactiveTrackColor = Color.Gray
+                        )
+                    )
+                },
+                thumb = {
+                    SliderDefaults.Thumb(
+                        interactionSource = remember { MutableInteractionSource() },
+                        modifier = Modifier.size(16.dp),
+                        colors = SliderDefaults.colors(thumbColor = Color.White)
+                    )
+                }
+            )
+        }
+    }
+}
+
+/**
  * Pager 模式底部页码滑块
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1712,7 +1961,9 @@ private fun PagerToolbarContent(
 ) {
     Surface(
         color = Color(0xCC222222),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Row(
             modifier = Modifier

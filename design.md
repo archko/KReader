@@ -397,6 +397,7 @@ for (page in pageToRender) page.drawTiles(drawScope)
 
 - `exponentialDecay`，`frictionMultiplier = 0.35`，`absVelocityThreshold = 0.5`，初速度乘 1.1。
 - 每帧 clamp offset；tile 请求每 100ms 一次。
+- 惯性期间只刷新可见页集合与缩略图底图，同页内不重建 tile；动画结束后完整刷新补齐 tile。
 - 顶到边界且速度继续向外时取消动画。
 - 动画结束调用 `endInteraction()`。
 

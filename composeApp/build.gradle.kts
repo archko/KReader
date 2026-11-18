@@ -28,6 +28,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.lifecycle.viewmodel.compose.android)
+            implementation(libs.k2pdfopt)
         }
         commonMain.dependencies {
             implementation(project(":lib"))
@@ -78,9 +79,9 @@ android {
     signingConfigs {
         named("debug") {
             storeFile = rootProject.file("composeApp/release_key.jks")
-            storePassword = ""
-            keyAlias = ""
-            keyPassword = ""
+            storePassword = "Abc123456"
+            keyAlias = "mupdf_release_key"
+            keyPassword = "Abc123456"
         }
     }
     buildTypes {

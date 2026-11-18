@@ -938,7 +938,6 @@ fun CustomView(
                             }, // 只在非重排模式下传递关闭回调
                             onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
                             onPageChanged = { page ->
-                                currentPage = page
                                 currentPageRef.intValue = page
                             },
                             onTapNonPageArea = { clickedPageIndex ->
