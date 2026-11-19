@@ -8,5 +8,6 @@ import io.github.triangleofice.dav4kmp.DavResource
 public data class DavResourceItem(
     public var resource: DavResource,
     public var isDirectory: Boolean,
-    public var contentLength: Long = 0
+    public var contentLength: Long = 0,
+    public var lastModified: Long = 0
 )

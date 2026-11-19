@@ -77,6 +77,9 @@ import kreader.composeapp.generated.resources.webdav_upload_success
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * @author: archko 2025/11/17 :15:17
@@ -425,6 +428,7 @@ private fun FileListItem(
     onFileClick: (DavResourceItem) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
     val displayName = item.resource.location.encodedPath
         .trimEnd('/')
         .substringAfterLast('/')
@@ -463,25 +467,28 @@ private fun FileListItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row {
-                    if (!item.isDirectory && item.contentLength > 0) {
+                    val hasSize = !item.isDirectory && item.contentLength > 0
+                    if (hasSize) {
                         Text(
                             text = formatFileSize(item.contentLength),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (item.lastModified > 0) {
+                            Text(
+                                text = " • ",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (item.lastModified > 0) {
                         Text(
-                            text = " • ",
+                            text = dateFormat.format(Date(item.lastModified)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Text(
-                        text = item.resource.location.encodedPath,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
                 }
             }
         }

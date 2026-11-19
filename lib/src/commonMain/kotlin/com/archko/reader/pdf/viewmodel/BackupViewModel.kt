@@ -13,7 +13,9 @@ import com.archko.reader.pdf.entity.WebdavUser
 import io.github.triangleofice.dav4kmp.DavCollection
 import io.github.triangleofice.dav4kmp.DavResource
 import io.github.triangleofice.dav4kmp.Response
+import io.github.triangleofice.dav4kmp.property.GetContentLength
 import io.github.triangleofice.dav4kmp.property.GetContentType
+import io.github.triangleofice.dav4kmp.property.GetLastModified
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
@@ -445,6 +447,7 @@ public class BackupViewModel : ViewModel() {
                 val resource = DavResource(client, Url(decodedHref))
                 var isDirectory = false
                 var contentLength = 0L
+                var lastModified = 0L
 
                 response.properties.forEach { prop ->
                     when (prop) {
@@ -454,8 +457,12 @@ public class BackupViewModel : ViewModel() {
                             }
                         }
 
-                        is io.github.triangleofice.dav4kmp.property.GetContentLength -> {
+                        is GetContentLength -> {
                             contentLength = prop.contentLength
+                        }
+
+                        is GetLastModified -> {
+                            lastModified = prop.lastModified
                         }
 
                         else -> {
@@ -465,7 +472,7 @@ public class BackupViewModel : ViewModel() {
                         }
                     }
                 }
-                davResources.add(DavResourceItem(resource, isDirectory, contentLength))
+                davResources.add(DavResourceItem(resource, isDirectory, contentLength, lastModified))
             }
         }
         return davResources
