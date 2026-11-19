@@ -328,7 +328,7 @@ private fun ToolbarContent(
                         }
                     }
 
-                    /*if (FileTypeUtils.isReflowable(currentPath)) {
+                    if (FileTypeUtils.isReflowable(currentPath)) {
                         item {
                             IconButton(onClick = { onFontDialogShow() }) {
                                 Icon(
@@ -338,7 +338,7 @@ private fun ToolbarContent(
                                 )
                             }
                         }
-                    }*/
+                    }
                 }
 
                 item {
@@ -697,8 +697,8 @@ fun CustomView(
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
-            var reflowWordSpacing by remember { mutableFloatStateOf(0.3f) }
-            var reflowFontSize by remember { mutableFloatStateOf(1.0f) }
+            var reflowWordSpacing by remember { mutableFloatStateOf(0.1f) }
+            var reflowFontSize by remember { mutableFloatStateOf(0.9f) }
             var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
             var isPagerMode by remember { mutableStateOf(false) }
             val canEnterPagerMode = FileTypeUtils.isDocumentFile(currentPath) ||
@@ -781,6 +781,13 @@ fun CustomView(
                         else -> JumpIntent(0, JumpMode.PageRestore)
                     }
                 )
+            }
+
+            // 切换重排模式时，以当前页码为目标，避免回到第一页
+            fun toggleReflow() {
+                val page = currentPageRef.intValue
+                jumpIntent = JumpIntent(page, JumpMode.PageNavigation)
+                isReflow = !isReflow
             }
 
             var isSpeaking by remember { mutableStateOf(false) }
@@ -959,6 +966,7 @@ fun CustomView(
                         }
                     },
                     jumpToPage = jumpIntent.page,
+                    initialPage = currentPageRef.intValue,
                     initialScrollX = initialScrollX,
                     initialScrollY = initialScrollY,
                     initialZoom = initialZoom,
@@ -1072,7 +1080,7 @@ fun CustomView(
                     ReflowToolbarContent(
                         onCloseDocument = onCloseDocument,
                         isReflow = isReflow,
-                        onToggleReflow = { isReflow = !isReflow },
+                        onToggleReflow = { toggleReflow() },
                     )
                 } else if (isPagerMode) {
                     PagerToolbarContent(
@@ -1128,7 +1136,7 @@ fun CustomView(
                             }
                         },
                         isReflow = isReflow,
-                        onToggleReflow = { isReflow = !isReflow },
+                        onToggleReflow = { toggleReflow() },
                         documents = documents,
                     )
                 }

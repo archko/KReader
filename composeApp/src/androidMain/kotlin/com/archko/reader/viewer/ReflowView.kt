@@ -63,6 +63,7 @@ fun ReflowView(
     onCloseDocument: (() -> Unit)? = null,
     onDoubleTapToolbar: (() -> Unit)? = null,
     onTapNonPageArea: ((pageIndex: Int) -> Unit)? = null,
+    initialPage: Int = 0,
     initialScrollX: Long = 0L,
     initialScrollY: Long = 0L,
     initialZoom: Double = 1.0,
@@ -93,8 +94,9 @@ fun ReflowView(
     }
 
     // ── Scroll state ──────────────────────────────────────────────────────────
-    val lazyListState = rememberLazyListState()
-    var currentPage by remember { mutableIntStateOf(0) }
+    val startPage = initialPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+    val lazyListState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
+    var currentPage by remember { mutableIntStateOf(startPage) }
     var toPage by remember { mutableIntStateOf(-1) }
     var isJumping by remember { mutableStateOf(false) }
 
@@ -233,10 +235,7 @@ private fun ReflowPageItem(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(horizontal = 8.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         when {
             isLoading && tiles.isEmpty() -> LoadingPlaceholder(screenHeight = screenHeight)
@@ -245,7 +244,9 @@ private fun ReflowPageItem(
                 Image(
                     bitmap = tile.asImageBitmap(),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
                     contentScale = ContentScale.FillWidth,
                 )
             }
