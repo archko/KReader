@@ -952,7 +952,6 @@ fun CustomView(
                     pageCount = pageCount,
                     currentPath = currentPath,
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
-                    onCloseDocument = null, // ReflowView 不处理文档关闭，只保存状态
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page ->
                         currentPageRef.intValue = page

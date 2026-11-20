@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.RectF
 import android.os.Build
+import com.archko.reader.pdf.cache.getCacheDirectory
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -48,13 +49,14 @@ class ReflowCache private constructor(
         )
 
         /**
-         * Create a [ReflowCache] bound to [documentPath]. Uses the application
-         * cache dir from [context] as the root, so no global [App] singleton is
-         * needed.
+         * Create a [ReflowCache] bound to [documentPath].
+         *
+         * 缓存根目录复用项目统一的缓存目录: <getStorageDirPath>/amupdf/reflow/books/
+         * 即 Android/data/<package>/files/amupdf/reflow/books/（外部存储不可用时
+         * [FileUtils.getStorageDirPath] 自带回退到内部 filesDir）。
          */
         fun create(context: Context, documentPath: String): ReflowCache {
-            val root = File(context.cacheDir, "reflow/books")
-            if (!root.exists()) root.mkdirs()
+            val root = getCacheDirectory("reflow/books")
             return ReflowCache(documentPath, root)
         }
     }
