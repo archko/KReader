@@ -323,6 +323,62 @@ public class PdfViewModel : ViewModel() {
         }
     }
 
+    public fun updateReflowStyle(wordSpacing: Float, fontSize: Float) {
+        viewModelScope.launch {
+            val currentUri = uri
+            val normalizedPath = path?.let { normalizePath(it) }
+            var target = recent
+            if (target == null && !currentUri.isNullOrEmpty()) {
+                target = database?.recentDao()?.getRecentByUri(currentUri)
+            }
+            if (target == null && normalizedPath != null) {
+                target = database?.recentDao()?.getRecent(normalizedPath)
+            }
+            if (target == null && normalizedPath != null) {
+                val absolutePath = getAbsolutePath(normalizedPath)
+                val file = File(absolutePath)
+                val created = Recent(
+                    path = normalizedPath,
+                    page = 0L,
+                    pageCount = 0L,
+                    createAt = System.currentTimeMillis(),
+                    updateAt = System.currentTimeMillis(),
+                    crop = 1L,
+                    reflow = 0L,
+                    scrollOri = 1L,
+                    zoom = 1.0,
+                    scrollX = 0L,
+                    scrollY = 0L,
+                    name = absolutePath.getFileName(),
+                    ext = absolutePath.getExtension(),
+                    size = file.length(),
+                    readTimes = 1L,
+                    progress = 0L,
+                    isFavorited = 0L,
+                    inRecent = 1L
+                )
+                created.uri = currentUri
+                created.reflowWordSpacing = wordSpacing
+                created.reflowFontSize = fontSize
+                database?.recentDao()?.addRecent(created)
+                target = database?.recentDao()?.getRecent(normalizedPath) ?: created
+            }
+            target?.let { item ->
+                item.reflowWordSpacing = wordSpacing
+                item.reflowFontSize = fontSize
+                database?.recentDao()?.updateRecent(item)
+                recent = item
+                val currentList = _recentList.value.toMutableList()
+                val index = currentList.indexOfFirst { it.path == item.path }
+                if (index != -1) {
+                    currentList[index] = item
+                    _recentList.value = currentList
+                }
+                println("PdfViewModel.updateReflowStyle:${item.path}, wordSpacing:$wordSpacing, fontSize:$fontSize")
+            }
+        }
+    }
+
     public suspend fun updateUri(oldPath: String?, newUri: String) {
         if (oldPath.isNullOrEmpty()) return
         val normalizedUri = normalizePath(newUri)

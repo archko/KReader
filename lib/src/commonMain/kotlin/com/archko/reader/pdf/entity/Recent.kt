@@ -66,6 +66,12 @@ public class Recent {
     //0未指定,1竖屏,2横屏
     public var screenOrientation: Long? = 0
 
+    @ColumnInfo(name = "reflowFontSize")
+    public var reflowFontSize: Float? = 0.9f
+
+    @ColumnInfo(name = "reflowWordSpacing")
+    public var reflowWordSpacing: Float? = 0.1f
+
     @ColumnInfo(name = "name")
     public var name: String? = null
 
@@ -119,7 +125,9 @@ public class Recent {
         inRecent: Long?,
         pageOffsetX: Long? = null,
         pageOffsetY: Long? = null,
-        screenOrientation: Long? = 0
+        screenOrientation: Long? = 0,
+        reflowFontSize: Float? = 0.9f,
+        reflowWordSpacing: Float? = 0.1f
     ) {
         //this.id = id
         this.updateAt = updateAt
@@ -143,6 +151,8 @@ public class Recent {
         this.pageOffsetX = pageOffsetX
         this.pageOffsetY = pageOffsetY
         this.screenOrientation = screenOrientation
+        this.reflowFontSize = reflowFontSize
+        this.reflowWordSpacing = reflowWordSpacing
     }
 
     override fun toString(): String {
@@ -160,6 +170,8 @@ public class Recent {
                 ", pageOffsetX=" + pageOffsetX +
                 ", pageOffsetY=" + pageOffsetY +
                 ", screenOrientation=" + screenOrientation +
+                ", reflowFontSize=" + reflowFontSize +
+                ", reflowWordSpacing=" + reflowWordSpacing +
                 ", path='" + path + '\'' +
                 ", uri='" + uri + '\'' +
                 ", name='" + name + '\'' +
@@ -191,6 +203,8 @@ public class Recent {
                 pageOffsetX == other.pageOffsetX &&
                 pageOffsetY == other.pageOffsetY &&
                 screenOrientation == other.screenOrientation &&
+                reflowFontSize == other.reflowFontSize &&
+                reflowWordSpacing == other.reflowWordSpacing &&
                 name == other.name &&
                 ext == other.ext &&
                 size == other.size &&
@@ -216,6 +230,8 @@ public class Recent {
         result = 31 * result + (pageOffsetX?.hashCode() ?: 0)
         result = 31 * result + (pageOffsetY?.hashCode() ?: 0)
         result = 31 * result + (screenOrientation?.hashCode() ?: 0)
+        result = 31 * result + (reflowFontSize?.hashCode() ?: 0)
+        result = 31 * result + (reflowWordSpacing?.hashCode() ?: 0)
         result = 31 * result + (name?.hashCode() ?: 0)
         result = 31 * result + (ext?.hashCode() ?: 0)
         result = 31 * result + (size?.hashCode() ?: 0)
@@ -246,7 +262,9 @@ public class Recent {
             readTimes: Long? = null,
             progress: Long? = null,
             isFavorited: Long? = null,
-            inRecent: Long? = null
+            inRecent: Long? = null,
+            reflowFontSize: Float? = 0.9f,
+            reflowWordSpacing: Float? = 0.1f
         ): Recent {
             val recent = Recent()
             recent.updateAt = System.currentTimeMillis()
@@ -270,6 +288,8 @@ public class Recent {
             recent.progress = progress
             recent.favorited = isFavorited
             recent.inRecent = inRecent
+            recent.reflowFontSize = reflowFontSize
+            recent.reflowWordSpacing = reflowWordSpacing
             return recent
         }
 

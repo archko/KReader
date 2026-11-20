@@ -663,6 +663,11 @@ fun FileScreen(
                     scrollOri = viewModel.recent?.scrollOri ?: 0,
                     screenOrientation = viewModel.recent?.screenOrientation ?: 0,
                     reflow = viewModel.recent?.reflow ?: 0L,
+                    initialReflowWordSpacing = viewModel.recent?.reflowWordSpacing ?: 0.1f,
+                    initialReflowFontSize = viewModel.recent?.reflowFontSize ?: 0.9f,
+                    onReflowStyleChanged = { wordSpacing, fontSize ->
+                        viewModel.updateReflowStyle(wordSpacing, fontSize)
+                    },
                     cropMode = viewModel.recent?.crop?.toInt() ?: CropMode.NONE,
                     fontViewModel = fontViewModel,
                     bookmarkViewModel = bookmarkViewModel,

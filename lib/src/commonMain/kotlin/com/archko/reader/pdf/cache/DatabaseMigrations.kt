@@ -172,3 +172,11 @@ public val MIGRATION_6_7: Migration = object : Migration(6, 7) {
         connection.execSQL("ALTER TABLE recent ADD COLUMN pageOffsetY INTEGER")
     }
 }
+
+public val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        // Add per-book reflow style columns to recent table
+        connection.execSQL("ALTER TABLE recent ADD COLUMN reflowFontSize REAL")
+        connection.execSQL("ALTER TABLE recent ADD COLUMN reflowWordSpacing REAL")
+    }
+}

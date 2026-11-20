@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -54,6 +55,8 @@ public object BookProgressParser {
             put("screenOrientation", recent.screenOrientation ?: 0)
             put("autoCrop", recent.crop ?: 1)
             put("reflow", recent.reflow ?: 0)
+            put("reflowFontSize", recent.reflowFontSize ?: 0.9f)
+            put("reflowWordSpacing", recent.reflowWordSpacing ?: 0.1f)
             put("isFavorited", recent.favorited ?: 0)
             put("inRecent", recent.inRecent ?: 0)
             put("scrollOrientation", recent.scrollOri ?: 1)
@@ -101,6 +104,8 @@ public object BookProgressParser {
             recent.screenOrientation = jsonObject["screenOrientation"]?.jsonPrimitive?.longOrNull ?: 0
             recent.crop = jsonObject["autoCrop"]?.jsonPrimitive?.longOrNull ?: 1
             recent.reflow = jsonObject["reflow"]?.jsonPrimitive?.longOrNull ?: 0
+            recent.reflowFontSize = jsonObject["reflowFontSize"]?.jsonPrimitive?.doubleOrNull?.toFloat() ?: 0.9f
+            recent.reflowWordSpacing = jsonObject["reflowWordSpacing"]?.jsonPrimitive?.doubleOrNull?.toFloat() ?: 0.1f
             recent.favorited = jsonObject["isFavorited"]?.jsonPrimitive?.longOrNull ?: 0
             recent.inRecent = jsonObject["inRecent"]?.jsonPrimitive?.longOrNull ?: 0
             recent.scrollOri = jsonObject["scrollOrientation"]?.jsonPrimitive?.longOrNull ?: 1

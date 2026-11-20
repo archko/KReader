@@ -21,7 +21,7 @@ import com.archko.reader.pdf.entity.Recent
         AIConversation::class,
         AIPageConversation::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 public abstract class AppDatabase : RoomDatabase() {

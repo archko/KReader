@@ -432,6 +432,9 @@ fun CustomView(
     scrollOri: Long = 0,
     screenOrientation: Long = 0,
     reflow: Long = 0,
+    initialReflowWordSpacing: Float = 0.1f,
+    initialReflowFontSize: Float = 0.9f,
+    onReflowStyleChanged: ((wordSpacing: Float, fontSize: Float) -> Unit)? = null,
     cropMode: Int = CropMode.NONE,
     fontViewModel: FontViewModel,
     bookmarkViewModel: BookmarkViewModel,
@@ -697,8 +700,8 @@ fun CustomView(
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
-            var reflowWordSpacing by remember { mutableFloatStateOf(0.1f) }
-            var reflowFontSize by remember { mutableFloatStateOf(0.9f) }
+            var reflowWordSpacing by remember { mutableFloatStateOf(initialReflowWordSpacing) }
+            var reflowFontSize by remember { mutableFloatStateOf(initialReflowFontSize) }
             var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
             var isPagerMode by remember { mutableStateOf(false) }
             val canEnterPagerMode = FileTypeUtils.isDocumentFile(currentPath) ||
@@ -1251,9 +1254,15 @@ fun CustomView(
                         // 重排模式底部：字间距 + 字号 + 页面进度
                         ReflowBottomControls(
                             wordSpacing = reflowWordSpacing,
-                            onWordSpacingChange = { reflowWordSpacing = it },
+                            onWordSpacingChange = {
+                                reflowWordSpacing = it
+                                onReflowStyleChanged?.invoke(it, reflowFontSize)
+                            },
                             fontSize = reflowFontSize,
-                            onFontSizeChange = { reflowFontSize = it },
+                            onFontSizeChange = {
+                                reflowFontSize = it
+                                onReflowStyleChanged?.invoke(reflowWordSpacing, it)
+                            },
                             currentPage = currentPage,
                             pageCount = pageCount,
                             onPageSelected = { targetPage ->
