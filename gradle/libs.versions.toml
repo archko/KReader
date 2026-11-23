@@ -8,17 +8,16 @@ androidx-room = "3.0.3"
 androidx-navigation = "2.10.2"
 sqlite = "2.7.0"
 coil = "3.6.1"
-ktor = "3.5.2"
+ktor = "3.6.1"
 kotlinx-coroutines = "1.11.0"
 kotlinx-immutableCollections = "0.5.1"
 ksp = "2.3.11"
 openai-client = "4.1.0"
 
-calf = "0.13.0"
+calf = "0.14.0"
 mupdfFitz = "1.28.0"
 mupdfFitzAar = "1.28.0"
 mmkv = "2.4.1"
-mmkv-kotlin = "1.5.1"
 core = "1.18.0"
 android-lifecycle = "2.10.0"
 tiff-loader = "1.1.7"
@@ -70,10 +69,6 @@ xmlutil-core = { module = "io.github.pdvrieze.xmlutil:core", version.ref = "xmlu
 klock = { module = "com.soywiz.korlibs.klock:klock", version.ref = "klock" }
 
 mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
-mmkv-kotlin = { module = "com.ctrip.flight.mmkv:mmkv-kotlin", version.ref = "mmkv-kotlin" }
-#mmkv-kotlin-android = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-android", version.ref = "mmkv-kotlin" }
-#mmkv-kotlin-macosx64 = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-macosx64", version.ref = "mmkv-kotlin" }
-#mmkv-kotlin-macosarm64 = { module = "com.ctrip.flight.mmkv:mmkv-kotlin-android", version.ref = "mmkv-kotlin" }
 
 coil-kt = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
 coil-kt-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
@@ -92,7 +87,6 @@ openai-client = { module = "com.aallam.openai:openai-client", version.ref = "ope
 k2pdfopt = { group = "com.archko.reader", name = "k2pdfopt", version.ref = "k2pdfopt" }
 
 [plugins]
-#kotlin-native-cocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
 # Android
