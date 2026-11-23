@@ -2,6 +2,9 @@ package com.archko.reader.pdf.cache
 
 import androidx.compose.ui.graphics.ImageBitmap
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -79,15 +82,31 @@ private class InnerImageCache(
 
     private val evictionLock = Any()
 
+    // put()/acquire() 只把 LRU 插入与候选回收入队，真正的 trim/recycle 交给独立线程
+    private val lruQueue = ConcurrentLinkedQueue<PendingEntry>()
+    private val candidateQueue = ConcurrentLinkedQueue<PendingEntry>()
+    private val evictionScheduled = AtomicBoolean(false)
+
+    private val evictionExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "ImageCache-eviction").apply { isDaemon = true }
+    }
+
+    private class PendingEntry(
+        val key: String,
+        val state: BitmapState
+    )
+
     private class CandidateEntry(
         val state: BitmapState,
         val timestamp: Long = System.currentTimeMillis()
     )
 
     public fun setMaxMemory(maxMemoryBytes: Long) {
-        this.maxMemoryBytes = maxMemoryBytes
-        this.maxCandidateMemoryBytes = maxMemoryBytes / 3
-        synchronized(evictionLock) { trimToSize() }
+        synchronized(evictionLock) {
+            this.maxMemoryBytes = maxMemoryBytes
+            this.maxCandidateMemoryBytes = maxMemoryBytes / 3
+        }
+        requestEviction()
     }
 
     public fun acquire(key: String): BitmapState? {
@@ -108,11 +127,9 @@ private class InnerImageCache(
             // 避免候选条目已从池中移除但引用/内存记账没有收尾。
             if (!expired && entry.state.acquire()) {
                 candidateMemoryBytes.addAndGet(-entry.state.byteSize)
-                synchronized(evictionLock) {
-                    cache[key] = entry.state
-                    lruList[key] = entry.state
-                }
+                cache[key] = entry.state
                 currentMemoryBytes.addAndGet(entry.state.byteSize)
+                enqueueLru(key, entry.state)
                 return entry.state
             }
             if (entry.state.markRecycled()) {
@@ -134,29 +151,63 @@ private class InnerImageCache(
         val oldState = cache.put(key, state)
         if (oldState != null) {
             currentMemoryBytes.addAndGet(-oldState.byteSize)
-            addToCandidatePool(key, oldState)
+            candidateQueue.add(PendingEntry(key, oldState))
         }
         currentMemoryBytes.addAndGet(imageSize)
 
-        synchronized(evictionLock) {
-            lruList[key] = state
-            trimToSize()
-        }
+        enqueueLru(key, state)
 
         return state
     }
 
+    private fun enqueueLru(key: String, state: BitmapState) {
+        lruQueue.add(PendingEntry(key, state))
+        requestEviction()
+    }
+
+    // 合并 eviction 请求：同一时刻最多只有一个排队中的 trim 任务
+    private fun requestEviction() {
+        if (!evictionScheduled.compareAndSet(false, true)) return
+        evictionExecutor.execute {
+            // 先复位标志，drain 期间新 put 的请求会再调度一次，不会丢
+            evictionScheduled.set(false)
+            synchronized(evictionLock) {
+                drainQueuesLocked()
+                trimToSize()
+            }
+        }
+    }
+
+    private fun drainQueuesLocked() {
+        while (true) {
+            val entry = lruQueue.poll() ?: break
+            // cache 中仍是同一个 state 才写入 LRU；已被替换/移除的旧 state 直接丢弃
+            if (cache[entry.key] === entry.state) {
+                lruList[entry.key] = entry.state
+            }
+        }
+        while (true) {
+            val entry = candidateQueue.poll() ?: break
+            addToCandidatePoolLocked(entry.key, entry.state)
+        }
+    }
+
+    // 调用方必须持有 evictionLock
     private fun trimToSize() {
         if (currentMemoryBytes.get() <= maxMemoryBytes) return
 
         val iterator = lruList.entries.iterator()
         while (iterator.hasNext() && currentMemoryBytes.get() > maxMemoryBytes) {
             val entry = iterator.next()
-            if (entry.value.canRecycle()) {
-                val evicted = cache.remove(entry.key)
-                if (evicted != null) {
-                    currentMemoryBytes.addAndGet(-evicted.byteSize)
-                    addToCandidatePool(entry.key, evicted)
+            val current = cache[entry.key]
+            if (current == null) {
+                iterator.remove()
+                continue
+            }
+            if (current.canRecycle()) {
+                if (cache.remove(entry.key, current)) {
+                    currentMemoryBytes.addAndGet(-current.byteSize)
+                    addToCandidatePoolLocked(entry.key, current)
                 }
                 iterator.remove()
             }
@@ -164,21 +215,26 @@ private class InnerImageCache(
     }
 
     private fun addToCandidatePool(key: String, state: BitmapState) {
+        synchronized(evictionLock) {
+            addToCandidatePoolLocked(key, state)
+        }
+    }
+
+    // 调用方必须持有 evictionLock
+    private fun addToCandidatePoolLocked(key: String, state: BitmapState) {
         val entry = CandidateEntry(state)
         candidatePool[key] = entry
         candidateMemoryBytes.addAndGet(state.byteSize)
 
         // 候选池超限时按迭代顺序回收，避免在解码线程上做 O(n) 扫描
-        synchronized(evictionLock) {
-            while (candidateMemoryBytes.get() > maxCandidateMemoryBytes) {
-                val iterator = candidatePool.entries.iterator()
-                if (!iterator.hasNext()) break
-                val entry = iterator.next()
-                if (candidatePool.remove(entry.key, entry.value)) {
-                    if (entry.value.state.markRecycled()) {
-                        candidateMemoryBytes.addAndGet(-entry.value.state.byteSize)
-                        recycleImageBitmap(entry.value.state.bitmap)
-                    }
+        while (candidateMemoryBytes.get() > maxCandidateMemoryBytes) {
+            val iterator = candidatePool.entries.iterator()
+            if (!iterator.hasNext()) break
+            val entry = iterator.next()
+            if (candidatePool.remove(entry.key, entry.value)) {
+                if (entry.value.state.markRecycled()) {
+                    candidateMemoryBytes.addAndGet(-entry.value.state.byteSize)
+                    recycleImageBitmap(entry.value.state.bitmap)
                 }
             }
         }
@@ -210,6 +266,12 @@ private class InnerImageCache(
             candidateMemoryBytes.set(0)
             candValues.forEach { entry ->
                 if (entry.state.markRecycled()) recycleImageBitmap(entry.state.bitmap)
+            }
+
+            // 尚未被 eviction 线程消费的旧 state 也要回收
+            while (true) {
+                val pending = candidateQueue.poll() ?: break
+                if (pending.state.markRecycled()) recycleImageBitmap(pending.state.bitmap)
             }
 
             lruList.clear()
