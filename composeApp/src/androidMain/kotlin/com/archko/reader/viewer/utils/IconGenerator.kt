@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.utils
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Environment
@@ -245,7 +245,7 @@ object IconGenerator {
                 Toast.makeText(context, "图标已生成: ${file.absolutePath}", Toast.LENGTH_LONG)
                     .show()
             }
-            println("图标已生成: ${file.absolutePath}")
+            Logger.d("图标已生成", "${file.absolutePath}")
 
             // 清理资源
             bitmap.recycle()
@@ -403,7 +403,7 @@ object IconGenerator {
                     Toast.LENGTH_LONG
                 ).show()
             }
-            println("自适应图标XML文件已重新生成，与Canvas效果一致")
+            Logger.d("App", "自适应图标XML文件已重新生成，与Canvas效果一致")
 
         } catch (e: Exception) {
             e.printStackTrace()

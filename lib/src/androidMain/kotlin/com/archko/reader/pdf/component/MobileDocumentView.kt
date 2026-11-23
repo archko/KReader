@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -110,7 +110,7 @@ public fun MobileDocumentView(
                     return@onSizeChanged
                 }
                 stateHolder.viewSize.value = size
-                println("DocumentView: onSizeChanged:${stateHolder.viewSize.value}, vZoom:${stateHolder.vZoom.value}, list: ${list.size}, orientation: ${stateHolder.orientation.value}")
+                Logger.d("DocumentView", "onSizeChanged:${stateHolder.viewSize.value}, vZoom:${stateHolder.vZoom.value}, list: ${list.size}, orientation: ${stateHolder.orientation.value}")
                 stateHolder.pageViewState.updateViewSize(
                     stateHolder.viewSize.value,
                     stateHolder.vZoom.value,
@@ -143,7 +143,7 @@ public fun MobileDocumentView(
             selectedPage = stateHolder.selectedPage.value,
             textSelector = textSelector,
             onCopy = { text ->
-                println("复制文本: $text")
+                Logger.d("复制文本", "$text")
                 stateHolder.showTextActionToolbar.value = false
                 stateHolder.selectedPage.value?.clearTextSelection()
                 stateHolder.selectedPage.value = null

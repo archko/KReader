@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -75,7 +75,7 @@ public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
             CustomImageFetcher.cacheBitmap(bitmap, documentInfo.path ?: "")
         } catch (e: Exception) {
-            println("缓存封面失败: ${e.message}")
+            Logger.d("缓存封面失败", "${e.message}")
         }
     }
 
@@ -207,7 +207,7 @@ public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${documentInfo.path ?: ""}: $e")
+            Logger.e("TiffDecoder", "renderPageRegion error for file ${documentInfo.path ?: ""}: $e", e)
             CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
@@ -242,7 +242,7 @@ public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             val scaleY = outHeight.toFloat() / originalSize.height
             val scale = minOf(scaleX, scaleY)
 
-            println("TiffDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale (scaleX=$scaleX, scaleY=$scaleY)")
+            Logger.d("TiffDecoder.renderPage", "原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale (scaleX=$scaleX, scaleY=$scaleY)")
 
             val bitmap = tiffLoader!!.decodeRegionToBitmap(
                 0,
@@ -257,7 +257,7 @@ public class TiffDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 outHeight
             )
         } catch (e: Exception) {
-            println("renderPage error: $e")
+            Logger.d("renderPage error", "$e")
             return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }

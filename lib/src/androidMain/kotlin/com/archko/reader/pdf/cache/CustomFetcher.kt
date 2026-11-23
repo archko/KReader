@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -144,7 +144,7 @@ public class CustomImageFetcher(
     }
 
     override suspend fun fetch(): FetchResult {
-        println("fetch:${data.path}")
+        Logger.d("fetch", "${data.path}")
         var bitmap = loadBitmapFromCache(data)
         if (bitmap == null) {
             val file = File(data.path)

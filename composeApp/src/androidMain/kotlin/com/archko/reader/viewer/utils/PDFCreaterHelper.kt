@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.utils
-
+import com.archko.reader.viewer.utils.Logger
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
@@ -631,12 +631,12 @@ object PDFCreaterHelper {
             val doc: Document? = Document.openDocument(inputFile)
 
             if (doc !is PDFDocument) {
-                System.err.println("输入文件不是PDF格式")
+                Logger.d("App", "输入文件不是PDF格式")
                 return false
             }
 
             if (doc.needsPassword()) {
-                println("原文档需要密码验证")
+                Logger.d("App", "原文档需要密码验证")
                 // 这里需要提供原文档的密码
                 // pdfDoc.authenticatePassword("original_password");
             }
@@ -658,11 +658,11 @@ object PDFCreaterHelper {
             // 设置权限（-1表示所有权限）
             options.append(",permissions=-1")
 
-            println("保存选项: $options")
+            Logger.d("保存选项", "$options")
 
             // 保存加密后的PDF
             doc.save(outputFile, options.toString())
-            println("PDF加密成功，保存到: $outputFile")
+            Logger.d("PDF加密成功，保存到", "$outputFile")
             return true
         } catch (e: java.lang.Exception) {
             System.err.println("加密PDF时出错: " + e.message)
@@ -677,17 +677,17 @@ object PDFCreaterHelper {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {
-                System.err.println("输入文件不是PDF格式")
+                Logger.d("App", "输入文件不是PDF格式")
                 return false
             }
 
             // 验证密码（如果需要）
             if (doc.needsPassword()) {
                 if (!doc.authenticatePassword(password)) {
-                    System.err.println("密码验证失败，无法解密")
+                    Logger.d("App", "密码验证失败，无法解密")
                     return false
                 }
-                println("密码验证成功")
+                Logger.d("App", "密码验证成功")
             }
 
             // 构建保存选项字符串 - 移除加密
@@ -695,7 +695,7 @@ object PDFCreaterHelper {
 
             // 保存解密后的PDF
             doc.save(outputFile, options)
-            println("PDF解密成功，保存到: $outputFile")
+            Logger.d("PDF解密成功，保存到", "$outputFile")
             return true
         } catch (e: java.lang.Exception) {
             System.err.println("解密PDF时出错: " + e.message)
@@ -713,17 +713,17 @@ object PDFCreaterHelper {
         try {
             val doc: Document? = Document.openDocument(inputFile)
             if (doc !is PDFDocument) {
-                System.err.println("输入文件不是PDF格式")
+                Logger.d("App", "输入文件不是PDF格式")
                 return false
             }
 
             // 验证原密码（如果需要）
             if (doc.needsPassword()) {
                 if (!doc.authenticatePassword(oldPassword)) {
-                    System.err.println("原密码验证失败")
+                    Logger.d("App", "原密码验证失败")
                     return false
                 }
-                println("原密码验证成功")
+                Logger.d("App", "原密码验证成功")
             }
 
             // 构建保存选项字符串
@@ -745,7 +745,7 @@ object PDFCreaterHelper {
 
             // 保存修改密码后的PDF
             doc.save(outputFile, options.toString())
-            println("PDF密码修改成功，保存到: $outputFile")
+            Logger.d("PDF密码修改成功，保存到", "$outputFile")
             return true
         } catch (e: java.lang.Exception) {
             System.err.println("修改PDF密码时出错: " + e.message)
@@ -811,17 +811,17 @@ object PDFCreaterHelper {
         try {
             val checkDoc = Document.openDocument(inputFile)
             if (checkDoc !is PDFDocument) {
-                System.err.println("输入文件不是PDF格式")
+                Logger.d("App", "输入文件不是PDF格式")
                 return -1
             }
             val totalPages = checkDoc.countPages()
             checkDoc.destroy()
 
-            println("源PDF总页数: $totalPages")
+            Logger.d("源PDF总页数", "$totalPages")
 
             val ranges = parseRanges(rangeInput, totalPages)
             if (ranges == null || ranges.isEmpty()) {
-                System.err.println("无效的页面范围")
+                Logger.d("App", "无效的页面范围")
                 return -1
             }
 
@@ -829,7 +829,7 @@ object PDFCreaterHelper {
 
             for ((index, range) in ranges.withIndex()) {
                 val (startPage, endPage) = range
-                println("处理范围: $startPage-$endPage")
+                Logger.d("处理范围", "$startPage-$endPage")
 
                 try {
                     // 创建临时文件
@@ -853,7 +853,7 @@ object PDFCreaterHelper {
                         }
                     }
 
-                    println("保留页面: $startPage-$endPage, 当前文档页数: ${editDoc.countPages()}")
+                    Logger.d("保留页面", "$startPage-$endPage, 当前文档页数: ${editDoc.countPages()}")
 
                     // 保存最终文件
                     val outputFileName = if (ranges.size == 1) {
@@ -870,18 +870,18 @@ object PDFCreaterHelper {
                     // 删除临时文件
                     tempFile.delete()
 
-                    println("已保存: ${outputFile.absolutePath}")
+                    Logger.d("已保存", "${outputFile.absolutePath}")
                     successCount++
 
                 } catch (e: Exception) {
-                    System.err.println("处理范围 $startPage-$endPage 时出错: ${e.message}")
+                    Logger.d("处理范围 $startPage-$endPage 时出错", "${e.message}")
                     e.printStackTrace()
                 }
             }
 
             return successCount
         } catch (e: Exception) {
-            System.err.println("拆分PDF时出错: ${e.message}")
+            Logger.d("拆分PDF时出错", "${e.message}")
             e.printStackTrace()
             return -1
         }
@@ -899,7 +899,7 @@ object PDFCreaterHelper {
     ): Int {
         try {
             if (pdfFiles.isEmpty()) {
-                System.err.println("没有要合并的PDF文件")
+                Logger.d("App", "没有要合并的PDF文件")
                 return -1
             }
 
@@ -907,19 +907,19 @@ object PDFCreaterHelper {
             val mergedDoc = Document.openDocument(firstPdfPath) as PDFDocument
 
             var successCount = 0
-            println("以文件 $firstPdfPath 为基础（${mergedDoc.countPages()}页），开始合并后续文件...")
+            Logger.d("App", "以文件 $firstPdfPath 为基础（${mergedDoc.countPages()}页），开始合并后续文件...")
 
             for ((index, pdfPath) in pdfFiles.withIndex().filter { it.index >= 1 }) {
                 try {
                     val sourceDoc = Document.openDocument(pdfPath)
                     if (sourceDoc !is PDFDocument) {
-                        System.err.println("文件 $pdfPath 不是有效的PDF格式")
+                        Logger.d("App", "文件 $pdfPath 不是有效的PDF格式")
                         sourceDoc.destroy()
                         continue
                     }
 
                     val pageCount = sourceDoc.countPages()
-                    println("正在合并文件 ${index + 1}/${pdfFiles.size}: $pdfPath (${pageCount}页)")
+                    Logger.d("正在合并文件 ${index + 1}/${pdfFiles.size}", "$pdfPath (${pageCount}页)")
 
                     // 将源文档的所有页面 graft 到合并文档末尾
                     for (pageIndex in 0 until pageCount) {
@@ -929,7 +929,7 @@ object PDFCreaterHelper {
                     sourceDoc.destroy()
                     successCount++
                 } catch (e: Exception) {
-                    System.err.println("处理文件 $pdfPath 时出错: ${e.message}")
+                    Logger.d("处理文件 $pdfPath 时出错", "${e.message}")
                     e.printStackTrace()
                 }
             }
@@ -937,10 +937,10 @@ object PDFCreaterHelper {
             mergedDoc.save(outputFile, "incremental")
             mergedDoc.destroy()
 
-            println("PDF合并成功: $outputFile (合并了 ${successCount + 1} 个文件)")
+            Logger.d("PDF合并成功", "$outputFile (合并了 ${successCount + 1} 个文件)")
             return successCount
         } catch (e: Exception) {
-            System.err.println("合并PDF时出错: ${e.message}")
+            Logger.d("合并PDF时出错", "${e.message}")
             e.printStackTrace()
             return -1
         }
@@ -952,7 +952,7 @@ object PDFCreaterHelper {
     ): Int {
         try {
             if (files.isEmpty()) {
-                System.err.println("没有要转换的文件")
+                Logger.d("App", "没有要转换的文件")
                 return -1
             }
 
@@ -962,17 +962,17 @@ object PDFCreaterHelper {
                     val converter = MobiConverter()
 
                     // 测试1: 验证文件
-                    println("=== 测试1: 验证 MOBI 文件 ===")
+                    Logger.d("=== 测试1", "验证 MOBI 文件 ===")
                     val isValid: Boolean = converter.isValidMobiFile(path)
                     println("文件有效性: " + (if (isValid) "✓ 有效" else "✗ 无效"))
 
                     if (!isValid) {
-                        System.err.println("文件无效，退出测试")
+                        Logger.d("App", "文件无效，退出测试")
                         System.exit(1)
                     }
 
                     // 测试2: 获取元数据
-                    println("\n=== 测试2: 获取文件元数据 ===")
+                    Logger.d("\n=== 测试2", "获取文件元数据 ===")
                     val metadata: MobiMetadata? = converter.getMetadata(path)
                     if (metadata != null) {
                         println("标题: " + metadata.title)
@@ -982,25 +982,25 @@ object PDFCreaterHelper {
                         println("有封面: " + metadata.hasCover)
                         //println("有目录: " + metadata.hasToc)
                     } else {
-                        println("✗ 无法获取元数据")
+                        Logger.d("App", "✗ 无法获取元数据")
                     }
 
                     // 测试3: 转换为 EPUB
-                    println("\n=== 测试3: 转换为 EPUB ===")
+                    Logger.d("\n=== 测试3", "转换为 EPUB ===")
 
                     val success: Boolean = converter.convertToEpub(path, outputFile)
-                    println("输出路径: $outputFile, 结果:$success")
+                    Logger.d("输出路径", "$outputFile, 结果:$success")
                     if (success) {
                         count++
                     }
                 } catch (e: Exception) {
-                    System.err.println("转换为epub时出错: ${e.message}")
+                    Logger.d("转换为epub时出错", "${e.message}")
                 }
             }
 
             return count
         } catch (e: Exception) {
-            System.err.println("转换为epub时出错: ${e.message}")
+            Logger.d("转换为epub时出错", "${e.message}")
             e.printStackTrace()
             return -1
         }

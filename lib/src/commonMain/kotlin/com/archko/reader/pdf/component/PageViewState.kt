@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -205,7 +205,7 @@ public class PageViewState(
         if (tasks.isNotEmpty()) {
             service.submitCropTasks(tasks)
         }
-        println("PageViewState.submitBackgroundCropTasks: ${tasks.size} tasks")
+        Logger.d("PageViewState.submitBackgroundCropTasks", "${tasks.size} tasks")
     }
 
     public fun notifyDecodeCompleted() {

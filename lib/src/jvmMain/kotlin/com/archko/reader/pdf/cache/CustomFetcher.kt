@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toAwtImage
@@ -76,7 +76,7 @@ public class CustomImageFetcher(
                         return image
                     }
                 } catch (e: Exception) {
-                    System.err.println("Error loading cached image: ${e.message}")
+                    Logger.d("Error loading cached image", "${e.message}")
                     // 如果读取失败，删除损坏的缓存文件
                     cacheFile.delete()
                 }

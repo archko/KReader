@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.entity.Recent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -130,7 +130,7 @@ public object BookProgressParser {
             rootArray?.forEach { element ->
                 val recent = parseRecent(element.jsonObject)
                 if (recent != null) {
-                    println("recent:$recent")
+                    Logger.d("recent", "$recent")
                     recentList.add(recent)
                 }
             }

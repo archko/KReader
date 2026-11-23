@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.entity.ReflowBean
 import java.util.regex.Pattern
 
@@ -190,7 +190,7 @@ public object ParseTextMain {
 
             //2.判断尾部的字符是否是结束符.通常是以标点结束的.或者是程序相关的字符结尾.
             val isEnd = if (END_MARK.contains(end) || PROGRAM_MARK.contains(end)) {
-                //println("step2.line.end.break:$ss")
+                //Logger.d("step2.line.end.break", "$ss")
                 true
             } else {
                 false
@@ -203,7 +203,7 @@ public object ParseTextMain {
             }
             val start = ss.substring(0, lineLength)
             var isStartLine = START_MARK.matcher(start).find()
-            //println("find:$find")
+            //Logger.d("find", "$find")
             if (!isStartLine) {
                 if (ss.startsWith("“|\"|'")) {
                     isStartLine = true
@@ -215,7 +215,7 @@ public object ParseTextMain {
                 }
             }
             if (isStartLine) {
-                //println("step3.line break,length:${ss.length}")
+                //Logger.d("step3.line break,length", "${ss.length}")
                 //如果是开始行,上行如果没有结束符,则添加上.
                 lastLine?.run {
                     if (!this.isEnd) {
@@ -229,7 +229,7 @@ public object ParseTextMain {
                 thisLine.isEnd = isEnd
                 thisLine.text = line.toString()
                 sb.append(line)
-                //println("count:${maxNumberCharOfLine} :$line")
+                //Logger.d("count", "${maxNumberCharOfLine} :$line")
                 return thisLine
             }
 
@@ -246,7 +246,7 @@ public object ParseTextMain {
                 thisLine.isEnd = true
                 thisLine.text = line.toString()
                 sb.append(line)
-                //println("count1:${maxNumberCharOfLine} :$line")
+                //Logger.d("count1", "${maxNumberCharOfLine} :$line")
                 return thisLine
             } else {
                 //5.如果这行没有结束标志
@@ -279,12 +279,12 @@ public object ParseTextMain {
                 }
             }
             if (isLetterDigitOrChinese(end)) {
-                //println("isLetterDigitOrChinese:$end")
+                //Logger.d("isLetterDigitOrChinese", "$end")
                 line.append(LINE_END)
             }
             thisLine.text = line.toString()
             sb.append(line)
-            //println("count2:${maxNumberCharOfLine} :$line")
+            //Logger.d("count2", "${maxNumberCharOfLine} :$line")
             return thisLine
         }
 
@@ -321,7 +321,7 @@ public object ParseTextMain {
                     sb.append(aChar)
                 }
             }
-            //println("result=>>${list.size}")
+            //Logger.d("App", "result=>>${list.size}")
             return parseTextList(list, pageIndex)
         }
 
@@ -339,7 +339,7 @@ public object ParseTextMain {
             }
 
             for (rb in reflowBeans) {
-                println("result:$rb")
+                Logger.d("result", "$rb")
             }
             return reflowBeans
         }

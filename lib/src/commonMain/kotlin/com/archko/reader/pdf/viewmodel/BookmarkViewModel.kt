@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.viewmodel
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
@@ -38,7 +38,7 @@ public class BookmarkViewModel : ViewModel() {
             val name = path.getFileName()
             val bookmarks = database?.bookmarkDao()?.getBookmarksByPath(name) ?: emptyList()
             _currentPathBookmarks.value = bookmarks
-            println("BookmarkViewModel.loadBookmarks: name=$name, count=${bookmarks.size}")
+            Logger.d("BookmarkViewModel.loadBookmarks", "name=$name, count=${bookmarks.size}")
         }
     }
 
@@ -64,7 +64,7 @@ public class BookmarkViewModel : ViewModel() {
                 scrollY = scrollY
             )
             database?.bookmarkDao()?.insertBookmark(bookmark)
-            println("BookmarkViewModel.addBookmark: $bookmark")
+            Logger.d("BookmarkViewModel.addBookmark", "$bookmark")
             
             // 重新加载当前文档的书签
             loadBookmarks(name)
@@ -78,7 +78,7 @@ public class BookmarkViewModel : ViewModel() {
         viewModelScope.launch {
             bookmark.updateAt = System.currentTimeMillis()
             database?.bookmarkDao()?.updateBookmark(bookmark)
-            println("BookmarkViewModel.updateBookmark: $bookmark")
+            Logger.d("BookmarkViewModel.updateBookmark", "$bookmark")
             
             // 重新加载当前文档的书签
             loadBookmarks(bookmark.path)
@@ -91,7 +91,7 @@ public class BookmarkViewModel : ViewModel() {
     public fun deleteBookmark(bookmark: Bookmark) {
         viewModelScope.launch {
             database?.bookmarkDao()?.deleteBookmark(bookmark)
-            println("BookmarkViewModel.deleteBookmark: $bookmark")
+            Logger.d("BookmarkViewModel.deleteBookmark", "$bookmark")
             
             // 重新加载当前文档的书签
             loadBookmarks(bookmark.path)
@@ -121,7 +121,7 @@ public class BookmarkViewModel : ViewModel() {
         viewModelScope.launch {
             val bookmarks = database?.bookmarkDao()?.getAllBookmarks() ?: emptyList()
             _bookmarkList.value = bookmarks
-            println("BookmarkViewModel.loadAllBookmarks: count=${bookmarks.size}")
+            Logger.d("BookmarkViewModel.loadAllBookmarks", "count=${bookmarks.size}")
         }
     }
 
@@ -148,7 +148,7 @@ public class BookmarkViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
-                println("搜索失败: ${e.message}")
+                Logger.d("搜索失败", "${e.message}")
                 withContext(Dispatchers.Main) {
                     _searchState.value = _searchState.value.copy(isSearching = false)
                 }
@@ -200,7 +200,7 @@ public class BookmarkViewModel : ViewModel() {
      */
     public fun resetSearch() {
         _searchState.value = SearchState()
-        println("BookmarkViewModel.resetSearch: 搜索状态已重置")
+        Logger.d("BookmarkViewModel.resetSearch", "搜索状态已重置")
     }
 
     /**
@@ -209,6 +209,6 @@ public class BookmarkViewModel : ViewModel() {
     public fun resetAll() {
         _currentPathBookmarks.value = emptyList()
         resetSearch()
-        println("BookmarkViewModel.resetAll: 所有数据已重置")
+        Logger.d("BookmarkViewModel.resetAll", "所有数据已重置")
     }
 }

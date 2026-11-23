@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.geometry.Rect
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.CropMode
@@ -80,11 +80,11 @@ public class APageSizeLoader {
         private fun fromJson(pageCount: Int, fileSize: Long, jo: JsonObject): PageSizeBean? {
             val ja = jo["pagesize"]?.jsonArray
             if (null == ja || ja.size != pageCount) {
-                println("new pagecount:$pageCount")
+                Logger.d("new pagecount", "$pageCount")
                 return null
             }
             if (fileSize != jo["filesize"]?.jsonPrimitive?.longOrNull) {
-                println("new filesize:$fileSize")
+                Logger.d("new filesize", "$fileSize")
                 return null
             }
             val pageSizeBean = PageSizeBean()

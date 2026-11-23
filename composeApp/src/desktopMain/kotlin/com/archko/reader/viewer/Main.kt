@@ -1,5 +1,5 @@
 package com.archko.reader.viewer
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -95,7 +95,7 @@ object SingleInstanceManager {
                 false
             }
         } catch (e: Exception) {
-            println("锁定实例失败: ${e.message}")
+            Logger.d("锁定实例失败", "${e.message}")
             false
         }
     }
@@ -115,7 +115,7 @@ object SingleInstanceManager {
                 }
 
                 if (serverSocket == null) {
-                    println("无法找到可用端口")
+                    Logger.d("App", "无法找到可用端口")
                     return@launch
                 }
 
@@ -124,7 +124,7 @@ object SingleInstanceManager {
                 val portFile = File(configDir, PORT_FILE)
                 portFile.writeText(port.toString())
 
-                println("服务器启动在端口: $port")
+                Logger.d("服务器启动在端口", "$port")
 
                 while (true) {
                     try {
@@ -134,13 +134,13 @@ object SingleInstanceManager {
                         }
                     } catch (e: Exception) {
                         if (serverSocket != null && !serverSocket!!.isClosed) {
-                            println("服务器错误: ${e.message}")
+                            Logger.d("服务器错误", "${e.message}")
                         }
                         break
                     }
                 }
             } catch (e: Exception) {
-                println("启动服务器失败: ${e.message}")
+                Logger.d("启动服务器失败", "${e.message}")
             }
         }
     }
@@ -153,13 +153,13 @@ object SingleInstanceManager {
             val message = reader.readLine()
             if (message != null && message.isNotEmpty()) {
                 if (message == "ACTIVATE") {
-                    println("收到窗口激活请求")
+                    Logger.d("App", "收到窗口激活请求")
                     // 发送激活事件
                     CoroutineScope(Dispatchers.Main).launch {
                         _fileOpenEvents.emit("ACTIVATE")
                     }
                 } else {
-                    println("收到文件打开请求: $message")
+                    Logger.d("收到文件打开请求", "$message")
                     // 验证文件是否存在且为支持的格式
                     val file = File(message)
                     // 注意：这里的检查应与 main 函数中的逻辑保持一致，只检查是否存在和是否为文件
@@ -174,7 +174,7 @@ object SingleInstanceManager {
                             !file.isFile -> "ERROR: Not a file"
                             else -> "ERROR: Unknown error"
                         }
-                        println("文件验证失败: $message - $errorMsg")
+                        Logger.d("文件验证失败", "$message - $errorMsg")
                         writer.println(errorMsg)
                         return
                     }
@@ -184,7 +184,7 @@ object SingleInstanceManager {
                 writer.println("ERROR: Empty message")
             }
         } catch (e: Exception) {
-            println("处理客户端请求失败: ${e.message}")
+            Logger.d("处理客户端请求失败", "${e.message}")
         } finally {
             try {
                 clientSocket.close()
@@ -200,7 +200,7 @@ object SingleInstanceManager {
             val portFile = File(configDir, PORT_FILE)
 
             if (!portFile.exists()) {
-                println("端口文件不存在")
+                Logger.d("App", "端口文件不存在")
                 return false
             }
 
@@ -217,7 +217,7 @@ object SingleInstanceManager {
 
             response == "OK"
         } catch (e: Exception) {
-            println("发送文件到运行实例失败: ${e.message}")
+            Logger.d("发送文件到运行实例失败", "${e.message}")
             false
         }
     }
@@ -233,7 +233,7 @@ object SingleInstanceManager {
             File(configDir, LOCK_FILE).delete()
             File(configDir, PORT_FILE).delete()
         } catch (e: Exception) {
-            println("清理资源失败: ${e.message}")
+            Logger.d("清理资源失败", "${e.message}")
         }
     }
 }
@@ -269,7 +269,7 @@ private fun loadWindowState(): SavedWindowState {
                 position = androidx.compose.ui.window.WindowPosition(x, y)
             )
         } catch (e: Exception) {
-            println("加载窗口状态失败: ${e.message}")
+            Logger.d("加载窗口状态失败", "${e.message}")
             // 默认全屏
             SavedWindowState(
                 placement = WindowPlacement.Maximized,
@@ -310,9 +310,9 @@ private fun saveWindowState(windowState: WindowState) {
         )
 
         properties.store(configFile.outputStream(), "KReader Window State")
-        println("窗口状态已保存")
+        Logger.d("App", "窗口状态已保存")
     } catch (e: Exception) {
-        println("保存窗口状态失败: ${e.message}")
+        Logger.d("保存窗口状态失败", "${e.message}")
     }
 }
 
@@ -324,16 +324,16 @@ fun main(args: Array<String>) {
     setSystemLookAndFeel()
 
     // 详细的启动调试信息
-    println("=== KReader 启动 ===")
+    Logger.d("App", "=== KReader 启动 ===")
     // 检查环境变量
     val relevantEnvs = listOf("KREADER_FILE", "JAVA_MAIN_CLASS_PID")
     relevantEnvs.forEach { env ->
         val value = System.getenv(env)
         if (value != null) {
-            println("环境变量 $env: $value")
+            Logger.d("环境变量 $env", "$value")
         }
     }
-    println("===================")
+    Logger.d("App", "===================")
 
     // 多种方式获取要打开的文件路径
     fun findFilePath(): String? {
@@ -341,14 +341,14 @@ fun main(args: Array<String>) {
         if (args.isNotEmpty()) {
             val filePath = args[0]
             val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
-            println("方法1 - 命令行参数: $filePath -> $cleanPath")
+            Logger.d("方法1 - 命令行参数", "$filePath -> $cleanPath")
 
             val file = File(cleanPath)
             if (file.exists() && file.isFile) {
-                println("✓ 命令行参数文件有效: ${file.absolutePath}")
+                Logger.d("✓ 命令行参数文件有效", "${file.absolutePath}")
                 return file.absolutePath
             } else {
-                println("✗ 命令行参数文件无效: ${file.absolutePath}")
+                Logger.d("✗ 命令行参数文件无效", "${file.absolutePath}")
             }
         }
 
@@ -363,14 +363,14 @@ fun main(args: Array<String>) {
             val filePath = System.getProperty(prop)
             if (filePath != null) {
                 val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
-                println("方法2 - 系统属性 $prop: $filePath -> $cleanPath")
+                Logger.d("方法2 - 系统属性 $prop", "$filePath -> $cleanPath")
 
                 val file = File(cleanPath)
                 if (file.exists() && file.isFile) {
-                    println("✓ 系统属性文件有效: ${file.absolutePath}")
+                    Logger.d("✓ 系统属性文件有效", "${file.absolutePath}")
                     return file.absolutePath
                 } else {
-                    println("✗ 系统属性文件无效: ${file.absolutePath}")
+                    Logger.d("✗ 系统属性文件无效", "${file.absolutePath}")
                 }
             }
         }
@@ -379,20 +379,20 @@ fun main(args: Array<String>) {
         val filePath = System.getenv("KREADER_FILE")
         if (filePath != null) {
             val cleanPath = filePath.trim('"', '\'').replace("\\", "/")
-            println("方法3 - 环境变量: $filePath -> $cleanPath")
+            Logger.d("方法3 - 环境变量", "$filePath -> $cleanPath")
 
             val file = File(cleanPath)
             if (file.exists() && file.isFile) {
-                println("✓ 环境变量文件有效: ${file.absolutePath}")
+                Logger.d("✓ 环境变量文件有效", "${file.absolutePath}")
                 return file.absolutePath
             } else {
-                println("✗ 环境变量文件无效: ${file.absolutePath}")
+                Logger.d("✗ 环境变量文件无效", "${file.absolutePath}")
             }
         }
 
         // 方法4: 检查 Java 命令中是否包含文件路径
         val javaCommand = System.getProperty("sun.java.command")
-        println("Java命令: $javaCommand")
+        Logger.d("Java命令", "$javaCommand")
         if (javaCommand != null && javaCommand.contains("/") && !javaCommand.endsWith(".jar")) {
             val parts = javaCommand.split(" ")
             for (part in parts) {
@@ -407,25 +407,25 @@ fun main(args: Array<String>) {
                             || part.endsWith(".md"))
                 ) {
                     val cleanPath = part.trim('"', '\'').replace("\\", "/")
-                    println("方法4 - Java命令解析: $part -> $cleanPath")
+                    Logger.d("方法4 - Java命令解析", "$part -> $cleanPath")
 
                     val file = File(cleanPath)
                     if (file.exists() && file.isFile) {
-                        println("✓ Java命令文件有效: ${file.absolutePath}")
+                        Logger.d("✓ Java命令文件有效", "${file.absolutePath}")
                         return file.absolutePath
                     } else {
-                        println("✗ Java命令文件无效: ${file.absolutePath}")
+                        Logger.d("✗ Java命令文件无效", "${file.absolutePath}")
                     }
                 }
             }
         }
 
-        println("所有方法都未找到有效文件路径")
+        Logger.d("App", "所有方法都未找到有效文件路径")
         return null
     }
 
     val initialFilePath = findFilePath()
-    println("启动应用，最终文件路径: $initialFilePath")
+    Logger.d("启动应用，最终文件路径", "$initialFilePath")
 
     // =======================================================
     // 启用单实例管理逻辑
@@ -433,21 +433,21 @@ fun main(args: Array<String>) {
     if (!SingleInstanceManager.tryLockInstance()) {
         // 如果实例已运行，则将文件路径发送给它
         if (initialFilePath != null) {
-            println("发送文件到已运行的实例: $initialFilePath")
+            Logger.d("发送文件到已运行的实例", "$initialFilePath")
             if (SingleInstanceManager.sendFileToRunningInstance(initialFilePath)) {
-                println("文件已发送到运行中的实例")
+                Logger.d("App", "文件已发送到运行中的实例")
                 exitProcess(0) // 成功发送后退出新进程
             } else {
-                println("发送文件失败，继续启动新实例")
+                Logger.d("App", "发送文件失败，继续启动新实例")
             }
         } else {
             // 如果没有文件路径，尝试激活已运行的实例（防止用户双击应用图标）
-            println("尝试激活已运行的实例")
+            Logger.d("App", "尝试激活已运行的实例")
             if (SingleInstanceManager.sendFileToRunningInstance("ACTIVATE")) {
-                println("已激活运行中的实例")
+                Logger.d("App", "已激活运行中的实例")
                 exitProcess(0) // 成功激活后退出新进程
             } else {
-                println("激活失败，继续启动新实例")
+                Logger.d("App", "激活失败，继续启动新实例")
             }
         }
     }
@@ -465,20 +465,20 @@ fun main(args: Array<String>) {
                 val desktop = Desktop.getDesktop()
                 if (desktop.isSupported(Desktop.Action.APP_OPEN_FILE)) {
                     desktop.setOpenFileHandler { event ->
-                        println("macOS 文件打开事件触发")
+                        Logger.d("App", "macOS 文件打开事件触发")
                         val files = event.files
                         if (files.isNotEmpty()) {
                             val file = files[0]
-                            println("通过 macOS 事件接收到文件: ${file.absolutePath}")
+                            Logger.d("通过 macOS 事件接收到文件", "${file.absolutePath}")
 
                             // 发送文件打开事件到应用
                             SingleInstanceManager.sendFileOpenEvent(file.absolutePath)
                         }
                     }
-                    println("macOS 文件打开事件处理器已设置")
+                    Logger.d("App", "macOS 文件打开事件处理器已设置")
                 }
             } catch (e: Exception) {
-                println("设置 macOS 文件打开事件处理器失败: ${e.message}")
+                Logger.d("设置 macOS 文件打开事件处理器失败", "${e.message}")
             }
         }
 
@@ -518,7 +518,7 @@ fun main(args: Array<String>) {
                 screenWidthInPixels = windowInfo.containerSize.width.toDp().toPx().toInt()
                 screenHeightInPixels = windowInfo.containerSize.height.toDp().toPx().toInt()
             }
-            println("app.screenHeight:$screenWidthInPixels-$screenHeightInPixels")
+            Logger.d("app.screenHeight", "$screenWidthInPixels-$screenHeightInPixels")
 
             val driverFactory = DriverFactory()
             val database = driverFactory.createRoomDatabase()
@@ -545,32 +545,32 @@ fun main(args: Array<String>) {
                 // =======================================================
                 LaunchedEffect(Unit) {
                     SingleInstanceManager.fileOpenEvents.collect { message ->
-                        println("收到事件: $message")
+                        Logger.d("收到事件", "$message")
 
                         if (message == "ACTIVATE") {
-                            println("激活窗口")
+                            Logger.d("App", "激活窗口")
                             windowState.isMinimized = false
                             window.toFront()
                             window.requestFocus()
                         } else {
-                            println("收到新文件打开事件: $message")
+                            Logger.d("收到新文件打开事件", "$message")
 
                             // 检查是否是不同的文件
                             if (currentFilePath != message) {
-                                println("切换文档: $currentFilePath -> $message")
+                                Logger.d("切换文档", "$currentFilePath -> $message")
 
                                 // 如果当前有打开的文档，先关闭它
                                 if (currentFilePath != null) {
-                                    println("关闭当前文档: $currentFilePath")
+                                    Logger.d("关闭当前文档", "$currentFilePath")
                                 }
 
                                 // 更新到新文档
                                 currentFilePath = message
                                 forceReload = !forceReload // 触发重新加载
 
-                                println("已切换到新文档: $message")
+                                Logger.d("已切换到新文档", "$message")
                             } else {
-                                println("相同文件，只激活窗口")
+                                Logger.d("App", "相同文件，只激活窗口")
                             }
 
                             windowState.isMinimized = false
@@ -583,7 +583,7 @@ fun main(args: Array<String>) {
                 // 监听文件路径变化，确保 FileScreen 能响应新文件
                 LaunchedEffect(currentFilePath, forceReload) {
                     if (currentFilePath != null) {
-                        println("LaunchedEffect: 准备加载文档 $currentFilePath")
+                        Logger.d("LaunchedEffect", "准备加载文档 $currentFilePath")
                     }
                 }
                 // =======================================================

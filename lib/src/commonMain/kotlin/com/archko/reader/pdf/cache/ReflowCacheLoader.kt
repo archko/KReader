@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import kotlinx.serialization.json.Json
@@ -31,13 +31,13 @@ public object ReflowCacheLoader {
             val cacheFile = getReflowCacheFile(file)
 
             if (!cacheFile.exists()) {
-                println("ReflowCache: 缓存文件不存在: ${cacheFile.absolutePath}")
+                Logger.d("ReflowCache", "缓存文件不存在: ${cacheFile.absolutePath}")
                 return null
             }
 
             val content = cacheFile.readText(Charsets.UTF_8)
             if (content.isEmpty()) {
-                println("ReflowCache: 缓存文件为空")
+                Logger.d("ReflowCache", "缓存文件为空")
                 return null
             }
 
@@ -45,19 +45,19 @@ public object ReflowCacheLoader {
 
             // 验证缓存有效性
             if (cacheBean.pageCount != pageCount) {
-                println("ReflowCache: 页数不匹配，缓存文档总页数=${cacheBean.pageCount}, 实际页数=$pageCount")
+                Logger.d("ReflowCache", "页数不匹配，缓存文档总页数=${cacheBean.pageCount}, 实际页数=$pageCount")
                 return null
             }
 
             if (cacheBean.fileSize != fileSize) {
-                println("ReflowCache: 文件大小不匹配，缓存大小=${cacheBean.fileSize}, 实际大小=$fileSize")
+                Logger.d("ReflowCache", "文件大小不匹配，缓存大小=${cacheBean.fileSize}, 实际大小=$fileSize")
                 return null
             }
 
-            println("ReflowCache: 成功加载缓存，页数=$pageCount")
+            Logger.d("ReflowCache", "成功加载缓存，页数=$pageCount")
             cacheBean
         } catch (e: Exception) {
-            println("ReflowCache: 加载缓存失败: ${e.message}")
+            Logger.d("ReflowCache", "加载缓存失败: ${e.message}")
             e.printStackTrace()
             null
         }
@@ -93,10 +93,10 @@ public object ReflowCacheLoader {
             val content = json.encodeToString(cacheBean)
             cacheFile.writeText(content, Charsets.UTF_8)
 
-            println("ReflowCache: 成功保存缓存，页数=${reflowTexts.size}, 文件=${cacheFile.absolutePath}")
+            Logger.d("ReflowCache", "成功保存缓存，页数=${reflowTexts.size}, 文件=${cacheFile.absolutePath}")
             return cacheBean
         } catch (e: Exception) {
-            println("ReflowCache: 保存缓存失败: ${e.message}")
+            Logger.d("ReflowCache", "保存缓存失败: ${e.message}")
             e.printStackTrace()
         }
         return null
@@ -111,10 +111,10 @@ public object ReflowCacheLoader {
             val cacheFile = getReflowCacheFile(file)
             if (cacheFile.exists()) {
                 cacheFile.delete()
-                println("ReflowCache: 删除缓存文件: ${cacheFile.absolutePath}")
+                Logger.d("ReflowCache", "删除缓存文件: ${cacheFile.absolutePath}")
             }
         } catch (e: Exception) {
-            println("ReflowCache: 删除缓存失败: ${e.message}")
+            Logger.d("ReflowCache", "删除缓存失败: ${e.message}")
             e.printStackTrace()
         }
     }
@@ -142,11 +142,11 @@ public object ReflowCacheLoader {
 
         // 如果没有找到匹配的页码，返回空列表
         if (startIndex == -1) {
-            println("ReflowCache: 未找到页码 >= $startPage 的内容")
+            Logger.d("ReflowCache", "未找到页码 >= $startPage 的内容")
             return emptyList()
         }
 
-        println("ReflowCache: 从索引 $startIndex 开始返回内容，对应页码 >= $startPage")
+        Logger.d("ReflowCache", "从索引 $startIndex 开始返回内容，对应页码 >= $startPage")
         return cacheBean.reflow.subList(startIndex, cacheBean.reflow.size)
     }
 

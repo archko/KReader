@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +48,7 @@ public fun TextActionToolbar(
 
     // 检查选中文本是否为空
     val selectedText = selection?.text ?: ""
-    println("TextActionToolbar:$selectedText")
+    Logger.d("TextActionToolbar", "$selectedText")
     var resultText by remember { mutableStateOf(selectedText) }
     var isOcring by remember { mutableStateOf(false) }
 

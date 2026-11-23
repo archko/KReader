@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -69,7 +69,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                     try {
                         eldest.value.destroy()
                     } catch (e: Exception) {
-                        println("Error destroying cached page: $e")
+                        Logger.d("Error destroying cached page", "$e")
                     }
                     return true
                 }
@@ -90,7 +90,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 try {
                     eldest.value.destroy()
                 } catch (e: Exception) {
-                    println("Error destroying cached display list: $e")
+                    Logger.d("Error destroying cached display list", "$e")
                 }
                 return true
             }
@@ -157,7 +157,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                     cropX = 0f
                     cropY = 0f
                 }
-                println("extreme pWidth:$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
+                Logger.d("extreme pWidth", "$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
             } else if (pWidth > pHeight) {
                 // 宽大于高：按宽度缩放到160，高度自适应
                 scale = targetWidth / pWidth
@@ -165,7 +165,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 renderHeight = (pHeight * scale)
                 cropX = 0f
                 cropY = 0f
-                println("wide. pWidth:$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
+                Logger.d("wide. pWidth", "$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
             } else {
                 // 高大于/等于宽：统一按宽度缩放到160，高度自适应
                 scale = targetWidth / pWidth
@@ -173,7 +173,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 renderHeight = (pHeight * scale)
                 cropX = 0f
                 cropY = 0f
-                println("normal. pWidth:$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
+                Logger.d("normal. pWidth", "$pWidth, pHeight:$pHeight, width-height:${renderWidth.toInt()}-${renderHeight.toInt()}, scale:$scale")
             }
 
             return CoverRenderParams(scale, renderWidth, renderHeight, cropX, cropY)
@@ -192,7 +192,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             val pHeight = page.bounds.y1 - page.bounds.y0
 
             val params = calculateCoverRenderParams(pWidth, pHeight, targetWidth, targetHeight)
-            println("decode.thumb:$path")
+            Logger.d("decode.thumb", "$path")
 
             try {
                 val pixmapBbox =
@@ -254,7 +254,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         try {
             if (FileTypeUtils.isReflowable(docPath)) {
                 val css = FontCSSGenerator.generateFontCSS(null, "10px")
-                println("应用自定义CSS: $css")
+                Logger.d("应用自定义CSS", "$css")
                 com.artifex.mupdf.fitz.Context.setUserCSS(css)
             }
             document = Document.openDocument(docPath)
@@ -283,7 +283,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             }
             success
         } catch (e: Exception) {
-            println("密码认证失败: ${e.message}")
+            Logger.d("密码认证失败", "${e.message}")
             false
         }
     }
@@ -327,7 +327,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         try {
             val count: Int = pageCount
             val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: "", documentInfo.fileSize)
-            println("PdfDecoder.initPageSizeBean:$psb")
+            Logger.d("PdfDecoder.initPageSizeBean", "$psb")
 
             if (null != psb && psb.list != null && psb.list!!.size == count) {
                 // 缓存存在且完整，直接使用
@@ -349,7 +349,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                     list.add(size)
                 }
                 originalPageSizes = list
-                println("PdfDecoder.initPageSizeBean: 从缓存加载了 ${list.size} 个页面尺寸")
+                Logger.d("PdfDecoder.initPageSizeBean", "从缓存加载了 ${list.size} 个页面尺寸")
                 return
             }
 
@@ -357,7 +357,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             pageSizeBean = PageSizeBean()
             pageSizeBean!!.list = aPageList
         } catch (e: Exception) {
-            println("PdfDecoder.initPageSizeBean error: ${e.message}")
+            Logger.d("PdfDecoder.initPageSizeBean error", "${e.message}")
             aPageList!!.clear()
         }
     }
@@ -376,7 +376,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
             CustomImageFetcher.cacheBitmap(bitmap, path)
         } catch (e: Exception) {
-            println("缓存封面失败: ${e.message}")
+            Logger.d("缓存封面失败", "${e.message}")
         }
     }
 
@@ -412,14 +412,14 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 scaledPageSizes.add(scaledPage)
                 totalHeight += scaledHeight
 
-                //println("PdfDecoder.caculateSize: page $i - original: ${originalPage.width}x${originalPage.height}, scale: $scale, scaled: ${scaledWidth}x${scaledHeight}")
+                //Logger.d("PdfDecoder.caculateSize", "page $i - original: ${originalPage.width}x${originalPage.height}, scale: $scale, scaled: ${scaledWidth}x${scaledHeight}")
             }
 
             // 更新对外提供的页面尺寸
             pageSizes = scaledPageSizes
 
             imageSize = IntSize(documentWidth, totalHeight)
-            println("PdfDecoder.caculateSize: documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
+            Logger.d("PdfDecoder.caculateSize", "documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
         }
     }
 
@@ -432,11 +432,11 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
     override fun close() {
         if (cachePage && !aPageList.isNullOrEmpty()) {
-            println("PdfDecoder.close:${aPageList.size}")
+            Logger.d("PdfDecoder.close", "${aPageList.size}")
             try {
                 APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
             } catch (e: Exception) {
-                println("PdfDecoder.close: 保存缓存失败: ${e.message}")
+                Logger.d("PdfDecoder.close", "保存缓存失败: ${e.message}")
             }
         }
 
@@ -445,7 +445,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             try {
                 displayList.destroy()
             } catch (e: Exception) {
-                println("Error destroying cached display list: $e")
+                Logger.d("Error destroying cached display list", "$e")
             }
         }
         displayListCache.clear()
@@ -455,7 +455,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             try {
                 page.destroy()
             } catch (e: Exception) {
-                println("Error destroying cached page: $e")
+                Logger.d("Error destroying cached page", "$e")
             }
         }
         pageCache.clear()
@@ -499,11 +499,11 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 try {
                     APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
                 } catch (e: Exception) {
-                    println("PdfDecoder: 缓存页面尺寸失败: ${e.message}")
+                    Logger.d("PdfDecoder", "缓存页面尺寸失败: ${e.message}")
                 }
             }
         }
-        println("PdfDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")
+        Logger.d("PdfDecoder.prepareSizes", "从文档加载了 ${list.size} 个页面尺寸")
         return list
     }
 
@@ -574,11 +574,11 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
             // 缓存结果
             linksCache[pageIndex] = hyperlinks
-            println("PdfDecoder.getPageLinks: page=$pageIndex, links=${hyperlinks.size}")
+            Logger.d("PdfDecoder.getPageLinks", "page=$pageIndex, links=${hyperlinks.size}")
 
             hyperlinks
         } catch (e: Exception) {
-            println("获取页面链接失败: $e")
+            Logger.d("获取页面链接失败", "$e")
             emptyList()
         }
     }
@@ -742,7 +742,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 return imageBitmap
             }
         } catch (e: Exception) {
-            println("PdfDecoder.renderPage error: $e")
+            Logger.d("PdfDecoder.renderPage error", "$e")
             return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
@@ -785,7 +785,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         val safeWidth = cropWidth.coerceIn(1, originalBitmap.width - safeX)
         val safeHeight = cropHeight.coerceIn(1, originalBitmap.height - safeY)
 
-        println("PdfDecoder.cropImageBitmap: 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight)")
+        Logger.d("PdfDecoder.cropImageBitmap", "原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight)")
 
         try {
             // 读取原始图片的像素数据
@@ -807,7 +807,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
 
             return croppedImage.toComposeImageBitmap()
         } catch (e: Exception) {
-            println("PdfDecoder.cropImageBitmap error: $e")
+            Logger.d("PdfDecoder.cropImageBitmap error", "$e")
             // 如果切边失败，返回原始图片
             return originalBitmap
         }
@@ -829,12 +829,12 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
             // 与 Page 的整数纹理边界一致：相邻 tile 的补丁原点首尾相接，不重叠
             val patchX = round(region.left).toInt()
             val patchY = round(region.top).toInt()
-            println("PdfDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
+            Logger.d("PdfDecoder.renderPageRegion", "index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
             val bitmap = acquireReusableBitmap(outWidth, outHeight)
             return decode(index, scale, bitmap, patchX, patchY, false, true)
         } catch (e: Exception) {
-            println("PdfDecoder.renderPageRegion error: $e")
+            Logger.d("PdfDecoder.renderPageRegion error", "$e")
             return CustomImageFetcher.createWhiteBitmap(outWidth, outHeight)
         }
     }
@@ -892,7 +892,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 null
             }
         } catch (e: Exception) {
-            println("TTS: 解码第${pageIndex + 1}页失败: ${e.message}")
+            Logger.d("TTS", "解码第${pageIndex + 1}页失败: ${e.message}")
             null
         }
     }
@@ -906,7 +906,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
 
         val totalPages = originalPageSizes.size
-        println("TTS: 开始解析所有页面，共${totalPages}页")
+        Logger.d("TTS", "开始解析所有页面，共${totalPages}页")
         val allTexts = mutableListOf<ReflowBean>()
 
         var addedPages = 0
@@ -932,20 +932,20 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                         )
                         addedPages++
                     } else {
-                        println("TTS: 第${currentPage + 1}页文本太短: ${pageText.length}")
+                        Logger.d("TTS", "第${currentPage + 1}页文本太短: ${pageText.length}")
                         skippedPages++
                     }
                 } else {
-                    println("TTS: 第${currentPage + 1}页无文本内容")
+                    Logger.d("TTS", "第${currentPage + 1}页无文本内容")
                     skippedPages++
                 }
             } catch (e: Exception) {
-                println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                Logger.d("TTS", "解码第${currentPage + 1}页失败: ${e.message}")
                 skippedPages++
             }
         }
 
-        println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
+        Logger.d("TTS", "解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
         return allTexts
     }
 
@@ -1041,11 +1041,11 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 }
             }
         } catch (e: Exception) {
-            println("PdfDecoder.search error: ${e.message}")
+            Logger.d("PdfDecoder.search error", "${e.message}")
             e.printStackTrace()
         }
 
-        println("PdfDecoder.search: query='$query', found ${results.size} results")
+        Logger.d("PdfDecoder", "search: query='$query', found ${results.size} results")
         return results
     }
 }

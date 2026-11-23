@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.util
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.Context
 import com.archko.reader.pdf.PdfApp
 import com.tencent.mmkv.MMKV
@@ -24,7 +24,7 @@ public object FontCSSGenerator {
 
     public fun setFontFace(name: String?) {
         val mmkv: MMKV = MMKV.mmkvWithID("epub")
-        println("setFontFace:$name")
+        Logger.d("setFontFace", "$name")
         mmkv.encode("font_face", name)
     }
 

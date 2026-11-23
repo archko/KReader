@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.image.DjvuLoader
@@ -75,7 +75,7 @@ public class AndroidStructuredTextImpl(
             val right = maxOf(startPoint.x, endPoint.x)
             val bottom = maxOf(startPoint.y, endPoint.y)
 
-            println("highlight: 使用坐标选择 start:($startPoint) end:($endPoint) -> rect:($left,$top,$right,$bottom)")
+            Logger.d("highlight", "使用坐标选择 start:($startPoint) end:($endPoint) -> rect:($left,$top,$right,$bottom)")
 
             // 只有当起始点和结束点不同时才创建选择区域
             if (left != right || top != bottom) {
@@ -133,19 +133,19 @@ public class AndroidStructuredTextImpl(
                 ""
             }
 
-            println("copy: 选择区域: ($left,$top,$right,$bottom)")
+            Logger.d("copy", "选择区域: ($left,$top,$right,$bottom)")
             //println("copy: 直接复制长度: ${directCopy.length}, 内容: '$directCopy'")
             //println("copy: 缩小复制长度: ${shrunkCopy.length}, 内容: '$shrunkCopy'")
 
             // 选择最合适的结果
             when {
                 shrunkCopy.isNotBlank() && shrunkCopy.length < directCopy.length -> {
-                    println("copy: 使用缩小选择结果")
+                    Logger.d("copy", "使用缩小选择结果")
                     shrunkCopy
                 }
 
                 directCopy.isNotBlank() -> {
-                    println("copy: 使用直接选择结果")
+                    Logger.d("copy", "使用直接选择结果")
                     directCopy
                 }
 
@@ -154,7 +154,7 @@ public class AndroidStructuredTextImpl(
                 }
             }
         } catch (e: Exception) {
-            println("MuPDF copy error: ${e.message}")
+            Logger.d("MuPDF copy error", "${e.message}")
             // 降级到简单实现
             (nativeStructuredText as com.artifex.mupdf.fitz.StructuredText).asText()
         }
@@ -181,7 +181,7 @@ public class AndroidStructuredTextImpl(
                 )
             }
         } catch (e: Exception) {
-            println("MuPDF snapSelection error: ${e.message}")
+            Logger.d("MuPDF snapSelection error", "${e.message}")
             null
         }
     }
@@ -203,7 +203,7 @@ public class AndroidStructuredTextImpl(
                 }.toTypedArray()
             }.toTypedArray()
         } catch (e: Exception) {
-            println("MuPDF search error: ${e.message}")
+            Logger.d("MuPDF search error", "${e.message}")
             emptyArray()
         }
     }
@@ -244,7 +244,7 @@ public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
             val right = maxOf(startPoint.x, endPoint.x)
             val bottom = maxOf(startPoint.y, endPoint.y)
 
-            println("highlight: 使用坐标选择 start:($startPoint) end:($endPoint) -> rect:($left,$top,$right,$bottom)")
+            Logger.d("highlight", "使用坐标选择 start:($startPoint) end:($endPoint) -> rect:($left,$top,$right,$bottom)")
 
             if (left != right || top != bottom) {
                 val quad = MuPdfQuad(
@@ -258,7 +258,7 @@ public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
                 emptyArray()
             }
         } catch (e: Exception) {
-            println(e)
+            Logger.e("AndroidTextSelector", "Exception", e)
             emptyArray()
         }
     }
@@ -272,7 +272,7 @@ public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
             endPoint.x.toInt(),
             endPoint.y.toInt()
         )
-        println("selectText:start:$startPoint, end:$endPoint, text:$result")
+        Logger.d("selectText", "start:$startPoint, end:$endPoint, text:$result")
         if (null != result) {
             return result.text
         }
@@ -303,7 +303,7 @@ public class DjvuStructuredTextImpl(private val text: Any) : StructuredText {
                 arrayOf(quad)
             }?.toTypedArray() ?: emptyArray()
         } catch (e: Exception) {
-            println("djvu search error: ${e.message}")
+            Logger.d("djvu search error", "${e.message}")
             return emptyArray()
         }
     }

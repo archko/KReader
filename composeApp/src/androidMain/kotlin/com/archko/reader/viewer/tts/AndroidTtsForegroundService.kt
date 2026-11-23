@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-
+import com.archko.reader.viewer.utils.Logger
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -181,20 +181,20 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     private fun setupTtsListener() {
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                println(String.format("onStart:%s, index:%s, size:%s", utteranceId, currentIndex, beanList.size))
+                Logger.d("TTS", String.format("onStart:%s, index:%s, size:%s", utteranceId, currentIndex, beanList.size))
                 currentBean?.let { progressListener?.onStart(it) }
                 _isSpeakingFlow.value = true
                 startForegroundIfNeeded()
             }
 
             override fun onDone(utteranceId: String?) {
-                println(String.format("onDone:%s, index:%s, size:%s", utteranceId, currentIndex, beanList.size))
+                Logger.d("TTS", String.format("onDone:%s, index:%s, size:%s", utteranceId, currentIndex, beanList.size))
                 currentBean?.let { progressListener?.onDone(it) }
                 playNext()
             }
 
             override fun onError(utteranceId: String?) {
-                println("TTS: Error occurred for utterance: $utteranceId, stopping TTS")
+                Logger.d("TTS", "Error occurred for utterance: $utteranceId, stopping TTS")
                 stop()
             }
         })
@@ -254,7 +254,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     fun addToQueue(beans: List<ReflowBean>) {
-        println("addToQueue beans size: ${beans.size}")
+        Logger.d("addToQueue beans size", "${beans.size}")
         val allSegments = mutableListOf<ReflowBean>()
         for (bean in beans) {
             val data = bean.data
@@ -332,10 +332,10 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
 
         if (minutes > 0) {
             sleepTimerJob = serviceScope.launch {
-                println("TTS: 设置睡眠定时器, $minutes 分钟")
+                Logger.d("TTS", "设置睡眠定时器, $minutes 分钟")
                 delay(minutes * 60 * 1000L) // 转换为毫秒
 
-                println("TTS: 睡眠定时器到期，停止朗读")
+                Logger.d("TTS", "睡眠定时器到期，停止朗读")
                 stop()
                 sleepTimerMinutes = 0
             }
@@ -346,7 +346,7 @@ class AndroidTtsForegroundService : Service(), TextToSpeech.OnInitListener {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
         sleepTimerMinutes = 0
-        println("TTS: 取消睡眠定时器")
+        Logger.d("TTS", "取消睡眠定时器")
     }
 
     fun getSleepTimerMinutes(): Int {

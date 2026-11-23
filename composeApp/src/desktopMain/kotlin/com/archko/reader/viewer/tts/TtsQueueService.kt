@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsProgressListener
@@ -137,22 +137,22 @@ class TtsQueueService : SpeechService {
                     if (text.isBlank()) continue
 
                     try {
-                        println("TTS: Attempt ${index + 1} - text: ${text.take(50)}...")
+                        Logger.d("TTS", "Attempt ${index + 1} - text: ${text.take(50)}...")
 
                         val success = attemptSpeak(text)
                         if (success) {
-                            println("TTS: Successfully spoke text on attempt ${index + 1}")
+                            Logger.d("TTS", "Successfully spoke text on attempt ${index + 1}")
                             
                             // 通知完成朗读
                             progressListener?.onDone(task.reflowBean)
                             return
                         }
                     } catch (e: Exception) {
-                        println("TTS: Attempt.error ${index + 1} error: ${e.message}")
+                        Logger.d("TTS", "Attempt.error ${index + 1} error: ${e.message}")
                     }
                 }
 
-                println("TTS: All attempts failed")
+                Logger.d("TTS", "All attempts failed")
                 // 即使失败也通知完成
                 progressListener?.onDone(task.reflowBean)
             } finally {
@@ -169,7 +169,7 @@ class TtsQueueService : SpeechService {
                 }
 
                 currentProcess = TtsUtils.createManagedProcess(isWindows, command)
-                println("TTS: Process started for text: ${text.take(30)}...")
+                Logger.d("TTS", "Process started for text: ${text.take(30)}...")
 
                 // 等待进程完成，但定期检查协程是否被取消
                 while (currentProcess?.isAlive == true && scope.isActive) {
@@ -185,11 +185,11 @@ class TtsQueueService : SpeechService {
                     -1
                 }
 
-                println("TTS: Process finished with exit code: $exitCode")
+                Logger.d("TTS", "Process finished with exit code: $exitCode")
                 exitCode == 0
 
             } catch (e: Exception) {
-                println("TTS: attemptSpeak error: ${e.message}")
+                Logger.d("TTS", "attemptSpeak error: ${e.message}")
                 currentProcess?.destroyForcibly()
                 false
             }
@@ -200,7 +200,7 @@ class TtsQueueService : SpeechService {
         }
 
         fun destroy() {
-            println("TTS: Destroying worker...")
+            Logger.d("TTS", "Destroying worker...")
 
             // 强制终止当前进程
             currentProcess?.destroyForcibly()
@@ -220,7 +220,7 @@ class TtsQueueService : SpeechService {
         }
         // 添加 JVM 关闭钩子，确保应用退出时清理 TTS 进程
         Runtime.getRuntime().addShutdownHook(Thread {
-            println("TTS: JVM shutdown hook triggered, cleaning up...")
+            Logger.d("TTS", "JVM shutdown hook triggered, cleaning up...")
             TtsUtils.forceKillAllTtsProcesses()
         })
     }
@@ -233,16 +233,16 @@ class TtsQueueService : SpeechService {
             rate = savedVoice.rate
             volume = savedVoice.volume
             _selectedVoiceFlow.value = savedVoice
-            println("TTS: Loaded saved voice: ${savedVoice.name} with rate=${savedVoice.rate}, volume=${savedVoice.volume}")
+            Logger.d("TTS", "Loaded saved voice: ${savedVoice.name} with rate=${savedVoice.rate}, volume=${savedVoice.volume}")
         } catch (e: Exception) {
-            println("TTS: Failed to initialize voice setting: ${e.message}")
+            Logger.d("TTS", "Failed to initialize voice setting: ${e.message}")
         }
     }
 
     private suspend fun ensureWorker(): TtsWorker {
         return workerMutex.withLock {
             if (ttsWorker == null) {
-                println("TTS: Creating new worker...")
+                Logger.d("TTS", "Creating new worker...")
                 ttsWorker = TtsWorker(selectedVoice, rate, volume)
             }
             ttsWorker!!
@@ -258,7 +258,7 @@ class TtsQueueService : SpeechService {
 
     override fun speak(reflowBean: ReflowBean) {
         val text = reflowBean.data ?: ""
-        println("TTS: Speak requested: ${text.take(50)}...")
+        Logger.d("TTS", "Speak requested: ${text.take(50)}...")
 
         GlobalScope.launch {
             // 完全重启：先销毁旧的工作器
@@ -274,7 +274,7 @@ class TtsQueueService : SpeechService {
             val worker = ensureWorker()
             worker.notifyNewTask()
 
-            println("TTS: Speak task added and worker started")
+            Logger.d("TTS", "Speak task added and worker started")
         }
     }
 
@@ -293,7 +293,7 @@ class TtsQueueService : SpeechService {
             val worker = ensureWorker()
             worker.notifyNewTask()
 
-            //println("TTS: Added to queue: ${text.take(50)}... (Queue size: $queueSize)")
+            //Logger.d("TTS", "Added to queue: ${text.take(50)}... (Queue size: $queueSize)")
         }
     }
 
@@ -307,7 +307,7 @@ class TtsQueueService : SpeechService {
         queueMutex.withLock {
             taskQueue.clear()
         }
-        println("TTS: Queue cleared")
+        Logger.d("TTS", "Queue cleared")
     }
 
     override fun stop() {
@@ -325,7 +325,7 @@ class TtsQueueService : SpeechService {
             // 通知朗读完成
             progressListener?.onFinish()
 
-            println("TTS: Stopped")
+            Logger.d("TTS", "Stopped")
         }
     }
 
@@ -338,7 +338,7 @@ class TtsQueueService : SpeechService {
             _isSpeakingFlow.value = false
             currentReflowBean.set(null)
 
-            println("TTS: Paused")
+            Logger.d("TTS", "Paused")
         }
     }
 
@@ -374,7 +374,7 @@ class TtsQueueService : SpeechService {
             // 只保留中文和英文语音
             TtsUtils.filterChineseAndEnglishVoices(allVoices)
         } catch (e: Exception) {
-            println("Get voices error: ${e.message}")
+            Logger.d("Get voices error", "${e.message}")
             emptyList()
         }
     }
@@ -425,7 +425,7 @@ class TtsQueueService : SpeechService {
     }
 
     fun destroy() {
-        println("TTS: Service destroy requested")
+        Logger.d("TTS", "Service destroy requested")
 
         runBlocking {
             destroyWorker()
@@ -434,7 +434,7 @@ class TtsQueueService : SpeechService {
         // 强制终止所有可能的 TTS 进程
         TtsUtils.forceKillAllTtsProcesses()
 
-        println("TTS: Service destroyed")
+        Logger.d("TTS", "Service destroyed")
     }
 
     override suspend fun saveVoiceSetting(voice: Voice) = withContext(Dispatchers.IO) {
@@ -445,7 +445,7 @@ class TtsQueueService : SpeechService {
         try {
             val configFile = File(TtsUtils.getConfigFilePath())
             if (!configFile.exists()) {
-                println("TTS: No voice setting file found")
+                Logger.d("TTS", "No voice setting file found")
                 return@withContext getDefaultVoice()
             }
 
@@ -453,10 +453,10 @@ class TtsQueueService : SpeechService {
             val json = Json { ignoreUnknownKeys = true }
             val voice = json.decodeFromString<Voice>(jsonString)
 
-            println("TTS: Voice setting loaded from ${configFile.absolutePath}")
+            Logger.d("TTS", "Voice setting loaded from ${configFile.absolutePath}")
             return@withContext voice
         } catch (e: Exception) {
-            println("TTS: Failed to load voice setting: ${e.message}")
+            Logger.d("TTS", "Failed to load voice setting: ${e.message}")
         }
         return@withContext getDefaultVoice()
     }

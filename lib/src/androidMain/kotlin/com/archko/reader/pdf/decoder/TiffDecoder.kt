@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.net.Uri
@@ -213,7 +213,7 @@ public class TiffDecoder(
                 ceil(pageHeight * scale).toInt()
             )
         } catch (e: Exception) {
-            println("renderPageRegion error: ${documentInfo ?: ""}, $e")
+            Logger.e("TiffDecoder", "renderPageRegion error: ${documentInfo ?: ""}, $e", e)
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -248,7 +248,7 @@ public class TiffDecoder(
             val scaleY = outHeight.toFloat() / originalSize.height
             val scale = minOf(scaleX, scaleY)
 
-            println("TiffDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale (scaleX=$scaleX, scaleY=$scaleY)")
+            Logger.d("TiffDecoder.renderPage", "原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 缩放=$scale (scaleX=$scaleX, scaleY=$scaleY)")
 
             return decodeRegionToImageBitmap(
                 0,
@@ -260,7 +260,7 @@ public class TiffDecoder(
                 ceil(originalSize.height * scale).toInt()
             )
         } catch (e: Exception) {
-            println("renderPage error: $e")
+            Logger.d("renderPage error", "$e")
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }

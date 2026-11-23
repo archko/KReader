@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aallam.openai.client.OpenAI
 import com.aallam.openai.client.OpenAIHost
+import com.archko.reader.viewer.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kreader.composeapp.generated.resources.Res
@@ -75,7 +76,7 @@ fun FreeModelBrowserDialog(
                     .sorted()
             }
         } catch (e: Exception) {
-            println("OpenAI:$e.message")
+            Logger.e("FreeModelBrowserDialog", "OpenAI: ${e.message}", e)
             errorMsg = getString(Res.string.ai_free_fetch_failed).format(e.message ?: "")
         } finally {
             isLoading = false

@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toAwtImage
 import java.awt.image.BufferedImage
@@ -61,7 +61,7 @@ internal actual object ImageSizeCalculator {
             bufferedImage?.flush()
         } catch (e: Exception) {
             // 如果回收失败，忽略错误
-            println("ImageSizeCalculator.recycleImageBitmap: JVM回收失败 - ${e.message}")
+            Logger.d("ImageSizeCalculator.recycleImageBitmap", "JVM回收失败 - ${e.message}")
         }
     }
 }

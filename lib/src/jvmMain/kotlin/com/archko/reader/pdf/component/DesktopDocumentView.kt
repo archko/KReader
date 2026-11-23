@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -141,7 +141,7 @@ public fun DesktopDocumentView(
 
     // 监听外部zoom参数的变化，并更新内部vZoom
     LaunchedEffect(zoom) {
-        println("DesktopDocumentView: 新的zoom: $zoom, 旧的vZoom=${stateHolder.vZoom.value}")
+        Logger.d("DesktopDocumentView", "新的zoom: $zoom, 旧的vZoom=${stateHolder.vZoom.value}")
         stateHolder.vZoom.value = zoom.toFloat()
 
         stateHolder.pageViewState.updateViewSize(
@@ -425,7 +425,7 @@ public fun DesktopDocumentView(
                     return@onSizeChanged
                 }
                 stateHolder.viewSize.value = size
-                println("DocumentView: onSizeChanged:${stateHolder.viewSize.value}, vZoom:${stateHolder.vZoom.value}, list: ${list.size}, orientation: ${stateHolder.orientation.value}")
+                Logger.d("DocumentView", "onSizeChanged:${stateHolder.viewSize.value}, vZoom:${stateHolder.vZoom.value}, list: ${list.size}, orientation: ${stateHolder.orientation.value}")
                 stateHolder.pageViewState.updateViewSize(
                     stateHolder.viewSize.value,
                     stateHolder.vZoom.value,
@@ -503,7 +503,7 @@ public fun DesktopDocumentView(
             selectedPage = stateHolder.selectedPage.value,
             textSelector = textSelector,
             onCopy = { text ->
-                println("复制文本: $text")
+                Logger.d("复制文本", "$text")
                 stateHolder.showTextActionToolbar.value = false
                 stateHolder.selectedPage.value?.clearTextSelection()
                 stateHolder.selectedPage.value = null

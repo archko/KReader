@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.PdfApp
 import com.archko.reader.pdf.util.FileUtils
 import java.io.File
@@ -51,6 +51,6 @@ public actual fun getWebdavCacheDir(): File {
 
 public actual fun saveWebdavCacheFile(name: String, content: String) {
     val file = File(getWebdavCacheDir(), name)
-    println("name:$name, content:$content")
+    Logger.d("name", "$name, content:$content")
     file.writeText(content)
 }

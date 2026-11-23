@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.util
-
+import com.archko.reader.viewer.utils.Logger
 /**
  * 阅读时长追踪器
  * @author: archko 2026/3/1
@@ -17,7 +17,7 @@ public class ReadingTimeTracker {
         sessionStartTime = System.currentTimeMillis()
         accumulatedTime = 0
         isActive = true
-        println("ReadingTimeTracker.startSession: ${sessionStartTime}")
+        Logger.d("ReadingTimeTracker.startSession", "${sessionStartTime}")
     }
 
     /**
@@ -28,7 +28,7 @@ public class ReadingTimeTracker {
         val duration = System.currentTimeMillis() - sessionStartTime
         accumulatedTime += duration
         isActive = false
-        println("ReadingTimeTracker.pauseSession: duration=${duration}ms, accumulated=${accumulatedTime}ms")
+        Logger.d("ReadingTimeTracker.pauseSession", "duration=${duration}ms, accumulated=${accumulatedTime}ms")
         return accumulatedTime / 1000  // 返回秒数
     }
 
@@ -39,7 +39,7 @@ public class ReadingTimeTracker {
         if (isActive) return
         sessionStartTime = System.currentTimeMillis()
         isActive = true
-        println("ReadingTimeTracker.resumeSession: ${sessionStartTime}")
+        Logger.d("ReadingTimeTracker.resumeSession", "${sessionStartTime}")
     }
 
     /**

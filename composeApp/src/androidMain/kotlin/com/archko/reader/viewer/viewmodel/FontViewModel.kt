@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.viewmodel
-
+import com.archko.reader.viewer.utils.Logger
 import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -46,7 +46,7 @@ class FontViewModel : ViewModel() {
             val allFiles = scanDirs.flatMap { dir ->
                 if (dir.exists() && dir.isDirectory) {
                     dir.listFiles { file ->
-                        println("font:${file.absolutePath}")
+                        Logger.d("font", "${file.absolutePath}")
                         val ext = file.extension.lowercase()
                         ext == "ttf" || ext == "otf"// || ext == "ttc"
                     }?.toList() ?: emptyList()
@@ -54,7 +54,7 @@ class FontViewModel : ViewModel() {
                     emptyList()
                 }
             }.filter { file ->
-                println("filter.font:${file.absolutePath}")
+                Logger.d("filter.font", "${file.absolutePath}")
                 // 1. 过滤掉黑名单中的绝对路径
                 // 2. 也可以通过文件名关键词过滤，比如过滤掉阿拉伯文(Naskh)
                 !blackListPaths.contains(file.absolutePath) &&
@@ -68,7 +68,7 @@ class FontViewModel : ViewModel() {
             _fontFiles.value = options
             _isFontLoading.value = false
 
-            println("Final font list size: ${allFiles.size}")
+            Logger.d("Final font list size", "${allFiles.size}")
         }
     }
 }

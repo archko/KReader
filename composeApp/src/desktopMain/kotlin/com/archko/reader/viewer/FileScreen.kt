@@ -68,6 +68,7 @@ import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.dialog.BookInfoDialog
+import com.archko.reader.viewer.utils.Logger
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
@@ -216,24 +217,24 @@ fun FileScreen(
         // 监听文件路径变化
         LaunchedEffect(initialFilePath) {
             initialFilePath?.let { filePath ->
-                println("FileScreen: 处理文件路径: $filePath")
+                Logger.d("FileScreen", "处理文件路径: $filePath")
                 val file = File(filePath)
-                println("FileScreen: 文件是否存在: ${file.exists()}")
+                Logger.d("FileScreen", "文件是否存在: ${file.exists()}")
 
                 val path = file.absolutePath
                 if (file.exists() && (FileTypeUtils.isImageFile(path)
                             || FileTypeUtils.isDocumentFile(path)
                             || FileTypeUtils.isTiffFile(path))
                 ) {
-                    println("FileScreen: 文件类型支持，准备打开")
+                    Logger.d("FileScreen", "文件类型支持，准备打开")
                     // 检查是否有历史记录，如果有则使用历史记录的页码，否则从第0页开始
                     viewModel.getRecent(path)
                     val startPage = viewModel.recent?.page?.toInt() ?: 0
-                    println("FileScreen: 开始页码: $startPage")
+                    Logger.i("FileScreen", "开始页码: $startPage")
                     openDocRequest = OpenDocRequest(listOf(DocumentInfo(path = path, fileSize = file.length())), startPage)
-                    println("FileScreen: 已设置打开文档请求")
+                    Logger.d("FileScreen", "已设置打开文档请求")
                 } else {
-                    println("FileScreen: 文件不存在或类型不支持")
+                    Logger.w("FileScreen", "文件不存在或类型不支持")
                     toaster.show(
                         message = getString(Res.string.unsupported_document, path),
                         type = ToastType.Error,

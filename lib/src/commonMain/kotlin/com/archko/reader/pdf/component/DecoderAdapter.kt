@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
@@ -68,7 +68,7 @@ public class DecoderAdapter(
             val aPage = task.aPage
             val (thumbWidth, thumbHeight) = calculateThumbnailSize(aPage.width, aPage.height)
 
-            //println("decodePage.page:${task.pageIndex}, $thumbWidth-$thumbHeight")
+            //Logger.d("decodePage.page", "${task.pageIndex}, $thumbWidth-$thumbHeight")
             // 多个 PageViewState 可能共享同一个 ImageDecoder（单页/连续模式切换、Pager 预加载相邻页），
             // 原生文档句柄不是线程安全的，必须串行化所有解码调用。
             synchronized(imageDecoder) {
@@ -81,7 +81,7 @@ public class DecoderAdapter(
                 )
             }
         } catch (e: Exception) {
-            println("PdfDecoderAdapter.decodePage error: ${e.message}")
+            Logger.d("PdfDecoderAdapter.decodePage error", "${e.message}")
             null
         }
     }
@@ -144,11 +144,11 @@ public class DecoderAdapter(
             }
 
             aPage.autoCropBounds = finalCropBounds
-            println("PdfDecoderAdapter.processCrop: page=${task.pageIndex}, cropBounds=$finalCropBounds")
+            Logger.d("PdfDecoderAdapter.processCrop", "page=${task.pageIndex}, cropBounds=$finalCropBounds")
 
             CropResult(task.pageIndex, finalCropBounds)
         } catch (e: Exception) {
-            println("PdfDecoderAdapter.processCrop error: ${e.message}")
+            Logger.d("PdfDecoderAdapter.processCrop error", "${e.message}")
             CropResult(task.pageIndex, null)
         }
     }
@@ -178,7 +178,7 @@ public class DecoderAdapter(
             }
         }
 
-        println("PdfDecoderAdapter.generateCropTasks: generated ${tasks.size} crop tasks")
+        Logger.d("PdfDecoderAdapter.generateCropTasks", "generated ${tasks.size} crop tasks")
         return tasks
     }
 }

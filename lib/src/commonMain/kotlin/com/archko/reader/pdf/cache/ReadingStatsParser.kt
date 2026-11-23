@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.entity.ReadingStats
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -120,12 +120,12 @@ public object ReadingStatsParser {
             statsArray?.forEach { element ->
                 val stats = parseStatsItem(element.jsonObject)
                 if (stats != null) {
-                    println("Parsed ReadingStats: $stats")
+                    Logger.d("Parsed ReadingStats", "$stats")
                     statsList.add(stats)
                 }
             }
         } catch (e: Exception) {
-            println("Error parsing ReadingStats JSON: ${e.message}")
+            Logger.d("Error parsing ReadingStats JSON", "${e.message}")
             e.printStackTrace()
         }
 

@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -67,7 +67,7 @@ public class ImagesDecoder(
                     try {
                         eldest.value.recycle()
                     } catch (e: Exception) {
-                        println("Error closing BitmapRegionDecoder: $e")
+                        Logger.d("Error closing BitmapRegionDecoder", "$e")
                     }
                     return true
                 }
@@ -163,7 +163,7 @@ public class ImagesDecoder(
                     BitmapFactory.decodeStream(inputStream, null, options)
                 }
             } catch (e: Exception) {
-                println("Failed to decode bounds for ${doc.uri}: $e")
+                Logger.d("Failed to decode bounds for ${doc.uri}", "$e")
             }
         } else if (doc.path != null) {
             BitmapFactory.decodeFile(doc.path, options)
@@ -233,7 +233,7 @@ public class ImagesDecoder(
                 ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for index $index: $e")
+            Logger.d("renderPageRegion error for index $index", "$e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -274,7 +274,7 @@ public class ImagesDecoder(
             inSampleSize = calculateInSampleSize(originalSize.width, originalSize.height, targetWidth, targetHeight)
         }
 
-        println("ImagesDecoder.renderPage: 原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 目标=$targetWidth-$targetHeight, inSampleSize=${options.inSampleSize}")
+        Logger.d("ImagesDecoder.renderPage", "原始=${originalSize.width}x${originalSize.height}, 输出=${outWidth}x${outHeight}, 目标=$targetWidth-$targetHeight, inSampleSize=${options.inSampleSize}")
 
         val bitmap = decodeImage(aPage.index, options)
         if (bitmap != null) {
@@ -311,7 +311,7 @@ public class ImagesDecoder(
                     null
                 }
             } catch (e: Exception) {
-                println("Failed to create BitmapRegionDecoder for index $index: $e")
+                Logger.d("Failed to create BitmapRegionDecoder for index $index", "$e")
                 null
             } ?: throw RuntimeException("Cannot create BitmapRegionDecoder")
         }
@@ -326,7 +326,7 @@ public class ImagesDecoder(
                     BitmapFactory.decodeStream(inputStream, null, options)
                 }
             } catch (e: Exception) {
-                println("Failed to decode image from URI ${doc.uri}: $e")
+                Logger.d("Failed to decode image from URI ${doc.uri}", "$e")
                 null
             }
         } else if (doc.path != null) {
@@ -392,7 +392,7 @@ public class ImagesDecoder(
             try {
                 decoder.recycle()
             } catch (e: Exception) {
-                println("Error closing BitmapRegionDecoder: $e")
+                Logger.d("Error closing BitmapRegionDecoder", "$e")
             }
         }
         regionDecoders.clear()

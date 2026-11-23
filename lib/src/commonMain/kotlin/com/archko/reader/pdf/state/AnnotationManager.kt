@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.state
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -192,7 +192,7 @@ public class AnnotationManager(public val path: String) {
         try {
             val saveFile = getAnnotationCacheFile()
             val content = toJson()
-            println("save.${saveFile.absolutePath}")
+            Logger.d("App", "save.${saveFile.absolutePath}")
             saveFile.writeText(content, Charsets.UTF_8)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -206,7 +206,7 @@ public class AnnotationManager(public val path: String) {
                 return false
             }
             val content = saveFile.readText(Charsets.UTF_8)
-            println("load.${saveFile.absolutePath}")
+            Logger.d("App", "load.${saveFile.absolutePath}")
             if (content.isNotEmpty()) {
                 fromJson(content)
                 true
@@ -227,12 +227,12 @@ public class AnnotationManager(public val path: String) {
             val fileName = file.name
             val jsonObj = Json.parseToJsonElement(json).jsonObject
             if (fileName != jsonObj["fileName"]?.jsonPrimitive?.content) {
-                println("new fileName:$fileName")
+                Logger.d("new fileName", "$fileName")
                 getAnnotationCacheFile().delete()
                 return
             }
             if (size != jsonObj["size"]?.jsonPrimitive?.longOrNull) {
-                println("new filesize:$size")
+                Logger.d("new filesize", "$size")
                 getAnnotationCacheFile().delete()
                 return
             }

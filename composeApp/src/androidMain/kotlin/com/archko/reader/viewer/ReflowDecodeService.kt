@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.IntSize
 import com.archko.reader.k2pdfopt.K2PdfOpt
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.viewer.utils.ReflowCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -153,7 +154,7 @@ public class ReflowDecodeService(
         )
         val cached = tileCache.load(cacheKey)
         if (cached != null) {
-            println("ReflowDecodeService: cache HIT page=${request.pageIndex}")
+            Logger.d("ReflowDecodeService", "cache HIT page=${request.pageIndex}")
             request.onResult(cached)
             return
         }
@@ -184,7 +185,7 @@ public class ReflowDecodeService(
                 crop = false
             )
         } catch (e: Exception) {
-            println("ReflowDecodeService: renderPage failed page=${request.pageIndex}: ${e.message}")
+            Logger.e("ReflowDecodeService", "renderPage failed page=${request.pageIndex}: ${e.message}", e)
             request.onResult(emptyList())
             return
         }
@@ -197,7 +198,7 @@ public class ReflowDecodeService(
         val sourceBitmap: Bitmap = try {
             imageBitmap.asAndroidBitmap()
         } catch (e: Exception) {
-            println("ReflowDecodeService: asAndroidBitmap failed page=${request.pageIndex}: ${e.message}")
+            Logger.e("ReflowDecodeService", "asAndroidBitmap failed page=${request.pageIndex}: ${e.message}", e)
             request.onResult(emptyList())
             return
         }
@@ -225,7 +226,7 @@ public class ReflowDecodeService(
             tileCache.save(cacheKey, tiles)
         }
 
-        println("ReflowDecodeService: decoded page=${request.pageIndex}, tiles=${tiles.size}")
+        Logger.d("ReflowDecodeService", "decoded page=${request.pageIndex}, tiles=${tiles.size}")
         request.onResult(tiles)
     }
 
@@ -264,7 +265,7 @@ public class ReflowDecodeService(
             val pageWidth = opt.pageWidth
             val pageHeight = opt.pageHeight
             if (pageWidth <= 0 || pageHeight <= 0) {
-                println("ReflowDecodeService: k2pdfopt empty output: $pageWidth×$pageHeight")
+                Logger.w("ReflowDecodeService", "k2pdfopt empty output: $pageWidth×$pageHeight")
                 return list
             }
 
@@ -277,7 +278,7 @@ public class ReflowDecodeService(
                 y += h
             }
         } catch (e: Exception) {
-            println("ReflowDecodeService: k2pdfopt error: ${e.message}")
+            Logger.e("ReflowDecodeService", "k2pdfopt error: ${e.message}", e)
         } finally {
             try { opt.releasePage() } catch (_: Exception) { }
         }

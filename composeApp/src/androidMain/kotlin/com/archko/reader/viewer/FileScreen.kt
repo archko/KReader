@@ -68,6 +68,7 @@ import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.getExtension
@@ -125,7 +126,7 @@ fun FileScreen(
             if (recentList.isEmpty()) {
                 val tempProgressList = TtsTempProgressHelper.getAllTempProgress(context)
                 if (tempProgressList.isNotEmpty()) {
-                    println("FileScreen: 发现${tempProgressList.size}个临时进度，开始恢复")
+                    Logger.d("FileScreen", "发现${tempProgressList.size}个临时进度，开始恢复")
                     for (tempProgress in tempProgressList) {
                         try {
                             viewModel.updateRecent(
@@ -133,9 +134,9 @@ fun FileScreen(
                                 tempProgress.path
                             )
 
-                            println("FileScreen: 恢复临时进度成功: ${tempProgress.path}, page=${tempProgress.page}")
+                            Logger.i("FileScreen", "恢复临时进度成功: ${tempProgress.path}, page=${tempProgress.page}")
                         } catch (e: Exception) {
-                            println("FileScreen: 恢复临时进度失败: ${tempProgress.path}, error=${e.message}")
+                            Logger.e("FileScreen", "恢复临时进度失败: ${tempProgress.path}, error=${e.message}", e)
                         }
                     }
                     TtsTempProgressHelper.clearAllTempProgress(context)

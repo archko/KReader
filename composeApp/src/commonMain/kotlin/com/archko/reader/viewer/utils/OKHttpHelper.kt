@@ -59,11 +59,11 @@ object OKHttpHelper {
             }
 
             val responseBody = response.body<String>()
-            println("Response status: ${response.status}")
-            println("Response body: $responseBody")
+            Logger.d("OKHttpHelper", "Response status: ${response.status}")
+            Logger.d("OKHttpHelper", "Response body: $responseBody")
             return responseBody
         } catch (e: Exception) {
-            println("An error occurred: ${e.message}")
+            Logger.e("OKHttpHelper", "An error occurred: ${e.message}", e)
         } finally {
             //client.close()
         }
@@ -80,11 +80,11 @@ object OKHttpHelper {
             }
 
             val responseBody = response.body<String>()
-            println("Response status: ${response.status}")
-            println("Response body: $responseBody")
+            Logger.d("OKHttpHelper", "Response status: ${response.status}")
+            Logger.d("OKHttpHelper", "Response body: $responseBody")
             return responseBody
         } catch (e: Exception) {
-            println("An error occurred: ${e.message}")
+            Logger.e("OKHttpHelper", "An error occurred: ${e.message}", e)
         } finally {
             //client.close()
         }

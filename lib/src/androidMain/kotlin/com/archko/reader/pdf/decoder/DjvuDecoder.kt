@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.net.Uri
@@ -126,7 +126,7 @@ public class DjvuDecoder(
                 val scaleY = outHeight.toFloat() / pageHeight
                 val scale = minOf(scaleX, scaleY)
 
-                println("renderDjvuPage:目标尺寸=$outWidth-$outHeight, 原始=${pageWidth}x${pageHeight}, 缩放=$scale")
+                Logger.d("renderDjvuPage", "目标尺寸=$outWidth-$outHeight, 原始=${pageWidth}x${pageHeight}, 缩放=$scale")
 
                 val bitmap = decodeDjvuRegionToBitmap(
                     djvuLoader,
@@ -144,7 +144,7 @@ public class DjvuDecoder(
 
                 return imageBitmap
             } catch (e: Exception) {
-                println("DjvuDecoder.renderPage error: $e")
+                Logger.d("DjvuDecoder.renderPage error", "$e")
                 return null
             }
         }
@@ -200,7 +200,7 @@ public class DjvuDecoder(
         try {
             val count: Int = pageCount
             val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize)
-            println("DjvuDecoder.initPageSizeBean:$psb")
+            Logger.d("DjvuDecoder.initPageSizeBean", "$psb")
 
             if (null != psb && psb.list != null && psb.list!!.size == count) {
                 // 缓存存在且完整，直接使用
@@ -222,7 +222,7 @@ public class DjvuDecoder(
                     list.add(size)
                 }
                 originalPageSizes = list
-                println("DjvuDecoder.initPageSizeBean: 从缓存加载了 ${list.size} 个页面尺寸")
+                Logger.d("DjvuDecoder.initPageSizeBean", "从缓存加载了 ${list.size} 个页面尺寸")
                 return
             }
 
@@ -230,7 +230,7 @@ public class DjvuDecoder(
             pageSizeBean = PageSizeBean()
             pageSizeBean!!.list = aPageList
         } catch (e: Exception) {
-            println("DjvuDecoder.initPageSizeBean error: ${e.message}")
+            Logger.d("DjvuDecoder.initPageSizeBean error", "${e.message}")
             aPageList.clear()
         }
     }
@@ -249,7 +249,7 @@ public class DjvuDecoder(
             CustomImageFetcher.cacheBitmap(bitmap?.asAndroidBitmap(), path)
             bitmap?.let { BitmapPool.release(it.asAndroidBitmap()) }
         } catch (e: Exception) {
-            println("缓存封面失败: ${e.message}")
+            Logger.d("缓存封面失败", "${e.message}")
         }
     }
 
@@ -289,7 +289,7 @@ public class DjvuDecoder(
             // 更新对外提供的页面尺寸
             pageSizes = scaledPageSizes
             imageSize = IntSize(documentWidth, totalHeight.toInt())
-            println("DjvuDecoder.caculateSize: documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
+            Logger.d("DjvuDecoder.caculateSize", "documentWidth=$documentWidth, totalHeight=$totalHeight, pageCount=${originalPageSizes.size}")
         }
     }
 
@@ -306,11 +306,11 @@ public class DjvuDecoder(
         fullPageCacheScale = 0f
         djvuLoader?.close()
         if (cachePage && aPageList.isNotEmpty()) {
-            println("DjvuDecoder.close:${aPageList.size}")
+            Logger.d("DjvuDecoder.close", "${aPageList.size}")
             try {
                 APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize, aPageList)
             } catch (e: Exception) {
-                println("DjvuDecoder.close: 保存缓存失败: ${e.message}")
+                Logger.d("DjvuDecoder.close", "保存缓存失败: ${e.message}")
             }
         }
 
@@ -322,12 +322,12 @@ public class DjvuDecoder(
         val list = mutableListOf<Size>()
 
         if (djvuLoader == null || !djvuLoader!!.isOpened) {
-            println("DjvuDecoder: DjvuLoader not opened")
+            Logger.d("DjvuDecoder", "DjvuLoader not opened")
             return list
         }
 
         var totalHeight = 0
-        println("DjVu document has $pageCount pages")
+        Logger.d("App", "DjVu document has $pageCount pages")
 
         for (i in 0 until pageCount) {
             val pageInfo = djvuLoader!!.getPageInfo(i)
@@ -355,11 +355,11 @@ public class DjvuDecoder(
             try {
                 APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: documentInfo.uri ?: "", documentInfo.fileSize, aPageList)
             } catch (e: Exception) {
-                println("DjvuDecoder: 缓存页面尺寸失败: ${e.message}")
+                Logger.d("DjvuDecoder", "缓存页面尺寸失败: ${e.message}")
             }
         }
 
-        println("DjvuDecoder.prepareSizes: 从文档加载了 ${list.size} 个页面尺寸")
+        Logger.d("DjvuDecoder.prepareSizes", "从文档加载了 ${list.size} 个页面尺寸")
         return list
     }
 
@@ -372,7 +372,7 @@ public class DjvuDecoder(
             val djvuOutlines = djvuLoader!!.getOutline()
             return convertDjvuOutlinesToItems(djvuOutlines)
         } catch (e: Exception) {
-            println("Failed to load DjVu outlines: ${e.message}")
+            Logger.d("Failed to load DjVu outlines", "${e.message}")
             return emptyList()
         }
     }
@@ -436,11 +436,11 @@ public class DjvuDecoder(
             }
 
             linksCache[pageIndex] = hyperlinks
-            //println("DjvuDecoder.decodePageLinks: page=$pageIndex, links=${hyperlinks.size}")
+            //Logger.d("DjvuDecoder.decodePageLinks", "page=$pageIndex, links=${hyperlinks.size}")
 
             hyperlinks
         } catch (e: Exception) {
-            println("获取页面链接失败: $e")
+            Logger.d("获取页面链接失败", "$e")
             emptyList()
         }
     }
@@ -583,7 +583,7 @@ public class DjvuDecoder(
                 val scaleY = outHeight.toFloat() / cropBounds.height
                 val scale = minOf(scaleX, scaleY)
 
-                println("DjvuDecoder.renderPage:croped page=$index, $outWidth-$outHeight, 切边后尺寸=${(scale * cropBounds.width).toInt()}x${(scale * cropBounds.height).toInt()}, bounds=$cropBounds")
+                Logger.d("DjvuDecoder.renderPage", "croped page=$index, $outWidth-$outHeight, 切边后尺寸=${(scale * cropBounds.width).toInt()}x${(scale * cropBounds.height).toInt()}, bounds=$cropBounds")
 
                 val bitmap = decodeDjvuRegionToBitmap(
                     djvuLoader!!,
@@ -611,7 +611,7 @@ public class DjvuDecoder(
                 val scaleY = outHeight.toFloat() / originalSize.height
                 val scale = minOf(scaleX, scaleY)
 
-                println("DjvuDecoder.renderPage:page=$index, 目标尺寸=$outWidth-$outHeight, 原始=${originalSize.width}x${originalSize.height}, 缩放=$scale")
+                Logger.d("DjvuDecoder.renderPage", "page=$index, 目标尺寸=$outWidth-$outHeight, 原始=${originalSize.width}x${originalSize.height}, 缩放=$scale")
 
                 val bitmap = decodeDjvuRegionToBitmap(
                     djvuLoader!!,
@@ -652,7 +652,7 @@ public class DjvuDecoder(
                             bottomBound
                         )
 
-                        println("DjvuDecoder.cropBounds:$index, 原始尺寸=${originalSize.width}x${originalSize.height}, 切边区域=($cropBounds), 切边后尺寸=${djvuCropBounds}")
+                        Logger.d("DjvuDecoder.cropBounds", "$index, 原始尺寸=${originalSize.width}x${originalSize.height}, 切边区域=($cropBounds), 切边后尺寸=${djvuCropBounds}")
 
                         if (djvuCropBounds.width < 0 || djvuCropBounds.height < 0) {
                             aPage.autoCropBounds = Rect(
@@ -676,7 +676,7 @@ public class DjvuDecoder(
             }
 
         } catch (e: Exception) {
-            println("DjvuDecoder.renderPage error: $e")
+            Logger.d("DjvuDecoder.renderPage error", "$e")
             return ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -732,7 +732,7 @@ public class DjvuDecoder(
 
         val croppedImageBitmap = croppedAndroidBitmap.asImageBitmap()
 
-        println("DjvuDecoder.cropImageBitmap:$index, 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight), 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
+        Logger.d("DjvuDecoder.cropImageBitmap", "$index, 原始尺寸=${originalBitmap.width}x${originalBitmap.height}, 切边区域=($safeX,$safeY,$safeWidth,$safeHeight), 切边后尺寸=${croppedImageBitmap.width}x${croppedImageBitmap.height}")
 
         return croppedImageBitmap
     }
@@ -771,7 +771,7 @@ public class DjvuDecoder(
                 null
             }
         } catch (e: Exception) {
-            println("TTS: 解码第${pageIndex + 1}页失败: ${e.message}")
+            Logger.d("TTS", "解码第${pageIndex + 1}页失败: ${e.message}")
             null
         }
     }
@@ -785,7 +785,7 @@ public class DjvuDecoder(
         }
 
         val totalPages = originalPageSizes.size
-        println("TTS: 开始解析所有页面，共${totalPages}页")
+        Logger.d("TTS", "开始解析所有页面，共${totalPages}页")
         val allTexts = mutableListOf<ReflowBean>()
 
         var addedPages = 0
@@ -807,20 +807,20 @@ public class DjvuDecoder(
                         )
                         addedPages++
                     } else {
-                        println("TTS: 第${currentPage + 1}页文本太短: ${pageText.length}")
+                        Logger.d("TTS", "第${currentPage + 1}页文本太短: ${pageText.length}")
                         skippedPages++
                     }
                 } else {
-                    println("TTS: 第${currentPage + 1}页无文本内容")
+                    Logger.d("TTS", "第${currentPage + 1}页无文本内容")
                     skippedPages++
                 }
             } catch (e: Exception) {
-                println("TTS: 解码第${currentPage + 1}页失败: ${e.message}")
+                Logger.d("TTS", "解码第${currentPage + 1}页失败: ${e.message}")
                 skippedPages++
             }
         }
 
-        println("TTS: 解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
+        Logger.d("TTS", "解析完成，有效页数=$addedPages，跳过页数=$skippedPages")
         return allTexts
     }
     
@@ -887,7 +887,7 @@ public class DjvuDecoder(
                 }
             }
         } catch (e: Exception) {
-            println("DjvuDecoder.search error: ${e.message}")
+            Logger.d("DjvuDecoder.search error", "${e.message}")
             e.printStackTrace()
         }
         

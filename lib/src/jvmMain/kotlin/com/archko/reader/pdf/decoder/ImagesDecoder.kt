@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -60,7 +60,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                     try {
                         eldest.value.destroy()
                     } catch (e: Exception) {
-                        println("Error closing MuPDF Document: $e")
+                        Logger.d("Error closing MuPDF Document", "$e")
                     }
                     return true
                 }
@@ -80,7 +80,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                     try {
                         eldest.value.close()
                     } catch (e: Exception) {
-                        println("Error closing HeifLoader: $e")
+                        Logger.d("Error closing HeifLoader", "$e")
                     }
                     return true
                 }
@@ -136,7 +136,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
 
             CustomImageFetcher.cacheBitmap(bitmap, path)
         } catch (e: Exception) {
-            println("缓存封面失败: ${e.message}")
+            Logger.d("缓存封面失败", "${e.message}")
         }
     }
 
@@ -236,7 +236,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 }
             }
         } catch (e: Exception) {
-            println("renderImageAtScale error for file ${documents[index]}: $e")
+            Logger.d("renderImageAtScale error for file ${documents[index]}", "$e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -353,7 +353,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
         return try {
             val patchX = region.left.toInt()
             val patchY = region.top.toInt()
-            println("ImagesDecoder.renderPageRegion:index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
+            Logger.d("ImagesDecoder.renderPageRegion", "index:$index scale:$scale, w-h:$outWidth-$outHeight, offset:$patchX-$patchY, bounds:$region")
 
             if (isHeifFile[index]) {
                 // 使用HeifLoader解码HEIF图片
@@ -437,7 +437,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 }
             }
         } catch (e: Exception) {
-            println("renderPageRegion error for file ${documents[index]}: $e")
+            Logger.d("renderPageRegion error for file ${documents[index]}", "$e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -537,7 +537,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
                 }
             }
         } catch (e: Exception) {
-            println("ImagesDecoder.renderPage error: $e")
+            Logger.d("ImagesDecoder.renderPage error", "$e")
             ImageBitmap(outWidth, outHeight, ImageBitmapConfig.Rgb565)
         }
     }
@@ -572,7 +572,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
             try {
                 decoder.destroy()
             } catch (e: Exception) {
-                println("Error closing MuPDF Document: $e")
+                Logger.d("Error closing MuPDF Document", "$e")
             }
         }
         regionDecoders.clear()
@@ -582,7 +582,7 @@ public class ImagesDecoder(private val documents: List<DocumentInfo>) : ImageDec
             try {
                 loader.close()
             } catch (e: Exception) {
-                println("Error closing HeifLoader: $e")
+                Logger.d("Error closing HeifLoader", "$e")
             }
         }
         heifLoaders.clear()

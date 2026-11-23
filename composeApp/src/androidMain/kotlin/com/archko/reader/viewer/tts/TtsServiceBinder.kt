@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -29,7 +29,7 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            println("TtsServiceBinder: 服务连接成功")
+            Logger.d("TtsServiceBinder", "服务连接成功")
             val serviceBinder = binder as? AndroidTtsForegroundService.TtsServiceBinder
             service = serviceBinder?.getService()
             isBound = true
@@ -37,11 +37,11 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
 
             TtsTempProgressHelper.clearAllTempProgress(service!!.application)
             service?.documentPath = documentPath
-            println("TtsServiceBinder: 设置文档路径: $documentPath")
+            Logger.d("TtsServiceBinder", "设置文档路径: $documentPath")
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            println("TtsServiceBinder: 服务连接断开")
+            Logger.d("TtsServiceBinder", "服务连接断开")
             service = null
             isBound = false
             _isConnected.value = false
@@ -59,7 +59,7 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
     fun unbindService() {
         service?.stop()
         if (isBound) {
-            println("TtsServiceBinder: 解绑服务")
+            Logger.d("TtsServiceBinder", "解绑服务")
             context.unbindService(serviceConnection)
             isBound = false
             _isConnected.value = false
@@ -67,7 +67,7 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
     }
 
     fun speak(reflowBean: ReflowBean) {
-        println("TtsServiceBinder: speak called")
+        Logger.d("TtsServiceBinder", "speak called")
         service?.speak(reflowBean)
     }
 
@@ -76,12 +76,12 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
     }
 
     fun pause() {
-        println("TtsServiceBinder: pause called")
+        Logger.d("TtsServiceBinder", "pause called")
         service?.pause()
     }
 
     fun stop() {
-        println("TtsServiceBinder: stop called")
+        Logger.d("TtsServiceBinder", "stop called")
         service?.stop()
     }
 
@@ -110,12 +110,12 @@ class TtsServiceBinder(private val context: Context, private val documentPath: S
     }
 
     fun setSleepTimer(minutes: Int) {
-        println("TtsServiceBinder: setSleepTimer called with $minutes minutes")
+        Logger.d("TtsServiceBinder", "setSleepTimer called with $minutes minutes")
         service?.setSleepTimer(minutes)
     }
 
     fun cancelSleepTimer() {
-        println("TtsServiceBinder: cancelSleepTimer called")
+        Logger.d("TtsServiceBinder", "cancelSleepTimer called")
         service?.cancelSleepTimer()
     }
 

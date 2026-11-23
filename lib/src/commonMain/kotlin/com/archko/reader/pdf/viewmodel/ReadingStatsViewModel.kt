@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.viewmodel
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.archko.reader.pdf.cache.AppDatabase
@@ -29,7 +29,7 @@ public class ReadingStatsViewModel : ViewModel() {
             val name = path.getFileName()
             val stats = database?.readingStatsDao()?.getStatsByPath(name)
             _currentStats.value = stats
-            println("ReadingStatsViewModel.loadStats: name=$name, stats=$stats")
+            Logger.d("ReadingStatsViewModel.loadStats", "name=$name, stats=$stats")
         }
     }
 
@@ -65,7 +65,7 @@ public class ReadingStatsViewModel : ViewModel() {
                     this.bookmarkCount = bookmarkCount
                 }
                 _currentStats.value = updatedStats
-                println("ReadingStatsViewModel.updateCurrentStats: 临时更新统计 $updatedStats")
+                Logger.d("ReadingStatsViewModel.updateCurrentStats", "临时更新统计 $updatedStats")
             }
         }
     }
@@ -81,10 +81,10 @@ public class ReadingStatsViewModel : ViewModel() {
             val newStats = ReadingStats(name, totalPages)
             database?.readingStatsDao()?.insertStats(newStats)
             _currentStats.value = newStats
-            println("ReadingStatsViewModel.startSession: 创建新统计记录 $newStats")
+            Logger.d("ReadingStatsViewModel.startSession", "创建新统计记录 $newStats")
         } else {
             _currentStats.value = stats
-            println("ReadingStatsViewModel.startSession: 加载已有统计记录 $stats")
+            Logger.d("ReadingStatsViewModel.startSession", "加载已有统计记录 $stats")
         }
     }
 
@@ -134,7 +134,7 @@ public class ReadingStatsViewModel : ViewModel() {
 
             database?.readingStatsDao()?.updateStats(stats)
             _currentStats.value = stats
-            println("ReadingStatsViewModel.endSession: 更新统计 $stats")
+            Logger.d("ReadingStatsViewModel.endSession", "更新统计 $stats")
         }
     }
 

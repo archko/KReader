@@ -1,5 +1,5 @@
 package com.archko.reader.viewer
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.widget.Toast
@@ -466,7 +466,7 @@ fun CustomView(
         val cacheMemoryLimit = maxMemory / 2
         ImageCache.setMaxMemory(cacheMemoryLimit)
 
-        println("ImageCache: 设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)")
+        Logger.d("ImageCache", "设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)")
 
         // 加载书签
         val firstPath = documents.getOrNull(0)?.path
@@ -535,7 +535,7 @@ fun CustomView(
         LaunchedEffect(currentPath) {
             withContext(Dispatchers.IO) {
                 delay(20.milliseconds)
-                println("init:$viewportSize, reflow:$reflow, cropMode:$cropMode, $currentPath")
+                Logger.d("init", "$viewportSize, reflow:$reflow, cropMode:$cropMode, $currentPath")
                 if (!FileTypeUtils.isDocumentFile(currentPath)
                     && !FileTypeUtils.isImageFile(currentPath)
                     && !FileTypeUtils.isTiffFile(currentPath)
@@ -589,12 +589,12 @@ fun CustomView(
                     }
                     if (newDecoder != null) {
                         newDecoder.size(viewportSize)
-                        println("init.size:${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
+                        Logger.d("init.size", "${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
                         decoder = newDecoder
                         loadingError = null
                     }
                 } catch (e: Exception) {
-                    println("文档加载失败: $currentPath, 错误: ${e.message}")
+                    Logger.d("文档加载失败", "$currentPath, 错误: ${e.message}")
                     loadingError = "document_open_failed"
                     decoder = null
                 }
@@ -615,7 +615,7 @@ fun CustomView(
 
         DisposableEffect(currentPath) {
             onDispose {
-                println("CustomView.onDispose:$currentPath, $decoder")
+                Logger.d("CustomView.onDispose", "$currentPath, $decoder")
                 ttsServiceBinder?.unbindService()
                 decoder?.close()
 
@@ -754,7 +754,7 @@ fun CustomView(
                             val firstPageSize = dec.originalPageSizes[0]
                             val width = firstPageSize.width
                             val height = firstPageSize.height
-                            println("isVertical:$isVertical, width:$width-$height, $currentPath")
+                            Logger.d("isVertical", "$isVertical, width:$width-$height, $currentPath")
                             // 如果图片的高度小于宽度的1/3，则切换为横向滚动
                             if (height < width / 3) {
                                 isVertical = false
@@ -920,7 +920,7 @@ fun CustomView(
                                 speakingPage?.let { pageStr ->
                                     val targetPageStr = pageStr.split("-").firstOrNull()
                                     val targetPage = targetPageStr?.toIntOrNull()
-                                    println("OnResume: 正在朗读第${targetPage}页，当前显示第${currentPage}页")
+                                    Logger.d("OnResume", "正在朗读第${targetPage}页，当前显示第${currentPage}页")
                                     if (targetPage != null && targetPage != currentPage) {
                                         jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
 
@@ -1005,7 +1005,7 @@ fun CustomView(
                     columnCount = columnCount,
                     onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
                     onCloseDocument = {
-                        println("onCloseDocument.isReflow:$isReflow, isPagerMode:$isPagerMode")
+                        Logger.d("onCloseDocument.isReflow", "$isReflow, isPagerMode:$isPagerMode")
                         // 切换到单页模式时 MobileDocumentView 只是退出组合，不能关闭文档
                         if (!isPagerMode) {
                             // 保存阅读统计
@@ -1160,7 +1160,7 @@ fun CustomView(
                             pathConfig = pathConfig,
                             onClose = { config ->
                                 pathConfig = config
-                                println("onClose.pathConfig:$pathConfig")
+                                Logger.d("onClose.pathConfig", "$pathConfig")
                             }
                         )
                     }
@@ -1595,7 +1595,7 @@ fun CustomView(
                     viewModel = fontViewModel,
                     onDismiss = { showFontDialog = false },
                     onFontSelected = { fontPath ->
-                        println("选择了字体: ${File(fontPath).name}")
+                        Logger.d("选择了字体", "${File(fontPath).name}")
                         FontCSSGenerator.setFontFace(fontPath)
                         showFontDialog = false
                     }
@@ -2054,7 +2054,7 @@ suspend fun speakFromCurrentPage(
     docPath: String = ""
 ) {
     if (speechService.isSpeaking()) {
-        println("TTS: 正在朗读，停止当前朗读")
+        Logger.d("TTS", "正在朗读，停止当前朗读")
         speechService.stop()
         return
     }
@@ -2074,7 +2074,7 @@ suspend fun speakFromCurrentPage(
 
             if (cacheBean != null) {
                 imageDecoder.cacheBean = cacheBean
-                println("TTS: 从缓存获取文本，从第${startPage + 1}页开始")
+                Logger.d("TTS", "从缓存获取文本，从第${startPage + 1}页开始")
                 val cachedTexts = ReflowCacheLoader.getTextsFromPage(
                     cacheBean,
                     startPage
@@ -2085,16 +2085,16 @@ suspend fun speakFromCurrentPage(
                 }
 
                 val queueSize = speechService.getQueueSize()
-                println("TTS: 从缓存添加完成,队列中共有$queueSize 个文本段落")
+                Logger.d("TTS", "从缓存添加完成,队列中共有$queueSize 个文本段落")
             } else {
                 try {
                     val reflowBean = imageDecoder.decodeReflowSinglePage(startPage)
                     if (reflowBean != null) {
                         speechService.addToQueue(reflowBean)
-                        println("TTS: 当前页解析完成，立即开始朗读")
+                        Logger.d("TTS", "当前页解析完成，立即开始朗读")
                     }
                 } catch (e: Exception) {
-                    println("TTS: 当前页解析失败: ${e.message}")
+                    Logger.d("TTS", "当前页解析失败: ${e.message}")
                     speechService.addToQueue(
                         ReflowBean(
                             data = "当前页解析失败",
@@ -2105,7 +2105,7 @@ suspend fun speakFromCurrentPage(
                 }
 
                 try {
-                    println("TTS: 开始后台解析整个文档，共${totalPages}页")
+                    Logger.d("TTS", "开始后台解析整个文档，共${totalPages}页")
                     val allTexts = imageDecoder.decodeReflowAllPages()
 
                     cacheBean = ReflowCacheLoader.saveReflowToFile(
@@ -2121,13 +2121,13 @@ suspend fun speakFromCurrentPage(
                     }
 
                     val queueSize = speechService.getQueueSize()
-                    println("TTS: 解析完成，队列中共有$queueSize 个文本段落")
+                    Logger.d("TTS", "解析完成，队列中共有$queueSize 个文本段落")
                 } catch (e: Exception) {
-                    println("TTS: 解析失败: ${e.message}")
+                    Logger.d("TTS", "解析失败: ${e.message}")
                 }
             }
         } catch (e: Exception) {
-            println("TTS: 朗读初始化失败: ${e.message}")
+            Logger.d("TTS", "朗读初始化失败: ${e.message}")
             speechService.addToQueue(
                 ReflowBean(
                     data = "文本解码失败，无法朗读",

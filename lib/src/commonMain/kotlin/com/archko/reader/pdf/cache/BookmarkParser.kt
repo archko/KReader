@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.entity.Bookmark
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -126,13 +126,13 @@ public object BookmarkParser {
                 items?.forEach { itemElement ->
                     val bookmark = parseBookmarkItem(itemElement.jsonObject, filename)
                     if (bookmark != null) {
-                        println("Parsed Bookmark: $bookmark")
+                        Logger.d("Parsed Bookmark", "$bookmark")
                         bookmarkList.add(bookmark)
                     }
                 }
             }
         } catch (e: Exception) {
-            println("Error parsing Bookmarks JSON: ${e.message}")
+            Logger.d("Error parsing Bookmarks JSON", "${e.message}")
             e.printStackTrace()
         }
 

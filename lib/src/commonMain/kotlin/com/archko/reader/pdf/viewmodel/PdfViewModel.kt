@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.viewmodel
-
+import com.archko.reader.viewer.utils.Logger
 import BackupEventBus
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -88,7 +88,7 @@ public class PdfViewModel : ViewModel() {
                 database?.recentDao()?.updateRecent(selRecent)
             }
             recent = database?.recentDao()?.getRecent(normalizedPath)
-            println("PdfViewModel.insertOrUpdate:${recent}")
+            Logger.d("PdfViewModel.insertOrUpdate", "${recent}")
 
             // 增量更新：如果记录不在当前列表中且列表未满，添加到开头
             if (recent != null) {
@@ -99,15 +99,15 @@ public class PdfViewModel : ViewModel() {
                     currentList.removeAt(existingIndex)
                     currentList.add(0, recent!!)
                     _recentList.value = currentList
-                    println("PdfViewModel.insertOrUpdate - moved existing record to beginning from index: $existingIndex")
+                    Logger.d("PdfViewModel.insertOrUpdate - moved existing record to beginning from index", "$existingIndex")
                 } else if (currentList.size < pageSize) {
                     // 如果记录不存在且列表未满，添加到开头
                     currentList.add(0, recent!!)
                     _recentList.value = currentList
-                    println("PdfViewModel.insertOrUpdate - added new record to beginning")
+                    Logger.d("App", "PdfViewModel.insertOrUpdate - added new record to beginning")
                 } else {
                     // 如果记录不存在且列表已满，不添加到当前列表（保持分页状态）
-                    println("PdfViewModel.insertOrUpdate - list is full, skipping add to current page")
+                    Logger.d("App", "PdfViewModel.insertOrUpdate - list is full, skipping add to current page")
                 }
             }
         }
@@ -157,7 +157,7 @@ public class PdfViewModel : ViewModel() {
                 database?.recentDao()?.updateRecent(selRecent)
             }
             this@PdfViewModel.recent = database?.recentDao()?.getRecent(normalizedPath)
-            println("PdfViewModel.insertOrUpdateAndWait:${this@PdfViewModel.recent}")
+            Logger.d("PdfViewModel.insertOrUpdateAndWait", "${this@PdfViewModel.recent}")
 
             // 增量更新：如果记录不在当前列表中且列表未满，添加到开头
             if (this@PdfViewModel.recent != null) {
@@ -168,15 +168,15 @@ public class PdfViewModel : ViewModel() {
                     currentList.removeAt(existingIndex)
                     currentList.add(0, this@PdfViewModel.recent!!)
                     _recentList.value = currentList
-                    println("PdfViewModel.insertOrUpdateAndWait - moved existing record to beginning from index: $existingIndex")
+                    Logger.d("PdfViewModel.insertOrUpdateAndWait - moved existing record to beginning from index", "$existingIndex")
                 } else if (currentList.size < pageSize) {
                     // 如果记录不存在且列表未满，添加到开头
                     currentList.add(0, this@PdfViewModel.recent!!)
                     _recentList.value = currentList
-                    println("PdfViewModel.insertOrUpdateAndWait - added new record to beginning")
+                    Logger.d("App", "PdfViewModel.insertOrUpdateAndWait - added new record to beginning")
                 } else {
                     // 如果记录不存在且列表已满，不添加到当前列表（保持分页状态）
-                    println("PdfViewModel.insertOrUpdateAndWait - list is full, skipping add to current page")
+                    Logger.d("App", "PdfViewModel.insertOrUpdateAndWait - list is full, skipping add to current page")
                 }
             }
 
@@ -198,7 +198,7 @@ public class PdfViewModel : ViewModel() {
         pageOffsetY: Long? = null,
         screenOrientation: Long? = null,
     ) {
-        println("PdfViewModel.updateRecent:$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, pageOffsetX:$pageOffsetX, pageOffsetY:$pageOffsetY, screenOrientation:$screenOrientation, old:$recent")
+        Logger.d("PdfViewModel.updateRecent", "$page, count:$pageCount, zoom:$zoom, crop:$crop, scrollX:$scrollX, scrollY:$scrollY, scrollOri:$scrollOri, reflow:$reflow, pageOffsetX:$pageOffsetX, pageOffsetY:$pageOffsetY, screenOrientation:$screenOrientation, old:$recent")
         if (path == null) {
             return
         }
@@ -209,7 +209,7 @@ public class PdfViewModel : ViewModel() {
             val file = File(absolutePath)
             // 如果recent为空但path不为空，则新建一个记录
             if (recent == null && path != null) {
-                println("PdfViewModel.get:$normalizedPath, path:$path, page:$page")
+                Logger.d("PdfViewModel.get", "$normalizedPath, path:$path, page:$page")
 
                 recent = if (!currentUri.isNullOrEmpty()) {
                     database?.recentDao()?.getRecentByUri(currentUri)
@@ -249,7 +249,7 @@ public class PdfViewModel : ViewModel() {
                 } else {
                     database?.recentDao()?.getRecent(normalizedPath)
                 }
-                println("PdfViewModel.updateRecent-created:${this@PdfViewModel.recent}")
+                Logger.d("PdfViewModel.updateRecent-created", "${this@PdfViewModel.recent}")
             } else {
                 // 更新现有记录
                 recent?.run {
@@ -278,7 +278,7 @@ public class PdfViewModel : ViewModel() {
                     } else {
                         database?.recentDao()?.getRecent(normalizedPath)
                     }
-                    println("PdfViewModel.updateRecent.after:$recent")
+                    Logger.d("PdfViewModel.updateRecent.after", "$recent")
                 }
             }
 
@@ -287,18 +287,18 @@ public class PdfViewModel : ViewModel() {
                 // 增量更新：从列表中删除旧记录，然后添加到开头（按updateAt排序）
                 val currentList = _recentList.value.toMutableList()
                 val updatedIndex = currentList.indexOfFirst { it.path == currentRecent.path }
-                println("PdfViewModel.updateRecent - currentList size: ${currentList.size}, updatedIndex: $updatedIndex")
+                Logger.d("PdfViewModel.updateRecent - currentList size", "${currentList.size}, updatedIndex: $updatedIndex")
 
                 if (updatedIndex != -1) {
                     // 从原位置删除旧记录
                     currentList.removeAt(updatedIndex)
-                    println("PdfViewModel.updateRecent - removed old record from index: $updatedIndex")
+                    Logger.d("PdfViewModel.updateRecent - removed old record from index", "$updatedIndex")
                 }
 
                 // 将更新后的记录添加到列表开头（因为updateAt最新）
                 currentList.add(0, currentRecent)
                 _recentList.value = currentList
-                println("PdfViewModel.updateRecent - added updated record to beginning, new list size: ${_recentList.value.size}")
+                Logger.d("PdfViewModel.updateRecent - added updated record to beginning, new list size", "${_recentList.value.size}")
             }
         }
     }
@@ -310,7 +310,7 @@ public class PdfViewModel : ViewModel() {
         viewModelScope.launch {
             val normalizedPath = normalizePath(path)
             val old = database?.recentDao()?.getRecent(normalizedPath)
-            println("PdfViewModel.updateRecent:$page, path:$normalizedPath, old:$old")
+            Logger.d("PdfViewModel.updateRecent", "$page, path:$normalizedPath, old:$old")
 
             if (old != null) {
                 old.apply {
@@ -318,7 +318,7 @@ public class PdfViewModel : ViewModel() {
                     updateAt = System.currentTimeMillis()
                 }
                 database?.recentDao()?.updateRecent(old)
-                println("PdfViewModel.updateRecent.after:$old")
+                Logger.d("PdfViewModel.updateRecent.after", "$old")
             }
         }
     }
@@ -374,7 +374,7 @@ public class PdfViewModel : ViewModel() {
                     currentList[index] = item
                     _recentList.value = currentList
                 }
-                println("PdfViewModel.updateReflowStyle:${item.path}, wordSpacing:$wordSpacing, fontSize:$fontSize")
+                Logger.d("PdfViewModel.updateReflowStyle", "${item.path}, wordSpacing:$wordSpacing, fontSize:$fontSize")
             }
         }
     }
@@ -406,7 +406,7 @@ public class PdfViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val recents = database?.recentDao()?.getRecents(0, pageSize)
-                println("PdfViewModel.loadRecents:${recents?.size}")
+                Logger.d("PdfViewModel.loadRecents", "${recents?.size}")
                 if (recents != null) {
                     if (recents.isNotEmpty()) {
                         _recentList.value = recents
@@ -470,7 +470,7 @@ public class PdfViewModel : ViewModel() {
     public fun deleteRecent(recent: Recent) {
         viewModelScope.launch {
             database?.recentDao()?.deleteRecent(recent)
-            println("PdfViewModel.deleteRecent:${recent}")
+            Logger.d("PdfViewModel.deleteRecent", "${recent}")
 
             // 从列表中移除被删除的记录
             val currentList = _recentList.value.toMutableList()
@@ -502,7 +502,7 @@ public class PdfViewModel : ViewModel() {
             if (recent == null) {
                 recent = database?.recentDao()?.getRecent(normalizedPath)
             }
-            println("PdfViewModel.getRecent:normalizedPath:$normalizedPath, path:$absolutePath, uri:$uri, $recent")
+            Logger.d("PdfViewModel.getRecent", "normalizedPath:$normalizedPath, path:$absolutePath, uri:$uri, $recent")
             deferred.complete(Unit)
         }
         deferred.await()

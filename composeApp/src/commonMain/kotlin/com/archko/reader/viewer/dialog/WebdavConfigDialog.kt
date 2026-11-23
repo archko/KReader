@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.dialog
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -309,13 +309,13 @@ fun WebdavConfigDialog(
                                                 com.archko.reader.pdf.viewmodel.RestoreType.BOOKMARKS -> "书签"
                                                 else -> "数据"
                                             }
-                                            println("Restore successful: $fileName ($typeText)")
+                                            Logger.d("Restore successful", "$fileName ($typeText)")
                                             toaster.show(
                                                 message = "恢复${typeText}成功",
                                                 type = ToastType.Success,
                                             )
                                         } else {
-                                            println("Restore failed: $fileName")
+                                            Logger.d("Restore failed", "$fileName")
                                             toaster.show(
                                                 message = getString(Res.string.webdav_restore_failed),
                                                 type = ToastType.Error,

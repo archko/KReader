@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.util
-
+import com.archko.reader.viewer.utils.Logger
 import java.awt.Desktop
 import java.net.URI
 
@@ -10,20 +10,20 @@ public actual object HyperLinkUtils {
 
     public actual fun openSystemBrowser(url: String?) {
         if (url.isNullOrBlank()) {
-            println("HyperLinkUtils: URL is null or blank")
+            Logger.d("HyperLinkUtils", "URL is null or blank")
             return
         }
 
         try {
             // 检查 Desktop 是否支持浏览功能
             if (!Desktop.isDesktopSupported()) {
-                println("HyperLinkUtils: Desktop is not supported on this platform")
+                Logger.d("HyperLinkUtils", "Desktop is not supported on this platform")
                 return
             }
 
             val desktop = Desktop.getDesktop()
             if (!desktop.isSupported(Desktop.Action.BROWSE)) {
-                println("HyperLinkUtils: BROWSE action is not supported")
+                Logger.d("HyperLinkUtils", "BROWSE action is not supported")
                 return
             }
 
@@ -36,9 +36,9 @@ public actual object HyperLinkUtils {
             }
 
             desktop.browse(uri)
-            println("HyperLinkUtils: Opening URL in browser: $uri")
+            Logger.d("HyperLinkUtils", "Opening URL in browser: $uri")
         } catch (e: Exception) {
-            println("HyperLinkUtils: Failed to open URL: $url, error: ${e.message}")
+            Logger.d("HyperLinkUtils", "Failed to open URL: $url, error: ${e.message}")
             e.printStackTrace()
         }
     }

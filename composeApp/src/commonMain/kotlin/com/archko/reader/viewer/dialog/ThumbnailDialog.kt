@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.dialog
-
+import com.archko.reader.viewer.utils.Logger
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -248,7 +248,7 @@ private fun ThumbnailItem(
                             isLoading.value = false
                         } else {
                             if (error != null) {
-                                println("Thumbnail decode error: ${error.message}")
+                                Logger.d("Thumbnail decode error", "${error.message}")
                             }
                             isLoading.value = false
                         }

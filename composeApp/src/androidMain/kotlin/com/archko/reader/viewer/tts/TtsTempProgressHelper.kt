@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-
+import com.archko.reader.viewer.utils.Logger
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import androidx.core.content.edit
@@ -38,9 +38,9 @@ object TtsTempProgressHelper {
             val json = """{"path":"$documentPath","page":$pageInt,"timestamp":$timestamp}"""
 
             prefs.edit { putString(key, json) }
-            println("TTS: 保存临时进度: path=$documentPath, page=$pageInt")
+            Logger.d("TTS", "保存临时进度: path=$documentPath, page=$pageInt")
         } catch (e: Exception) {
-            println("TTS: 保存临时进度失败: ${e.message}")
+            Logger.d("TTS", "保存临时进度失败: ${e.message}")
         }
     }
 
@@ -68,10 +68,10 @@ object TtsTempProgressHelper {
                     } else {
                         // 清除过期的进度
                         prefs.edit { remove(key) }
-                        println("TtsTempProgress: 清除过期进度: $path")
+                        Logger.d("TtsTempProgress", "清除过期进度: $path")
                     }
                 } catch (e: Exception) {
-                    println("TtsTempProgress: 解析进度失败: ${e.message}")
+                    Logger.d("TtsTempProgress", "解析进度失败: ${e.message}")
                 }
             }
         }
@@ -99,11 +99,11 @@ object TtsTempProgressHelper {
             } else {
                 // 清除过期的进度
                 prefs.edit { remove(key) }
-                println("TtsTempProgress: 清除过期进度: $path")
+                Logger.d("TtsTempProgress", "清除过期进度: $path")
                 null
             }
         } catch (e: Exception) {
-            println("TtsTempProgress: 解析进度失败: ${e.message}")
+            Logger.d("TtsTempProgress", "解析进度失败: ${e.message}")
             null
         }
     }
@@ -115,7 +115,7 @@ object TtsTempProgressHelper {
         val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val key = "progress_${documentPath.hashCode()}"
         prefs.edit { remove(key) }
-        println("TtsTempProgress: 清除临时进度: $documentPath")
+        Logger.d("TtsTempProgress", "清除临时进度: $documentPath")
     }
 
     /**
@@ -124,6 +124,6 @@ object TtsTempProgressHelper {
     fun clearAllTempProgress(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         prefs.edit { clear() }
-        println("TtsTempProgress: 清除所有临时进度")
+        Logger.d("TtsTempProgress", "清除所有临时进度")
     }
 }

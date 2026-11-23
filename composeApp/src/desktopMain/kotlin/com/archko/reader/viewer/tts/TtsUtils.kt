@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.pdf.cache.FileUtils
 import com.archko.reader.pdf.tts.Voice
 import kotlinx.coroutines.Dispatchers
@@ -31,9 +31,9 @@ class TtsUtils {
                     // 尝试清理可能导致 -108 错误的系统语音守护进程
                     ProcessBuilder("pkill", "-9", "com.apple.speech.speechsynthesisd").start().waitFor()
                 }
-                println("TTS: Force killed all TTS processes")
+                Logger.d("TTS", "Force killed all TTS processes")
             } catch (e: Exception) {
-                println("TTS: Failed to force kill TTS processes: ${e.message}")
+                Logger.d("TTS", "Failed to force kill TTS processes: ${e.message}")
             }
         }
 
@@ -49,7 +49,7 @@ class TtsUtils {
                 configFile.parentFile?.mkdirs()
 
                 // 添加调试信息
-                println("TTS: Saving voice - name=${voice.name}, rate=${voice.rate}, volume=${voice.volume}")
+                Logger.d("TTS", "Saving voice - name=${voice.name}, rate=${voice.rate}, volume=${voice.volume}")
 
                 val json = Json {
                     prettyPrint = true
@@ -58,10 +58,10 @@ class TtsUtils {
                 val jsonString = json.encodeToString(voice)
                 configFile.writeText(jsonString)
 
-                println("TTS: Voice setting saved to ${configFile.absolutePath}")
-                println("TTS: Saved JSON content: $jsonString")
+                Logger.d("TTS", "Voice setting saved to ${configFile.absolutePath}")
+                Logger.d("TTS", "Saved JSON content: $jsonString")
             } catch (e: Exception) {
-                println("TTS: Failed to save voice setting: ${e.message}")
+                Logger.d("TTS", "Failed to save voice setting: ${e.message}")
             }
         }
 
@@ -171,7 +171,7 @@ class TtsUtils {
                         } else null
                     }
             } catch (e: Exception) {
-                println("Failed to get Windows voices: ${e.message}")
+                Logger.d("Failed to get Windows voices", "${e.message}")
                 getDefaultWindowsVoices()
             }
         }
@@ -188,7 +188,7 @@ class TtsUtils {
                         parseMacVoiceLine(line.trim())
                     }
             } catch (e: Exception) {
-                println("Failed to get Mac voices: ${e.message}")
+                Logger.d("Failed to get Mac voices", "${e.message}")
                 getDefaultMacVoices()
             }
         }
@@ -223,7 +223,7 @@ class TtsUtils {
                     )
                 }
             } catch (e: Exception) {
-                println("Failed to parse voice line: $line, error: ${e.message}")
+                Logger.d("Failed to parse voice line", "$line, error: ${e.message}")
                 null
             }
         }

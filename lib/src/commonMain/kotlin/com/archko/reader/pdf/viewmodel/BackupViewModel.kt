@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.viewmodel
-
+import com.archko.reader.viewer.utils.Logger
 import BackupEventBus
 import androidx.lifecycle.ViewModel
 import com.archko.reader.pdf.cache.AppDatabase
@@ -110,7 +110,7 @@ public class BackupViewModel : ViewModel() {
                     DavCollection(httpClient!!, Url(buildWebdavUrl(user.host, user.path)))
                 return true
             } catch (e: Exception) {
-                println("checkAndLoadUser error: ${e.message}")
+                Logger.d("checkAndLoadUser error", "${e.message}")
                 return false
             }
         }
@@ -144,11 +144,11 @@ public class BackupViewModel : ViewModel() {
                     body = content.toByteArray(),
                     contentType = ContentType.Application.Json
                 ) { response ->
-                    println("Upload history successful: ${response.status}")
+                    Logger.d("Upload history successful", "${response.status}")
                 }
                 successCount++
             } catch (e: Exception) {
-                println("Backup history error: ${e.message}")
+                Logger.d("Backup history error", "${e.message}")
             }
 
             // 2. 备份阅读统计
@@ -165,11 +165,11 @@ public class BackupViewModel : ViewModel() {
                     body = content.toByteArray(),
                     contentType = ContentType.Application.Json
                 ) { response ->
-                    println("Upload reading stats successful: ${response.status}")
+                    Logger.d("Upload reading stats successful", "${response.status}")
                 }
                 successCount++
             } catch (e: Exception) {
-                println("Backup reading stats error: ${e.message}")
+                Logger.d("Backup reading stats error", "${e.message}")
             }
 
             // 3. 备份书签
@@ -186,17 +186,17 @@ public class BackupViewModel : ViewModel() {
                     body = content.toByteArray(),
                     contentType = ContentType.Application.Json
                 ) { response ->
-                    println("Upload bookmarks successful: ${response.status}")
+                    Logger.d("Upload bookmarks successful", "${response.status}")
                 }
                 successCount++
             } catch (e: Exception) {
-                println("Backup bookmarks error: ${e.message}")
+                Logger.d("Backup bookmarks error", "${e.message}")
             }
 
             emit(BackupResult(successCount == totalCount, successCount, totalCount))
         } catch (e: Exception) {
             emit(BackupResult(false, 0, 3))
-            println("backupAllToWebdav error: ${e.message}")
+            Logger.d("backupAllToWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -214,24 +214,24 @@ public class BackupViewModel : ViewModel() {
             } else {
                 BookProgressParser.recentsToJson(list)
             }
-            println("backupToWebdav.content:$content")
+            Logger.d("backupToWebdav.content", "$content")
 
             // 使用 dav4kmp 上传文件到指定路径
             val fileName = DEFAULT_JSON
             val fileUrl = "${webdavUser!!.host}$currentPath/$fileName"
-            println("backupToWebdav - fileUrl: $fileUrl")
+            Logger.d("backupToWebdav - fileUrl", "$fileUrl")
 
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
             davResource.put(
                 body = content.toByteArray(),
                 contentType = ContentType.Application.Json
             ) { response ->
-                println("Upload successful: ${response.status}")
+                Logger.d("Upload successful", "${response.status}")
             }
             emit(true)
         } catch (e: Exception) {
             emit(false)
-            println("backupToWebdav error: ${e.message}")
+            Logger.d("backupToWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -249,24 +249,24 @@ public class BackupViewModel : ViewModel() {
             } else {
                 ReadingStatsParser.statsToJson(list)
             }
-            println("backupReadingStatsToWebdav.content:$content")
+            Logger.d("backupReadingStatsToWebdav.content", "$content")
 
             // 使用 dav4kmp 上传文件到指定路径
             val fileName = READING_STATS_JSON
             val fileUrl = "${webdavUser!!.host}$currentPath/$fileName"
-            println("backupReadingStatsToWebdav - fileUrl: $fileUrl")
+            Logger.d("backupReadingStatsToWebdav - fileUrl", "$fileUrl")
 
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
             davResource.put(
                 body = content.toByteArray(),
                 contentType = ContentType.Application.Json
             ) { response ->
-                println("Upload successful: ${response.status}")
+                Logger.d("Upload successful", "${response.status}")
             }
             emit(true)
         } catch (e: Exception) {
             emit(false)
-            println("backupReadingStatsToWebdav error: ${e.message}")
+            Logger.d("backupReadingStatsToWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -284,24 +284,24 @@ public class BackupViewModel : ViewModel() {
             } else {
                 BookmarkParser.bookmarksToJson(list)
             }
-            println("backupBookmarksToWebdav.content:$content")
+            Logger.d("backupBookmarksToWebdav.content", "$content")
 
             // 使用 dav4kmp 上传文件到指定路径
             val fileName = BOOKMARKS_JSON
             val fileUrl = "${webdavUser!!.host}$currentPath/$fileName"
-            println("backupBookmarksToWebdav - fileUrl: $fileUrl")
+            Logger.d("backupBookmarksToWebdav - fileUrl", "$fileUrl")
 
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
             davResource.put(
                 body = content.toByteArray(),
                 contentType = ContentType.Application.Json
             ) { response ->
-                println("Upload successful: ${response.status}")
+                Logger.d("Upload successful", "${response.status}")
             }
             emit(true)
         } catch (e: Exception) {
             emit(false)
-            println("backupBookmarksToWebdav error: ${e.message}")
+            Logger.d("backupBookmarksToWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -319,7 +319,7 @@ public class BackupViewModel : ViewModel() {
             // 使用 dav4kmp 下载文件
             val fileUrl = "${webdavUser!!.host}$filePath"
             val fileName = filePath.substringAfterLast('/')
-            println("restoreFromWebdav - fileUrl: $fileUrl, fileName: $fileName")
+            Logger.d("restoreFromWebdav - fileUrl", "$fileUrl, fileName: $fileName")
             
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
             var content = ""
@@ -350,7 +350,7 @@ public class BackupViewModel : ViewModel() {
             emit(result)
         } catch (e: Exception) {
             emit(RestoreResult(false, RestoreType.UNKNOWN))
-            println("restoreFromWebdav error: ${e.message}")
+            Logger.d("restoreFromWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -364,7 +364,7 @@ public class BackupViewModel : ViewModel() {
 
             // 使用 dav4kmp 下载文件
             val fileUrl = "${webdavUser!!.host}$filePath"
-            println("restoreReadingStatsFromWebdav - fileUrl: $fileUrl")
+            Logger.d("restoreReadingStatsFromWebdav - fileUrl", "$fileUrl")
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
 
             var content = ""
@@ -376,7 +376,7 @@ public class BackupViewModel : ViewModel() {
             emit(result)
         } catch (e: Exception) {
             emit(false)
-            println("restoreReadingStatsFromWebdav error: ${e.message}")
+            Logger.d("restoreReadingStatsFromWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -390,7 +390,7 @@ public class BackupViewModel : ViewModel() {
 
             // 使用 dav4kmp 下载文件
             val fileUrl = "${webdavUser!!.host}$filePath"
-            println("restoreBookmarksFromWebdav - fileUrl: $fileUrl")
+            Logger.d("restoreBookmarksFromWebdav - fileUrl", "$fileUrl")
             val davResource = DavCollection(httpClient!!, Url(fileUrl))
 
             var content = ""
@@ -402,7 +402,7 @@ public class BackupViewModel : ViewModel() {
             emit(result)
         } catch (e: Exception) {
             emit(false)
-            println("restoreBookmarksFromWebdav error: ${e.message}")
+            Logger.d("restoreBookmarksFromWebdav error", "${e.message}")
             e.printStackTrace()
         }
     }.flowOn(Dispatchers.IO)
@@ -414,11 +414,11 @@ public class BackupViewModel : ViewModel() {
                 return@flow
             }
             try {
-                println("loadFileList - path: $path, webdavUser: $webdavUser")
+                Logger.d("loadFileList - path", "$path, webdavUser: $webdavUser")
                 val list = listFilesWithType(httpClient!!, path, webdavUser)
                 emit(list)
             } catch (e: Exception) {
-                println("loadFileList error: ${e.message}")
+                Logger.d("loadFileList error", "${e.message}")
                 e.printStackTrace()
                 emit(listOf())
             }
@@ -434,7 +434,7 @@ public class BackupViewModel : ViewModel() {
         val normalizedHost = webdavUser?.host?.trimEnd('/') ?: ""
         val normalizedPath = path.let { if (it.startsWith("/")) it else "/$it" }
         val filePath = "$normalizedHost$normalizedPath"
-        println("listFilesWithType - filePath: $filePath")
+        Logger.d("listFilesWithType - filePath", "$filePath")
         val collection = DavCollection(client, Url(filePath))
         val davResources = mutableListOf<DavResourceItem>()
         collection.propfind(depth = 1) { response, relation ->
@@ -521,7 +521,7 @@ public class BackupViewModel : ViewModel() {
             val testHttpClient = createHttpClient(name, pass)
             val fullUrl = buildWebdavUrl(host, path)
             val result = testPathOrCreate(testHttpClient, fullUrl)
-            println("url:$fullUrl, res:$result")
+            Logger.d("url", "$fullUrl, res:$result")
 
             if (result) {
                 val user = WebdavUser(name, pass, host, path)
@@ -594,14 +594,14 @@ public class BackupViewModel : ViewModel() {
                         }
                         true
                     } catch (e: Exception) {
-                        println("Failed to create directory: ${e.message}")
+                        Logger.d("Failed to create directory", "${e.message}")
                         false
                     }
                 } else {
                     true
                 }
             } catch (e: Exception) {
-                println("WebDAV connection test failed: ${e.message}")
+                Logger.d("WebDAV connection test failed", "${e.message}")
                 false
             }
         }
@@ -618,7 +618,7 @@ public class BackupViewModel : ViewModel() {
                 body = data,
                 contentType = ContentType.Application.OctetStream
             ) { response ->
-                println("Upload file successful: ${response.status}")
+                Logger.d("Upload file successful", "${response.status}")
             }
         }
 
@@ -635,7 +635,7 @@ public class BackupViewModel : ViewModel() {
                 body = data,
                 contentType = ContentType.Application.OctetStream
             ) { response ->
-                println("Upload file successful: ${response.status}")
+                Logger.d("Upload file successful", "${response.status}")
             }
         }
 
@@ -648,7 +648,7 @@ public class BackupViewModel : ViewModel() {
             val normalizedHost = webdavUser?.host?.trimEnd('/') ?: ""
             val normalizedPath = path.let { if (it.startsWith("/")) it else "/$it" }
             val filePath = "$normalizedHost$normalizedPath"
-            println("listFiles - filePath: $filePath")
+            Logger.d("listFiles - filePath", "$filePath")
             val collection = DavCollection(client, Url(filePath))
             val davResources = mutableListOf<DavResource>()
             collection.propfind(depth = 1) { response, relation ->
@@ -673,7 +673,7 @@ public class BackupViewModel : ViewModel() {
             webdavUser: WebdavUser?
         ): String {
             val filePath = "${webdavUser?.host}$name"
-            println("download:$name")
+            Logger.d("download", "$name")
             val davCollection = DavCollection(client, Url(filePath))
             var fileContent = ""
             davCollection.get(accept = "*/*", headers = null) { response ->
@@ -686,20 +686,20 @@ public class BackupViewModel : ViewModel() {
             val filePath = "${webdavUser?.host}$name"
             val davCollection = DavCollection(client, Url(filePath))
             davCollection.delete { response ->
-                println("Delete file successful: ${response.status}")
+                Logger.d("Delete file successful", "${response.status}")
             }
         }
 
         public suspend fun restore(database: AppDatabase?, content: String): Boolean {
             try {
                 if (database == null) {
-                    println("restore: database is null")
+                    Logger.d("restore", "database is null")
                     return false
                 }
 
                 val recents = BookProgressParser.parseRecents(content)
                 if (recents.isEmpty()) {
-                    println("restore: no recents found in content")
+                    Logger.d("restore", "no recents found in content")
                     return false
                 }
 
@@ -707,10 +707,10 @@ public class BackupViewModel : ViewModel() {
                 database.recentDao().deleteAllRecents()
                 database.recentDao().addRecents(recents)
 
-                println("restore: successfully restored ${recents.size} records")
+                Logger.d("restore", "successfully restored ${recents.size} records")
                 return true
             } catch (e: Exception) {
-                println("restore error: ${e.message}")
+                Logger.d("restore error", "${e.message}")
                 e.printStackTrace()
             }
             return false
@@ -722,14 +722,14 @@ public class BackupViewModel : ViewModel() {
         ): Boolean {
             try {
                 if (database == null) {
-                    println("restoreReadingStats: database is null")
+                    Logger.d("restoreReadingStats", "database is null")
                     return false
                 }
 
                 // Parse JSON content
                 val stats = ReadingStatsParser.parseStats(content)
                 if (stats.isEmpty()) {
-                    println("restoreReadingStats: no stats found in content")
+                    Logger.d("restoreReadingStats", "no stats found in content")
                     return false
                 }
 
@@ -747,13 +747,13 @@ public class BackupViewModel : ViewModel() {
                         stat.path = localPath
                         stat
                     } else {
-                        println("restoreReadingStats: no local file found for filename: $filename")
+                        Logger.d("restoreReadingStats", "no local file found for filename: $filename")
                         null
                     }
                 }
 
                 if (statsWithPaths.isEmpty()) {
-                    println("restoreReadingStats: no matching files found")
+                    Logger.d("restoreReadingStats", "no matching files found")
                     return false
                 }
 
@@ -761,10 +761,10 @@ public class BackupViewModel : ViewModel() {
                 database.readingStatsDao().deleteAllStats()
                 database.readingStatsDao().insertAllStats(statsWithPaths)
 
-                println("restoreReadingStats: successfully restored ${statsWithPaths.size} records")
+                Logger.d("restoreReadingStats", "successfully restored ${statsWithPaths.size} records")
                 return true
             } catch (e: Exception) {
-                println("restoreReadingStats error: ${e.message}")
+                Logger.d("restoreReadingStats error", "${e.message}")
                 e.printStackTrace()
             }
             return false
@@ -776,14 +776,14 @@ public class BackupViewModel : ViewModel() {
         ): Boolean {
             try {
                 if (database == null) {
-                    println("restoreBookmarks: database is null")
+                    Logger.d("restoreBookmarks", "database is null")
                     return false
                 }
 
                 // Parse JSON content
                 val bookmarks = BookmarkParser.parseBookmarks(content)
                 if (bookmarks.isEmpty()) {
-                    println("restoreBookmarks: no bookmarks found in content")
+                    Logger.d("restoreBookmarks", "no bookmarks found in content")
                     return false
                 }
 
@@ -801,13 +801,13 @@ public class BackupViewModel : ViewModel() {
                         bookmark.path = localPath
                         bookmark
                     } else {
-                        println("restoreBookmarks: no local file found for filename: $filename")
+                        Logger.d("restoreBookmarks", "no local file found for filename: $filename")
                         null
                     }
                 }
 
                 if (bookmarksWithPaths.isEmpty()) {
-                    println("restoreBookmarks: no matching files found")
+                    Logger.d("restoreBookmarks", "no matching files found")
                     return false
                 }
 
@@ -815,10 +815,10 @@ public class BackupViewModel : ViewModel() {
                 database.bookmarkDao().deleteAllBookmarks()
                 database.bookmarkDao().insertAllBookmarks(bookmarksWithPaths)
 
-                println("restoreBookmarks: successfully restored ${bookmarksWithPaths.size} records")
+                Logger.d("restoreBookmarks", "successfully restored ${bookmarksWithPaths.size} records")
                 return true
             } catch (e: Exception) {
-                println("restoreBookmarks error: ${e.message}")
+                Logger.d("restoreBookmarks error", "${e.message}")
                 e.printStackTrace()
             }
             return false
