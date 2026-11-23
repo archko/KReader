@@ -99,7 +99,7 @@ public class PdfDecoder(
     )
 
     // DisplayList 缓存，避免同一页多个 tile 重复解释 content stream
-    private val maxDisplayListCache = 3
+    private val maxDisplayListCache = 4
     private val displayListCache = object : LinkedHashMap<Int, DisplayList>(
         maxDisplayListCache,
         0.75f,

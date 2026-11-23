@@ -64,6 +64,12 @@ private class PageSlot(
     var loading: Boolean = false,
 )
 
+private class LayoutAnchor(
+    val pageIndex: Int,
+    val offsetDocY: Float,
+    val screenY: Float,
+)
+
 @Composable
 fun ReflowView(
     decoder: ImageDecoder,
@@ -174,11 +180,67 @@ fun ReflowView(
         if (slots.isEmpty() || currentZoom <= 0f) return 0
         val topDoc = (-currentOffset.y / currentZoom).coerceAtLeast(0f)
         for (slot in slots) {
-            if (topDoc < slot.topDocY + slot.heightDoc + gapDoc) {
+            if (topDoc < slot.topDocY + slot.heightDoc) {
                 return slot.pageIndex
             }
         }
         return slots.last().pageIndex
+    }
+
+    // 捕获视口顶部对应的页内锚点：pageIndex + 页内偏移 + 该点在屏幕上的位置
+    fun captureAnchor(): LayoutAnchor? {
+        if (slots.isEmpty() || zoom <= 0f) return null
+        val focusDocY = -scrollOffset.y / zoom
+        var anchorSlot = slots.last()
+        for (slot in slots) {
+            if (focusDocY < slot.topDocY + slot.heightDoc) {
+                anchorSlot = slot
+                break
+            }
+        }
+        val offsetDocY = focusDocY - anchorSlot.topDocY
+        val screenY = focusDocY * zoom + scrollOffset.y
+        return LayoutAnchor(anchorSlot.pageIndex, offsetDocY, screenY)
+    }
+
+    // 页面高度变化后按锚点补偿 scrollOffset，使锚点在屏幕上的位置保持不变
+    fun applyPageHeight(pageIndex: Int, newHeight: Float) {
+        val slot = slots.getOrNull(pageIndex) ?: return
+        if (viewSize.width <= 0 || viewSize.height <= 0) {
+            slot.heightDoc = newHeight
+            slot.loaded = true
+            layoutTick++
+            return
+        }
+        val docWidth = viewSize.width.toFloat()
+        val cWidth = contentWidthDoc(docWidth)
+        recomputeTops(cWidth)
+
+        val anchor = captureAnchor()
+        val oldHeight = slot.heightDoc
+        val anchorOffset = when {
+            anchor == null -> 0f
+            anchor.pageIndex != pageIndex -> anchor.offsetDocY
+            oldHeight > 0f && newHeight > 0f && anchor.offsetDocY > 0f ->
+                anchor.offsetDocY * (newHeight / oldHeight)
+            else -> anchor.offsetDocY
+        }
+
+        slot.heightDoc = newHeight
+        slot.loaded = true
+        val totalH = recomputeTops(cWidth)
+
+        if (anchor != null) {
+            val anchorSlot = slots[anchor.pageIndex]
+            val anchorDocY = anchorSlot.topDocY + anchorOffset
+            scrollOffset = clampOffset(
+                Offset(scrollOffset.x, anchor.screenY - anchorDocY * zoom),
+                zoom,
+                docWidth,
+                totalH
+            )
+        }
+        layoutTick++
     }
 
     // 字号或字间距变化时重置已解码页，触发重新解码
@@ -240,7 +302,6 @@ fun ReflowView(
                 scope.launch {
                     val tiles = decodeService.requestPage(idx, fontSize, wordSpacing)
                     slot.loading = false
-                    slot.loaded = true
                     slot.tiles = tiles
 
                     val totalTileH = tiles.sumOf { it.height }.toFloat()
@@ -250,24 +311,7 @@ fun ReflowView(
                     } else {
                         defaultPageHeight(idx, cWidth)
                     }
-
-                    val oldHeight = slot.heightDoc
-                    val deltaDocH = newHeight - oldHeight
-                    slot.heightDoc = newHeight
-
-                    val newTotalH = recomputeTops(cWidth)
-                    val anchorPage = findFirstVisiblePage(scrollOffset, zoom)
-                    if (idx < anchorPage && deltaDocH != 0f) {
-                        scrollOffset = clampOffset(
-                            Offset(scrollOffset.x, scrollOffset.y - deltaDocH * zoom),
-                            zoom,
-                            docWidth,
-                            newTotalH
-                        )
-                    } else {
-                        scrollOffset = clampOffset(scrollOffset, zoom, docWidth, newTotalH)
-                    }
-                    layoutTick++
+                    applyPageHeight(idx, newHeight)
                 }
             }
         }
