@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig

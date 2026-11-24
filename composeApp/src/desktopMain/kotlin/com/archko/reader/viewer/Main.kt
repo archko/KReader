@@ -1,5 +1,5 @@
 package com.archko.reader.viewer
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +23,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.util.DebugLogger
-import coil3.util.Logger
 import com.archko.reader.pdf.cache.CustomImageDataKeyer
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.DriverFactory

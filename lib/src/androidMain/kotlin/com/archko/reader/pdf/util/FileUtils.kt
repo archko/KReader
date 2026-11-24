@@ -1,5 +1,4 @@
 package com.archko.reader.pdf.util
-import com.archko.reader.viewer.utils.Logger
 import android.content.Context
 import android.content.res.AssetManager
 import android.os.Environment

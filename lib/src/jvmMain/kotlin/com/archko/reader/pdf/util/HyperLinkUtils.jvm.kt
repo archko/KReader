@@ -1,5 +1,4 @@
 package com.archko.reader.pdf.util
-import com.archko.reader.viewer.utils.Logger
 import java.awt.Desktop
 import java.net.URI
 

@@ -1,9 +1,8 @@
 package com.archko.reader.pdf.decoder
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -30,7 +29,6 @@ import com.archko.reader.pdf.util.SmartCropUtils
 import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import java.io.File
 import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.round
 
 private fun decodeDjvuRegionToBitmap(

@@ -1,4 +1,4 @@
-package com.archko.reader.viewer.utils
+package com.archko.reader.pdf.util
 
 import android.content.pm.ApplicationInfo
 import com.archko.reader.pdf.PdfApp

@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.component
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf

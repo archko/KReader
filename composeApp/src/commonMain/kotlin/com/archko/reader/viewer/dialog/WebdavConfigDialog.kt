@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.dialog
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,7 +69,6 @@ import kreader.composeapp.generated.resources.webdav_config_path_eg
 import kreader.composeapp.generated.resources.webdav_config_success
 import kreader.composeapp.generated.resources.webdav_restore
 import kreader.composeapp.generated.resources.webdav_restore_failed
-import kreader.composeapp.generated.resources.webdav_restore_success
 import kreader.composeapp.generated.resources.webdav_title
 import kreader.composeapp.generated.resources.webdav_upload
 import kreader.composeapp.generated.resources.webdav_upload_failed

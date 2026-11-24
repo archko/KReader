@@ -1,12 +1,14 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.util.ReflowCache
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -42,7 +44,10 @@ public class ReflowDecodeService(
     private val orientation: Int = 0,
 ) {
     // ── Single-thread coroutine worker ────────────────────────────────────────
+    @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
     private val dispatcher = newSingleThreadContext("ReflowDecode")
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val isShutdown = AtomicBoolean(false)
 
@@ -108,6 +113,7 @@ public class ReflowDecodeService(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     public fun shutdown() {
         if (isShutdown.compareAndSet(false, true)) {
             requestChannel.close()

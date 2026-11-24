@@ -1,10 +1,10 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.archko.reader.k2pdfopt.K2PdfOpt
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 
 internal actual fun renderReflowTiles(
     source: ImageBitmap,

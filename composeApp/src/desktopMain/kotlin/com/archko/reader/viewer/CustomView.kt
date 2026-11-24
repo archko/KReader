@@ -52,7 +52,7 @@ import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsQueueService
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState

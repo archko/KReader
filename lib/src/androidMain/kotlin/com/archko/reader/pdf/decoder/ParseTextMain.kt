@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap

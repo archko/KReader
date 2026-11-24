@@ -68,7 +68,7 @@ import com.archko.reader.pdf.entity.CustomImageData
 import com.archko.reader.pdf.entity.DocumentInfo
 import com.archko.reader.pdf.entity.Recent
 import com.archko.reader.pdf.util.FileTypeUtils
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import com.archko.reader.pdf.util.IntentFile
 import com.archko.reader.pdf.util.getAbsolutePath
 import com.archko.reader.pdf.util.getExtension

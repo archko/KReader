@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
@@ -23,8 +23,6 @@ import com.artifex.mupdf.fitz.Document
 import java.io.File
 import java.util.Collections
 import java.util.LinkedHashMap
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.round
 
 /**

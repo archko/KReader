@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.api
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -28,7 +27,6 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.lifecycle.viewmodel.compose.android)
-            implementation(libs.k2pdfopt)
         }
         commonMain.dependencies {
             implementation(project(":lib"))
@@ -79,9 +77,9 @@ android {
     signingConfigs {
         named("debug") {
             storeFile = rootProject.file("composeApp/release_key.jks")
-            storePassword = "Abc123456"
-            keyAlias = "mupdf_release_key"
-            keyPassword = "Abc123456"
+            storePassword = ""
+            keyAlias = ""
+            keyPassword = ""
         }
     }
     buildTypes {

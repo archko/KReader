@@ -1,9 +1,8 @@
 package com.archko.reader.pdf.component
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.image.DjvuLoader
-import com.archko.reader.image.TextSearchResult
 import com.archko.reader.pdf.state.OcrEngine
 import com.archko.reader.pdf.util.FileTypeUtils
 

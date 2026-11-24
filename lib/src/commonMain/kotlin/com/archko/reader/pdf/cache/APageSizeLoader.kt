@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.ui.geometry.Rect
 import com.archko.reader.pdf.entity.APage
 import com.archko.reader.pdf.entity.CropMode

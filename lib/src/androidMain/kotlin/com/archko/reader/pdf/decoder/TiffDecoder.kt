@@ -1,12 +1,11 @@
 package com.archko.reader.pdf.decoder
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
 import com.archko.reader.image.TiffLoader

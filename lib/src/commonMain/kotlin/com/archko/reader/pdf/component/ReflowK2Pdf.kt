@@ -1,4 +1,4 @@
-package com.archko.reader.viewer
+package com.archko.reader.pdf.component
 
 import androidx.compose.ui.graphics.ImageBitmap
 

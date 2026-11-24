@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsProgressListener

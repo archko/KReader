@@ -1,4 +1,4 @@
-package com.archko.reader.viewer.utils
+package com.archko.reader.pdf.util
 
 /**
  * Desktop platform implementation of DebugConfig.

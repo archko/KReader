@@ -1,5 +1,4 @@
 package com.archko.reader.pdf.util
-import com.archko.reader.viewer.utils.Logger
 import android.content.Context
 import com.archko.reader.pdf.PdfApp
 import com.tencent.mmkv.MMKV

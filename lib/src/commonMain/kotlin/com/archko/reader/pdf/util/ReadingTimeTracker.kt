@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.util
-import com.archko.reader.viewer.utils.Logger
+
 /**
  * 阅读时长追踪器
  * @author: archko 2026/3/1

@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import androidx.core.content.edit

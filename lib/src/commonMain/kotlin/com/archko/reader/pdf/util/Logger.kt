@@ -1,4 +1,4 @@
-package com.archko.reader.viewer.utils
+package com.archko.reader.pdf.util
 
 /**
  * Expect declaration for platform-specific logging.

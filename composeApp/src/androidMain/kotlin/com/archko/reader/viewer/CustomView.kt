@@ -37,6 +37,7 @@ import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.MobileDocumentView
 import com.archko.reader.pdf.component.PagerDocumentView
 import com.archko.reader.pdf.component.PathConfig
+import com.archko.reader.pdf.component.ReflowView
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -71,7 +72,7 @@ import com.archko.reader.viewer.dialog.SleepTimerDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

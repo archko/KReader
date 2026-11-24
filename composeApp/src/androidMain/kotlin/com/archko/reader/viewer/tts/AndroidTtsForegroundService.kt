@@ -1,5 +1,5 @@
 package com.archko.reader.viewer.tts
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager

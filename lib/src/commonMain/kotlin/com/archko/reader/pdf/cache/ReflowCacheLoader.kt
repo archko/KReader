@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.cache
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import com.archko.reader.pdf.entity.ReflowBean
 import com.archko.reader.pdf.entity.ReflowCacheBean
 import kotlinx.serialization.json.Json

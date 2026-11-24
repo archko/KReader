@@ -1,5 +1,6 @@
 package com.archko.reader.viewer.utils
 
+import com.archko.reader.pdf.util.Logger
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout

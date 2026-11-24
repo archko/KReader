@@ -68,7 +68,7 @@ import com.archko.reader.pdf.viewmodel.BookmarkViewModel
 import com.archko.reader.pdf.viewmodel.PdfViewModel
 import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.dialog.BookInfoDialog
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState

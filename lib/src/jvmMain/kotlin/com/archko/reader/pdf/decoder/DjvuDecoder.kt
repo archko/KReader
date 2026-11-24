@@ -1,5 +1,5 @@
 package com.archko.reader.pdf.decoder
-import com.archko.reader.viewer.utils.Logger
+import com.archko.reader.pdf.util.Logger
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.ImageBitmap
@@ -28,7 +28,6 @@ import com.archko.reader.pdf.util.convertDjvuOutlinesToItems
 import java.awt.image.BufferedImage
 import java.io.File
 import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.round
 
 /**
