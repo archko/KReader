@@ -1,5 +1,5 @@
 package com.archko.reader.viewer
-import com.archko.reader.viewer.utils.Logger
+
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -52,6 +52,7 @@ import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsQueueService
+import com.archko.reader.viewer.utils.Logger
 import com.dokar.sonner.ToastType
 import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
@@ -322,7 +323,7 @@ private fun ToolbarContent(
                     }
                 }
                 // 只有单文档文件才显示大纲按钮
-                    if (FileTypeUtils.shouldShowOutline(paths)) {
+                if (FileTypeUtils.shouldShowOutline(paths)) {
                     IconButton(onClick = { onOutlineDialogShow() }) {
                         Icon(
                             painter = painterResource(Res.drawable.ic_toc),
@@ -331,13 +332,14 @@ private fun ToolbarContent(
                         )
                     }
                 }
-                //IconButton(onClick = { isReflow = !isReflow }) {
-                //    Icon(
-                //        painter = painterResource(Res.drawable.ic_reflow),
-                //        contentDescription = stringResource(Res.string.reflow),
-                //        tint = if (isReflow) Color.Green else Color.White
-                //    )
-                //}
+
+                IconButton(onClick = { isReflow = !isReflow }) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_reflow),
+                        contentDescription = stringResource(Res.string.reflow),
+                        tint = if (isReflow) Color.Green else Color.White
+                    )
+                }
 
                 // AI按钮
                 if (FileTypeUtils.isDocumentFile(currentPath)) {
@@ -512,7 +514,10 @@ fun CustomView(
                     }
                     if (newDecoder != null) {
                         newDecoder.size(viewportSize)
-                        Logger.d("init.size", "${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
+                        Logger.d(
+                            "init.size",
+                            "${newDecoder.imageSize.width}-${newDecoder.imageSize.height}"
+                        )
                         decoder = newDecoder
                         loadingError = null
                     }
@@ -668,7 +673,10 @@ fun CustomView(
                             val firstPageSize = dec.originalPageSizes[0]
                             val width = firstPageSize.width
                             val height = firstPageSize.height
-                            Logger.d("isVertical", "$isVertical, width:$width-$height, $currentPath")
+                            Logger.d(
+                                "isVertical",
+                                "$isVertical, width:$width-$height, $currentPath"
+                            )
                             // 如果图片的高度小于宽度的1/3，则切换为横向滚动
                             if (height < width / 3) {
                                 isVertical = false
@@ -744,7 +752,10 @@ fun CustomView(
                         // Segment开始朗读，更新speakingPageIndex和跳转
                         val newPageStr = bean.page?.split("-")?.firstOrNull()
                         val newPage = newPageStr?.toIntOrNull()
-                        Logger.d("TTS", "onStart - page: ${bean.page}, newPage: $newPage, currentPage: $currentPage")
+                        Logger.d(
+                            "TTS",
+                            "onStart - page: ${bean.page}, newPage: $newPage, currentPage: $currentPage"
+                        )
                         if (newPage != null) {
                             scope.launch {
                                 speakingPageIndex = newPage
@@ -759,7 +770,10 @@ fun CustomView(
                         // Segment完成
                         val newPageStr = bean.page?.split("-")?.firstOrNull()
                         val newPage = newPageStr?.toIntOrNull()
-                        Logger.d("TTS", "onDone - page: ${bean.page}, newPage: $newPage, currentPage: $currentPage")
+                        Logger.d(
+                            "TTS",
+                            "onDone - page: ${bean.page}, newPage: $newPage, currentPage: $currentPage"
+                        )
                     }
 
                     override fun onFinish() {

@@ -30,6 +30,7 @@ kotlin {
             api(libs.mmkv)
             api(libs.crashreport)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.k2pdfopt)
         }
         commonMain {
             dependencies {
@@ -61,6 +62,7 @@ kotlin {
                 api(libs.mupdf.fitz)
                 api(libs.tiff.loader.jar)
                 implementation(libs.ktor.client.okhttp)
+                implementation(libs.k2pdfopt.desktop)
             }
         }
     }

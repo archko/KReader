@@ -1,14 +1,10 @@
-package com.archko.reader.viewer.utils
+package com.archko.reader.pdf.util
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.RectF
-import android.os.Build
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ImageBitmap
 import com.archko.reader.pdf.cache.getCacheDirectory
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -27,17 +23,15 @@ import java.util.concurrent.TimeUnit
  *
  * 使用 [ReflowCacheHolder] 获取单例实例，避免为每本书重建缓存目录扫描。
  */
-class ReflowCache private constructor(
+public class ReflowCache private constructor(
     private val documentPath: String,
     private val cacheRoot: File,
 ) {
 
-    companion object {
+    public companion object {
         private const val MAGIC = 0x4b325246
         private const val CACHE_VERSION = 3
         private const val MAX_SIZE_BYTES = 256L * 1024 * 1024
-        private const val TILE_FORMAT_PNG = 1
-        private const val TILE_FORMAT_WEBP = 2
         private const val MAX_TILE_BYTES = 64 * 1024 * 1024
         private val writer = ThreadPoolExecutor(
             1,
@@ -55,7 +49,7 @@ class ReflowCache private constructor(
          * 即 Android/data/<package>/files/amupdf/reflow/books/（外部存储不可用时
          * [FileUtils.getStorageDirPath] 自带回退到内部 filesDir）。
          */
-        fun create(context: Context, documentPath: String): ReflowCache {
+        public fun create(documentPath: String): ReflowCache {
             val root = getCacheDirectory("reflow/books")
             return ReflowCache(documentPath, root)
         }
@@ -63,7 +57,7 @@ class ReflowCache private constructor(
 
     private val bookDir: File? = createBookDir()
 
-    val available: Boolean
+    public val available: Boolean
         get() = bookDir != null
 
     private fun createBookDir(): File? {
@@ -92,7 +86,7 @@ class ReflowCache private constructor(
         }
     }
 
-    fun buildKey(
+    public fun buildKey(
         pageNumber: Int,
         targetWidth: Int,
         targetHeight: Int,
@@ -102,7 +96,7 @@ class ReflowCache private constructor(
         wordSpacing: Float,
         crop: Boolean,
         orientation: Int,
-        pageSliceBounds: RectF?,
+        pageSliceBounds: Rect?,
     ): String {
         val source = String.format(
             Locale.US,
@@ -122,7 +116,7 @@ class ReflowCache private constructor(
         return String.format(Locale.US, "%d-%s", pageNumber, sha1(source).substring(0, 16))
     }
 
-    fun load(key: String): MutableList<Bitmap>? {
+    public fun load(key: String): MutableList<ImageBitmap>? {
         val dir = bookDir ?: return null
         val file = File(dir, "$key.tiles")
         if (!file.exists()) {
@@ -144,9 +138,7 @@ class ReflowCache private constructor(
                     file.delete()
                     return null
                 }
-                val options = BitmapFactory.Options()
-                options.inPreferredConfig = Bitmap.Config.ARGB_8888
-                val list = ArrayList<Bitmap>(tileCount)
+                val list = ArrayList<ImageBitmap>(tileCount)
                 for (i in 0 until tileCount) {
                     val width = input.readInt()
                     val height = input.readInt()
@@ -161,7 +153,7 @@ class ReflowCache private constructor(
                     }
                     val bytes = ByteArray(length)
                     input.readFully(bytes)
-                    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, length, options)
+                    val bitmap = decodeReflowTile(bytes)
                     if (bitmap == null) {
                         recycleAll(list)
                         file.delete()
@@ -179,16 +171,13 @@ class ReflowCache private constructor(
         }
     }
 
-    fun save(key: String, bitmaps: List<Bitmap>) {
+    public fun save(key: String, bitmaps: List<ImageBitmap>) {
         val dir = bookDir ?: return
         if (bitmaps.isEmpty()) {
             return
         }
         val tiles = ArrayList(bitmaps)
         writer.execute {
-            if (tiles.any { it.isRecycled }) {
-                return@execute
-            }
             val target = File(dir, "$key.tiles")
             val tmp = File(dir, "$key.tmp")
             try {
@@ -198,24 +187,17 @@ class ReflowCache private constructor(
                     output.writeUTF(key)
                     output.writeInt(tiles[0].width)
                     output.writeInt(tiles.size)
-                    val compressFormat: Bitmap.CompressFormat
-                    val formatTag: Int
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        compressFormat = Bitmap.CompressFormat.WEBP_LOSSLESS
-                        formatTag = TILE_FORMAT_WEBP
-                    } else {
-                        compressFormat = Bitmap.CompressFormat.PNG
-                        formatTag = TILE_FORMAT_PNG
-                    }
                     for (bitmap in tiles) {
-                        val buffer = ByteArrayOutputStream()
-                        bitmap.compress(compressFormat, 100, buffer)
-                        val bytes = buffer.toByteArray()
+                        val encoded = encodeReflowTile(bitmap)
+                        if (encoded == null) {
+                            tmp.delete()
+                            return@execute
+                        }
                         output.writeInt(bitmap.width)
                         output.writeInt(bitmap.height)
-                        output.writeInt(formatTag)
-                        output.writeInt(bytes.size)
-                        output.write(bytes)
+                        output.writeInt(encoded.format)
+                        output.writeInt(encoded.bytes.size)
+                        output.write(encoded.bytes)
                     }
                 }
                 if (!tmp.renameTo(target)) {
@@ -274,9 +256,9 @@ class ReflowCache private constructor(
         }
     }
 
-    private fun recycleAll(bitmaps: List<Bitmap>) {
+    private fun recycleAll(bitmaps: List<ImageBitmap>) {
         for (bitmap in bitmaps) {
-            bitmap.recycle()
+            recycleReflowTile(bitmap)
         }
     }
 

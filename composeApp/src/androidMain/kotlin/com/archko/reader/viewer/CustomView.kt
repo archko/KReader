@@ -1,5 +1,5 @@
 package com.archko.reader.viewer
-import com.archko.reader.viewer.utils.Logger
+
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.widget.Toast
@@ -16,16 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -75,6 +71,7 @@ import com.archko.reader.viewer.dialog.SleepTimerDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
 import com.archko.reader.viewer.tts.TtsTempProgressHelper
+import com.archko.reader.viewer.utils.Logger
 import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -279,6 +276,16 @@ private fun ToolbarContent(
                         }
                     }
 
+                    item {
+                        IconButton(onClick = { onToggleReflow() }) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_reflow),
+                                contentDescription = stringResource(Res.string.reflow),
+                                tint = if (isReflow) Color.Green else Color.White
+                            )
+                        }
+                    }
+
                     // AI按钮
                     if (FileTypeUtils.isDocumentFile(currentPath)) {
                         item {
@@ -315,16 +322,6 @@ private fun ToolbarContent(
                                     tint = Color.White
                                 )
                             }
-                        }
-                    }
-
-                    item {
-                        IconButton(onClick = { onToggleReflow() }) {
-                            Icon(
-                                painter = painterResource(Res.drawable.ic_reflow),
-                                contentDescription = stringResource(Res.string.reflow),
-                                tint = if (isReflow) Color.Green else Color.White
-                            )
                         }
                     }
 
@@ -466,7 +463,10 @@ fun CustomView(
         val cacheMemoryLimit = maxMemory / 2
         ImageCache.setMaxMemory(cacheMemoryLimit)
 
-        Logger.d("ImageCache", "设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)")
+        Logger.d(
+            "ImageCache",
+            "设置内存限制为 ${cacheMemoryLimit / 1024 / 1024}MB (总内存: ${maxMemory / 1024 / 1024}MB)"
+        )
 
         // 加载书签
         val firstPath = documents.getOrNull(0)?.path
@@ -589,7 +589,10 @@ fun CustomView(
                     }
                     if (newDecoder != null) {
                         newDecoder.size(viewportSize)
-                        Logger.d("init.size", "${newDecoder.imageSize.width}-${newDecoder.imageSize.height}")
+                        Logger.d(
+                            "init.size",
+                            "${newDecoder.imageSize.width}-${newDecoder.imageSize.height}"
+                        )
                         decoder = newDecoder
                         loadingError = null
                     }
@@ -705,9 +708,9 @@ fun CustomView(
             var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
             var isPagerMode by remember { mutableStateOf(false) }
             val canEnterPagerMode = FileTypeUtils.isDocumentFile(currentPath) ||
-                FileTypeUtils.isImageFile(currentPath) ||
-                FileTypeUtils.isTiffFile(currentPath) ||
-                documents.size > 1
+                    FileTypeUtils.isImageFile(currentPath) ||
+                    FileTypeUtils.isTiffFile(currentPath) ||
+                    documents.size > 1
 
             var showSleepDialog by remember { mutableStateOf(false) }
             var showQueueDialog by remember { mutableStateOf(false) }
@@ -754,7 +757,10 @@ fun CustomView(
                             val firstPageSize = dec.originalPageSizes[0]
                             val width = firstPageSize.width
                             val height = firstPageSize.height
-                            Logger.d("isVertical", "$isVertical, width:$width-$height, $currentPath")
+                            Logger.d(
+                                "isVertical",
+                                "$isVertical, width:$width-$height, $currentPath"
+                            )
                             // 如果图片的高度小于宽度的1/3，则切换为横向滚动
                             if (height < width / 3) {
                                 isVertical = false
@@ -920,7 +926,10 @@ fun CustomView(
                                 speakingPage?.let { pageStr ->
                                     val targetPageStr = pageStr.split("-").firstOrNull()
                                     val targetPage = targetPageStr?.toIntOrNull()
-                                    Logger.d("OnResume", "正在朗读第${targetPage}页，当前显示第${currentPage}页")
+                                    Logger.d(
+                                        "OnResume",
+                                        "正在朗读第${targetPage}页，当前显示第${currentPage}页"
+                                    )
                                     if (targetPage != null && targetPage != currentPage) {
                                         jumpIntent = JumpIntent(targetPage, JumpMode.PageNavigation)
 
@@ -951,7 +960,10 @@ fun CustomView(
                     decoder = decoder!!,
                     pageCount = pageCount,
                     currentPath = currentPath,
-                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
+                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(
+                            documents
+                        )
+                    ) onSaveDocument else null,
                     onDoubleTapToolbar = { showToolbar = !showToolbar },
                     onPageChanged = { page ->
                         currentPageRef.intValue = page
@@ -990,7 +1002,10 @@ fun CustomView(
                         },
                         onTapCenter = { showToolbar = !showToolbar },
                         cropMode = isCropMode,
-                        onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
+                        onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(
+                                documents
+                            )
+                        ) onSaveDocument else null,
                     )
                 }
             } else {
@@ -1003,7 +1018,10 @@ fun CustomView(
                     jumpOffsetY = jumpIntent.offsetY,
                     initialOrientation = orientation,
                     columnCount = columnCount,
-                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(documents)) onSaveDocument else null,
+                    onSaveDocument = if (list.isNotEmpty() && FileTypeUtils.shouldSaveProgress(
+                            documents
+                        )
+                    ) onSaveDocument else null,
                     onCloseDocument = {
                         Logger.d("onCloseDocument.isReflow", "$isReflow, isPagerMode:$isPagerMode")
                         // 切换到单页模式时 MobileDocumentView 只是退出组合，不能关闭文档
@@ -1013,7 +1031,8 @@ fun CustomView(
                                 val sessionDuration = readingTimeTracker.pauseSession()
                                 val annotationCount =
                                     annotationManager.annotations.values.sumOf { it.size }
-                                val bookmarkCount = bookmarkViewModel.currentPathBookmarks.value.size
+                                val bookmarkCount =
+                                    bookmarkViewModel.currentPathBookmarks.value.size
                                 readingStatsViewModel.endSession(
                                     path = currentPath,
                                     sessionDuration = sessionDuration,
@@ -1304,7 +1323,9 @@ fun CustomView(
                                         ) {
                                             Icon(
                                                 painter = painterResource(if (isVertical) Res.drawable.ic_vertical else Res.drawable.ic_horizontal),
-                                                contentDescription = if (isVertical) stringResource(Res.string.vertical) else stringResource(
+                                                contentDescription = if (isVertical) stringResource(
+                                                    Res.string.vertical
+                                                ) else stringResource(
                                                     Res.string.horizontal
                                                 ),
                                                 tint = Color.White
@@ -1320,7 +1341,7 @@ fun CustomView(
                                             // 避免方向已变化但状态未同步时需要点击两次
                                             val currentlyPortrait =
                                                 context.resources.configuration.orientation ==
-                                                    Configuration.ORIENTATION_PORTRAIT
+                                                        Configuration.ORIENTATION_PORTRAIT
                                             val targetPortrait = !currentlyPortrait
                                             isActivityPortrait = targetPortrait
 
@@ -1527,7 +1548,8 @@ fun CustomView(
                 val outlineList = decoder?.outlineItems ?: emptyList()
                 OutlineDialog(
                     currentPage = currentPage,
-                    currentPath = documents.firstOrNull()?.path ?: documents.firstOrNull()?.uri ?: "",
+                    currentPath = documents.firstOrNull()?.path ?: documents.firstOrNull()?.uri
+                    ?: "",
                     outlineList = outlineList,
                     annotationManager = annotationManager,
                     bookmarkViewModel = bookmarkViewModel,

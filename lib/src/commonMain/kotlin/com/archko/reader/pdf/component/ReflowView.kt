@@ -1,19 +1,13 @@
 package com.archko.reader.viewer
 
-import android.graphics.Bitmap
-import androidx.compose.animation.core.AnimationState
-import androidx.compose.animation.core.AnimationVector2D
-import androidx.compose.animation.core.TwoWayConverter
-import androidx.compose.animation.core.animateDecay
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -42,47 +36,42 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastAny
-import androidx.compose.ui.util.fastForEach
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.flinger.StockFlingBehaviours
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 private data class ReflowPageData(
-    val tiles: List<Bitmap> = emptyList(),
+    val tiles: List<ImageBitmap> = emptyList(),
     val height: Float = 0f,
     val loaded: Boolean = false
 )
 
 @Composable
-fun ReflowView(
+public fun ReflowView(
     decoder: ImageDecoder,
     pageCount: Int,
     currentPath: String,
@@ -115,8 +104,8 @@ fun ReflowView(
     horizontalPadding: Dp = 10.dp,
     pageGap: Dp = 10.dp,
 ) {
-    val context = LocalContext.current
     val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
     val scope = rememberCoroutineScope()
     val viewConfiguration = LocalViewConfiguration.current
     val scrollFlingBehavior = StockFlingBehaviours.smoothScroll()
@@ -127,16 +116,23 @@ fun ReflowView(
 
     val safeInitialPage = initialPage.coerceIn(0, pageTotal - 1)
 
-    val decodeService = remember(decoder, currentPath) {
-        val dm = context.resources.displayMetrics
+    val screenWidth = windowInfo.containerSize.width.coerceAtLeast(1)
+    val screenHeight = windowInfo.containerSize.height.coerceAtLeast(1)
+    val densityDpi = (density.density * 160f).roundToInt().coerceAtLeast(1)
 
+    val decodeService = remember(
+        decoder,
+        currentPath,
+        screenWidth,
+        screenHeight,
+        densityDpi
+    ) {
         ReflowDecodeService(
-            context = context,
             decoder = decoder,
             documentPath = currentPath,
-            screenWidth = dm.widthPixels,
-            screenHeight = dm.heightPixels,
-            densityDpi = dm.densityDpi,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
+            densityDpi = densityDpi,
             orientation = initialOrientation
         )
     }
@@ -385,12 +381,12 @@ fun ReflowView(
             .coerceIn(0, pageTotal - 1)
 
         val offset = (
-            listState.firstVisibleItemScrollOffset / zoom.coerceAtLeast(0.01f)
-        ).roundToLong().coerceAtLeast(0L)
+                listState.firstVisibleItemScrollOffset / zoom.coerceAtLeast(0.01f)
+                ).roundToLong().coerceAtLeast(0L)
 
         val docX = (
-            -horizontalOffset / zoom.coerceAtLeast(0.01f)
-        ).roundToLong().coerceAtLeast(0L)
+                -horizontalOffset / zoom.coerceAtLeast(0.01f)
+                ).roundToLong().coerceAtLeast(0L)
 
         onSaveDocument?.invoke(
             page,
@@ -496,7 +492,7 @@ fun ReflowView(
                                 val item = listState.layoutInfo.visibleItemsInfo
                                     .firstOrNull {
                                         previousCentroid.y >= it.offset &&
-                                            previousCentroid.y < it.offset + it.size
+                                                previousCentroid.y < it.offset + it.size
                                     }
 
                                 if (item != null) {
@@ -507,15 +503,15 @@ fun ReflowView(
                                     // 水平方向也以双指中心为缩放焦点
                                     val localDocX =
                                         (previousCentroid.x -
-                                            hPaddingPx * oldZoom -
-                                            oldOffsetX) / oldZoom
+                                                hPaddingPx * oldZoom -
+                                                oldOffsetX) / oldZoom
 
                                     zoom = newZoom
 
                                     horizontalOffset = clampHorizontalOffset(
                                         currentCentroid.x -
-                                            hPaddingPx * newZoom -
-                                            localDocX * newZoom,
+                                                hPaddingPx * newZoom -
+                                                localDocX * newZoom,
                                         newZoom
                                     )
 
@@ -525,8 +521,8 @@ fun ReflowView(
 
                                         // 将原来的页面内焦点重新放回双指中心
                                         val targetOffsetY = (
-                                            localDocY * newZoom - currentCentroid.y
-                                        ).roundToInt()
+                                                localDocY * newZoom - currentCentroid.y
+                                                ).roundToInt()
 
                                         listState.scrollToItem(
                                             index = item.index,
@@ -711,7 +707,7 @@ fun ReflowView(
 
 @Composable
 private fun ReflowPageItem(
-    tiles: List<Bitmap>,
+    tiles: List<ImageBitmap>,
     contentWidth: Float,
     horizontalPadding: Float,
     horizontalOffset: Float,
@@ -732,9 +728,9 @@ private fun ReflowPageItem(
         val scaledContentWidth = contentWidth * zoom
 
         val left = (
-            horizontalPadding * zoom +
-                horizontalOffset
-            )
+                horizontalPadding * zoom +
+                        horizontalOffset
+                )
 
         if (tiles.isEmpty()) {
             drawRect(
@@ -757,12 +753,12 @@ private fun ReflowPageItem(
 
             val tileHeight =
                 contentWidth *
-                    bitmap.height.toFloat() /
-                    bitmap.width.toFloat() *
-                    zoom
+                        bitmap.height.toFloat() /
+                        bitmap.width.toFloat() *
+                        zoom
 
             drawImage(
-                image = bitmap.asImageBitmap(),
+                image = bitmap,
                 dstOffset = IntOffset(
                     left.roundToInt(),
                     top.roundToInt()

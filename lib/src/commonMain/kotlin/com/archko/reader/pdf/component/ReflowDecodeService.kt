@@ -1,21 +1,18 @@
 package com.archko.reader.viewer
 
-import android.content.Context
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
-import com.archko.reader.k2pdfopt.K2PdfOpt
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
 import com.archko.reader.pdf.entity.APage
+import com.archko.reader.pdf.util.ReflowCache
 import com.archko.reader.viewer.utils.Logger
-import com.archko.reader.viewer.utils.ReflowCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
@@ -37,7 +34,6 @@ import kotlin.math.sqrt
  * Lifecycle: call [shutdown] when the document is closed.
  */
 public class ReflowDecodeService(
-    private val context: Context,
     private val decoder: ImageDecoder,
     private val documentPath: String,
     private val screenWidth: Int,
@@ -60,7 +56,7 @@ public class ReflowDecodeService(
     private val pending = ConcurrentHashMap<Int, DecodeRequest>()
 
     // ── Disk tile cache ───────────────────────────────────────────────────────
-    private val tileCache = ReflowCache.create(context, documentPath)
+    private val tileCache = ReflowCache.create(documentPath)
 
     init {
         scope.launch {
@@ -91,7 +87,7 @@ public class ReflowDecodeService(
         pageIndex: Int,
         fontSize: Float,
         wordSpacing: Float,
-    ): List<Bitmap> = suspendCancellableCoroutine { cont ->
+    ): List<ImageBitmap> = suspendCancellableCoroutine { cont ->
         // Cancel any in-flight request for this page
         pending[pageIndex]?.cancelled?.set(true)
 
@@ -176,7 +172,7 @@ public class ReflowDecodeService(
             APage(request.pageIndex, pageWidthPts.toInt(), pageHeightPts.toInt(), 1f)
         }
 
-        val imageBitmap = try {
+        val sourceImage: ImageBitmap = try {
             decoder.renderPage(
                 aPage = aPage,
                 viewSize = IntSize(screenWidth, screenHeight),
@@ -185,7 +181,11 @@ public class ReflowDecodeService(
                 crop = false
             )
         } catch (e: Exception) {
-            Logger.e("ReflowDecodeService", "renderPage failed page=${request.pageIndex}: ${e.message}", e)
+            Logger.e(
+                "ReflowDecodeService",
+                "renderPage failed page=${request.pageIndex}: ${e.message}",
+                e
+            )
             request.onResult(emptyList())
             return
         }
@@ -195,24 +195,16 @@ public class ReflowDecodeService(
             return
         }
 
-        val sourceBitmap: Bitmap = try {
-            imageBitmap.asAndroidBitmap()
-        } catch (e: Exception) {
-            Logger.e("ReflowDecodeService", "asAndroidBitmap failed page=${request.pageIndex}: ${e.message}", e)
-            request.onResult(emptyList())
-            return
-        }
-
-        // sourceDpi = 72 × bitmapWidth / pageWidthPts
-        val sourceDpi = if (sourceBitmap.width > 0 && pageWidthPts > 0f) {
-            (72f * sourceBitmap.width / pageWidthPts).coerceAtLeast(1f)
+        // sourceDpi = 72 × imageWidth / pageWidthPts
+        val sourceDpi = if (sourceImage.width > 0 && pageWidthPts > 0f) {
+            (72f * sourceImage.width / pageWidthPts).coerceAtLeast(1f)
         } else {
             renderDpi
         }
 
         // ── 3. Run k2pdfopt ───────────────────────────────────────────────────
         val tiles = k2pdf2bitmap(
-            bitmap = sourceBitmap,
+            bitmap = sourceImage,
             fontSize = request.fontSize,
             viewWidth = screenWidth,
             viewHeight = screenHeight,
@@ -240,49 +232,28 @@ public class ReflowDecodeService(
     }
 
     private fun k2pdf2bitmap(
-        bitmap: Bitmap,
+        bitmap: ImageBitmap,
         fontSize: Float,
         viewWidth: Int,
         viewHeight: Int,
         densityDpi: Int,
         sourceDpi: Float,
         wordSpacing: Float,
-    ): List<Bitmap> {
-        val list = mutableListOf<Bitmap>()
+    ): List<ImageBitmap> {
         val devDpi = if (sourceDpi > 1f) {
             minOf(densityDpi.toFloat(), sourceDpi).toInt()
         } else {
             densityDpi
         }
-        val opt = K2PdfOpt()
-        try {
-            opt.create(viewWidth, viewHeight, devDpi)
-            opt.setSourceDpi(sourceDpi)
-            opt.setWordSpacing(wordSpacing)
-            opt.fontSize = fontSize
-            opt.load(bitmap)
-
-            val pageWidth = opt.pageWidth
-            val pageHeight = opt.pageHeight
-            if (pageWidth <= 0 || pageHeight <= 0) {
-                Logger.w("ReflowDecodeService", "k2pdfopt empty output: $pageWidth×$pageHeight")
-                return list
-            }
-
-            val tileHeight = if (viewHeight > 0) viewHeight else 1024
-            var y = 0
-            while (y < pageHeight) {
-                val h = minOf(tileHeight, pageHeight - y)
-                val tile = opt.renderTile(0, y, pageWidth, h) ?: break
-                list.add(tile)
-                y += h
-            }
-        } catch (e: Exception) {
-            Logger.e("ReflowDecodeService", "k2pdfopt error: ${e.message}", e)
-        } finally {
-            try { opt.releasePage() } catch (_: Exception) { }
-        }
-        return list
+        return renderReflowTiles(
+            source = bitmap,
+            fontSize = fontSize,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            devDpi = devDpi,
+            sourceDpi = sourceDpi,
+            wordSpacing = wordSpacing,
+        )
     }
 
     // ── Inner types ───────────────────────────────────────────────────────────
@@ -291,7 +262,7 @@ public class ReflowDecodeService(
         val pageIndex: Int,
         val fontSize: Float,
         val wordSpacing: Float,
-        val onResult: (List<Bitmap>) -> Unit,
+        val onResult: (List<ImageBitmap>) -> Unit,
         val cancelled: AtomicBoolean = AtomicBoolean(false),
     )
 }
