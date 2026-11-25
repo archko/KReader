@@ -16,7 +16,7 @@ openai-client = "4.1.0"
 
 calf = "0.14.0"
 mupdfFitz = "1.28.0"
-mupdfFitzAar = "1.28.0"
+mupdfFitzAar = "1.28.1"
 mmkv = "2.4.1"
 core = "1.18.0"
 android-lifecycle = "2.10.0"
