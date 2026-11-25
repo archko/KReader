@@ -418,10 +418,11 @@ public fun ReflowView(
     }
 
     /*
-     * 双指缩放。
+     * 缩放与任意方向平移。
      *
-     * 单指滚动完全交给 LazyColumn。
-     * 双指操作时才接管手势。
+     * 未放大到页面宽超过视口时，单指滚动交给 LazyColumn 原生处理。
+     * 放大后单指越过 touchSlop 即进入自由平移：
+     * delta.x 更新 horizontalOffset，delta.y 通过 listState.scrollBy 驱动纵向滚动。
      */
     Box(
         modifier = Modifier
@@ -450,17 +451,18 @@ public fun ReflowView(
                 }
 
                 var flingJob: Job? = null
+                var verticalFlingJob: Job? = null
 
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
 
                     flingJob?.cancel()
+                    verticalFlingJob?.cancel()
 
                     val velocityTracker = VelocityTracker()
 
-                    var horizontalDragStarted = false
-                    var horizontalDragX = 0f
-                    var horizontalDragY = 0f
+                    var isFreePanning = false
+                    var accumulatedPan = Offset.Zero
 
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -559,50 +561,70 @@ public fun ReflowView(
                                     change.uptimeMillis,
                                     change.position
                                 )
-                            }
 
-                            if (
-                                change != null &&
-                                canPanHorizontally(zoom)
-                            ) {
                                 val delta = change.positionChange()
 
-                                if (!horizontalDragStarted) {
-                                    horizontalDragX += delta.x
-                                    horizontalDragY += delta.y
+                                if (canPanHorizontally(zoom)) {
+                                    if (!isFreePanning) {
+                                        accumulatedPan += delta
 
-                                    if (
-                                        abs(horizontalDragX) > viewConfiguration.touchSlop &&
-                                        abs(horizontalDragX) > abs(horizontalDragY)
-                                    ) {
-                                        horizontalDragStarted = true
+                                        if (
+                                            accumulatedPan.getDistance() >
+                                            viewConfiguration.touchSlop
+                                        ) {
+                                            isFreePanning = true
 
+                                            horizontalOffset = clampHorizontalOffset(
+                                                horizontalOffset + accumulatedPan.x,
+                                                zoom
+                                            )
+
+                                            val initialDy = accumulatedPan.y
+
+                                            scope.launch {
+                                                listState.scrollBy(-initialDy)
+                                            }
+
+                                            if (change.positionChanged()) {
+                                                change.consume()
+                                            }
+                                        }
+                                    } else {
                                         horizontalOffset = clampHorizontalOffset(
-                                            horizontalOffset + horizontalDragX,
+                                            horizontalOffset + delta.x,
                                             zoom
                                         )
 
-                                        change.consume()
-                                    }
-                                } else {
-                                    horizontalOffset = clampHorizontalOffset(
-                                        horizontalOffset + delta.x,
-                                        zoom
-                                    )
+                                        scope.launch {
+                                            listState.scrollBy(-delta.y)
+                                        }
 
-                                    change.consume()
+                                        if (change.positionChanged()) {
+                                            change.consume()
+                                        }
+                                    }
                                 }
                             }
                         }
                     } while (event.changes.any { it.pressed })
 
-                    if (horizontalDragStarted) {
-                        val velocityX = velocityTracker.calculateVelocity().x
+                    if (isFreePanning) {
+                        val velocity = velocityTracker.calculateVelocity()
 
-                        if (abs(velocityX) > 1f) {
+                        if (abs(velocity.x) > 1f) {
                             flingJob = scope.launch {
                                 with(scrollFlingBehavior) {
-                                    horizontalScrollScope.performFling(velocityX)
+                                    horizontalScrollScope.performFling(velocity.x)
+                                }
+                            }
+                        }
+
+                        if (abs(velocity.y) > 1f) {
+                            verticalFlingJob = scope.launch {
+                                listState.scroll {
+                                    with(scrollFlingBehavior) {
+                                        performFling(-velocity.y)
+                                    }
                                 }
                             }
                         }
@@ -689,17 +711,6 @@ public fun ReflowView(
                     heightPx = scaledHeight,
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                LaunchedEffect(
-                    index,
-                    fontSize,
-                    wordSpacing,
-                    contentWidth
-                ) {
-                    if (pages[index]?.loaded != true) {
-                        loadPage(index)
-                    }
-                }
             }
         }
     }

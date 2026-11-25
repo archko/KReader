@@ -70,7 +70,7 @@ fun ReflowStyleDialog(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     TextButton(onClick = onDismiss) {
-                        Text(text = "完成")
+                        Text(text = "关闭")
                     }
                 }
 
