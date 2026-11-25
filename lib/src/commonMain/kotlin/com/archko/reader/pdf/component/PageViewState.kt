@@ -36,7 +36,7 @@ import kotlin.math.min
  * 缩放只影响 ViewportState，不触发重新布局。
  */
 public class PageViewState(
-    public val list: List<APage>,
+    public val list: MutableList<APage>,
     public val state: ImageDecoder,
     public val annotationManager: AnnotationManager,
     public var orientation: Int = Vertical,
@@ -295,6 +295,103 @@ public class PageViewState(
         }
     }
 
+    /**
+     * 当前可见区域在文档中的进度（0..1），用于样式重排后近似恢复阅读位置。
+     */
+    public fun visibleProgress(): Float {
+        if (!init || pages.isEmpty()) {
+            return 0f
+        }
+        val rect = viewport.docRect
+        return if (orientation == Vertical || columnCount > 1) {
+            if (docHeight <= 0f) 0f else (rect.top / docHeight).coerceIn(0f, 1f)
+        } else {
+            if (docWidth <= 0f) 0f else (rect.left / docWidth).coerceIn(0f, 1f)
+        }
+    }
+
+    /**
+     * 样式重排完成后替换页面列表。
+     * 保持 list 实例不变，避免 remember(list) 重建 PageViewState（重建会触发 decoder.close）。
+     */
+    public fun reloadPages(newPages: List<APage>, progress: Float): Int {
+        if (isShutdown) {
+            return 0
+        }
+        decodeService?.cancelPendingTasks()
+        pages.forEach { it.recycle() }
+        pages = emptyList()
+        pageToRender = emptyList()
+        wantedPagesRef.set(emptySet())
+        lastScannedVisible = null
+        pendingCropPages.clear()
+        init = false
+
+        // 保持同一个 list 实例，解码线程不会在这个阶段写它
+        list.clear()
+        list.addAll(newPages)
+        // TTS / ReflowDecodeService 读取的是 decoder.aPageList，确保同步
+        val decoderPages = state.aPageList
+        if (decoderPages != null && decoderPages !== list) {
+            decoderPages.clear()
+            decoderPages.addAll(newPages)
+        }
+        if (viewSize.width > 0 && viewSize.height > 0) {
+            state.size(viewSize)
+        }
+        pages = createPages()
+        // 旧页面的缩略图/tile 尺寸都基于旧排版，必须丢弃
+        ImageCache.clear()
+
+        relayout(notify = false)
+        val targetPage = pageIndexForProgress(progress)
+        viewport.offset = offsetForPage(targetPage)
+        updateTotals()
+        updateVisibleNow(true)
+        revision++
+
+        if (cropEnabled && cropMode == CropMode.AUTO) {
+            submitBackgroundCropTasks()
+        }
+        return targetPage
+    }
+
+    /**
+     * 丢弃排队的解码任务（例如样式重排前），正在执行的任务会由 decoder 的锁串行化。
+     */
+    public fun cancelPendingDecodes() {
+        decodeService?.cancelPendingTasks()
+    }
+
+    private fun pageIndexForProgress(progress: Float): Int {
+        if (pages.isEmpty()) {
+            return 0
+        }
+        val value = progress.coerceIn(0f, 1f)
+        if (orientation == Vertical || columnCount > 1) {
+            if (docHeight <= 0f) {
+                return 0
+            }
+            val targetY = value * docHeight
+            for (page in pages) {
+                if (page.baseRect.bottom > targetY) {
+                    return page.index
+                }
+            }
+        } else {
+            if (docWidth <= 0f) {
+                return 0
+            }
+            val targetX = value * docWidth
+            for (page in pages) {
+                if (page.baseRect.right > targetX) {
+                    return page.index
+                }
+            }
+        }
+        return pages.lastIndex
+    }
+
     public fun setPreloadScreens(screens: Float) {
         preloadScreens = screens.coerceAtLeast(0f)
     }
@@ -414,7 +511,7 @@ public class PageViewState(
         relayout()
     }
 
-    private fun relayout() {
+    private fun relayout(notify: Boolean = true) {
         if (viewSize.width == 0 || viewSize.height == 0 || pages.isEmpty()) {
             updateTotals()
             return
@@ -433,7 +530,9 @@ public class PageViewState(
         init = true
         layoutVersion++
         onLayoutApplied?.invoke()
-        updateVisibleNow(true)
+        if (notify) {
+            updateVisibleNow(true)
+        }
         revision++
     }
 

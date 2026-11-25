@@ -47,6 +47,8 @@ public fun MobileDocumentView(
     searchHighlightQuads: Map<Int, List<DocQuad>> = emptyMap(),
     currentSearchPageIndex: Int? = null,
     closeDecoderOnShutdown: Boolean = true,
+    styleRequest: ReflowStyleRequest? = null,
+    onStyleApplied: ((pageCount: Int, pageIndex: Int) -> Unit)? = null,
 ) {
     // 创建文档视图状态
     val stateHolder = rememberDocumentViewState(
@@ -100,6 +102,8 @@ public fun MobileDocumentView(
         onSaveDocument = onSaveDocument,
         onCloseDocument = onCloseDocument,
         onPageChanged = onPageChanged,
+        styleRequest = styleRequest,
+        onStyleApplied = onStyleApplied,
     )
 
     Box(

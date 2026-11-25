@@ -8,8 +8,9 @@ public class PageSizeBean {
     public var crop: Boolean = false
     public var cropMode: Int = CropMode.NONE
     public var fileSize: Long = 0L
+    public var styleKey: String? = null
 
     override fun toString(): String {
-        return "PageSizeBean(crop=$crop, cropMode=$cropMode, fileSize=$fileSize, list=${list?.size})"
+        return "PageSizeBean(crop=$crop, cropMode=$cropMode, fileSize=$fileSize, styleKey=$styleKey, list=${list?.size})"
     }
 }

@@ -37,6 +37,8 @@ import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.MobileDocumentView
 import com.archko.reader.pdf.component.PagerDocumentView
 import com.archko.reader.pdf.component.PathConfig
+import com.archko.reader.pdf.component.ReflowStyle
+import com.archko.reader.pdf.component.ReflowStyleRequest
 import com.archko.reader.pdf.component.ReflowView
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
@@ -68,6 +70,7 @@ import com.archko.reader.viewer.dialog.ManualCropDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
+import com.archko.reader.viewer.dialog.ReflowStyleDialog
 import com.archko.reader.viewer.dialog.SleepTimerDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsServiceBinder
@@ -76,6 +79,7 @@ import com.archko.reader.pdf.util.Logger
 import com.archko.reader.viewer.viewmodel.FontViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -509,6 +513,40 @@ fun CustomView(
     // 字体选择相关状态
     var showFontDialog by remember { mutableStateOf(false) }
 
+    // 流式文档阅读样式
+    var showStyleDialog by remember { mutableStateOf(false) }
+    var styleFontPath by remember {
+        mutableStateOf(FontCSSGenerator.getFontFace()?.takeIf { it.isNotEmpty() })
+    }
+    var styleFontSize by remember { mutableFloatStateOf(FontCSSGenerator.getFontSize()) }
+    var styleFontWeight by remember { mutableIntStateOf(FontCSSGenerator.getFontWeight()) }
+    var styleMarginEnabled by remember { mutableStateOf(FontCSSGenerator.getMarginPx() > 0) }
+    var styleRequest by remember { mutableStateOf<ReflowStyleRequest?>(null) }
+    val styleRequestSeq = remember { intArrayOf(0) }
+    val styleApplyJob = remember { arrayOfNulls<Job>(1) }
+
+    fun currentReflowStyle(): ReflowStyle {
+        return ReflowStyle(
+            fontPath = styleFontPath,
+            fontSize = styleFontSize,
+            fontWeight = styleFontWeight,
+            marginPx = if (styleMarginEnabled) 20 else 0,
+        )
+    }
+
+    fun submitReflowStyle(immediate: Boolean) {
+        val style = currentReflowStyle()
+        styleApplyJob[0]?.cancel()
+        styleApplyJob[0] = scope.launch {
+            if (!immediate) {
+                delay(400)
+            }
+            FontCSSGenerator.saveReflowStyle(style)
+            styleRequestSeq[0]++
+            styleRequest = ReflowStyleRequest(styleRequestSeq[0], style)
+        }
+    }
+
     // AI对话相关状态
     var showAIDialog by remember { mutableStateOf(false) }
 
@@ -779,7 +817,7 @@ fun CustomView(
             val currentPage by remember { derivedStateOf { currentPageRef.intValue } }
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
-            val pageCount: Int = list.size
+            var pageCount by remember { mutableIntStateOf(list.size) }
             // 跳转页面状态
             var jumpIntent by remember {
                 mutableStateOf(
@@ -1079,7 +1117,8 @@ fun CustomView(
                                 CropMode.MANUAL,
                                 path,
                                 currentDoc.fileSize,
-                                list
+                                list,
+                                FontCSSGenerator.getStyleFingerprint()
                             )
                         }
                         manualCropRect = null
@@ -1092,6 +1131,12 @@ fun CustomView(
                     searchHighlightQuads = searchHighlightQuads,
                     currentSearchPageIndex = currentSearchPageIndex,
                     closeDecoderOnShutdown = false,
+                    styleRequest = styleRequest,
+                    onStyleApplied = { newPageCount, newPageIndex ->
+                        pageCount = newPageCount
+                        currentPageRef.intValue = newPageIndex
+                        styleRequest = null
+                    },
                 )
             }
 
@@ -1150,7 +1195,7 @@ fun CustomView(
                         onAIDialogShow = { showAIDialog = true },
                         onBookmarkDialogShow = { showAddBookmarkDialog = true },
                         onSearchBarShow = { showSearchBar = !showSearchBar },
-                        onFontDialogShow = { showFontDialog = true },
+                        onFontDialogShow = { showStyleDialog = true },
                         onThumbnailDialogShow = { showThumbnailDialog = true },
                         scope = scope,
                         onStartSpeaking = { page, dec, binder ->
@@ -1614,15 +1659,44 @@ fun CustomView(
                 )
             }
 
+            // 流式文档阅读样式弹窗
+            if (showStyleDialog) {
+                ReflowStyleDialog(
+                    fontName = styleFontPath?.let { File(it).name },
+                    fontSize = styleFontSize,
+                    fontWeight = styleFontWeight,
+                    marginEnabled = styleMarginEnabled,
+                    onFontClick = { showFontDialog = true },
+                    onFontSizeChange = {
+                        styleFontSize = it
+                        submitReflowStyle(immediate = false)
+                    },
+                    onFontWeightChange = {
+                        styleFontWeight = it
+                        submitReflowStyle(immediate = false)
+                    },
+                    onMarginChange = {
+                        styleMarginEnabled = it
+                        submitReflowStyle(immediate = true)
+                    },
+                    onDismiss = {
+                        showStyleDialog = false
+                        showFontDialog = false
+                    }
+                )
+            }
+
             // 字体选择弹窗
             if (showFontDialog) {
                 FontDialog(
                     viewModel = fontViewModel,
+                    selectedPath = styleFontPath,
                     onDismiss = { showFontDialog = false },
                     onFontSelected = { fontPath ->
                         Logger.d("选择了字体", "${File(fontPath).name}")
-                        FontCSSGenerator.setFontFace(fontPath)
+                        styleFontPath = fontPath.takeIf { it.isNotEmpty() }
                         showFontDialog = false
+                        submitReflowStyle(immediate = true)
                     }
                 )
             }

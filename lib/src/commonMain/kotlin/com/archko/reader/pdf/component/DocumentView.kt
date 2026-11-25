@@ -48,10 +48,13 @@ import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.util.HyperLinkUtils
 import com.archko.reader.pdf.util.ViewUtils
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val max_zoom = 30f
 
@@ -211,6 +214,8 @@ internal fun DocumentViewEffects(
     onSaveDocument: ((page: Int, pageCount: Int, zoom: Double, scrollX: Long, scrollY: Long, scrollOri: Long, reflow: Long, crop: Long, pageOffsetX: Long, pageOffsetY: Long) -> Unit)?,
     onCloseDocument: (() -> Unit)?,
     onPageChanged: ((page: Int) -> Unit)?,
+    styleRequest: ReflowStyleRequest? = null,
+    onStyleApplied: ((pageCount: Int, pageIndex: Int) -> Unit)? = null,
 ) {
     val pageViewState = state.pageViewState
     val viewSize = state.viewSize
@@ -332,6 +337,35 @@ internal fun DocumentViewEffects(
             .distinctUntilChanged()
             .collect { page ->
                 onPageChanged?.invoke(page)
+            }
+    }
+
+    val currentStyleRequest by rememberUpdatedState(styleRequest)
+    val currentOnStyleApplied by rememberUpdatedState(onStyleApplied)
+
+    LaunchedEffect(pageViewState) {
+        snapshotFlow { currentStyleRequest }
+            .filterNotNull()
+            .collect { request ->
+                if (pageViewState.isShutdown()) {
+                    return@collect
+                }
+                val receiver = pageViewState.state as? ReflowStyleReceiver
+                if (receiver == null || !receiver.supportsReflowStyle()) {
+                    return@collect
+                }
+                val progress = pageViewState.visibleProgress()
+                // 旧排版的 tile/缩略图已经无意义，尽量不占用解码线程
+                pageViewState.cancelPendingDecodes()
+                val result = withContext(Dispatchers.Default) {
+                    receiver.applyReflowStyle(request.style)
+                }
+                if (result == null || pageViewState.isShutdown()) {
+                    return@collect
+                }
+                val targetPage = pageViewState.reloadPages(result.pages, progress)
+                offset.value = pageViewState.viewOffset
+                currentOnStyleApplied?.invoke(result.pageCount, targetPage)
             }
     }
 

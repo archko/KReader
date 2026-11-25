@@ -55,7 +55,8 @@ import org.jetbrains.compose.resources.stringResource
 fun FontDialog(
     viewModel: FontViewModel,
     onDismiss: () -> Unit,
-    onFontSelected: (String) -> Unit
+    onFontSelected: (String) -> Unit,
+    selectedPath: String? = null,
 ) {
     val fontFiles by viewModel.fontFiles.collectAsState()
     val isLoading by viewModel.isFontLoading.collectAsState()
@@ -147,6 +148,7 @@ fun FontDialog(
                             key = { index -> fontFiles[index].path }
                         ) { index ->
                             val fontItem = fontFiles[index]
+                            val isSelected = (selectedPath ?: "") == fontItem.path
 
                             val customFontFamily = remember(fontItem.path) {
                                 if (fontItem.fontFile != null) {
@@ -166,9 +168,11 @@ fun FontDialog(
                                     .padding(vertical = 4.dp),
                                 onClick = { onFontSelected(fontItem.path) },
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                        alpha = 0.5f
-                                    )
+                                    containerColor = if (isSelected) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    }
                                 )
                             ) {
                                 Row(

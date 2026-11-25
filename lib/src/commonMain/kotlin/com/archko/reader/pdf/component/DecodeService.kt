@@ -59,6 +59,20 @@ public class DecodeService(
         }
     }
 
+    /**
+     * 丢弃排队中的任务。用于样式重排：旧排版的 tile/缩略图已经无意义。
+     * 正在执行的任务不会被中断，由 decoder 层的锁保证串行。
+     */
+    public fun cancelPendingTasks() {
+        synchronized(lock) {
+            pageQueue.clear()
+            nodeQueue.clear()
+            cropQueue.clear()
+            pendingJobs.clear()
+            (lock as Object).notifyAll()
+        }
+    }
+
     public fun submitCropTasks(tasks: List<DecodeTask>) {
         synchronized(lock) {
             tasks.forEach { task ->

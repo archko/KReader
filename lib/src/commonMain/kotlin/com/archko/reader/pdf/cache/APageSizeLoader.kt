@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
@@ -37,6 +38,7 @@ public class APageSizeLoader {
             pageCount: Int,
             path: String,
             fileSize: Long,
+            styleKey: String? = null,
         ): PageSizeBean? {
             var pageSizeBean: PageSizeBean? = null
             try {
@@ -46,7 +48,7 @@ public class APageSizeLoader {
                 }
                 val content = saveFile.readText(Charsets.UTF_8)
                 if (!content.isEmpty()) {
-                    pageSizeBean = fromJson(pageCount, fileSize, json.decodeFromString(content))
+                    pageSizeBean = fromJson(pageCount, fileSize, styleKey, json.decodeFromString(content))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -59,11 +61,12 @@ public class APageSizeLoader {
             path: String,
             fileSize: Long,
             list: MutableList<APage>?,
+            styleKey: String? = null,
         ) {
             list?.run {
                 val saveFile = getPageCacheFile(path)
                 saveFile.parentFile?.mkdirs()
-                val content = toJson(cropMode, fileSize, list)
+                val content = toJson(cropMode, fileSize, list, styleKey)
                 saveFile.writeText(content, Charsets.UTF_8)
             }
         }
@@ -77,7 +80,12 @@ public class APageSizeLoader {
             }
         }
 
-        private fun fromJson(pageCount: Int, fileSize: Long, jo: JsonObject): PageSizeBean? {
+        private fun fromJson(
+            pageCount: Int,
+            fileSize: Long,
+            styleKey: String?,
+            jo: JsonObject,
+        ): PageSizeBean? {
             val ja = jo["pagesize"]?.jsonArray
             if (null == ja || ja.size != pageCount) {
                 Logger.d("new pagecount", "$pageCount")
@@ -85,6 +93,11 @@ public class APageSizeLoader {
             }
             if (fileSize != jo["filesize"]?.jsonPrimitive?.longOrNull) {
                 Logger.d("new filesize", "$fileSize")
+                return null
+            }
+            val cachedStyleKey = jo["styleKey"]?.jsonPrimitive?.contentOrNull
+            if (styleKey != null && styleKey != cachedStyleKey) {
+                Logger.d("new style", "styleKey=$styleKey, cached=$cachedStyleKey")
                 return null
             }
             val pageSizeBean = PageSizeBean()
@@ -100,6 +113,7 @@ public class APageSizeLoader {
             pageSizeBean.list = list
             pageSizeBean.crop = crop
             pageSizeBean.cropMode = cropMode
+            pageSizeBean.styleKey = cachedStyleKey
             return pageSizeBean
         }
 
@@ -113,12 +127,20 @@ public class APageSizeLoader {
             return list
         }
 
-        private fun toJson(cropMode: Int, fileSize: Long, list: List<APage>): String {
+        private fun toJson(
+            cropMode: Int,
+            fileSize: Long,
+            list: List<APage>,
+            styleKey: String?,
+        ): String {
             return try {
                 buildJsonObject {
                     put("crop", cropMode != CropMode.NONE)
                     put("cropMode", cropMode)
                     put("filesize", fileSize)
+                    if (styleKey != null) {
+                        put("styleKey", styleKey)
+                    }
                     put("pagesize", toJsons(list))
                 }.toString()
             } catch (e: Exception) {
