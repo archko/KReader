@@ -1,6 +1,5 @@
 package com.archko.reader.viewer
 
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,6 +46,7 @@ import com.archko.reader.pdf.viewmodel.ReadingStatsViewModel
 import com.archko.reader.viewer.component.CropModeMenuItem
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.SearchBar
+import com.archko.reader.viewer.component.ThinSeekBar
 import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.ManualCropDialog
@@ -746,9 +746,7 @@ fun CustomView(
 
             // 使用 derivedStateOf 来避免 orientation 变化时重新组合 DocumentView
             val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
-            var currentPage by remember { mutableIntStateOf(0) }
-            // 添加标志位以跟踪是否为外部更改
-            var isExternalChange by remember { mutableStateOf(false) }
+            val currentPage by remember { derivedStateOf { currentPageRef.intValue } }
             var pageCount by remember { mutableIntStateOf(list.size) }
 
             // 正在朗读的页面索引
@@ -1160,65 +1158,27 @@ fun CustomView(
                                 .fillMaxWidth()
                                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                         ) {
-                            var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-                            // 当currentPage变化时更新sliderValue
-                            SideEffect(currentPage) {
-                                isExternalChange = true
-                                sliderValue = (currentPage + 1).toFloat()
-                                isExternalChange = false
-                            }
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 4.dp) // 减小垂直padding
                             ) {
                                 Text(
-                                    text = "${sliderValue.toInt()} / $pageCount",
+                                    text = "${currentPage + 1} / $pageCount",
                                     color = Color.White,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.align(Alignment.CenterHorizontally)
                                 )
-                                Slider(
-                                    value = sliderValue,
-                                    onValueChange = { sliderValue = it },
-                                    valueRange = 1f..pageCount.toFloat(),
-                                    steps = (pageCount - 2).coerceAtLeast(0),
-                                    onValueChangeFinished = {
-                                        if (!isExternalChange) {
-                                            val targetPage = sliderValue.toInt() - 1
-                                            if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                                jumpIntent =
-                                                    JumpIntent(targetPage, JumpMode.PageNavigation)
-                                            }
+                                ThinSeekBar(
+                                    currentPage = currentPage,
+                                    pageCount = pageCount,
+                                    onJumpPage = { targetPage ->
+                                        if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                            jumpIntent =
+                                                JumpIntent(targetPage, JumpMode.PageNavigation)
                                         }
                                     },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(20.dp),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color.White,
-                                        activeTrackColor = Color.White,
-                                        inactiveTrackColor = Color.Gray
-                                    ),
-                                    track = { sliderState ->
-                                        SliderDefaults.Track(
-                                            sliderState = sliderState,
-                                            modifier = Modifier.height(2.dp), // 设置轨道高度为2dp
-                                            colors = SliderDefaults.colors(
-                                                activeTrackColor = Color.White,
-                                                inactiveTrackColor = Color.Gray
-                                            )
-                                        )
-                                    },
-                                    thumb = {
-                                        SliderDefaults.Thumb(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            modifier = Modifier.size(16.dp), // 设置滑块大小为16dp
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = Color.White
-                                            )
-                                        )
-                                    }
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }

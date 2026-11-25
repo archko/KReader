@@ -63,6 +63,7 @@ import com.archko.reader.viewer.component.CropModeMenuItem
 import com.archko.reader.viewer.component.DrawingToolbar
 import com.archko.reader.viewer.component.ErrorContent
 import com.archko.reader.viewer.component.SearchBar
+import com.archko.reader.viewer.component.ThinSeekBar
 import com.archko.reader.viewer.dialog.AIPageDialog
 import com.archko.reader.viewer.dialog.AddBookmarkDialog
 import com.archko.reader.viewer.dialog.FontDialog
@@ -815,8 +816,6 @@ fun CustomView(
             val orientation by remember { derivedStateOf { if (isVertical) Vertical else Horizontal } }
             // 当前页与总页数 - 使用全局引用保持模式切换时的页码
             val currentPage by remember { derivedStateOf { currentPageRef.intValue } }
-            // 添加标志位以跟踪是否为外部更改
-            var isExternalChange by remember { mutableStateOf(false) }
             var pageCount by remember { mutableIntStateOf(list.size) }
             // 跳转页面状态
             var jumpIntent by remember {
@@ -1454,61 +1453,22 @@ fun CustomView(
                                     }
                                 }
 
-                                var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-                                // 当currentPage变化时更新sliderValue
-                                SideEffect(currentPage) {
-                                    isExternalChange = true
-                                    sliderValue = (currentPage + 1).toFloat()
-                                    isExternalChange = false
-                                }
-
                                 Text(
-                                    text = "${sliderValue.toInt()} / $pageCount",
+                                    text = "${currentPage + 1} / $pageCount",
                                     color = Color.White,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.align(Alignment.CenterHorizontally)
                                 )
-                                Slider(
-                                    value = sliderValue,
-                                    onValueChange = { sliderValue = it },
-                                    valueRange = 1f..pageCount.toFloat(),
-                                    steps = (pageCount - 2).coerceAtLeast(0),
-                                    onValueChangeFinished = {
-                                        if (!isExternalChange) {
-                                            val targetPage = sliderValue.toInt() - 1
-                                            if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
-                                                jumpIntent =
-                                                    JumpIntent(targetPage, JumpMode.PageNavigation)
-                                            }
+                                ThinSeekBar(
+                                    currentPage = currentPage,
+                                    pageCount = pageCount,
+                                    onJumpPage = { targetPage ->
+                                        if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
+                                            jumpIntent =
+                                                JumpIntent(targetPage, JumpMode.PageNavigation)
                                         }
                                     },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(20.dp),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color.White,
-                                        activeTrackColor = Color.White,
-                                        inactiveTrackColor = Color.Gray
-                                    ),
-                                    track = { sliderState ->
-                                        SliderDefaults.Track(
-                                            sliderState = sliderState,
-                                            modifier = Modifier.height(2.dp),
-                                            colors = SliderDefaults.colors(
-                                                activeTrackColor = Color.White,
-                                                inactiveTrackColor = Color.Gray
-                                            )
-                                        )
-                                    },
-                                    thumb = {
-                                        SliderDefaults.Thumb(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            modifier = Modifier.size(16.dp),
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = Color.White
-                                            )
-                                        )
-                                    }
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
@@ -1936,53 +1896,22 @@ private fun ReflowBottomControls(
                 )
             }
 
-            // 页码 Slider
-            var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-            SideEffect(currentPage) {
-                sliderValue = (currentPage + 1).toFloat()
-            }
+            // 页码进度条
             Text(
-                text = "${sliderValue.toInt()} / $pageCount",
+                text = "${currentPage + 1} / $pageCount",
                 color = Color.White,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
-            Slider(
-                value = sliderValue,
-                onValueChange = { sliderValue = it },
-                valueRange = 1f..pageCount.toFloat(),
-                steps = (pageCount - 2).coerceAtLeast(0),
-                onValueChangeFinished = {
-                    val targetPage = sliderValue.toInt() - 1
+            ThinSeekBar(
+                currentPage = currentPage,
+                pageCount = pageCount,
+                onJumpPage = { targetPage ->
                     if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
                         onPageSelected(targetPage)
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color.White,
-                    inactiveTrackColor = Color.Gray
-                ),
-                track = { sliderState ->
-                    SliderDefaults.Track(
-                        sliderState = sliderState,
-                        modifier = Modifier.height(2.dp),
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.Gray
-                        )
-                    )
-                },
-                thumb = {
-                    SliderDefaults.Thumb(
-                        interactionSource = remember { MutableInteractionSource() },
-                        modifier = Modifier.size(16.dp),
-                        colors = SliderDefaults.colors(thumbColor = Color.White)
-                    )
-                }
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -1998,11 +1927,6 @@ private fun PagerBottomSlider(
     pageCount: Int,
     onPageSelected: (Int) -> Unit,
 ) {
-    var sliderValue by remember { mutableFloatStateOf((currentPage + 1).toFloat()) }
-    SideEffect(currentPage) {
-        sliderValue = (currentPage + 1).toFloat()
-    }
-
     Surface(
         color = Color(0xCC222222),
         modifier = Modifier.fillMaxWidth()
@@ -2014,49 +1938,20 @@ private fun PagerBottomSlider(
                 .padding(horizontal = 16.dp, vertical = 4.dp)
         ) {
             Text(
-                text = "${sliderValue.toInt()} / $pageCount",
+                text = "${currentPage + 1} / $pageCount",
                 color = Color.White,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
-            Slider(
-                value = sliderValue,
-                onValueChange = { sliderValue = it },
-                valueRange = 1f..pageCount.toFloat(),
-                steps = (pageCount - 2).coerceAtLeast(0),
-                onValueChangeFinished = {
-                    val targetPage = sliderValue.toInt() - 1
+            ThinSeekBar(
+                currentPage = currentPage,
+                pageCount = pageCount,
+                onJumpPage = { targetPage ->
                     if (targetPage != currentPage && targetPage >= 0 && targetPage < pageCount) {
                         onPageSelected(targetPage)
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color.White,
-                    inactiveTrackColor = Color.Gray
-                ),
-                track = { sliderState ->
-                    SliderDefaults.Track(
-                        sliderState = sliderState,
-                        modifier = Modifier.height(2.dp),
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.Gray
-                        )
-                    )
-                },
-                thumb = {
-                    SliderDefaults.Thumb(
-                        interactionSource = remember { MutableInteractionSource() },
-                        modifier = Modifier.size(16.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White
-                        )
-                    )
-                }
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

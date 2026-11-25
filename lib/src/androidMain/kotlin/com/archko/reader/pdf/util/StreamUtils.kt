@@ -49,7 +49,6 @@ public object StreamUtils {
     /**
      * 将输入流保存到指定的文件中
      */
-    @Synchronized
     public fun saveStreamToFile(`in`: InputStream?, filePath: String): Boolean {
         val file = File(filePath)
         return saveStreamToFile(`in`, file)
@@ -58,7 +57,6 @@ public object StreamUtils {
     /**
      * 将输入流保存到指定的文件中
      */
-    @Synchronized
     public fun saveStreamToFile(`in`: InputStream?, file: File): Boolean {
         var fos: FileOutputStream? = null
         try {

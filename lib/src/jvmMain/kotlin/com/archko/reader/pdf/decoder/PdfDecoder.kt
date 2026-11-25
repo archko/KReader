@@ -518,7 +518,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
         return originalPageSizes[index]
     }
 
-    @Synchronized
     override fun close() {
         if (cachePage && !aPageList.isNullOrEmpty() && aPageList!!.size == pageCount) {
             Logger.d("PdfDecoder.close", "${aPageList.size}")
@@ -629,7 +628,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
      * @param pageIndex 页面索引
      * @return 链接列表
      */
-    @Synchronized
     public override fun getPageLinks(pageIndex: Int): List<Hyperlink> {
         // 先检查缓存
         if (linksCache.containsKey(pageIndex)) {
@@ -771,7 +769,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
         return displayList
     }
 
-    @Synchronized
     public override fun renderPage(
         aPage: APage,
         viewSize: IntSize,
@@ -928,7 +925,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
         }
     }
 
-    @Synchronized
     public override fun renderPageRegion(
         region: androidx.compose.ui.geometry.Rect,
         index: Int,
@@ -955,7 +951,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
         }
     }
 
-    @Synchronized
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
@@ -967,7 +962,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
         )
     }
 
-    @Synchronized
     public override fun getStructuredText(index: Int): Any? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
@@ -979,7 +973,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
     /**
      * 解析单个页面的文本内容（用于TTS快速启动）
      */
-    @Synchronized
     public override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
@@ -1019,7 +1012,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
     /**
      * 解析所有页面的文本内容（用于TTS后台缓存）
      */
-    @Synchronized
     public override fun decodeReflowAllPages(): List<ReflowBean> {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return emptyList()
@@ -1090,7 +1082,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, R
     /**
      * 在文档中搜索文本
      */
-    @Synchronized
     override fun search(
         query: String,
         caseSensitive: Boolean

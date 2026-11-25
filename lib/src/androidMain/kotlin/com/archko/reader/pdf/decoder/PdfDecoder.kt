@@ -537,7 +537,6 @@ public class PdfDecoder(
         return originalPageSizes[index]
     }
 
-    @Synchronized
     override fun close() {
         val docPath = documentInfo.path ?: documentInfo.uri ?: ""
         if (cachePage && !aPageList.isNullOrEmpty() &&
@@ -662,7 +661,6 @@ public class PdfDecoder(
      * @param pageIndex 页面索引
      * @return 链接列表
      */
-    @Synchronized
     public override fun getPageLinks(pageIndex: Int): List<Hyperlink> {
         // 先检查缓存
         if (linksCache.containsKey(pageIndex)) {
@@ -779,7 +777,6 @@ public class PdfDecoder(
         return displayList
     }
 
-    @Synchronized
     public override fun renderPage(
         aPage: APage,
         viewSize: IntSize,
@@ -939,7 +936,6 @@ public class PdfDecoder(
         return croppedImageBitmap
     }
 
-    @Synchronized
     public override fun renderPageRegion(
         region: Rect,
         index: Int,
@@ -976,7 +972,6 @@ public class PdfDecoder(
         }
     }
 
-    @Synchronized
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
@@ -998,7 +993,6 @@ public class PdfDecoder(
         return bitmap.asImageBitmap()
     }
 
-    @Synchronized
     public override fun getStructuredText(index: Int): Any? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
@@ -1043,7 +1037,6 @@ public class PdfDecoder(
     /**
      * 解析单个页面的文本内容（用于TTS快速启动）
      */
-    @Synchronized
     public override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
@@ -1083,7 +1076,6 @@ public class PdfDecoder(
     /**
      * 解析所有页面的文本内容（用于TTS后台缓存）
      */
-    @Synchronized
     public override fun decodeReflowAllPages(): List<ReflowBean> {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return emptyList()
@@ -1214,7 +1206,6 @@ public class PdfDecoder(
     /**
      * 在文档中搜索文本
      */
-    @Synchronized
     override fun search(
         query: String,
         caseSensitive: Boolean
