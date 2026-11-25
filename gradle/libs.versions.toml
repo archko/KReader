@@ -85,7 +85,7 @@ crashreport = { module = "com.tencent.bugly:crashreport", version.ref = "crashre
 
 openai-client = { module = "com.aallam.openai:openai-client", version.ref = "openai-client" }
 k2pdfopt = { group = "com.archko.reader", name = "k2pdfopt", version.ref = "k2pdfopt" }
-k2pdfopt-desktop = { group = "com.archko.reader", name = "k2pdfopt", version.ref = "k2pdfopt" }
+k2pdfopt-desktop = { group = "com.archko.reader", name = "k2pdfopt-desktop", version.ref = "k2pdfopt" }
 
 [plugins]
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

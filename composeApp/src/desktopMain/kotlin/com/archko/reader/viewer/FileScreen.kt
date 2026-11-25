@@ -473,6 +473,8 @@ fun FileScreen(
                     initialPageOffsetX = viewModel.recent?.pageOffsetX,
                     initialPageOffsetY = viewModel.recent?.pageOffsetY,
                     initialZoom = viewModel.recent?.zoom ?: 1.0,
+                    initialReflowWordSpacing = viewModel.recent?.reflowWordSpacing ?: 0.1f,
+                    initialReflowFontSize = viewModel.recent?.reflowFontSize ?: 0.9f,
                     scrollOri = viewModel.recent?.scrollOri ?: 0,
                     reflow = viewModel.recent?.reflow ?: 0L,
                     cropMode = viewModel.recent?.crop?.toInt() ?: CropMode.NONE,

@@ -23,6 +23,7 @@ import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.PathConfig
 import com.archko.reader.pdf.component.ReflowStyle
 import com.archko.reader.pdf.component.ReflowStyleRequest
+import com.archko.reader.pdf.component.ReflowView
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -104,6 +105,7 @@ private fun ToolbarContent(
     scope: CoroutineScope,
     onStartSpeaking: (Int, ImageDecoder, SpeechService) -> Unit,
     isReflow: Boolean,
+    onToggleReflow: () -> Unit,
 ) {
     Surface(
         color = Color(0xff000000),
@@ -339,7 +341,7 @@ private fun ToolbarContent(
                     }
                 }
 
-                IconButton(onClick = { isReflow = !isReflow }) {
+                IconButton(onClick = { onToggleReflow() }) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_reflow),
                         contentDescription = stringResource(Res.string.reflow),
@@ -412,6 +414,8 @@ fun CustomView(
     initialPageOffsetX: Long? = null,
     initialPageOffsetY: Long? = null,
     initialZoom: Double = 1.0,
+    initialReflowWordSpacing: Float = 0.1f,
+    initialReflowFontSize: Float = 0.9f,
     scrollOri: Long = 0,
     reflow: Long = 0,
     cropMode: Int = CropMode.NONE,
@@ -701,6 +705,8 @@ fun CustomView(
 
             var isVertical by remember { mutableStateOf(scrollOri.toInt() == Vertical) }
             var isReflow by remember { mutableStateOf(reflow == 1L) }
+            var reflowWordSpacing by remember { mutableFloatStateOf(initialReflowWordSpacing) }
+            var reflowFontSize by remember { mutableFloatStateOf(initialReflowFontSize) }
             var gestureMode by remember { mutableStateOf(GestureMode.VIEW) }
 
             var showQueueDialog by remember { mutableStateOf(false) }
@@ -767,6 +773,13 @@ fun CustomView(
             }
 
             var columnCount by remember { mutableIntStateOf(1) }
+
+            // 切换重排模式时，以当前页码为目标，避免回到第一页
+            fun toggleReflow() {
+                val page = currentPageRef.intValue
+                jumpIntent = JumpIntent(page, JumpMode.PageNavigation)
+                isReflow = !isReflow
+            }
 
             // 搜索辅助函数 - 必须在performSearch之前定义
             fun goToSearchResult(index: Int) {
@@ -935,6 +948,7 @@ fun CustomView(
                         vZoom = zoom
                     },
                     isReflow = isReflow,
+                    onToggleReflow = { toggleReflow() },
                 )
 
                 // 队列列表弹窗
@@ -980,6 +994,38 @@ fun CustomView(
                 ) {
                     if (isReflow && FileTypeUtils.isDocumentFile(currentPath)) {
                         // Reflow视图
+                        ReflowView(
+                            decoder = decoder!!,
+                            pageCount = pageCount,
+                            currentPath = currentPath,
+                            onSaveDocument = onSaveDocument,
+                            onDoubleTapToolbar = { showBottomToolbar = !showBottomToolbar },
+                            onPageChanged = { page ->
+                                currentPageRef.intValue = page
+                            },
+                            onTapNonPageArea = { clickedPageIndex ->
+                                if (showBottomToolbar) {
+                                    showBottomToolbar = false
+                                } else {
+                                    scope.launch {
+                                        toaster.show(
+                                            message = getString(Res.string.current_page)
+                                                .format(clickedPageIndex + 1, pageCount),
+                                            type = ToastType.Error,
+                                        )
+                                    }
+                                }
+                            },
+                            jumpToPage = jumpIntent.page,
+                            initialPage = currentPageRef.intValue,
+                            initialScrollX = initialScrollX,
+                            initialScrollY = initialScrollY,
+                            initialZoom = vZoom,
+                            initialOrientation = orientation,
+                            reflow = 1L,
+                            wordSpacing = reflowWordSpacing,
+                            fontSize = reflowFontSize,
+                        )
                     } else {
                         DesktopDocumentView(
                             list = list,
