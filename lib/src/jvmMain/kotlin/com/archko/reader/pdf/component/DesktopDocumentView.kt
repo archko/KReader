@@ -72,6 +72,8 @@ public fun DesktopDocumentView(
     currentPath: String,
     searchHighlightQuads: Map<Int, List<DocQuad>> = emptyMap(),
     currentSearchPageIndex: Int? = null,
+    styleRequest: ReflowStyleRequest? = null,
+    onStyleApplied: ((pageCount: Int, pageIndex: Int) -> Unit)? = null,
 ) {
     // 平台判断
     val isMacOs by remember {
@@ -137,6 +139,8 @@ public fun DesktopDocumentView(
         onSaveDocument = onSaveDocument,
         onCloseDocument = onCloseDocument,
         onPageChanged = onPageChanged,
+        styleRequest = styleRequest,
+        onStyleApplied = onStyleApplied,
     )
 
     // 监听外部zoom参数的变化，并更新内部vZoom

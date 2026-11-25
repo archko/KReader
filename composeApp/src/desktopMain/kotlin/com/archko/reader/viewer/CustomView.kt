@@ -22,6 +22,8 @@ import com.archko.reader.pdf.component.Horizontal
 import com.archko.reader.pdf.component.JumpIntent
 import com.archko.reader.pdf.component.JumpMode
 import com.archko.reader.pdf.component.PathConfig
+import com.archko.reader.pdf.component.ReflowStyle
+import com.archko.reader.pdf.component.ReflowStyleRequest
 import com.archko.reader.pdf.component.Vertical
 import com.archko.reader.pdf.decoder.DjvuDecoder
 import com.archko.reader.pdf.decoder.ImagesDecoder
@@ -37,6 +39,7 @@ import com.archko.reader.pdf.state.AnnotationManager
 import com.archko.reader.pdf.tts.SpeechService
 import com.archko.reader.pdf.tts.TtsProgressListener
 import com.archko.reader.pdf.util.FileTypeUtils
+import com.archko.reader.pdf.util.FontCSSGenerator
 import com.archko.reader.pdf.util.ReadingTimeTracker
 import com.archko.reader.pdf.viewmodel.AIViewModel
 import com.archko.reader.pdf.viewmodel.BookmarkViewModel
@@ -50,6 +53,7 @@ import com.archko.reader.viewer.dialog.ManualCropDialog
 import com.archko.reader.viewer.dialog.OutlineDialog
 import com.archko.reader.viewer.dialog.PasswordDialog
 import com.archko.reader.viewer.dialog.QueueDialog
+import com.archko.reader.viewer.dialog.ReflowStyleDialog
 import com.archko.reader.viewer.dialog.ThumbnailDialog
 import com.archko.reader.viewer.tts.TtsQueueService
 import com.archko.reader.pdf.util.Logger
@@ -58,6 +62,7 @@ import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -92,6 +97,7 @@ private fun ToolbarContent(
     onAIDialogShow: () -> Unit,
     onBookmarkDialogShow: () -> Unit,
     onSearchBarShow: () -> Unit,
+    onStyleDialogShow: () -> Unit,
     onQueueDialogShow: () -> Unit,
     onThumbnailDialogShow: () -> Unit,
     onColumnCountChanged: (Int) -> Unit,
@@ -341,6 +347,16 @@ private fun ToolbarContent(
                     )
                 }
 
+                if (FileTypeUtils.isReflowable(currentPath) && !isReflow) {
+                    IconButton(onClick = { onStyleDialogShow() }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_font),
+                            contentDescription = stringResource(Res.string.font),
+                            tint = Color.White
+                        )
+                    }
+                }
+
                 // AI按钮
                 if (FileTypeUtils.isDocumentFile(currentPath)) {
                     IconButton(onClick = { onAIDialogShow() }) {
@@ -413,6 +429,37 @@ fun CustomView(
     var isPasswordError by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val toaster = rememberToasterState()
+
+    var showStyleDialog by remember { mutableStateOf(false) }
+    var styleFontSize by remember { mutableFloatStateOf(FontCSSGenerator.getFontSize()) }
+    var styleFontWeight by remember { mutableIntStateOf(FontCSSGenerator.getFontWeight()) }
+    var styleMarginEnabled by remember { mutableStateOf(FontCSSGenerator.getMarginPx() > 0) }
+    var styleRequest by remember { mutableStateOf<ReflowStyleRequest?>(null) }
+    val styleRequestSeq = remember { intArrayOf(0) }
+    val styleApplyJob = remember { arrayOfNulls<Job>(1) }
+
+    fun currentReflowStyle(): ReflowStyle {
+        return ReflowStyle(
+            fontPath = null,
+            fontSize = styleFontSize,
+            fontWeight = styleFontWeight,
+            marginPx = if (styleMarginEnabled) 30 else 0,
+        )
+    }
+
+    fun submitReflowStyle(immediate: Boolean) {
+        val style = currentReflowStyle()
+        styleApplyJob[0]?.cancel()
+        styleApplyJob[0] = scope.launch {
+            if (!immediate) {
+                delay(400)
+            }
+            FontCSSGenerator.saveReflowStyle(style)
+            styleRequestSeq[0]++
+            styleRequest = ReflowStyleRequest(styleRequestSeq[0], style)
+        }
+    }
+
     var isCropMode by remember { mutableStateOf(cropMode) }
     var manualCropRect by remember { mutableStateOf<Rect?>(null) }
     var isNeedPass by remember { mutableStateOf(false) }
@@ -702,7 +749,7 @@ fun CustomView(
             var currentPage by remember { mutableIntStateOf(0) }
             // 添加标志位以跟踪是否为外部更改
             var isExternalChange by remember { mutableStateOf(false) }
-            val pageCount: Int = list.size
+            var pageCount by remember { mutableIntStateOf(list.size) }
 
             // 正在朗读的页面索引
             var speakingPageIndex by remember { mutableStateOf<Int?>(null) }
@@ -870,6 +917,7 @@ fun CustomView(
                     onAIDialogShow = { showAIDialog = true },
                     onBookmarkDialogShow = { showAddBookmarkDialog = true },
                     onSearchBarShow = { showSearchBar = !showSearchBar },
+                    onStyleDialogShow = { showStyleDialog = true },
                     onQueueDialogShow = { showQueueDialog = true },
                     onThumbnailDialogShow = { showThumbnailDialog = true },
                     onColumnCountChanged = { columnCount = it },
@@ -983,7 +1031,8 @@ fun CustomView(
                                         CropMode.MANUAL,
                                         path,
                                         currentDoc.fileSize,
-                                        list
+                                        list,
+                                        FontCSSGenerator.getStyleFingerprint()
                                     )
                                 }
                                 manualCropRect = null
@@ -995,6 +1044,12 @@ fun CustomView(
                             currentPath = currentPath,
                             searchHighlightQuads = searchHighlightQuads,
                             currentSearchPageIndex = currentSearchPageIndex,
+                            styleRequest = styleRequest,
+                            onStyleApplied = { newPageCount, newPageIndex ->
+                                pageCount = newPageCount
+                                currentPageRef.intValue = newPageIndex
+                                styleRequest = null
+                            },
                         )
                     }
 
@@ -1195,6 +1250,28 @@ fun CustomView(
                                 showManualCropDialog = false
                             },
                             onDismiss = { showManualCropDialog = false }
+                        )
+                    }
+
+                    if (showStyleDialog) {
+                        ReflowStyleDialog(
+                            fontSize = styleFontSize,
+                            fontWeight = styleFontWeight,
+                            marginEnabled = styleMarginEnabled,
+                            showFont = false,
+                            onFontSizeChange = {
+                                styleFontSize = it
+                                submitReflowStyle(immediate = false)
+                            },
+                            onFontWeightChange = {
+                                styleFontWeight = it
+                                submitReflowStyle(immediate = false)
+                            },
+                            onMarginChange = {
+                                styleMarginEnabled = it
+                                submitReflowStyle(immediate = true)
+                            },
+                            onDismiss = { showStyleDialog = false }
                         )
                     }
 

@@ -34,15 +34,16 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun ReflowStyleDialog(
-    fontName: String?,
+    fontName: String? = null,
     fontSize: Float,
     fontWeight: Int,
     marginEnabled: Boolean,
-    onFontClick: () -> Unit,
+    onFontClick: () -> Unit = {},
     onFontSizeChange: (Float) -> Unit,
     onFontWeightChange: (Int) -> Unit,
     onMarginChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
+    showFont: Boolean = true,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -69,32 +70,34 @@ fun ReflowStyleDialog(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     TextButton(onClick = onDismiss) {
-                        Text(text = "关闭")
+                        Text(text = "完成")
                     }
                 }
 
                 HorizontalDivider()
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onFontClick() }
-                        .padding(vertical = 12.dp)
-                ) {
-                    Text(
-                        text = "字体",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = fontName ?: "默认",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                if (showFont) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onFontClick() }
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "字体",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = fontName ?: "默认",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
 
-                HorizontalDivider()
+                    HorizontalDivider()
+                }
 
                 Column(
                     modifier = Modifier
@@ -182,7 +185,7 @@ fun ReflowStyleDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "20px",
+                            text = "30px",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )

@@ -530,7 +530,7 @@ fun CustomView(
             fontPath = styleFontPath,
             fontSize = styleFontSize,
             fontWeight = styleFontWeight,
-            marginPx = if (styleMarginEnabled) 20 else 0,
+            marginPx = if (styleMarginEnabled) 30 else 0,
         )
     }
 

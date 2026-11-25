@@ -49,11 +49,11 @@ public object FontCSSGenerator {
 
     public fun getMarginPx(): Int {
         val margin = MMKV.mmkvWithID("epub").decodeInt("margin_px", 0)
-        return margin.coerceAtLeast(0)
+        return if (margin > 0) 30 else 0
     }
 
     public fun setMarginPx(margin: Int) {
-        MMKV.mmkvWithID("epub").encode("margin_px", margin.coerceAtLeast(0))
+        MMKV.mmkvWithID("epub").encode("margin_px", if (margin > 0) 30 else 0)
     }
 
     public fun getReflowStyle(): ReflowStyle {

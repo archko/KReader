@@ -9,6 +9,9 @@ import com.archko.reader.pdf.cache.APageSizeLoader
 import com.archko.reader.pdf.cache.CustomImageFetcher
 import com.archko.reader.pdf.cache.ImageCache
 import com.archko.reader.pdf.component.DecodeTask
+import com.archko.reader.pdf.component.ReflowStyle
+import com.archko.reader.pdf.component.ReflowStyleReceiver
+import com.archko.reader.pdf.component.ReflowStyleResult
 import com.archko.reader.pdf.component.SearchResult
 import com.archko.reader.pdf.component.Size
 import com.archko.reader.pdf.decoder.internal.ImageDecoder
@@ -38,7 +41,10 @@ import kotlin.math.round
 /**
  * @author: archko 2025/4/11 :11:26
  */
-public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
+public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder, ReflowStyleReceiver {
+
+    private val initialStyle: ReflowStyle by lazy { FontCSSGenerator.getReflowStyle() }
+    private var currentStyleKey: String? = null
 
     private var document: Document? = null
     public override var pageCount: Int = 0
@@ -252,11 +258,6 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
 
         try {
-            if (FileTypeUtils.isReflowable(docPath)) {
-                val css = FontCSSGenerator.generateFontCSS(null, "10px")
-                Logger.d("应用自定义CSS", "$css")
-                com.artifex.mupdf.fitz.Context.setUserCSS(css)
-            }
             document = Document.openDocument(docPath)
             needsPassword = document?.needsPassword() == true
             if (!needsPassword) {
@@ -294,19 +295,13 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
     private fun initializeDocument() {
         document?.let { doc ->
             if (FileTypeUtils.isReflowable(documentInfo.path ?: "")) {
-                val fontSize = FontCSSGenerator.getDefFontSize()
-                val fs = fontSize.toInt().toFloat()
-                val w = 1280f
-                val h = 1024f
-                System.out.printf(
-                    "width:%s, height:%s, font:%s->%s, open:%s",
-                    w,
-                    h,
-                    fontSize,
-                    fs,
-                    documentInfo.path ?: ""
-                )
-                doc.layout(w, h, fontSize)
+                currentStyleKey = FontCSSGenerator.getStyleFingerprint(initialStyle)
+                val css = FontCSSGenerator.generateReflowCSS(initialStyle)
+                Logger.d("应用自定义CSS", "$css")
+                doc.style(true, css)
+                val fontSize = initialStyle.fontSize.takeIf { it > 0f }
+                    ?: FontCSSGenerator.getDefFontSize()
+                layoutDocument(doc, fontSize)
             }
             pageCount = doc.countPages()
 
@@ -323,10 +318,103 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
     }
 
+    override fun supportsReflowStyle(): Boolean {
+        return document != null &&
+                FileTypeUtils.isReflowable(documentInfo.path ?: "") &&
+                (isAuthenticated || !needsPassword)
+    }
+
+    override fun applyReflowStyle(style: ReflowStyle): ReflowStyleResult? {
+        if (!FileTypeUtils.isReflowable(documentInfo.path ?: "")) {
+            return null
+        }
+        synchronized(this) {
+            val doc = document ?: return null
+            try {
+                val fontSize = style.fontSize.takeIf { it > 0f }
+                    ?: FontCSSGenerator.getDefFontSize()
+                clearRenderCaches()
+                doc.style(true, FontCSSGenerator.generateReflowCSS(style))
+                layoutDocument(doc, fontSize)
+                val newCount = doc.countPages()
+                if (newCount <= 0) {
+                    return null
+                }
+                val newSizes = buildPageSizes(
+                    doc = doc,
+                    fillAPageList = false,
+                    saveCache = false
+                )
+                if (newSizes.isEmpty()) {
+                    return null
+                }
+                val newPages = newSizes.map { APage(it.page, it.width, it.height, 1f) }
+
+                pageCount = newCount
+                originalPageSizes = newSizes
+                pageSizes = emptyList()
+                imageSize = IntSize.Zero
+                pageSizeBean = null
+                cacheBean = null
+                currentStyleKey = FontCSSGenerator.getStyleFingerprint(style)
+                outlineItems = prepareOutlines(doc)
+                try {
+                    if (viewSize.width > 0 && viewSize.height > 0) {
+                        calculateSize(viewSize)
+                    }
+                } catch (e: Exception) {
+                    Logger.d("PdfDecoder.applyReflowStyle", "calculateSize failed: ${e.message}")
+                }
+                return ReflowStyleResult(newPages, newCount)
+            } catch (e: Exception) {
+                Logger.d("PdfDecoder.applyReflowStyle", "${e.message}")
+                return null
+            }
+        }
+    }
+
+    private fun clearRenderCaches() {
+        displayListCache.values.forEach { displayList ->
+            try {
+                displayList.destroy()
+            } catch (e: Exception) {
+                Logger.d("Error destroying cached display list", "$e")
+            }
+        }
+        displayListCache.clear()
+        pageCache.values.forEach { page ->
+            try {
+                page.destroy()
+            } catch (e: Exception) {
+                Logger.d("Error destroying cached page", "$e")
+            }
+        }
+        pageCache.clear()
+        linksCache.clear()
+    }
+
+    private fun layoutDocument(doc: Document, fontSize: Float) {
+        val w = 1280f
+        val h = 1024f
+        System.out.printf(
+            "width:%s, height:%s, font:%s, open:%s\n",
+            w,
+            h,
+            fontSize,
+            documentInfo.path ?: ""
+        )
+        doc.layout(w, h, fontSize)
+    }
+
     private fun initPageSizeBean() {
         try {
             val count: Int = pageCount
-            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(count, documentInfo.path ?: "", documentInfo.fileSize)
+            val psb: PageSizeBean? = APageSizeLoader.loadPageSizeFromFile(
+                count,
+                documentInfo.path ?: "",
+                documentInfo.fileSize,
+                currentStyleKey
+            )
             Logger.d("PdfDecoder.initPageSizeBean", "$psb")
 
             if (null != psb && psb.list != null && psb.list!!.size == count) {
@@ -430,11 +518,18 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         return originalPageSizes[index]
     }
 
+    @Synchronized
     override fun close() {
-        if (cachePage && !aPageList.isNullOrEmpty()) {
+        if (cachePage && !aPageList.isNullOrEmpty() && aPageList!!.size == pageCount) {
             Logger.d("PdfDecoder.close", "${aPageList.size}")
             try {
-                APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                APageSizeLoader.savePageSizeToFile(
+                    cropMode,
+                    documentInfo.path ?: "",
+                    documentInfo.fileSize,
+                    aPageList,
+                    currentStyleKey
+                )
             } catch (e: Exception) {
                 Logger.d("PdfDecoder.close", "保存缓存失败: ${e.message}")
             }
@@ -470,11 +565,20 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
     }
 
     private fun prepareSizes(): List<Size> {
+        return buildPageSizes(document, fillAPageList = true, saveCache = true)
+    }
+
+    private fun buildPageSizes(
+        doc: Document?,
+        fillAPageList: Boolean,
+        saveCache: Boolean,
+    ): List<Size> {
         val list = mutableListOf<Size>()
         var totalHeight = 0
-        document?.let { doc ->
-            for (i in 0 until pageCount) {
-                val page = doc.loadPage(i)
+        doc?.let { d ->
+            val count = d.countPages()
+            for (i in 0 until count) {
+                val page = d.loadPage(i)
                 val bounds = page.bounds
                 val width = bounds.x1.toInt() - bounds.x0.toInt()
                 val height = bounds.y1.toInt() - bounds.y0.toInt()
@@ -489,26 +593,35 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
                 page.destroy()
                 list.add(size)
 
-                // 同时填充 aPageList
-                val aPage = APage(i, width, height, 1f)
-                aPageList!!.add(aPage)
+                if (fillAPageList) {
+                    aPageList!!.add(APage(i, width, height, 1f))
+                }
             }
 
-            // 保存到缓存
-            if (cachePage && aPageList!!.isNotEmpty()) {
+            if (saveCache && fillAPageList && cachePage && aPageList!!.isNotEmpty()) {
                 try {
-                    APageSizeLoader.savePageSizeToFile(cropMode, documentInfo.path ?: "", documentInfo.fileSize, aPageList)
+                    APageSizeLoader.savePageSizeToFile(
+                        cropMode,
+                        documentInfo.path ?: "",
+                        documentInfo.fileSize,
+                        aPageList,
+                        currentStyleKey
+                    )
                 } catch (e: Exception) {
                     Logger.d("PdfDecoder", "缓存页面尺寸失败: ${e.message}")
                 }
             }
         }
-        Logger.d("PdfDecoder.prepareSizes", "从文档加载了 ${list.size} 个页面尺寸")
+        Logger.d("PdfDecoder.buildPageSizes", "从文档加载了 ${list.size} 个页面尺寸")
         return list
     }
 
     private fun prepareOutlines(): List<Item> {
-        return document?.loadOutlineItems() ?: emptyList()
+        return prepareOutlines(document)
+    }
+
+    private fun prepareOutlines(doc: Document?): List<Item> {
+        return doc?.loadOutlineItems() ?: emptyList()
     }
 
     /**
@@ -516,6 +629,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
      * @param pageIndex 页面索引
      * @return 链接列表
      */
+    @Synchronized
     public override fun getPageLinks(pageIndex: Int): List<Hyperlink> {
         // 先检查缓存
         if (linksCache.containsKey(pageIndex)) {
@@ -657,6 +771,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         return displayList
     }
 
+    @Synchronized
     public override fun renderPage(
         aPage: APage,
         viewSize: IntSize,
@@ -813,6 +928,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
     }
 
+    @Synchronized
     public override fun renderPageRegion(
         region: androidx.compose.ui.geometry.Rect,
         index: Int,
@@ -839,6 +955,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         }
     }
 
+    @Synchronized
     public override fun renderPageRegion(
         task: DecodeTask,
         totalScale: Float
@@ -850,6 +967,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
         )
     }
 
+    @Synchronized
     public override fun getStructuredText(index: Int): Any? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
@@ -861,6 +979,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
     /**
      * 解析单个页面的文本内容（用于TTS快速启动）
      */
+    @Synchronized
     public override fun decodeReflowSinglePage(pageIndex: Int): ReflowBean? {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return null
@@ -900,6 +1019,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
     /**
      * 解析所有页面的文本内容（用于TTS后台缓存）
      */
+    @Synchronized
     public override fun decodeReflowAllPages(): List<ReflowBean> {
         if (document == null || (!isAuthenticated && needsPassword)) {
             return emptyList()
@@ -970,6 +1090,7 @@ public class PdfDecoder(public val documentInfo: DocumentInfo) : ImageDecoder {
     /**
      * 在文档中搜索文本
      */
+    @Synchronized
     override fun search(
         query: String,
         caseSensitive: Boolean
