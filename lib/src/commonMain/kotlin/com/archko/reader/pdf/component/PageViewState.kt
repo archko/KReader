@@ -592,27 +592,6 @@ public class PageViewState(
         updateViewport(vZoom, newOffset, request = true)
     }
 
-    /**
-     * 兼容旧调用：更新视口并刷新可见 tile。
-     * 仅同步视口尺寸，其余全部走 [updateViewport]。
-     */
-    @Deprecated(
-        message = "改用 updateViewport(zoom, offset, request) 或 updateOffset(offset)",
-        replaceWith = ReplaceWith("updateViewport(currentVZoom, offset, request = true)")
-    )
-    public fun updateVisiblePages(
-        offset: Offset,
-        viewSize: IntSize,
-        currentVZoom: Float = vZoom
-    ) {
-        if (!init) {
-            updateViewSize(viewSize, currentVZoom, orientation)
-            return
-        }
-        this.viewSize = viewSize
-        updateViewport(currentVZoom, offset, request = true)
-    }
-
     internal fun updateViewport(zoom: Float, offset: Offset, request: Boolean) {
         this.vZoom = zoom
         viewport.viewSize = viewSize

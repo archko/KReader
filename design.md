@@ -100,7 +100,7 @@ class DocumentViewState(
 - `updateViewSize`：视口尺寸/方向变化重排；仅 zoom 变化时只更新视口并刷新可见 tile。
 - `updateColumnCount / setCropEnabled`：重排并保留锚点。
 - `updateViewport(zoom, offset, request)`：手势路径，只更新视口字段；`request=true` 时调度可见性刷新，`request=false` 时按 16ms 节流检查是否需要重新扫描。
-- `updateOffset / updateVisiblePages`：跳页与外部定位，更新视口并立即刷新。
+- `updateOffset`：跳页与外部定位，更新视口并立即刷新。
 - `updateVisibleNow`：扫描可见页、维护预加载页、请求缩略图与 tile、触发切边探测。
 - `drawVisiblePages / drawOverlay`。
 - `handleClick / offsetForPage / offsetForDoc / firstVisiblePageIndex`。
