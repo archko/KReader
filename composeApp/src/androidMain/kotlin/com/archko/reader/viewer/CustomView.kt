@@ -583,6 +583,7 @@ fun CustomView(
                     && !FileTypeUtils.isTiffFile(currentPath)
                     && !currentDoc.hasUri()
                 ) {
+                    Logger.d("init", "不支持的文档, $currentPath")
                     loadingError = "document_open_failed"
                     decoder = null
                     return@withContext

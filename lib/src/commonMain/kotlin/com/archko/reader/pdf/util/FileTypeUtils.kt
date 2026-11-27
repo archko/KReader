@@ -12,7 +12,7 @@ private val IMAGE_EXTENSIONS = setOf(
 
 private val DOCUMENT_EXTENSIONS = setOf(
     "pdf", "epub", "mobi", "xps", "fb", "fb2",
-    "pptx", "docx", "djvu", "djv", "txt", "md",
+    "pptx", "docx", "doc", "djvu", "djv", "txt", "md",
     "html", "xhtml", "svg"
 )
 
@@ -163,7 +163,7 @@ public object FileTypeUtils {
 
     public fun isReflowable(path: String): Boolean {
         val ext = path.substringAfterLast('.', "").lowercase()
-        return ext in setOf("cbz", "epub", "mobi", "pptx", "docx", "xlsx", "html", "xhtml", "txt", "md")
+        return ext in setOf("cbz", "epub", "mobi", "pptx", "docx", "doc", "xlsx", "html", "xhtml", "txt", "md")
     }
 
     public fun isSupportedImageForCreater(path: String): Boolean {

@@ -1,5 +1,5 @@
 <resources>
-    <string name="support_format">目前支持 PDF, Epub, Mobi, Xps, Djvu, Fb2, Cbz, 图片, (无图的Docx, PPTX), Tiff, BigTiff.</string>
+    <string name="support_format">目前支持 PDF, Epub, Mobi, Xps, Djvu, Fb2, Cbz, 图片, (docx, pptx排版有待优化), Tiff, BigTiff.</string>
     <string name="about_content">市面上绝大多数Android PDF阅读器均基于传统 View 系统开发，而基于Jetpack Compose 构建的同类产品始终处于空白状态。\n\n为此，我们打造了这款基于 Compose 的全平台 PDF 阅读器，旨在实现全平台统一的流畅阅读体验：\n\n核心体验：安卓端已实现极致流畅的缩放，解码响应远超传统方案；\n\n个性化支持：Epub/Mobi可自定义字体（将 TTF/OTF 格式字体放入 /sdcard/fonts/ 路径即可）；\n\n全平台进度：\n安卓端：核心阅读功能已上线；\n桌面端：macOS 版本已开发完成。\niOS 端：需完成 mupdf 编译，且依赖对应的 iOS 开发者账号；\n\n开发说明：欢迎参与开源贡献 → https://github.com/archko/kreader.git\n</string>
     <string name="app_author">作者:archko@gmail.com</string>
     <string name="version">版本</string>
